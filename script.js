@@ -311,11 +311,31 @@ function updateDisplay() {
                     if (thumbDiv.classList.contains("playing")) return;
                     thumbDiv.classList.add("playing");
                     const ifr = document.createElement("iframe");
-                    ifr.src = `https://www.youtube-nocookie.com/embed/${yt.videoId}?autoplay=1&start=${yt.startSeconds}`;
+                    // プライバシー強化モード（nocookie）を維持
+                    ifr.src = `https://www.youtube-nocookie.com/embed/${yt.videoId}?autoplay=1&playsinline=1&start=${yt.startSeconds}`;
                     ifr.allow = "autoplay; encrypted-media";
                     ifr.referrerPolicy = "strict-origin-when-cross-origin";
                     ifr.allowFullscreen = true;
-                    thumbDiv.replaceChildren(ifr);
+                    // 右下の YouTube ロゴ経由だと開始秒が落ちる端末があるため、
+                    // 開始位置つきの外部リンク（CSVのURL）をオーバーレイとして用意する。
+                    const open = document.createElement("a");
+                    open.href = row.url || `https://www.youtube.com/watch?v=${yt.videoId}&t=${yt.startSeconds}s`;
+                    open.target = "_blank";
+                    open.rel = "noopener noreferrer";
+                    open.className = "open-youtube-overlay";
+                    open.textContent = "YouTubeで開く";
+                    open.title = "YouTubeで開く（開始位置から）";
+                    open.addEventListener("click", (e) => {
+                        e.stopPropagation();
+                        ifr.src = "about:blank";
+                        thumbDiv.classList.remove("playing");
+                        const img = document.createElement("img");
+                        img.src = `https://i.ytimg.com/vi/${yt.videoId}/mqdefault.jpg`;
+                        img.dataset.src = img.src;
+                        thumbDiv.replaceChildren(img);
+                    });
+
+                    thumbDiv.replaceChildren(ifr, open);
                 };
                 thumbDiv.appendChild(img);
             }
