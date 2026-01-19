@@ -127,7 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 window.addEventListener("pageshow", (e) => {
     if (e.persisted) {
-        resetEphemeralFilters();
+        resetSearchConditions(true);
         applyThemeFromStorage();
     }
 });
@@ -140,6 +140,27 @@ function resetEphemeralFilters() {
     const harmonyOnly = document.getElementById('harmonyOnly');
     if (relayOnly) relayOnly.checked = false;
     if (harmonyOnly) harmonyOnly.checked = false;
+}
+
+/**
+ * 検索条件を初期状態に戻す（検索語・チェック・形態）
+ * @param {boolean} shouldSearch
+ */
+function resetSearchConditions(shouldSearch) {
+    const searchBox = document.getElementById('searchBox');
+    const relayOnly = document.getElementById('relayOnly');
+    const harmonyOnly = document.getElementById('harmonyOnly');
+    const formatCheckboxes = document.querySelectorAll('#formatsList input[type="checkbox"]');
+
+    if (searchBox) searchBox.value = "";
+    if (relayOnly) relayOnly.checked = false;
+    if (harmonyOnly) harmonyOnly.checked = false;
+
+    selectedFormats.clear();
+    DEFAULT_FORMATS.forEach(f => selectedFormats.add(f));
+    formatCheckboxes.forEach(cb => { cb.checked = true; });
+
+    if (shouldSearch) search();
 }
 
 /**
@@ -185,19 +206,7 @@ function setupUIHandlers() {
  * すべての検索・フィルタ条件を初期状態にリセットする
  */
 function clearSearch() {
-    const searchBox = document.getElementById('searchBox');
-    const relayOnly = document.getElementById('relayOnly');
-    const harmonyOnly = document.getElementById('harmonyOnly');
-    const formatCheckboxes = document.querySelectorAll('#formatsList input[type="checkbox"]');
-
-    searchBox.value = "";
-    relayOnly.checked = false;
-    harmonyOnly.checked = false;
-    selectedFormats.clear();
-    DEFAULT_FORMATS.forEach(f => selectedFormats.add(f));
-    formatCheckboxes.forEach(cb => { cb.checked = true; });
-
-    search();
+    resetSearchConditions(true);
 }
 
 /**
@@ -263,6 +272,7 @@ async function loadInitialData() {
         initFilterMenu();
         allSongsUnique = generateUniqueList(allSongsRaw);
         document.getElementById('searchBox').disabled = false;
+        resetSearchConditions(false);
         search();
     } catch (e) {
         const cached = localStorage.getItem(CSV_CACHE_KEY);
@@ -272,6 +282,7 @@ async function loadInitialData() {
             allSongsUnique = generateUniqueList(allSongsRaw);
             document.getElementById('searchBox').disabled = false;
             resCount.innerText = "キャッシュを表示中";
+            resetSearchConditions(false);
             search();
         } else {
             resCount.innerText = "読込エラー";
