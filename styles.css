@@ -139,8 +139,10 @@ input[type="text"] {
 
 .card-footer { display: flex; justify-content: space-between; align-items: center; font-size: 10px; border-top: 1px solid var(--border-color); padding-top: 4px; }
 
-/* 日付とリンクを右側にまとめる */
-.footer-right { display: flex; align-items: center; gap: 8px; }
+/* 日付は左、タグは右にまとめる */
+.footer-left { display: flex; align-items: center; gap: 8px; }
+.footer-right { display: flex; align-items: center; justify-content: flex-end; }
+.footer-tags { display: flex; align-items: center; gap: 6px; }
 .external-link { color: var(--primary-color); text-decoration: underline; cursor: pointer; }
 .external-link:hover { opacity: 0.7; }
 

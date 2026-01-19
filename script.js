@@ -359,7 +359,17 @@ function updateDisplay() {
         const footer = document.createElement("div");
         footer.className = "card-footer";
 
+        const leftGroup = document.createElement("div");
+        leftGroup.className = "footer-left";
+        const date = document.createElement("span");
+        date.textContent = row.date;
+        leftGroup.append(date);
+
+        const rightGroup = document.createElement("div");
+        rightGroup.className = "footer-right";
+
         const tags = document.createElement("div");
+        tags.className = "footer-tags";
         if (row.format) {
             const fmt = document.createElement("span");
             fmt.className = "tag";
@@ -379,14 +389,8 @@ function updateDisplay() {
             tags.appendChild(harmony);
         }
 
-        // 日付
-        const rightGroup = document.createElement("div");
-        rightGroup.className = "footer-right";
-        const date = document.createElement("span");
-        date.textContent = row.date;
-
-        rightGroup.append(date);
-        footer.append(tags, rightGroup);
+        rightGroup.append(tags);
+        footer.append(leftGroup, rightGroup);
         content.append(title, artist, footer);
         if (thumbDiv) card.append(thumbDiv);
         card.append(content);
