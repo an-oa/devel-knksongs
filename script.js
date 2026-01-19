@@ -335,7 +335,22 @@ function updateDisplay() {
                         thumbDiv.replaceChildren(img);
                     });
 
-                    thumbDiv.replaceChildren(ifr, open);
+                    const close = document.createElement("button");
+                    close.type = "button";
+                    close.className = "thumb-close-btn";
+                    close.setAttribute("aria-label", "サムネイルに戻す");
+                    close.innerHTML = "&times;";
+                    close.addEventListener("click", (e) => {
+                        e.stopPropagation();
+                        ifr.src = "about:blank";
+                        thumbDiv.classList.remove("playing");
+                        const img = document.createElement("img");
+                        img.src = `https://i.ytimg.com/vi/${yt.videoId}/mqdefault.jpg`;
+                        img.dataset.src = img.src;
+                        thumbDiv.replaceChildren(img);
+                    });
+
+                    thumbDiv.replaceChildren(ifr, open, close);
                 };
                 thumbDiv.appendChild(img);
             }
