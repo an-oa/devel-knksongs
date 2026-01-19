@@ -388,6 +388,23 @@ function renderCard(row) {
     const rightGroup = document.createElement("div");
     rightGroup.className = "footer-right";
 
+    const tags = buildTags(row);
+
+    rightGroup.append(tags);
+    footer.append(leftGroup, rightGroup);
+    content.append(title, artist, footer);
+    if (thumbDiv) card.append(thumbDiv);
+    card.append(content);
+
+    return { card, thumbDiv };
+}
+
+/**
+ * フッター用のタグ群を生成する
+ * @param {Object} row
+ * @returns {HTMLDivElement}
+ */
+function buildTags(row) {
     const tags = document.createElement("div");
     tags.className = "footer-tags";
     if (row.format) {
@@ -408,14 +425,7 @@ function renderCard(row) {
         harmony.textContent = "✨ハモリ";
         tags.appendChild(harmony);
     }
-
-    rightGroup.append(tags);
-    footer.append(leftGroup, rightGroup);
-    content.append(title, artist, footer);
-    if (thumbDiv) card.append(thumbDiv);
-    card.append(content);
-
-    return { card, thumbDiv };
+    return tags;
 }
 
 function updateDisplay() {
