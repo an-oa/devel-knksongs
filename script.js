@@ -68,6 +68,25 @@ function setupScrollObserver() {
     });
 }
 
+/**
+ * 再生中の埋め込みを止めてサムネイルに戻す
+ * @param {HTMLDivElement} thumbDiv
+ * @param {string} videoId
+ */
+function restoreThumbnail(thumbDiv, videoId) {
+    const iframe = thumbDiv.querySelector("iframe");
+    if (iframe) iframe.src = "about:blank";
+    thumbDiv.classList.remove("playing");
+    if (videoId) {
+        const img = document.createElement("img");
+        img.src = `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
+        img.dataset.src = img.src;
+        thumbDiv.replaceChildren(img);
+    } else {
+        thumbDiv.replaceChildren();
+    }
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
     resetEphemeralFilters();
     setupUIHandlers();
@@ -346,12 +365,7 @@ function updateDisplay() {
                     open.title = "YouTubeで開く（開始位置から）";
                     open.addEventListener("click", (e) => {
                         e.stopPropagation();
-                        ifr.src = "about:blank";
-                        thumbDiv.classList.remove("playing");
-                        const img = document.createElement("img");
-                        img.src = `https://i.ytimg.com/vi/${yt.videoId}/mqdefault.jpg`;
-                        img.dataset.src = img.src;
-                        thumbDiv.replaceChildren(img);
+                        restoreThumbnail(thumbDiv, yt.videoId);
                     });
 
                     const close = document.createElement("button");
@@ -361,12 +375,7 @@ function updateDisplay() {
                     close.innerHTML = "&times;";
                     close.addEventListener("click", (e) => {
                         e.stopPropagation();
-                        ifr.src = "about:blank";
-                        thumbDiv.classList.remove("playing");
-                        const img = document.createElement("img");
-                        img.src = `https://i.ytimg.com/vi/${yt.videoId}/mqdefault.jpg`;
-                        img.dataset.src = img.src;
-                        thumbDiv.replaceChildren(img);
+                        restoreThumbnail(thumbDiv, yt.videoId);
                     });
 
                     thumbDiv.replaceChildren(ifr, open, close);
