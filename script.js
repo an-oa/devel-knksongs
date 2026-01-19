@@ -279,31 +279,50 @@ function initFilterMenu() {
 /**
  * 入力条件に応じて検索結果を更新し、表示を再描画する
  */
+function getSearchState() {
+    return {
+        queryRaw: document.getElementById('searchBox').value.trim(),
+        relayOnly: document.getElementById('relayOnly').checked,
+        harmonyOnly: document.getElementById('harmonyOnly').checked
+    };
+}
+
+function isRecommendedMode(state) {
+    return state.queryRaw === "" &&
+           !state.relayOnly &&
+           !state.harmonyOnly &&
+           DEFAULT_FORMATS.every(f => selectedFormats.has(f));
+}
+
+function filterSongs(state) {
+    const queryNorm = normalizeForSearch(state.queryRaw);
+    const keywords = queryNorm.split(/[\s\u3000]+/).filter(k => k.length > 0);
+    return allSongsRaw.filter(row => {
+        const matchText = keywords.every(kw =>
+            row.titleNorm.includes(kw) ||
+            row.artistNorm.includes(kw) ||
+            row.titleYomiNorm.includes(kw) ||
+            row.artistYomiNorm.includes(kw)
+        );
+        return matchText && selectedFormats.has(row.format) && (!state.relayOnly || row.isRelay) && (!state.harmonyOnly || row.isHarmony);
+    }).sort((a, b) => b.date.localeCompare(a.date));
+}
+
+function pickRecommended() {
+    const popular = allSongsUnique.filter(s => (s.count || 0) >= MIN_PERFORMANCE_FOR_RANDOM);
+    return popular.sort(() => Math.random() - 0.5).slice(0, RANDOM_DISPLAY_COUNT);
+}
+
 function search() {
-    const queryRaw = document.getElementById('searchBox').value.trim();
-    const queryNorm = normalizeForSearch(queryRaw);
-    const relayOnly = document.getElementById('relayOnly').checked;
-    const harmonyOnly = document.getElementById('harmonyOnly').checked;
+    const state = getSearchState();
     const resCount = document.getElementById("resultCount");
 
-    const isRecommendedMode = queryRaw === "" && !relayOnly && !harmonyOnly && DEFAULT_FORMATS.every(f => selectedFormats.has(f));
-
-    if (isRecommendedMode) {
-        const popular = allSongsUnique.filter(s => (s.count || 0) >= MIN_PERFORMANCE_FOR_RANDOM);
-        currentResults = popular.sort(() => Math.random() - 0.5).slice(0, RANDOM_DISPLAY_COUNT);
+    if (isRecommendedMode(state)) {
+        currentResults = pickRecommended();
         displayLimit = RANDOM_DISPLAY_COUNT;
         resCount.innerText = "おすすめを表示中";
     } else {
-        const keywords = queryNorm.split(/[\s\u3000]+/).filter(k => k.length > 0);
-        currentResults = allSongsRaw.filter(row => {
-            const matchText = keywords.every(kw =>
-                row.titleNorm.includes(kw) ||
-                row.artistNorm.includes(kw) ||
-                row.titleYomiNorm.includes(kw) ||
-                row.artistYomiNorm.includes(kw)
-            );
-            return matchText && selectedFormats.has(row.format) && (!relayOnly || row.isRelay) && (!harmonyOnly || row.isHarmony);
-        }).sort((a, b) => b.date.localeCompare(a.date));
+        currentResults = filterSongs(state);
         displayLimit = INCREMENT_COUNT;
         resCount.innerText = `${currentResults.length} 件がヒット`;
     }
