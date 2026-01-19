@@ -104,7 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
 window.addEventListener("pageshow", (e) => {
     if (e.persisted) {
         resetEphemeralFilters();
-        setupTheme();
+        applyThemeFromStorage();
     }
 });
 
@@ -181,18 +181,19 @@ function clearSearch() {
  * 1. ユーザーが手動で設定した記録があればそれを優先
  * 2. 記録がなければOSのダークモード設定に従う
  */
-function setupTheme() {
+function applyThemeFromStorage() {
     const themeToggle = document.getElementById('theme-toggle');
     const savedTheme = localStorage.getItem('theme');
     const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const isDarkMode = savedTheme ? (savedTheme === 'dark') : systemPrefersDark;
+    document.body.classList.toggle('dark-theme', isDarkMode);
+    if (themeToggle) themeToggle.checked = isDarkMode;
+}
 
-    let isDarkMode = savedTheme ? (savedTheme === 'dark') : systemPrefersDark;
-
-    if (isDarkMode) {
-        document.body.classList.add('dark-theme');
-        themeToggle.checked = true;
-    }
-
+function setupTheme() {
+    const themeToggle = document.getElementById('theme-toggle');
+    applyThemeFromStorage();
+    if (!themeToggle) return;
     themeToggle.addEventListener('change', () => {
         const isDarkNow = themeToggle.checked;
         document.body.classList.toggle('dark-theme', isDarkNow);
