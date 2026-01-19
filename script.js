@@ -87,6 +87,10 @@ function restoreThumbnail(thumbDiv, videoId) {
     }
 }
 
+/**
+ * UI初期化をまとめて実行する
+ * @returns {Promise<void>}
+ */
 async function initUI() {
     resetEphemeralFilters();
     setupUIHandlers();
@@ -177,9 +181,7 @@ function clearSearch() {
 }
 
 /**
- * テーマ初期設定
- * 1. ユーザーが手動で設定した記録があればそれを優先
- * 2. 記録がなければOSのダークモード設定に従う
+ * 保存済みテーマを反映してUIを同期する
  */
 function applyThemeFromStorage() {
     const themeToggle = document.getElementById('theme-toggle');
@@ -190,6 +192,9 @@ function applyThemeFromStorage() {
     if (themeToggle) themeToggle.checked = isDarkMode;
 }
 
+/**
+ * テーマトグルの初期化とイベント設定
+ */
 function setupTheme() {
     const themeToggle = document.getElementById('theme-toggle');
     applyThemeFromStorage();
@@ -278,7 +283,8 @@ function initFilterMenu() {
 }
 
 /**
- * 入力条件に応じて検索結果を更新し、表示を再描画する
+ * 検索条件の現在値を取得する
+ * @returns {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean}}
  */
 function getSearchState() {
     return {
@@ -288,6 +294,11 @@ function getSearchState() {
     };
 }
 
+/**
+ * おすすめ表示条件を満たしているか判定する
+ * @param {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean}} state
+ * @returns {boolean}
+ */
 function isRecommendedMode(state) {
     return state.queryRaw === "" &&
            !state.relayOnly &&
@@ -295,6 +306,11 @@ function isRecommendedMode(state) {
            DEFAULT_FORMATS.every(f => selectedFormats.has(f));
 }
 
+/**
+ * 検索条件で楽曲を絞り込む
+ * @param {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean}} state
+ * @returns {Array<Object>}
+ */
 function filterSongs(state) {
     const queryNorm = normalizeForSearch(state.queryRaw);
     const keywords = queryNorm.split(/[\s\u3000]+/).filter(k => k.length > 0);
@@ -309,11 +325,18 @@ function filterSongs(state) {
     }).sort((a, b) => b.date.localeCompare(a.date));
 }
 
+/**
+ * おすすめ表示用の楽曲を抽出する
+ * @returns {Array<Object>}
+ */
 function pickRecommended() {
     const popular = allSongsUnique.filter(s => (s.count || 0) >= MIN_PERFORMANCE_FOR_RANDOM);
     return popular.sort(() => Math.random() - 0.5).slice(0, RANDOM_DISPLAY_COUNT);
 }
 
+/**
+ * 検索条件に応じて結果を更新する
+ */
 function search() {
     const state = getSearchState();
     const resCount = document.getElementById("resultCount");
@@ -331,7 +354,9 @@ function search() {
 }
 
 /**
- * 現在の検索結果をカードとして描画する
+ * 楽曲カードを生成する
+ * @param {Object} row
+ * @returns {{card: HTMLDivElement, thumbDiv: (HTMLDivElement|null)}}
  */
 function renderCard(row) {
     const card = document.createElement("div");
@@ -452,6 +477,9 @@ function buildTags(row) {
     return tags;
 }
 
+/**
+ * 現在の検索結果をカードとして描画する
+ */
 function updateDisplay() {
     const container = document.getElementById("resultList");
     const loadMoreContainer = document.getElementById('loadMoreContainer');
