@@ -11,7 +11,7 @@
   --transition-speed: 0.3s;
 }
 
-body.dark-theme {
+:root.dark-theme {
   --bg-color: #121212;
   --card-bg: #1e1e1e;
   --text-color: #e5e7eb;

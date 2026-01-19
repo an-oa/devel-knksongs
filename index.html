@@ -24,6 +24,17 @@
   <meta name="twitter:description" content="曲名・アーティスト名で検索。配信/動画/ショート/切り抜き、リレー/ハモリで絞り込み。" />
   <meta name="twitter:image" content="https://an-oa.github.io/knksongs/ogp.png" />
 
+  <script>
+    (function () {
+      try {
+        var saved = localStorage.getItem('theme');
+        var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (saved === 'dark' || (!saved && prefersDark)) {
+          document.documentElement.classList.add('dark-theme');
+        }
+      } catch (e) {}
+    })();
+  </script>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
