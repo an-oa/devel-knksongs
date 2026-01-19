@@ -17,6 +17,24 @@ let scrollObserver;
 let showThumbnails = false;
 
 /**
+ * @typedef {Object} SongRow
+ * @property {string} date
+ * @property {string} format
+ * @property {boolean} isRelay
+ * @property {boolean} isHarmony
+ * @property {string} title
+ * @property {string} artist
+ * @property {string} titleYomi
+ * @property {string} artistYomi
+ * @property {string} url
+ * @property {string} titleNorm
+ * @property {string} artistNorm
+ * @property {string} titleYomiNorm
+ * @property {string} artistYomiNorm
+ * @property {number} [count]
+ */
+
+/**
  * IntersectionObserverの通知でサムネ読み込みと再生停止を制御する
  * @param {IntersectionObserverEntry[]} entries
  */
@@ -102,7 +120,9 @@ async function initUI() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    initUI();
+    initUI().catch((err) => {
+        console.error("initUI failed", err);
+    });
 });
 
 window.addEventListener("pageshow", (e) => {
@@ -149,9 +169,9 @@ function setupUIHandlers() {
         if (e.key === "Escape") closeMenu();
     });
 
-    document.getElementById('relayOnly').onchange = search;
-    document.getElementById('harmonyOnly').onchange = search;
-    document.getElementById('searchBox').oninput = search;
+    document.getElementById('relayOnly').addEventListener('change', search);
+    document.getElementById('harmonyOnly').addEventListener('change', search);
+    document.getElementById('searchBox').addEventListener('input', search);
 
     loadMoreBtn.addEventListener('click', () => {
         displayLimit += INCREMENT_COUNT;
@@ -309,7 +329,7 @@ function isRecommendedMode(state) {
 /**
  * 検索条件で楽曲を絞り込む
  * @param {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean}} state
- * @returns {Array<Object>}
+ * @returns {Array<SongRow>}
  */
 function filterSongs(state) {
     const queryNorm = normalizeForSearch(state.queryRaw);
@@ -327,7 +347,7 @@ function filterSongs(state) {
 
 /**
  * おすすめ表示用の楽曲を抽出する
- * @returns {Array<Object>}
+ * @returns {Array<SongRow>}
  */
 function pickRecommended() {
     const popular = allSongsUnique.filter(s => (s.count || 0) >= MIN_PERFORMANCE_FOR_RANDOM);
@@ -355,7 +375,7 @@ function search() {
 
 /**
  * 楽曲カードを生成する
- * @param {Object} row
+ * @param {SongRow} row
  * @returns {{card: HTMLDivElement, thumbDiv: (HTMLDivElement|null)}}
  */
 function renderCard(row) {
@@ -437,7 +457,7 @@ function renderCard(row) {
     const rightGroup = document.createElement("div");
     rightGroup.className = "footer-right";
 
-    const tags = buildTags(row);
+    const tags = buildFooterTags(row);
 
     rightGroup.append(tags);
     footer.append(leftGroup, rightGroup);
@@ -450,10 +470,10 @@ function renderCard(row) {
 
 /**
  * フッター用のタグ群を生成する
- * @param {Object} row
+ * @param {SongRow} row
  * @returns {HTMLDivElement}
  */
-function buildTags(row) {
+function buildFooterTags(row) {
     const tags = document.createElement("div");
     tags.className = "footer-tags";
     if (row.format) {
@@ -509,12 +529,9 @@ function updateDisplay() {
         if (showThumbnails && thumbDiv) scrollObserver.observe(card);
     });
 
-    const isRecommendedMode = document.getElementById('searchBox').value.trim() === "" &&
-                             !document.getElementById('relayOnly').checked &&
-                             !document.getElementById('harmonyOnly').checked &&
-                             DEFAULT_FORMATS.every(f => selectedFormats.has(f));
+    const recommendedMode = isRecommendedMode(getSearchState());
 
-    if (!isRecommendedMode && currentResults.length > displayLimit) {
+    if (!recommendedMode && currentResults.length > displayLimit) {
         loadMoreContainer.classList.remove('hidden');
     } else {
         loadMoreContainer.classList.add('hidden');
@@ -524,7 +541,7 @@ function updateDisplay() {
 /**
  * CSVテキストを曲データの配列に変換する
  * @param {string} csvText
- * @returns {Array<Object>}
+ * @returns {Array<SongRow>}
  */
 function parseCsvToSongs(csvText) {
     const rows = parseCsvRFC4180(csvText);
@@ -585,8 +602,8 @@ function parseCsvRFC4180(t) {
 
 /**
  * 曲名とアーティストで重複をまとめ、最新のデータを保持する
- * @param {Array<Object>} raw
- * @returns {Array<Object>}
+ * @param {Array<SongRow>} raw
+ * @returns {Array<SongRow>}
  */
 function generateUniqueList(raw) {
     const map = new Map();

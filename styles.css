@@ -143,8 +143,6 @@ input[type="text"] {
 .footer-left { display: flex; align-items: center; gap: 8px; }
 .footer-right { display: flex; align-items: center; justify-content: flex-end; }
 .footer-tags { display: flex; align-items: center; gap: 6px; }
-.external-link { color: var(--primary-color); text-decoration: underline; cursor: pointer; }
-.external-link:hover { opacity: 0.7; }
 
 .tag { padding: 1px 3px; border-radius: 2px; font-size: 9px; background: var(--border-color); color: var(--text-mute); font-weight: bold; }
 .tag-relay { background: #fff3e0; color: #e65100; }
