@@ -87,7 +87,7 @@ function restoreThumbnail(thumbDiv, videoId) {
     }
 }
 
-document.addEventListener('DOMContentLoaded', async () => {
+async function initUI() {
     resetEphemeralFilters();
     setupUIHandlers();
     setupTheme();
@@ -95,6 +95,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupScrollObserver();
     window.addEventListener('resize', setupScrollObserver);
     await loadInitialData();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    initUI();
 });
 
 window.addEventListener("pageshow", (e) => {
