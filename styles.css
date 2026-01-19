@@ -133,6 +133,8 @@ input[type="text"] {
 
 .content { padding: 6px; flex-grow: 1; }
 .title { font-size: 14px; font-weight: bold; color: var(--primary-color); margin-bottom: 2px; line-height: 1.2; }
+.title-link { text-decoration: none; }
+.title-link:hover { text-decoration: underline; }
 .artist { font-size: 12px; color: var(--text-mute); margin-bottom: 6px; }
 
 .card-footer { display: flex; justify-content: space-between; align-items: center; font-size: 10px; border-top: 1px solid var(--border-color); padding-top: 4px; }

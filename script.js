@@ -343,9 +343,14 @@ function updateDisplay() {
 
         const content = document.createElement("div");
         content.className = "content";
-        const title = document.createElement("div");
-        title.className = "title";
+        const title = document.createElement(row.url ? "a" : "div");
+        title.className = row.url ? "title title-link" : "title";
         title.textContent = row.title || "無題";
+        if (row.url) {
+            title.href = row.url;
+            title.target = "_blank";
+            title.rel = "noopener noreferrer";
+        }
 
         const artist = document.createElement("div");
         artist.className = "artist";
@@ -374,22 +379,13 @@ function updateDisplay() {
             tags.appendChild(harmony);
         }
 
-        // 日付と「YouTubeで開く」リンク
+        // 日付
         const rightGroup = document.createElement("div");
         rightGroup.className = "footer-right";
         const date = document.createElement("span");
         date.textContent = row.date;
 
         rightGroup.append(date);
-        if (yt.videoId) {
-            const link = document.createElement("a");
-            link.href = row.url;
-            link.target = "_blank";
-            link.rel = "noopener noreferrer";
-            link.className = "external-link";
-            link.textContent = "YouTubeで開く";
-            rightGroup.append(link);
-        }
         footer.append(tags, rightGroup);
         content.append(title, artist, footer);
         if (thumbDiv) card.append(thumbDiv);
