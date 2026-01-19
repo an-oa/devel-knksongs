@@ -27,7 +27,8 @@ function handleScrollObserver(entries) {
         if (entry.isIntersecting) {
             // 画面内に入ったタイミングでサムネを遅延読み込み
             const img = thumb.querySelector('img');
-            if (img && (!img.src || img.src === "about:blank")) {
+            const srcAttr = img ? img.getAttribute("src") : null;
+            if (img && (!srcAttr || srcAttr === "about:blank")) {
                 const dataSrc = img.dataset.src;
                 if (dataSrc) img.src = dataSrc;
             }
@@ -68,6 +69,7 @@ function setupScrollObserver() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+    resetEphemeralFilters();
     setupUIHandlers();
     setupTheme();
     setupThumbnailToggle();
@@ -75,6 +77,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.addEventListener('resize', setupScrollObserver);
     await loadInitialData();
 });
+
+window.addEventListener("pageshow", (e) => {
+    if (e.persisted) {
+        resetEphemeralFilters();
+        setupTheme();
+    }
+});
+
+/**
+ * ブラウザのフォーム復元でチェック状態が残るのを防ぐ
+ */
+function resetEphemeralFilters() {
+    const relayOnly = document.getElementById('relayOnly');
+    const harmonyOnly = document.getElementById('harmonyOnly');
+    if (relayOnly) relayOnly.checked = false;
+    if (harmonyOnly) harmonyOnly.checked = false;
+}
 
 /**
  * UIイベント（サイドバー、検索、読み込み）を結び付ける
