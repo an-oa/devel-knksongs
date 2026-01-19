@@ -15,6 +15,8 @@ let displayLimit = RANDOM_DISPLAY_COUNT;
 let selectedFormats = new Set();
 let scrollObserver;
 let showThumbnails = false;
+let dataReady = false;
+let userTouchedSearch = false;
 
 /**
  * @typedef {Object} SongRow
@@ -116,6 +118,10 @@ async function initUI() {
     setupThumbnailToggle();
     setupScrollObserver();
     window.addEventListener('resize', setupScrollObserver);
+    window.addEventListener('focus', scheduleSyncUiState);
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === "visible") scheduleSyncUiState();
+    });
     await loadInitialData();
 }
 
@@ -127,8 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 window.addEventListener("pageshow", (e) => {
     if (e.persisted) {
-        resetSearchConditions(true);
-        applyThemeFromStorage();
+        scheduleSyncUiState();
     }
 });
 
@@ -160,7 +165,8 @@ function resetSearchConditions(shouldSearch) {
     DEFAULT_FORMATS.forEach(f => selectedFormats.add(f));
     formatCheckboxes.forEach(cb => { cb.checked = true; });
 
-    if (shouldSearch) search();
+    userTouchedSearch = false;
+    if (shouldSearch && dataReady) search();
 }
 
 /**
@@ -190,9 +196,18 @@ function setupUIHandlers() {
         if (e.key === "Escape") closeMenu();
     });
 
-    document.getElementById('relayOnly').addEventListener('change', search);
-    document.getElementById('harmonyOnly').addEventListener('change', search);
-    document.getElementById('searchBox').addEventListener('input', search);
+    document.getElementById('relayOnly').addEventListener('change', () => {
+        userTouchedSearch = true;
+        search();
+    });
+    document.getElementById('harmonyOnly').addEventListener('change', () => {
+        userTouchedSearch = true;
+        search();
+    });
+    document.getElementById('searchBox').addEventListener('input', () => {
+        userTouchedSearch = true;
+        search();
+    });
 
     loadMoreBtn.addEventListener('click', () => {
         displayLimit += INCREMENT_COUNT;
@@ -219,6 +234,40 @@ function applyThemeFromStorage() {
     const isDarkMode = savedTheme ? (savedTheme === 'dark') : systemPrefersDark;
     document.body.classList.toggle('dark-theme', isDarkMode);
     if (themeToggle) themeToggle.checked = isDarkMode;
+}
+
+/**
+ * 保存済みサムネ設定を反映してUIを同期する
+ */
+function applyThumbnailFromStorage() {
+    const thumbToggle = document.getElementById('thumbnail-toggle');
+    const savedSetting = localStorage.getItem('showThumbnails');
+    const isShow = savedSetting !== null ? (savedSetting === 'true') : false;
+    const prev = showThumbnails;
+    showThumbnails = isShow;
+    if (thumbToggle) thumbToggle.checked = isShow;
+    document.body.classList.toggle('hide-thumbs', !isShow);
+    if (prev !== isShow && dataReady) {
+        updateDisplay();
+        setupScrollObserver();
+    }
+}
+
+/**
+ * ペイント復元後のUI状態を同期する
+ */
+function syncUiState() {
+    applyThemeFromStorage();
+    applyThumbnailFromStorage();
+    if (!userTouchedSearch) resetSearchConditions(true);
+}
+
+/**
+ * 2段階でUI状態を同期する
+ */
+function scheduleSyncUiState() {
+    syncUiState();
+    requestAnimationFrame(syncUiState);
 }
 
 /**
@@ -272,6 +321,7 @@ async function loadInitialData() {
         initFilterMenu();
         allSongsUnique = generateUniqueList(allSongsRaw);
         document.getElementById('searchBox').disabled = false;
+        dataReady = true;
         resetSearchConditions(false);
         search();
     } catch (e) {
@@ -282,6 +332,7 @@ async function loadInitialData() {
             allSongsUnique = generateUniqueList(allSongsRaw);
             document.getElementById('searchBox').disabled = false;
             resCount.innerText = "キャッシュを表示中";
+            dataReady = true;
             resetSearchConditions(false);
             search();
         } else {
@@ -304,6 +355,7 @@ function initFilterMenu() {
         cb.checked = true;
         selectedFormats.add(fmt);
         cb.addEventListener('change', (e) => {
+            userTouchedSearch = true;
             if (e.target.checked) selectedFormats.add(e.target.value);
             else selectedFormats.delete(e.target.value);
             search();
