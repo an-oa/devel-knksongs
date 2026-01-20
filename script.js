@@ -42,8 +42,7 @@ let userTouchedSearch = false;
  */
 function handleScrollObserver(entries) {
     entries.forEach(entry => {
-        const thumb = entry.target.querySelector('.thumb');
-        if (!thumb) return;
+        const thumb = entry.target;
         if (entry.isIntersecting) {
             // 画面内に入ったタイミングでサムネを遅延読み込み
             const img = thumb.querySelector('img');
@@ -83,8 +82,8 @@ function setupScrollObserver() {
         rootMargin: `-${headerHeight}px 0px 0px 0px`
     });
     if (!showThumbnails) return;
-    document.querySelectorAll('.song-card').forEach(card => {
-        if (card.querySelector('.thumb')) scrollObserver.observe(card);
+    document.querySelectorAll('.thumb').forEach(thumb => {
+        scrollObserver.observe(thumb);
     });
 }
 
@@ -589,7 +588,7 @@ function updateDisplay() {
     results.forEach(row => {
         const { card, thumbDiv } = renderCard(row);
         container.appendChild(card);
-        if (showThumbnails && thumbDiv) scrollObserver.observe(card);
+        if (showThumbnails && thumbDiv) scrollObserver.observe(thumbDiv);
     });
 
     const recommendedMode = isRecommendedMode(getSearchState());
