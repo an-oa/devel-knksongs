@@ -7,6 +7,7 @@ const INCREMENT_COUNT = 48;
 const PUBLIC_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR-cSDIsEc3sqIOkmiuuSeaUKmNb2gBvM_NoH8-Se5ZrosaSOdMhPo3RuvxhZirUPJ_ll8PGnbRnJeF/pub?gid=1962692986&single=true&output=csv";
 const DEFAULT_FORMATS = ["配信", "動画", "ショート", "切り抜き"];
 const CSV_CACHE_KEY = "cachedCsv";
+const SEARCH_DEBOUNCE_MS = 200;
 
 let allSongsRaw = [];
 let allSongsUnique = [];
@@ -17,6 +18,7 @@ let scrollObserver;
 let showThumbnails = false;
 let dataReady = false;
 let userTouchedSearch = false;
+let searchDebounceId = 0;
 
 /**
  * @typedef {Object} SongRow
@@ -164,6 +166,10 @@ function resetSearchConditions(shouldSearch) {
     DEFAULT_FORMATS.forEach(f => selectedFormats.add(f));
     formatCheckboxes.forEach(cb => { cb.checked = true; });
 
+    if (searchDebounceId) {
+        clearTimeout(searchDebounceId);
+        searchDebounceId = 0;
+    }
     userTouchedSearch = false;
     if (shouldSearch && dataReady) search();
 }
@@ -197,15 +203,15 @@ function setupUIHandlers() {
 
     document.getElementById('relayOnly').addEventListener('change', () => {
         userTouchedSearch = true;
-        search();
+        scheduleSearch();
     });
     document.getElementById('harmonyOnly').addEventListener('change', () => {
         userTouchedSearch = true;
-        search();
+        scheduleSearch();
     });
     document.getElementById('searchBox').addEventListener('input', () => {
         userTouchedSearch = true;
-        search();
+        scheduleSearch();
     });
 
     loadMoreBtn.addEventListener('click', () => {
@@ -357,7 +363,7 @@ function initFilterMenu() {
             userTouchedSearch = true;
             if (e.target.checked) selectedFormats.add(e.target.value);
             else selectedFormats.delete(e.target.value);
-            search();
+            scheduleSearch();
         });
         label.append(cb, " " + fmt);
         container.appendChild(label);
@@ -374,6 +380,17 @@ function getSearchState() {
         relayOnly: document.getElementById('relayOnly').checked,
         harmonyOnly: document.getElementById('harmonyOnly').checked
     };
+}
+
+/**
+ * 入力中の検索をまとめて実行する
+ */
+function scheduleSearch() {
+    if (searchDebounceId) clearTimeout(searchDebounceId);
+    searchDebounceId = setTimeout(() => {
+        searchDebounceId = 0;
+        search();
+    }, SEARCH_DEBOUNCE_MS);
 }
 
 /**
