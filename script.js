@@ -22,6 +22,8 @@ let dataReady = false;
 let userTouchedQuery = false;
 let userTouchedFilters = false;
 let searchDebounceId = 0;
+let cardPool = [];
+let emptyStateEl = null;
 
 /**
  * @typedef {Object} SongRow
@@ -505,72 +507,25 @@ function search() {
  * @param {SongRow} row
  * @returns {{card: HTMLDivElement, thumbDiv: (HTMLDivElement|null)}}
  */
-function renderCard(row) {
+/**
+ * 楽曲カードのベース要素を生成する
+ * @returns {{card: HTMLDivElement, thumbDiv: HTMLDivElement, titleEl: HTMLAnchorElement, artistEl: HTMLDivElement, dateEl: HTMLSpanElement, tagsEl: HTMLDivElement}}
+ */
+function createCardElements() {
     const card = document.createElement("div");
     card.className = "song-card";
-    const yt = extractYoutubeInfo(row.url);
-    let thumbDiv = null;
-    if (showThumbnails) {
-        thumbDiv = document.createElement("div");
-        thumbDiv.className = "thumb";
-        thumbDiv.dataset.videoId = yt.videoId;
 
-        if (yt.videoId) {
-            const img = document.createElement("img");
-            img.dataset.src = `https://i.ytimg.com/vi/${yt.videoId}/mqdefault.jpg`;
-            thumbDiv.onclick = () => {
-                if (thumbDiv.classList.contains("playing")) return;
-                thumbDiv.classList.add("playing");
-                const ifr = document.createElement("iframe");
-                // プライバシー強化モード（nocookie）を維持
-                ifr.src = `https://www.youtube-nocookie.com/embed/${yt.videoId}?autoplay=1&playsinline=1&start=${yt.startSeconds}`;
-                ifr.allow = "autoplay; encrypted-media";
-                ifr.referrerPolicy = "strict-origin-when-cross-origin";
-                ifr.allowFullscreen = true;
-                // 右下の YouTube ロゴ経由だと開始秒が落ちる端末があるため、
-                // 開始位置つきの外部リンク（CSVのURL）をオーバーレイとして用意する。
-                const open = document.createElement("a");
-                open.href = row.url || `https://www.youtube.com/watch?v=${yt.videoId}&t=${yt.startSeconds}s`;
-                open.target = "_blank";
-                open.rel = "noopener noreferrer";
-                open.className = "open-youtube-overlay";
-                open.textContent = "YouTubeで開く";
-                open.title = "YouTubeで開く（開始位置から）";
-                open.addEventListener("click", (e) => {
-                    e.stopPropagation();
-                    restoreThumbnail(thumbDiv, yt.videoId);
-                });
-
-                const close = document.createElement("button");
-                close.type = "button";
-                close.className = "thumb-close-btn";
-                close.setAttribute("aria-label", "サムネイルに戻す");
-                close.innerHTML = "&times;";
-                close.addEventListener("click", (e) => {
-                    e.stopPropagation();
-                    restoreThumbnail(thumbDiv, yt.videoId);
-                });
-
-                thumbDiv.replaceChildren(ifr, open, close);
-            };
-            thumbDiv.appendChild(img);
-        }
-    }
+    const thumbDiv = document.createElement("div");
+    thumbDiv.className = "thumb";
 
     const content = document.createElement("div");
     content.className = "content";
-    const title = document.createElement(row.url ? "a" : "div");
-    title.className = row.url ? "title title-link" : "title";
-    title.textContent = row.title || "無題";
-    if (row.url) {
-        title.href = row.url;
-        title.target = "_blank";
-        title.rel = "noopener noreferrer";
-    }
+
+    const title = document.createElement("a");
+    title.className = "title";
 
     const artist = document.createElement("div");
     artist.className = "artist";
-    artist.textContent = row.artist || "不明";
 
     const footer = document.createElement("div");
     footer.className = "card-footer";
@@ -578,31 +533,133 @@ function renderCard(row) {
     const leftGroup = document.createElement("div");
     leftGroup.className = "footer-left";
     const date = document.createElement("span");
-    date.textContent = row.date;
     leftGroup.append(date);
 
     const rightGroup = document.createElement("div");
     rightGroup.className = "footer-right";
 
-    const tags = buildFooterTags(row);
+    const tags = document.createElement("div");
+    tags.className = "footer-tags";
 
     rightGroup.append(tags);
     footer.append(leftGroup, rightGroup);
     content.append(title, artist, footer);
-    if (thumbDiv) card.append(thumbDiv);
-    card.append(content);
+    card.append(thumbDiv, content);
 
-    return { card, thumbDiv };
+    return { card, thumbDiv, titleEl: title, artistEl: artist, dateEl: date, tagsEl: tags };
 }
 
 /**
- * フッター用のタグ群を生成する
+ * 楽曲データでカード内容を更新する
+ * @param {{card: HTMLDivElement, thumbDiv: HTMLDivElement, titleEl: HTMLAnchorElement, artistEl: HTMLDivElement, dateEl: HTMLSpanElement, tagsEl: HTMLDivElement}} entry
  * @param {SongRow} row
- * @returns {HTMLDivElement}
  */
-function buildFooterTags(row) {
-    const tags = document.createElement("div");
-    tags.className = "footer-tags";
+/**
+ * 楽曲データでカード内容を更新する
+ * @param {{card: HTMLDivElement, thumbDiv: HTMLDivElement, titleEl: HTMLAnchorElement, artistEl: HTMLDivElement, dateEl: HTMLSpanElement, tagsEl: HTMLDivElement}} entry
+ * @param {SongRow} row
+ */
+function updateCardFromRow(entry, row) {
+    const yt = extractYoutubeInfo(row.url);
+    updateThumbnail(entry.thumbDiv, row, yt);
+    updateTitleLink(entry.titleEl, row);
+    entry.artistEl.textContent = row.artist || "不明";
+    entry.dateEl.textContent = row.date;
+    updateFooterTags(entry.tagsEl, row);
+}
+
+/**
+ * タイトルのリンク状態を更新する
+ * @param {HTMLAnchorElement} titleEl
+ * @param {SongRow} row
+ */
+function updateTitleLink(titleEl, row) {
+    titleEl.textContent = row.title || "無題";
+    if (row.url) {
+        titleEl.classList.add("title-link");
+        titleEl.setAttribute("href", row.url);
+        titleEl.setAttribute("target", "_blank");
+        titleEl.setAttribute("rel", "noopener noreferrer");
+    } else {
+        titleEl.classList.remove("title-link");
+        titleEl.removeAttribute("href");
+        titleEl.removeAttribute("target");
+        titleEl.removeAttribute("rel");
+    }
+}
+
+/**
+ * サムネイル表示を更新する
+ * @param {HTMLDivElement} thumbDiv
+ * @param {SongRow} row
+ * @param {{videoId: string, startSeconds: number}} yt
+ */
+function updateThumbnail(thumbDiv, row, yt) {
+    thumbDiv.dataset.videoId = yt.videoId;
+    thumbDiv.classList.remove("playing");
+    thumbDiv.onclick = null;
+    thumbDiv.replaceChildren();
+
+    if (!showThumbnails) return;
+    if (!yt.videoId) return;
+
+    const img = document.createElement("img");
+    img.dataset.src = `https://i.ytimg.com/vi/${yt.videoId}/mqdefault.jpg`;
+    thumbDiv.onclick = () => {
+        if (thumbDiv.classList.contains("playing")) return;
+        thumbDiv.classList.add("playing");
+        const ifr = document.createElement("iframe");
+        // プライバシー強化モード（nocookie）を維持
+        ifr.src = `https://www.youtube-nocookie.com/embed/${yt.videoId}?autoplay=1&playsinline=1&start=${yt.startSeconds}`;
+        ifr.allow = "autoplay; encrypted-media";
+        ifr.referrerPolicy = "strict-origin-when-cross-origin";
+        ifr.allowFullscreen = true;
+        // 右下の YouTube ロゴ経由だと開始秒が落ちる端末があるため、
+        // 開始位置つきの外部リンク（CSVのURL）をオーバーレイとして用意する。
+        const open = document.createElement("a");
+        open.href = row.url || `https://www.youtube.com/watch?v=${yt.videoId}&t=${yt.startSeconds}s`;
+        open.target = "_blank";
+        open.rel = "noopener noreferrer";
+        open.className = "open-youtube-overlay";
+        open.textContent = "YouTubeで開く";
+        open.title = "YouTubeで開く（開始位置から）";
+        open.addEventListener("click", (e) => {
+            e.stopPropagation();
+            restoreThumbnail(thumbDiv, yt.videoId);
+        });
+
+        const close = document.createElement("button");
+        close.type = "button";
+        close.className = "thumb-close-btn";
+        close.setAttribute("aria-label", "サムネイルに戻す");
+        close.innerHTML = "&times;";
+        close.addEventListener("click", (e) => {
+            e.stopPropagation();
+            restoreThumbnail(thumbDiv, yt.videoId);
+        });
+
+        thumbDiv.replaceChildren(ifr, open, close);
+    };
+    thumbDiv.appendChild(img);
+    const rect = thumbDiv.getBoundingClientRect();
+    const viewHeight = window.innerHeight || document.documentElement.clientHeight;
+    if (rect.bottom > 0 && rect.top < viewHeight) {
+        img.src = img.dataset.src;
+    }
+}
+
+/**
+ * フッター用のタグ群を更新する
+ * @param {HTMLDivElement} tags
+ * @param {SongRow} row
+ */
+/**
+ * フッター用のタグ群を更新する
+ * @param {HTMLDivElement} tags
+ * @param {SongRow} row
+ */
+function updateFooterTags(tags, row) {
+    tags.replaceChildren();
     if (row.format) {
         const fmt = document.createElement("span");
         fmt.className = "tag";
@@ -621,7 +678,22 @@ function buildFooterTags(row) {
         harmony.textContent = "✨ハモリ";
         tags.appendChild(harmony);
     }
-    return tags;
+}
+
+/**
+ * 検索結果が空のときに使う要素を取得する
+ * @returns {HTMLDivElement}
+ */
+function getEmptyStateElement() {
+    if (emptyStateEl) return emptyStateEl;
+    const empty = document.createElement("div");
+    empty.style.gridColumn = "1/-1";
+    empty.style.textAlign = "center";
+    empty.style.padding = "50px";
+    empty.style.color = "var(--text-mute)";
+    empty.textContent = "見つかりませんでした";
+    emptyStateEl = empty;
+    return emptyStateEl;
 }
 
 /**
@@ -631,30 +703,31 @@ function updateDisplay() {
     const container = document.getElementById("resultList");
     const loadMoreContainer = document.getElementById('loadMoreContainer');
 
-    if (showThumbnails) {
-        if (!scrollObserver) setupScrollObserver();
-        scrollObserver.disconnect();
-    }
+    if (scrollObserver) scrollObserver.disconnect();
+    if (showThumbnails && !scrollObserver) setupScrollObserver();
+
     const results = currentResults.slice(0, displayLimit);
-    container.innerHTML = "";
 
     if (results.length === 0) {
-        const empty = document.createElement("div");
-        empty.style.gridColumn = "1/-1";
-        empty.style.textAlign = "center";
-        empty.style.padding = "50px";
-        empty.style.color = "var(--text-mute)";
-        empty.textContent = "見つかりませんでした";
-        container.replaceChildren(empty);
+        container.replaceChildren(getEmptyStateElement());
         loadMoreContainer.classList.add('hidden');
         return;
     }
 
-    results.forEach(row => {
-        const { card, thumbDiv } = renderCard(row);
-        container.appendChild(card);
-        if (showThumbnails && thumbDiv) scrollObserver.observe(thumbDiv);
-    });
+    const nodes = [];
+    for (let i = 0; i < results.length; i++) {
+        if (!cardPool[i]) cardPool[i] = createCardElements();
+        const entry = cardPool[i];
+        updateCardFromRow(entry, results[i]);
+        nodes.push(entry.card);
+    }
+
+    container.replaceChildren(...nodes);
+    if (showThumbnails && scrollObserver) {
+        for (let i = 0; i < results.length; i++) {
+            scrollObserver.observe(cardPool[i].thumbDiv);
+        }
+    }
 
     const recommendedMode = isRecommendedMode(getSearchState());
 
