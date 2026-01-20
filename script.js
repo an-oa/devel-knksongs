@@ -7,6 +7,8 @@ const INCREMENT_COUNT = 48;
 const PUBLIC_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR-cSDIsEc3sqIOkmiuuSeaUKmNb2gBvM_NoH8-Se5ZrosaSOdMhPo3RuvxhZirUPJ_ll8PGnbRnJeF/pub?gid=1962692986&single=true&output=csv";
 const DEFAULT_FORMATS = ["配信", "動画", "ショート", "切り抜き"];
 const CSV_CACHE_KEY = "cachedCsv";
+// Paint preview/フォーム復元の後追い対策で複数回同期する。
+const UI_SYNC_PASSES = 2;
 const SEARCH_DEBOUNCE_MS = 200;
 
 let allSongsRaw = [];
@@ -262,9 +264,9 @@ function applyThumbnailFromStorage() {
  * ペイント復元後のUI状態を同期する
  */
 function syncUiState() {
-    applyThemeFromStorage();
-    applyThumbnailFromStorage();
-    if (!userTouchedSearch) resetSearchConditions(true);
+    syncThemeUI();
+    syncThumbnailUI();
+    syncSearchUI();
 }
 
 /**
@@ -272,7 +274,20 @@ function syncUiState() {
  */
 function scheduleSyncUiState() {
     syncUiState();
+    if (UI_SYNC_PASSES < 2) return;
     requestAnimationFrame(syncUiState);
+}
+
+function syncThemeUI() {
+    applyThemeFromStorage();
+}
+
+function syncThumbnailUI() {
+    applyThumbnailFromStorage();
+}
+
+function syncSearchUI() {
+    if (!userTouchedSearch) resetSearchConditions(true);
 }
 
 /**
