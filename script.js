@@ -192,7 +192,7 @@ function resetSearchConditions(shouldSearch) {
     clearSearchDebounce();
     resetSearchQuery();
     resetSearchFilters();
-    if (shouldSearch && dataReady) search();
+    if (shouldSearch && dataReady) scheduleSearch({ immediate: true });
 }
 
 /**
@@ -315,7 +315,7 @@ function syncSearchUI() {
         resetSearchFilters();
         shouldSearch = true;
     }
-    if (shouldSearch && dataReady) search();
+    if (shouldSearch && dataReady) scheduleSearch({ immediate: true });
 }
 
 /**
@@ -371,7 +371,7 @@ async function loadInitialData() {
         document.getElementById('searchBox').disabled = false;
         dataReady = true;
         resetSearchConditions(false);
-        search();
+        scheduleSearch({ immediate: true });
     } catch (e) {
         const cached = localStorage.getItem(CSV_CACHE_KEY);
         if (cached) {
@@ -382,7 +382,7 @@ async function loadInitialData() {
             resCount.innerText = "キャッシュを表示中";
             dataReady = true;
             resetSearchConditions(false);
-            search();
+            scheduleSearch({ immediate: true });
         } else {
             resCount.innerText = "読込エラー";
         }
@@ -427,9 +427,14 @@ function getSearchState() {
 
 /**
  * 入力中の検索をまとめて実行する
+ * @param {{ immediate?: boolean }} [options]
  */
-function scheduleSearch() {
+function scheduleSearch(options) {
     if (searchDebounceId) clearTimeout(searchDebounceId);
+    if (options && options.immediate) {
+        search();
+        return;
+    }
     searchDebounceId = setTimeout(() => {
         searchDebounceId = 0;
         search();
