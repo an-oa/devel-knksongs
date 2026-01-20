@@ -19,7 +19,8 @@ let selectedFormats = new Set();
 let scrollObserver;
 let showThumbnails = false;
 let dataReady = false;
-let userTouchedSearch = false;
+let userTouchedQuery = false;
+let userTouchedFilters = false;
 let searchDebounceId = 0;
 
 /**
@@ -141,13 +142,46 @@ window.addEventListener("pageshow", (e) => {
 });
 
 /**
- * ブラウザのフォーム復元でチェック状態が残るのを防ぐ
+ * ブラウザのフォーム復元でフィルタ状態が残るのを防ぐ
  */
 function resetEphemeralFilters() {
+    resetSearchFilters();
+}
+
+/**
+ * 検索デバウンスを解除する
+ */
+function clearSearchDebounce() {
+    if (searchDebounceId) {
+        clearTimeout(searchDebounceId);
+        searchDebounceId = 0;
+    }
+}
+
+/**
+ * 検索語を初期状態に戻す
+ */
+function resetSearchQuery() {
+    const searchBox = document.getElementById('searchBox');
+    if (searchBox) searchBox.value = "";
+    userTouchedQuery = false;
+}
+
+/**
+ * フィルタ条件を初期状態に戻す
+ */
+function resetSearchFilters() {
     const relayOnly = document.getElementById('relayOnly');
     const harmonyOnly = document.getElementById('harmonyOnly');
+    const formatCheckboxes = document.querySelectorAll('#formatsList input[type="checkbox"]');
+
     if (relayOnly) relayOnly.checked = false;
     if (harmonyOnly) harmonyOnly.checked = false;
+
+    selectedFormats.clear();
+    DEFAULT_FORMATS.forEach(f => selectedFormats.add(f));
+    formatCheckboxes.forEach(cb => { cb.checked = true; });
+    userTouchedFilters = false;
 }
 
 /**
@@ -155,24 +189,9 @@ function resetEphemeralFilters() {
  * @param {boolean} shouldSearch
  */
 function resetSearchConditions(shouldSearch) {
-    const searchBox = document.getElementById('searchBox');
-    const relayOnly = document.getElementById('relayOnly');
-    const harmonyOnly = document.getElementById('harmonyOnly');
-    const formatCheckboxes = document.querySelectorAll('#formatsList input[type="checkbox"]');
-
-    if (searchBox) searchBox.value = "";
-    if (relayOnly) relayOnly.checked = false;
-    if (harmonyOnly) harmonyOnly.checked = false;
-
-    selectedFormats.clear();
-    DEFAULT_FORMATS.forEach(f => selectedFormats.add(f));
-    formatCheckboxes.forEach(cb => { cb.checked = true; });
-
-    if (searchDebounceId) {
-        clearTimeout(searchDebounceId);
-        searchDebounceId = 0;
-    }
-    userTouchedSearch = false;
+    clearSearchDebounce();
+    resetSearchQuery();
+    resetSearchFilters();
     if (shouldSearch && dataReady) search();
 }
 
@@ -204,15 +223,15 @@ function setupUIHandlers() {
     });
 
     document.getElementById('relayOnly').addEventListener('change', () => {
-        userTouchedSearch = true;
+        userTouchedFilters = true;
         scheduleSearch();
     });
     document.getElementById('harmonyOnly').addEventListener('change', () => {
-        userTouchedSearch = true;
+        userTouchedFilters = true;
         scheduleSearch();
     });
     document.getElementById('searchBox').addEventListener('input', () => {
-        userTouchedSearch = true;
+        userTouchedQuery = true;
         scheduleSearch();
     });
 
@@ -287,7 +306,16 @@ function syncThumbnailUI() {
 }
 
 function syncSearchUI() {
-    if (!userTouchedSearch) resetSearchConditions(true);
+    let shouldSearch = false;
+    if (!userTouchedQuery) {
+        resetSearchQuery();
+        shouldSearch = true;
+    }
+    if (!userTouchedFilters) {
+        resetSearchFilters();
+        shouldSearch = true;
+    }
+    if (shouldSearch && dataReady) search();
 }
 
 /**
@@ -375,7 +403,7 @@ function initFilterMenu() {
         cb.checked = true;
         selectedFormats.add(fmt);
         cb.addEventListener('change', (e) => {
-            userTouchedSearch = true;
+            userTouchedFilters = true;
             if (e.target.checked) selectedFormats.add(e.target.value);
             else selectedFormats.delete(e.target.value);
             scheduleSearch();
