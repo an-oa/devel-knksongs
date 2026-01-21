@@ -6,6 +6,7 @@ const MIN_PERFORMANCE_FOR_RANDOM = 3;
 const INCREMENT_COUNT = 48;
 const PUBLIC_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR-cSDIsEc3sqIOkmiuuSeaUKmNb2gBvM_NoH8-Se5ZrosaSOdMhPo3RuvxhZirUPJ_ll8PGnbRnJeF/pub?gid=1763338905&single=true&output=csv";
 const DEFAULT_FORMATS = ["配信", "動画", "ショート", "切り抜き"];
+const FORMAT_PRIORITY = { "動画": 3, "配信": 2, "切り抜き": 1, "ショート": 0 };
 const CSV_CACHE_KEY = "cachedCsv";
 // Paint preview/フォーム復元の後追い対策で複数回同期する。
 const UI_SYNC_PASSES = 2;
@@ -28,6 +29,7 @@ let emptyStateEl = null;
 /**
  * @typedef {Object} SongRow
  * @property {string} date
+ * @property {number} sourceIndex
  * @property {string} format
  * @property {boolean} isRelay
  * @property {boolean} isHarmony
@@ -475,12 +477,60 @@ function filterSongs(state) {
 }
 
 /**
+ * 配列を均等にシャッフルする
+ * @template T
+ * @param {T[]} list
+ * @returns {T[]}
+ */
+function shuffleInPlace(list) {
+    for (let i = list.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [list[i], list[j]] = [list[j], list[i]];
+    }
+    return list;
+}
+
+/**
+ * 形態の優先度を取得する
+ * @param {string} format
+ * @returns {number}
+ */
+function getFormatPriority(format) {
+    return Object.prototype.hasOwnProperty.call(FORMAT_PRIORITY, format) ? FORMAT_PRIORITY[format] : -1;
+}
+
+/**
+ * CSVの並び順で新しさを判定するための値
+ * @param {SongRow} row
+ * @returns {number}
+ */
+function getRowOrderKey(row) {
+    return Number.isFinite(row.sourceIndex) ? row.sourceIndex : Number.MAX_SAFE_INTEGER;
+}
+
+/**
+ * 優先度とCSV順で表示候補を比較する
+ * @param {SongRow} nextRow
+ * @param {SongRow} currentRow
+ * @returns {boolean}
+ */
+function isPreferredRow(nextRow, currentRow) {
+    const nextPriority = getFormatPriority(nextRow.format);
+    const currentPriority = getFormatPriority(currentRow.format);
+    if (nextPriority !== currentPriority) {
+        return nextPriority > currentPriority;
+    }
+    return getRowOrderKey(nextRow) < getRowOrderKey(currentRow);
+}
+
+/**
  * おすすめ表示用の楽曲を抽出する
  * @returns {Array<SongRow>}
  */
 function pickRecommended() {
     const popular = allSongsUnique.filter(s => (s.count || 0) >= MIN_PERFORMANCE_FOR_RANDOM);
-    return popular.sort(() => Math.random() - 0.5).slice(0, RANDOM_DISPLAY_COUNT);
+    const shuffled = shuffleInPlace(popular);
+    return shuffled.slice(0, RANDOM_DISPLAY_COUNT);
 }
 
 /**
@@ -753,18 +803,20 @@ function parseCsvToSongs(csvText) {
     }
     const body = rows.slice(1);
     const idx = (n) => header.indexOf(n);
-    return body.filter(r => {
+    const songs = [];
+    for (let i = 0; i < body.length; i++) {
+        const r = body[i];
         const memo = r[idx("メモ")] || "";
         const memoUpper = memo.toUpperCase();
         const memoAllows = !memoUpper.includes("URL") && !memoUpper.includes("URI");
-        return r[idx("公開範囲")] === "全体" && r[idx("#")] && memoAllows;
-    }).map(r => {
+        if (r[idx("公開範囲")] !== "全体" || !r[idx("#")] || !memoAllows) continue;
         const title = r[idx("曲名")];
         const artist = r[idx("アーティスト名")];
         const titleYomi = r[idx("キョクメイ")];
         const artistYomi = r[idx("アーティストメイ")];
-        return {
+        songs.push({
             date: r[idx("配信日")],
+            sourceIndex: i,
             format: r[idx("形態")],
             isRelay: r[idx("歌枠リレー？")] === "◯",
             isHarmony: r[idx("ハモリあり？")] === "◯",
@@ -777,8 +829,9 @@ function parseCsvToSongs(csvText) {
             artistNorm: normalizeForSearch(artist),
             titleYomiNorm: normalizeForSearch(titleYomi),
             artistYomiNorm: normalizeForSearch(artistYomi)
-        };
-    });
+        });
+    }
+    return songs;
 }
 
 /**
@@ -801,7 +854,7 @@ function parseCsvRFC4180(t) {
 }
 
 /**
- * 曲名とアーティストで重複をまとめ、最新のデータを保持する
+ * 曲名とアーティストで重複をまとめ、優先度とCSV順で表示候補を決める
  * @param {Array<SongRow>} raw
  * @returns {Array<SongRow>}
  */
@@ -809,8 +862,12 @@ function generateUniqueList(raw) {
     const map = new Map();
     raw.forEach(r => {
         const key = (r.title||'') + '|||' + (r.artist||'');
-        if (!map.has(key)) map.set(key, { latest: r.date, count: 1, data: r });
-        else { const e = map.get(key); e.count++; if(r.date > e.latest){ e.latest = r.date; e.data = r; } }
+        if (!map.has(key)) map.set(key, { count: 1, data: r });
+        else {
+            const e = map.get(key);
+            e.count++;
+            if (isPreferredRow(r, e.data)) e.data = r;
+        }
     });
     return Array.from(map.values()).map(e => ({...e.data, count: e.count}));
 }
