@@ -145,6 +145,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
 window.addEventListener("pageshow", (e) => {
     scheduleSyncUiState();
+    setTimeout(() => {
+        syncThemeUI();
+        syncThumbnailUI();
+    }, 200);
 });
 
 /**
