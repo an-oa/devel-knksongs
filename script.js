@@ -26,6 +26,8 @@ let searchDebounceId = 0;
 let cardPool = [];
 let emptyStateEl = null;
 let recommendedCache = null;
+let ytApiPromise = null;
+const ytPlayers = new WeakMap();
 
 /**
  * @typedef {Object} SongRow
@@ -103,6 +105,7 @@ function setupScrollObserver() {
  * @param {string} videoId
  */
 function restoreThumbnail(thumbDiv, videoId) {
+    destroyEmbeddedPlayer(thumbDiv);
     const iframe = thumbDiv.querySelector("iframe");
     if (iframe) iframe.src = "about:blank";
     thumbDiv.classList.remove("playing");
@@ -694,11 +697,82 @@ function createOpenOverlay(openUrl, thumbDiv) {
         e.stopPropagation();
         const opened = window.open(openUrl, "_blank");
         if (opened) opened.opener = null;
-        if (thumbDiv.classList.contains("playing")) {
+        if (thumbDiv.classList.contains("playing") || thumbDiv.querySelector("iframe")) {
             restoreThumbnail(thumbDiv, thumbDiv.dataset.videoId || "");
         }
     });
     return open;
+}
+
+/**
+ * YouTube IFrame APIを必要時に読み込む
+ * @returns {Promise<void>}
+ */
+function ensureYouTubeApi() {
+    if (window.YT && window.YT.Player) return Promise.resolve();
+    if (ytApiPromise) return ytApiPromise;
+    ytApiPromise = new Promise((resolve, reject) => {
+        const existing = document.querySelector('script[data-yt-iframe-api="true"]');
+        if (existing) {
+            const checkReady = () => {
+                if (window.YT && window.YT.Player) resolve();
+                else setTimeout(checkReady, 50);
+            };
+            checkReady();
+            return;
+        }
+        const script = document.createElement("script");
+        script.src = "https://www.youtube.com/iframe_api";
+        script.async = true;
+        script.dataset.ytIframeApi = "true";
+        script.onerror = () => reject(new Error("iframe_api load failed"));
+        const prevCallback = window.onYouTubeIframeAPIReady;
+        window.onYouTubeIframeAPIReady = () => {
+            if (typeof prevCallback === "function") prevCallback();
+            resolve();
+        };
+        document.head.appendChild(script);
+    });
+    return ytApiPromise;
+}
+
+/**
+ * 埋め込みプレーヤーを生成してイベントを紐づける
+ * @param {HTMLDivElement} thumbDiv
+ * @param {HTMLIFrameElement} iframe
+ * @param {{videoId: string}} yt
+ */
+function attachEmbeddedPlayer(thumbDiv, iframe, yt) {
+    ensureYouTubeApi().then(() => {
+        if (!document.body.contains(iframe)) return;
+        if (ytPlayers.has(thumbDiv)) return;
+        const player = new window.YT.Player(iframe, {
+            events: {
+                onStateChange: (event) => {
+                    if (event.data === window.YT.PlayerState.PAUSED ||
+                        event.data === window.YT.PlayerState.ENDED) {
+                        restoreThumbnail(thumbDiv, yt.videoId || "");
+                    }
+                }
+            }
+        });
+        ytPlayers.set(thumbDiv, player);
+    }).catch(() => {
+        // API読み込み失敗時は埋め込みのみで継続する
+    });
+}
+
+/**
+ * 既存の埋め込みプレーヤーを破棄する
+ * @param {HTMLDivElement} thumbDiv
+ */
+function destroyEmbeddedPlayer(thumbDiv) {
+    const player = ytPlayers.get(thumbDiv);
+    if (!player) return;
+    if (typeof player.destroy === "function") {
+        player.destroy();
+    }
+    ytPlayers.delete(thumbDiv);
 }
 
 /**
@@ -723,7 +797,7 @@ function updateThumbnail(thumbDiv, row, yt) {
         thumbDiv.classList.add("playing");
         const ifr = document.createElement("iframe");
         // プライバシー強化モード（nocookie）を維持
-        ifr.src = `https://www.youtube-nocookie.com/embed/${yt.videoId}?autoplay=1&playsinline=1&start=${yt.startSeconds}`;
+        ifr.src = `https://www.youtube-nocookie.com/embed/${yt.videoId}?autoplay=1&playsinline=1&start=${yt.startSeconds}&enablejsapi=1`;
         ifr.allow = "autoplay; encrypted-media";
         ifr.referrerPolicy = "strict-origin-when-cross-origin";
         ifr.allowFullscreen = true;
@@ -731,17 +805,8 @@ function updateThumbnail(thumbDiv, row, yt) {
         // 開始位置つきの外部リンク（CSVのURL）をオーバーレイとして用意する。
         const openUrl = row.url || `https://www.youtube.com/watch?v=${yt.videoId}&t=${yt.startSeconds}s`;
         const open = createOpenOverlay(openUrl, thumbDiv);
-        const close = document.createElement("button");
-        close.type = "button";
-        close.className = "thumb-close-btn";
-        close.setAttribute("aria-label", "サムネイルに戻す");
-        close.innerHTML = "&times;";
-        close.addEventListener("click", (e) => {
-            e.stopPropagation();
-            restoreThumbnail(thumbDiv, yt.videoId);
-        });
-
-        thumbDiv.replaceChildren(ifr, open, close);
+        thumbDiv.replaceChildren(ifr, open);
+        attachEmbeddedPlayer(thumbDiv, ifr, yt);
     };
     thumbDiv.appendChild(img);
     const rect = thumbDiv.getBoundingClientRect();
