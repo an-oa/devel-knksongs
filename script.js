@@ -313,15 +313,45 @@ function syncThumbnailUI() {
     applyThumbnailFromStorage();
 }
 
+/**
+ * 形態フィルタが初期状態か判定する
+ * @returns {boolean}
+ */
+function areFormatsDefault() {
+    if (selectedFormats.size !== DEFAULT_FORMATS.length) return false;
+    return DEFAULT_FORMATS.every(f => selectedFormats.has(f));
+}
+
+/**
+ * フィルタが初期状態からずれているか判定する
+ * @returns {boolean}
+ */
+function needsFilterReset() {
+    const relayOnly = document.getElementById('relayOnly');
+    const harmonyOnly = document.getElementById('harmonyOnly');
+    if (relayOnly && relayOnly.checked) return true;
+    if (harmonyOnly && harmonyOnly.checked) return true;
+    const formatCheckboxes = document.querySelectorAll('#formatsList input[type="checkbox"]');
+    for (const cb of formatCheckboxes) {
+        if (!cb.checked) return true;
+    }
+    return !areFormatsDefault();
+}
+
 function syncSearchUI() {
     let shouldSearch = false;
     if (!userTouchedQuery) {
-        resetSearchQuery();
-        shouldSearch = true;
+        const searchBox = document.getElementById('searchBox');
+        if (searchBox && searchBox.value !== "") {
+            resetSearchQuery();
+            shouldSearch = true;
+        }
     }
     if (!userTouchedFilters) {
-        resetSearchFilters();
-        shouldSearch = true;
+        if (needsFilterReset()) {
+            resetSearchFilters();
+            shouldSearch = true;
+        }
     }
     if (shouldSearch && dataReady) scheduleSearch({ immediate: true });
 }
@@ -647,6 +677,32 @@ function updateTitleLink(titleEl, row) {
 }
 
 /**
+ * YouTubeの外部再生ボタンを生成する
+ * @param {string} openUrl
+ * @param {HTMLDivElement} thumbDiv
+ * @returns {HTMLAnchorElement}
+ */
+function createOpenOverlay(openUrl, thumbDiv) {
+    const open = document.createElement("a");
+    open.href = openUrl;
+    open.target = "_blank";
+    open.rel = "noopener noreferrer";
+    open.className = "open-youtube-overlay";
+    open.textContent = "YouTubeで開く";
+    open.title = "YouTubeで開く（開始位置から）";
+    open.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const opened = window.open(openUrl, "_blank");
+        if (opened) opened.opener = null;
+        if (thumbDiv.classList.contains("playing")) {
+            restoreThumbnail(thumbDiv, thumbDiv.dataset.videoId || "");
+        }
+    });
+    return open;
+}
+
+/**
  * サムネイル表示を更新する
  * @param {HTMLDivElement} thumbDiv
  * @param {SongRow} row
@@ -674,18 +730,8 @@ function updateThumbnail(thumbDiv, row, yt) {
         ifr.allowFullscreen = true;
         // 右下の YouTube ロゴ経由だと開始秒が落ちる端末があるため、
         // 開始位置つきの外部リンク（CSVのURL）をオーバーレイとして用意する。
-        const open = document.createElement("a");
-        open.href = row.url || `https://www.youtube.com/watch?v=${yt.videoId}&t=${yt.startSeconds}s`;
-        open.target = "_blank";
-        open.rel = "noopener noreferrer";
-        open.className = "open-youtube-overlay";
-        open.textContent = "YouTubeで開く";
-        open.title = "YouTubeで開く（開始位置から）";
-        open.addEventListener("click", (e) => {
-            e.stopPropagation();
-            restoreThumbnail(thumbDiv, yt.videoId);
-        });
-
+        const openUrl = row.url || `https://www.youtube.com/watch?v=${yt.videoId}&t=${yt.startSeconds}s`;
+        const open = createOpenOverlay(openUrl, thumbDiv);
         const close = document.createElement("button");
         close.type = "button";
         close.className = "thumb-close-btn";
