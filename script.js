@@ -305,10 +305,16 @@ function scheduleSyncUiState() {
     requestAnimationFrame(syncUiState);
 }
 
+/**
+ * 保存済みテーマを反映してUIを同期する
+ */
 function syncThemeUI() {
     applyThemeFromStorage();
 }
 
+/**
+ * 保存済みサムネ設定を反映してUIを同期する
+ */
 function syncThumbnailUI() {
     applyThumbnailFromStorage();
 }
@@ -338,6 +344,9 @@ function needsFilterReset() {
     return !areFormatsDefault();
 }
 
+/**
+ * 検索UIの状態を初期条件と同期する
+ */
 function syncSearchUI() {
     let shouldSearch = false;
     if (!userTouchedQuery) {
@@ -591,11 +600,6 @@ function search() {
 }
 
 /**
- * 楽曲カードを生成する
- * @param {SongRow} row
- * @returns {{card: HTMLDivElement, thumbDiv: (HTMLDivElement|null)}}
- */
-/**
  * 楽曲カードのベース要素を生成する
  * @returns {{card: HTMLDivElement, thumbDiv: HTMLDivElement, titleEl: HTMLAnchorElement, artistEl: HTMLDivElement, dateEl: HTMLSpanElement, tagsEl: HTMLDivElement}}
  */
@@ -637,11 +641,6 @@ function createCardElements() {
     return { card, thumbDiv, titleEl: title, artistEl: artist, dateEl: date, tagsEl: tags };
 }
 
-/**
- * 楽曲データでカード内容を更新する
- * @param {{card: HTMLDivElement, thumbDiv: HTMLDivElement, titleEl: HTMLAnchorElement, artistEl: HTMLDivElement, dateEl: HTMLSpanElement, tagsEl: HTMLDivElement}} entry
- * @param {SongRow} row
- */
 /**
  * 楽曲データでカード内容を更新する
  * @param {{card: HTMLDivElement, thumbDiv: HTMLDivElement, titleEl: HTMLAnchorElement, artistEl: HTMLDivElement, dateEl: HTMLSpanElement, tagsEl: HTMLDivElement}} entry
@@ -752,11 +751,6 @@ function updateThumbnail(thumbDiv, row, yt) {
     }
 }
 
-/**
- * フッター用のタグ群を更新する
- * @param {HTMLDivElement} tags
- * @param {SongRow} row
- */
 /**
  * フッター用のタグ群を更新する
  * @param {HTMLDivElement} tags
