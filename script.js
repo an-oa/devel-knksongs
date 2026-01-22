@@ -145,10 +145,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 window.addEventListener("pageshow", (e) => {
     scheduleSyncUiState();
-    setTimeout(() => {
-        syncThemeUI();
-        syncThumbnailUI();
-    }, 200);
+    scheduleDelayedVisualSync();
 });
 
 /**
@@ -296,8 +293,7 @@ function applyThumbnailFromStorage() {
  * ペイント復元後のUI状態を同期する
  */
 function syncUiState() {
-    syncThemeUI();
-    syncThumbnailUI();
+    syncVisualUI();
     syncSearchUI();
 }
 
@@ -322,6 +318,23 @@ function syncThemeUI() {
  */
 function syncThumbnailUI() {
     applyThumbnailFromStorage();
+}
+
+/**
+ * 見た目系のUIを同期する
+ */
+function syncVisualUI() {
+    syncThemeUI();
+    syncThumbnailUI();
+}
+
+/**
+ * 復元直後の描画ズレを緩和するために再同期を遅らせる
+ * @param {number} [delayMs]
+ */
+function scheduleDelayedVisualSync(delayMs) {
+    const delay = Number.isFinite(delayMs) ? delayMs : 200;
+    setTimeout(syncVisualUI, delay);
 }
 
 /**
