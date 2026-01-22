@@ -123,7 +123,7 @@ function restoreThumbnail(thumbDiv, videoId) {
     destroyEmbeddedPlayer(thumbDiv);
     const iframe = thumbDiv.querySelector("iframe");
     if (iframe) iframe.src = "about:blank";
-    thumbDiv.classList.remove("playing");
+    thumbDiv.classList.remove("playing", "paused");
     if (videoId) {
         const img = document.createElement("img");
         img.src = `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
@@ -818,7 +818,13 @@ function buildYouTubeEmbedUrl(yt) {
 function handleYouTubePlayerStateChange(thumbDiv, yt, event) {
     if (event.data === window.YT.PlayerState.PAUSED ||
         event.data === window.YT.PlayerState.ENDED) {
-        restoreThumbnail(thumbDiv, yt.videoId || "");
+        thumbDiv.classList.remove("playing");
+        thumbDiv.classList.add("paused");
+        return;
+    }
+    if (event.data === window.YT.PlayerState.PLAYING) {
+        thumbDiv.classList.remove("paused");
+        thumbDiv.classList.add("playing");
     }
 }
 
@@ -864,7 +870,7 @@ function destroyEmbeddedPlayer(thumbDiv) {
  */
 function resetThumbnailContainer(thumbDiv, videoId) {
     thumbDiv.dataset.videoId = videoId;
-    thumbDiv.classList.remove("playing");
+    thumbDiv.classList.remove("playing", "paused");
     thumbDiv.onclick = null;
     thumbDiv.replaceChildren();
 }
@@ -919,8 +925,50 @@ function startEmbeddedPlayback(thumbDiv, row, yt) {
     // 開始位置つきの外部リンク（CSVのURL）をオーバーレイとして用意する。
     const openUrl = buildYouTubeOpenUrl(row, yt);
     const open = createOpenOverlay(openUrl, thumbDiv);
-    thumbDiv.replaceChildren(ifr, open);
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "thumb-close-btn";
+    close.setAttribute("aria-label", "サムネイルに戻す");
+    close.innerHTML = "&times;";
+    close.addEventListener("click", (e) => {
+        e.stopPropagation();
+        restoreThumbnail(thumbDiv, yt.videoId);
+    });
+    const pauseOverlay = document.createElement("button");
+    pauseOverlay.type = "button";
+    pauseOverlay.className = "thumb-pause-overlay";
+    pauseOverlay.setAttribute("aria-label", "再生を切り替える");
+    pauseOverlay.addEventListener("click", (e) => {
+        e.stopPropagation();
+        toggleEmbeddedPlayback(thumbDiv);
+    });
+    thumbDiv.replaceChildren(ifr, pauseOverlay, open, close);
     attachEmbeddedPlayer(thumbDiv, ifr, yt);
+}
+
+/**
+ * 埋め込みプレーヤーの再生状態を切り替える
+ * @param {HTMLDivElement} thumbDiv
+ */
+function toggleEmbeddedPlayback(thumbDiv) {
+    const player = youtube.players.get(thumbDiv);
+    if (player) {
+        if (thumbDiv.classList.contains("paused") && typeof player.playVideo === "function") {
+            player.playVideo();
+            return;
+        }
+        if (thumbDiv.classList.contains("playing") && typeof player.pauseVideo === "function") {
+            player.pauseVideo();
+            return;
+        }
+    }
+    if (thumbDiv.classList.contains("playing")) {
+        thumbDiv.classList.remove("playing");
+        thumbDiv.classList.add("paused");
+    } else if (thumbDiv.classList.contains("paused")) {
+        thumbDiv.classList.remove("paused");
+        thumbDiv.classList.add("playing");
+    }
 }
 
 /**
