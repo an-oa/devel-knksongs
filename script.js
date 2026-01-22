@@ -144,9 +144,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 window.addEventListener("pageshow", (e) => {
-    if (e.persisted) {
-        scheduleSyncUiState();
-    }
+    scheduleSyncUiState();
 });
 
 /**
