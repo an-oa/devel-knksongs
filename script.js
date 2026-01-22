@@ -25,6 +25,7 @@ let userTouchedFilters = false;
 let searchDebounceId = 0;
 let cardPool = [];
 let emptyStateEl = null;
+let recommendedCache = null;
 
 /**
  * @typedef {Object} SongRow
@@ -228,14 +229,17 @@ function setupUIHandlers() {
 
     document.getElementById('relayOnly').addEventListener('change', () => {
         userTouchedFilters = true;
+        recommendedCache = null;
         scheduleSearch();
     });
     document.getElementById('harmonyOnly').addEventListener('change', () => {
         userTouchedFilters = true;
+        recommendedCache = null;
         scheduleSearch();
     });
     document.getElementById('searchBox').addEventListener('input', () => {
         userTouchedQuery = true;
+        recommendedCache = null;
         scheduleSearch();
     });
 
@@ -372,6 +376,7 @@ async function loadInitialData() {
         allSongsRaw = parseCsvToSongs(csvText);
         initFilterMenu();
         allSongsUnique = generateUniqueList(allSongsRaw);
+        recommendedCache = null;
         document.getElementById('searchBox').disabled = false;
         dataReady = true;
         resetSearchConditions(false);
@@ -382,6 +387,7 @@ async function loadInitialData() {
             allSongsRaw = parseCsvToSongs(cached);
             initFilterMenu();
             allSongsUnique = generateUniqueList(allSongsRaw);
+            recommendedCache = null;
             document.getElementById('searchBox').disabled = false;
             resCount.innerText = "キャッシュを表示中";
             dataReady = true;
@@ -528,9 +534,11 @@ function isPreferredRow(nextRow, currentRow) {
  * @returns {Array<SongRow>}
  */
 function pickRecommended() {
+    if (recommendedCache) return recommendedCache;
     const popular = allSongsUnique.filter(s => (s.count || 0) >= MIN_PERFORMANCE_FOR_RANDOM);
     const shuffled = shuffleInPlace(popular);
-    return shuffled.slice(0, RANDOM_DISPLAY_COUNT);
+    recommendedCache = shuffled.slice(0, RANDOM_DISPLAY_COUNT);
+    return recommendedCache;
 }
 
 /**
