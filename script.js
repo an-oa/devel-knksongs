@@ -1,3 +1,4 @@
+(() => {
 /**
  * かねきかう 歌サーチ
  */
@@ -11,23 +12,37 @@ const CSV_CACHE_KEY = "cachedCsv";
 // Paint preview/フォーム復元の後追い対策で複数回同期する。
 const UI_SYNC_PASSES = 2;
 const SEARCH_DEBOUNCE_MS = 200;
+const YT_IFRAME_API_SRC = "https://www.youtube.com/iframe_api";
+const YT_IFRAME_API_SELECTOR = 'script[data-yt-iframe-api="true"]';
+const YT_IFRAME_READY_POLL_MS = 50;
 
-let allSongsRaw = [];
-let allSongsUnique = [];
-let currentResults = [];
-let displayLimit = RANDOM_DISPLAY_COUNT;
-let selectedFormats = new Set();
-let scrollObserver;
-let showThumbnails = false;
-let dataReady = false;
-let userTouchedQuery = false;
-let userTouchedFilters = false;
-let searchDebounceId = 0;
-let cardPool = [];
-let emptyStateEl = null;
-let recommendedCache = null;
-let ytApiPromise = null;
-const ytPlayers = new WeakMap();
+const state = {
+    data: {
+        allSongsRaw: [],
+        allSongsUnique: [],
+        currentResults: [],
+        displayLimit: RANDOM_DISPLAY_COUNT
+    },
+    ui: {
+        selectedFormats: new Set(),
+        scrollObserver: null,
+        showThumbnails: false,
+        dataReady: false,
+        userTouchedQuery: false,
+        userTouchedFilters: false,
+        searchDebounceId: 0,
+        cardPool: [],
+        emptyStateEl: null,
+        recommendedCache: null
+    },
+    youtube: {
+        apiPromise: null,
+        players: new WeakMap()
+    }
+};
+const data = state.data;
+const ui = state.ui;
+const youtube = state.youtube;
 
 /**
  * @typedef {Object} SongRow
@@ -88,14 +103,14 @@ function handleScrollObserver(entries) {
 function setupScrollObserver() {
     const header = document.querySelector('.header');
     const headerHeight = header ? header.getBoundingClientRect().height : 0;
-    if (scrollObserver) scrollObserver.disconnect();
-    scrollObserver = new IntersectionObserver(handleScrollObserver, {
+    if (ui.scrollObserver) ui.scrollObserver.disconnect();
+    ui.scrollObserver = new IntersectionObserver(handleScrollObserver, {
         threshold: 0,
         rootMargin: `-${headerHeight}px 0px 0px 0px`
     });
-    if (!showThumbnails) return;
+    if (!ui.showThumbnails) return;
     document.querySelectorAll('.thumb').forEach(thumb => {
-        scrollObserver.observe(thumb);
+        ui.scrollObserver.observe(thumb);
     });
 }
 
@@ -129,11 +144,8 @@ async function initUI() {
     setupTheme();
     setupThumbnailToggle();
     setupScrollObserver();
+    setupSyncEvents();
     window.addEventListener('resize', setupScrollObserver);
-    window.addEventListener('focus', scheduleSyncUiState);
-    document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === "visible") scheduleSyncUiState();
-    });
     await loadInitialData();
 }
 
@@ -141,11 +153,6 @@ document.addEventListener('DOMContentLoaded', () => {
     initUI().catch((err) => {
         console.error("initUI failed", err);
     });
-});
-
-window.addEventListener("pageshow", (e) => {
-    scheduleSyncUiState();
-    scheduleDelayedVisualSync();
 });
 
 /**
@@ -156,12 +163,26 @@ function resetEphemeralFilters() {
 }
 
 /**
+ * 復元タイミングに合わせたUI同期イベントを登録する
+ */
+function setupSyncEvents() {
+    window.addEventListener('focus', scheduleSyncUiState);
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === "visible") scheduleSyncUiState();
+    });
+    window.addEventListener("pageshow", () => {
+        scheduleSyncUiState();
+        scheduleDelayedVisualSync();
+    });
+}
+
+/**
  * 検索デバウンスを解除する
  */
 function clearSearchDebounce() {
-    if (searchDebounceId) {
-        clearTimeout(searchDebounceId);
-        searchDebounceId = 0;
+    if (ui.searchDebounceId) {
+        clearTimeout(ui.searchDebounceId);
+        ui.searchDebounceId = 0;
     }
 }
 
@@ -171,7 +192,7 @@ function clearSearchDebounce() {
 function resetSearchQuery() {
     const searchBox = document.getElementById('searchBox');
     if (searchBox) searchBox.value = "";
-    userTouchedQuery = false;
+    ui.userTouchedQuery = false;
 }
 
 /**
@@ -185,10 +206,10 @@ function resetSearchFilters() {
     if (relayOnly) relayOnly.checked = false;
     if (harmonyOnly) harmonyOnly.checked = false;
 
-    selectedFormats.clear();
-    DEFAULT_FORMATS.forEach(f => selectedFormats.add(f));
+    ui.selectedFormats.clear();
+    DEFAULT_FORMATS.forEach(f => ui.selectedFormats.add(f));
     formatCheckboxes.forEach(cb => { cb.checked = true; });
-    userTouchedFilters = false;
+    ui.userTouchedFilters = false;
 }
 
 /**
@@ -199,7 +220,7 @@ function resetSearchConditions(shouldSearch) {
     clearSearchDebounce();
     resetSearchQuery();
     resetSearchFilters();
-    if (shouldSearch && dataReady) scheduleSearch({ immediate: true });
+    if (shouldSearch && ui.dataReady) scheduleSearch({ immediate: true });
 }
 
 /**
@@ -230,23 +251,23 @@ function setupUIHandlers() {
     });
 
     document.getElementById('relayOnly').addEventListener('change', () => {
-        userTouchedFilters = true;
-        recommendedCache = null;
+        ui.userTouchedFilters = true;
+        ui.recommendedCache = null;
         scheduleSearch();
     });
     document.getElementById('harmonyOnly').addEventListener('change', () => {
-        userTouchedFilters = true;
-        recommendedCache = null;
+        ui.userTouchedFilters = true;
+        ui.recommendedCache = null;
         scheduleSearch();
     });
     document.getElementById('searchBox').addEventListener('input', () => {
-        userTouchedQuery = true;
-        recommendedCache = null;
+        ui.userTouchedQuery = true;
+        ui.recommendedCache = null;
         scheduleSearch();
     });
 
     loadMoreBtn.addEventListener('click', () => {
-        displayLimit += INCREMENT_COUNT;
+        data.displayLimit += INCREMENT_COUNT;
         updateDisplay();
     });
 
@@ -279,11 +300,11 @@ function applyThumbnailFromStorage() {
     const thumbToggle = document.getElementById('thumbnail-toggle');
     const savedSetting = localStorage.getItem('showThumbnails');
     const isShow = savedSetting !== null ? (savedSetting === 'true') : false;
-    const prev = showThumbnails;
-    showThumbnails = isShow;
+    const prev = ui.showThumbnails;
+    ui.showThumbnails = isShow;
     if (thumbToggle) thumbToggle.checked = isShow;
     document.body.classList.toggle('hide-thumbs', !isShow);
-    if (prev !== isShow && dataReady) {
+    if (prev !== isShow && ui.dataReady) {
         updateDisplay();
         setupScrollObserver();
     }
@@ -342,8 +363,8 @@ function scheduleDelayedVisualSync(delayMs) {
  * @returns {boolean}
  */
 function areFormatsDefault() {
-    if (selectedFormats.size !== DEFAULT_FORMATS.length) return false;
-    return DEFAULT_FORMATS.every(f => selectedFormats.has(f));
+    if (ui.selectedFormats.size !== DEFAULT_FORMATS.length) return false;
+    return DEFAULT_FORMATS.every(f => ui.selectedFormats.has(f));
 }
 
 /**
@@ -363,24 +384,34 @@ function needsFilterReset() {
 }
 
 /**
+ * 検索語を初期条件に戻すべきか判定し同期する
+ * @returns {boolean}
+ */
+function syncSearchQueryIfNeeded() {
+    if (ui.userTouchedQuery) return false;
+    const searchBox = document.getElementById('searchBox');
+    if (!searchBox || searchBox.value === "") return false;
+    resetSearchQuery();
+    return true;
+}
+
+/**
+ * フィルタを初期条件に戻すべきか判定し同期する
+ * @returns {boolean}
+ */
+function syncSearchFiltersIfNeeded() {
+    if (ui.userTouchedFilters) return false;
+    if (!needsFilterReset()) return false;
+    resetSearchFilters();
+    return true;
+}
+
+/**
  * 検索UIの状態を初期条件と同期する
  */
 function syncSearchUI() {
-    let shouldSearch = false;
-    if (!userTouchedQuery) {
-        const searchBox = document.getElementById('searchBox');
-        if (searchBox && searchBox.value !== "") {
-            resetSearchQuery();
-            shouldSearch = true;
-        }
-    }
-    if (!userTouchedFilters) {
-        if (needsFilterReset()) {
-            resetSearchFilters();
-            shouldSearch = true;
-        }
-    }
-    if (shouldSearch && dataReady) scheduleSearch({ immediate: true });
+    const shouldSearch = syncSearchQueryIfNeeded() || syncSearchFiltersIfNeeded();
+    if (shouldSearch && ui.dataReady) scheduleSearch({ immediate: true });
 }
 
 /**
@@ -404,14 +435,14 @@ function setupThumbnailToggle() {
     const thumbToggle = document.getElementById('thumbnail-toggle');
     const savedSetting = localStorage.getItem('showThumbnails');
     let isShow = savedSetting !== null ? (savedSetting === 'true') : false;
-    showThumbnails = isShow;
+    ui.showThumbnails = isShow;
 
     thumbToggle.checked = isShow;
     if (!isShow) document.body.classList.add('hide-thumbs');
 
     thumbToggle.addEventListener('change', () => {
         const checked = thumbToggle.checked;
-        showThumbnails = checked;
+        ui.showThumbnails = checked;
         document.body.classList.toggle('hide-thumbs', !checked);
         localStorage.setItem('showThumbnails', checked);
         updateDisplay();
@@ -430,25 +461,25 @@ async function loadInitialData() {
         if (!res.ok) throw new Error("fetch failed");
         const csvText = await res.text();
         localStorage.setItem(CSV_CACHE_KEY, csvText);
-        allSongsRaw = parseCsvToSongs(csvText);
+        data.allSongsRaw = parseCsvToSongs(csvText);
         initFilterMenu();
-        allSongsUnique = generateUniqueList(allSongsRaw);
-        recommendedCache = null;
+        data.allSongsUnique = generateUniqueList(data.allSongsRaw);
+        ui.recommendedCache = null;
         document.getElementById('searchBox').disabled = false;
-        dataReady = true;
+        ui.dataReady = true;
         resetSearchConditions(false);
         scheduleSearch({ immediate: true });
         requestAnimationFrame(() => ensureYouTubeApi().catch(() => {}));
     } catch (e) {
         const cached = localStorage.getItem(CSV_CACHE_KEY);
         if (cached) {
-            allSongsRaw = parseCsvToSongs(cached);
+            data.allSongsRaw = parseCsvToSongs(cached);
             initFilterMenu();
-            allSongsUnique = generateUniqueList(allSongsRaw);
-            recommendedCache = null;
+            data.allSongsUnique = generateUniqueList(data.allSongsRaw);
+            ui.recommendedCache = null;
             document.getElementById('searchBox').disabled = false;
             resCount.innerText = "キャッシュを表示中";
-            dataReady = true;
+            ui.dataReady = true;
             resetSearchConditions(false);
             scheduleSearch({ immediate: true });
             requestAnimationFrame(() => ensureYouTubeApi().catch(() => {}));
@@ -470,11 +501,11 @@ function initFilterMenu() {
         cb.type = 'checkbox';
         cb.value = fmt;
         cb.checked = true;
-        selectedFormats.add(fmt);
+        ui.selectedFormats.add(fmt);
         cb.addEventListener('change', (e) => {
-            userTouchedFilters = true;
-            if (e.target.checked) selectedFormats.add(e.target.value);
-            else selectedFormats.delete(e.target.value);
+            ui.userTouchedFilters = true;
+            if (e.target.checked) ui.selectedFormats.add(e.target.value);
+            else ui.selectedFormats.delete(e.target.value);
             scheduleSearch();
         });
         label.append(cb, " " + fmt);
@@ -499,45 +530,45 @@ function getSearchState() {
  * @param {{ immediate?: boolean }} [options]
  */
 function scheduleSearch(options) {
-    if (searchDebounceId) clearTimeout(searchDebounceId);
+    if (ui.searchDebounceId) clearTimeout(ui.searchDebounceId);
     if (options && options.immediate) {
         search();
         return;
     }
-    searchDebounceId = setTimeout(() => {
-        searchDebounceId = 0;
+    ui.searchDebounceId = setTimeout(() => {
+        ui.searchDebounceId = 0;
         search();
     }, SEARCH_DEBOUNCE_MS);
 }
 
 /**
  * おすすめ表示条件を満たしているか判定する
- * @param {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean}} state
+ * @param {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean}} searchState
  * @returns {boolean}
  */
-function isRecommendedMode(state) {
-    return state.queryRaw === "" &&
-           !state.relayOnly &&
-           !state.harmonyOnly &&
-           DEFAULT_FORMATS.every(f => selectedFormats.has(f));
+function isRecommendedMode(searchState) {
+    return searchState.queryRaw === "" &&
+           !searchState.relayOnly &&
+           !searchState.harmonyOnly &&
+           DEFAULT_FORMATS.every(f => ui.selectedFormats.has(f));
 }
 
 /**
  * 検索条件で楽曲を絞り込む
- * @param {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean}} state
+ * @param {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean}} searchState
  * @returns {Array<SongRow>}
  */
-function filterSongs(state) {
-    const queryNorm = normalizeForSearch(state.queryRaw);
+function filterSongs(searchState) {
+    const queryNorm = normalizeForSearch(searchState.queryRaw);
     const keywords = queryNorm.split(/[\s\u3000]+/).filter(k => k.length > 0);
-    return allSongsRaw.filter(row => {
+    return data.allSongsRaw.filter(row => {
         const matchText = keywords.every(kw =>
             row.titleNorm.includes(kw) ||
             row.artistNorm.includes(kw) ||
             row.titleYomiNorm.includes(kw) ||
             row.artistYomiNorm.includes(kw)
         );
-        return matchText && selectedFormats.has(row.format) && (!state.relayOnly || row.isRelay) && (!state.harmonyOnly || row.isHarmony);
+        return matchText && ui.selectedFormats.has(row.format) && (!searchState.relayOnly || row.isRelay) && (!searchState.harmonyOnly || row.isHarmony);
     });
 }
 
@@ -593,28 +624,28 @@ function isPreferredRow(nextRow, currentRow) {
  * @returns {Array<SongRow>}
  */
 function pickRecommended() {
-    if (recommendedCache) return recommendedCache;
-    const popular = allSongsUnique.filter(s => (s.count || 0) >= MIN_PERFORMANCE_FOR_RANDOM);
+    if (ui.recommendedCache) return ui.recommendedCache;
+    const popular = data.allSongsUnique.filter(s => (s.count || 0) >= MIN_PERFORMANCE_FOR_RANDOM);
     const shuffled = shuffleInPlace(popular);
-    recommendedCache = shuffled.slice(0, RANDOM_DISPLAY_COUNT);
-    return recommendedCache;
+    ui.recommendedCache = shuffled.slice(0, RANDOM_DISPLAY_COUNT);
+    return ui.recommendedCache;
 }
 
 /**
  * 検索条件に応じて結果を更新する
  */
 function search() {
-    const state = getSearchState();
+    const searchState = getSearchState();
     const resCount = document.getElementById("resultCount");
 
-    if (isRecommendedMode(state)) {
-        currentResults = pickRecommended();
-        displayLimit = RANDOM_DISPLAY_COUNT;
+    if (isRecommendedMode(searchState)) {
+        data.currentResults = pickRecommended();
+        data.displayLimit = RANDOM_DISPLAY_COUNT;
         resCount.innerText = "おすすめを表示中";
     } else {
-        currentResults = filterSongs(state);
-        displayLimit = INCREMENT_COUNT;
-        resCount.innerText = `${currentResults.length} 件がヒット`;
+        data.currentResults = filterSongs(searchState);
+        data.displayLimit = INCREMENT_COUNT;
+        resCount.innerText = `${data.currentResults.length} 件がヒット`;
     }
     updateDisplay();
 }
@@ -722,24 +753,40 @@ function createOpenOverlay(openUrl, thumbDiv) {
 }
 
 /**
+ * YouTube IFrame APIの準備完了を判定する
+ * @returns {boolean}
+ */
+function isYouTubeApiReady() {
+    return Boolean(window.YT && window.YT.Player);
+}
+
+/**
+ * YouTube IFrame APIの準備完了を待つ
+ * @param {() => void} resolve
+ */
+function waitForYouTubeApi(resolve) {
+    if (isYouTubeApiReady()) {
+        resolve();
+        return;
+    }
+    setTimeout(() => waitForYouTubeApi(resolve), YT_IFRAME_READY_POLL_MS);
+}
+
+/**
  * YouTube IFrame APIを必要時に読み込む
  * @returns {Promise<void>}
  */
 function ensureYouTubeApi() {
-    if (window.YT && window.YT.Player) return Promise.resolve();
-    if (ytApiPromise) return ytApiPromise;
-    ytApiPromise = new Promise((resolve, reject) => {
-        const existing = document.querySelector('script[data-yt-iframe-api="true"]');
+    if (isYouTubeApiReady()) return Promise.resolve();
+    if (youtube.apiPromise) return youtube.apiPromise;
+    youtube.apiPromise = new Promise((resolve, reject) => {
+        const existing = document.querySelector(YT_IFRAME_API_SELECTOR);
         if (existing) {
-            const checkReady = () => {
-                if (window.YT && window.YT.Player) resolve();
-                else setTimeout(checkReady, 50);
-            };
-            checkReady();
+            waitForYouTubeApi(resolve);
             return;
         }
         const script = document.createElement("script");
-        script.src = "https://www.youtube.com/iframe_api";
+        script.src = YT_IFRAME_API_SRC;
         script.async = true;
         script.dataset.ytIframeApi = "true";
         script.onerror = () => reject(new Error("iframe_api load failed"));
@@ -750,7 +797,29 @@ function ensureYouTubeApi() {
         };
         document.head.appendChild(script);
     });
-    return ytApiPromise;
+    return youtube.apiPromise;
+}
+
+/**
+ * 埋め込みURLを組み立てる（nocookie + API有効化）
+ * @param {{videoId: string, startSeconds: number}} yt
+ * @returns {string}
+ */
+function buildYouTubeEmbedUrl(yt) {
+    return `https://www.youtube-nocookie.com/embed/${yt.videoId}?autoplay=1&playsinline=1&start=${yt.startSeconds}&enablejsapi=1`;
+}
+
+/**
+ * プレーヤーの状態変化を処理する
+ * @param {HTMLDivElement} thumbDiv
+ * @param {{videoId: string}} yt
+ * @param {{data: number}} event
+ */
+function handleYouTubePlayerStateChange(thumbDiv, yt, event) {
+    if (event.data === window.YT.PlayerState.PAUSED ||
+        event.data === window.YT.PlayerState.ENDED) {
+        restoreThumbnail(thumbDiv, yt.videoId || "");
+    }
 }
 
 /**
@@ -762,19 +831,14 @@ function ensureYouTubeApi() {
 function attachEmbeddedPlayer(thumbDiv, iframe, yt) {
     ensureYouTubeApi().then(() => {
         if (!document.body.contains(iframe)) return;
-        if (ytPlayers.has(thumbDiv)) return;
+        if (youtube.players.has(thumbDiv)) return;
         const player = new window.YT.Player(iframe, {
             host: "https://www.youtube-nocookie.com",
             events: {
-                onStateChange: (event) => {
-                    if (event.data === window.YT.PlayerState.PAUSED ||
-                        event.data === window.YT.PlayerState.ENDED) {
-                        restoreThumbnail(thumbDiv, yt.videoId || "");
-                    }
-                }
+                onStateChange: (event) => handleYouTubePlayerStateChange(thumbDiv, yt, event)
             }
         });
-        ytPlayers.set(thumbDiv, player);
+        youtube.players.set(thumbDiv, player);
     }).catch(() => {
         // API読み込み失敗時は埋め込みのみで継続する
     });
@@ -785,12 +849,78 @@ function attachEmbeddedPlayer(thumbDiv, iframe, yt) {
  * @param {HTMLDivElement} thumbDiv
  */
 function destroyEmbeddedPlayer(thumbDiv) {
-    const player = ytPlayers.get(thumbDiv);
+    const player = youtube.players.get(thumbDiv);
     if (!player) return;
     if (typeof player.destroy === "function") {
         player.destroy();
     }
-    ytPlayers.delete(thumbDiv);
+    youtube.players.delete(thumbDiv);
+}
+
+/**
+ * サムネイル要素の初期状態を整える
+ * @param {HTMLDivElement} thumbDiv
+ * @param {string} videoId
+ */
+function resetThumbnailContainer(thumbDiv, videoId) {
+    thumbDiv.dataset.videoId = videoId;
+    thumbDiv.classList.remove("playing");
+    thumbDiv.onclick = null;
+    thumbDiv.replaceChildren();
+}
+
+/**
+ * サムネイル画像を生成する
+ * @param {string} videoId
+ * @returns {HTMLImageElement}
+ */
+function createThumbnailImage(videoId) {
+    const img = document.createElement("img");
+    img.dataset.src = `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
+    return img;
+}
+
+/**
+ * サムネイルを今すぐ読み込むべきか判定する
+ * @param {HTMLDivElement} thumbDiv
+ * @returns {boolean}
+ */
+function shouldLoadThumbnailNow(thumbDiv) {
+    const rect = thumbDiv.getBoundingClientRect();
+    const viewHeight = window.innerHeight || document.documentElement.clientHeight;
+    return rect.bottom > 0 && rect.top < viewHeight;
+}
+
+/**
+ * YouTubeの外部再生URLを組み立てる
+ * @param {SongRow} row
+ * @param {{videoId: string, startSeconds: number}} yt
+ * @returns {string}
+ */
+function buildYouTubeOpenUrl(row, yt) {
+    return row.url || `https://www.youtube.com/watch?v=${yt.videoId}&t=${yt.startSeconds}s`;
+}
+
+/**
+ * 埋め込み再生を開始する
+ * @param {HTMLDivElement} thumbDiv
+ * @param {SongRow} row
+ * @param {{videoId: string, startSeconds: number}} yt
+ */
+function startEmbeddedPlayback(thumbDiv, row, yt) {
+    thumbDiv.classList.add("playing");
+    const ifr = document.createElement("iframe");
+    // プライバシー強化モード（nocookie）を維持
+    ifr.src = buildYouTubeEmbedUrl(yt);
+    ifr.allow = "autoplay; encrypted-media";
+    ifr.referrerPolicy = "strict-origin-when-cross-origin";
+    ifr.allowFullscreen = true;
+    // 右下の YouTube ロゴ経由だと開始秒が落ちる端末があるため、
+    // 開始位置つきの外部リンク（CSVのURL）をオーバーレイとして用意する。
+    const openUrl = buildYouTubeOpenUrl(row, yt);
+    const open = createOpenOverlay(openUrl, thumbDiv);
+    thumbDiv.replaceChildren(ifr, open);
+    attachEmbeddedPlayer(thumbDiv, ifr, yt);
 }
 
 /**
@@ -800,36 +930,18 @@ function destroyEmbeddedPlayer(thumbDiv) {
  * @param {{videoId: string, startSeconds: number}} yt
  */
 function updateThumbnail(thumbDiv, row, yt) {
-    thumbDiv.dataset.videoId = yt.videoId;
-    thumbDiv.classList.remove("playing");
-    thumbDiv.onclick = null;
-    thumbDiv.replaceChildren();
+    resetThumbnailContainer(thumbDiv, yt.videoId);
 
-    if (!showThumbnails) return;
+    if (!ui.showThumbnails) return;
     if (!yt.videoId) return;
 
-    const img = document.createElement("img");
-    img.dataset.src = `https://i.ytimg.com/vi/${yt.videoId}/mqdefault.jpg`;
+    const img = createThumbnailImage(yt.videoId);
     thumbDiv.onclick = () => {
         if (thumbDiv.classList.contains("playing")) return;
-        thumbDiv.classList.add("playing");
-        const ifr = document.createElement("iframe");
-        // プライバシー強化モード（nocookie）を維持
-        ifr.src = `https://www.youtube-nocookie.com/embed/${yt.videoId}?autoplay=1&playsinline=1&start=${yt.startSeconds}&enablejsapi=1`;
-        ifr.allow = "autoplay; encrypted-media";
-        ifr.referrerPolicy = "strict-origin-when-cross-origin";
-        ifr.allowFullscreen = true;
-        // 右下の YouTube ロゴ経由だと開始秒が落ちる端末があるため、
-        // 開始位置つきの外部リンク（CSVのURL）をオーバーレイとして用意する。
-        const openUrl = row.url || `https://www.youtube.com/watch?v=${yt.videoId}&t=${yt.startSeconds}s`;
-        const open = createOpenOverlay(openUrl, thumbDiv);
-        thumbDiv.replaceChildren(ifr, open);
-        attachEmbeddedPlayer(thumbDiv, ifr, yt);
+        startEmbeddedPlayback(thumbDiv, row, yt);
     };
     thumbDiv.appendChild(img);
-    const rect = thumbDiv.getBoundingClientRect();
-    const viewHeight = window.innerHeight || document.documentElement.clientHeight;
-    if (rect.bottom > 0 && rect.top < viewHeight) {
+    if (shouldLoadThumbnailNow(thumbDiv)) {
         img.src = img.dataset.src;
     }
 }
@@ -866,15 +978,15 @@ function updateFooterTags(tags, row) {
  * @returns {HTMLDivElement}
  */
 function getEmptyStateElement() {
-    if (emptyStateEl) return emptyStateEl;
+    if (ui.emptyStateEl) return ui.emptyStateEl;
     const empty = document.createElement("div");
     empty.style.gridColumn = "1/-1";
     empty.style.textAlign = "center";
     empty.style.padding = "50px";
     empty.style.color = "var(--text-mute)";
     empty.textContent = "見つかりませんでした";
-    emptyStateEl = empty;
-    return emptyStateEl;
+    ui.emptyStateEl = empty;
+    return ui.emptyStateEl;
 }
 
 /**
@@ -884,10 +996,10 @@ function updateDisplay() {
     const container = document.getElementById("resultList");
     const loadMoreContainer = document.getElementById('loadMoreContainer');
 
-    if (scrollObserver) scrollObserver.disconnect();
-    if (showThumbnails && !scrollObserver) setupScrollObserver();
+    if (ui.scrollObserver) ui.scrollObserver.disconnect();
+    if (ui.showThumbnails && !ui.scrollObserver) setupScrollObserver();
 
-    const results = currentResults.slice(0, displayLimit);
+    const results = data.currentResults.slice(0, data.displayLimit);
 
     if (results.length === 0) {
         container.replaceChildren(getEmptyStateElement());
@@ -897,22 +1009,22 @@ function updateDisplay() {
 
     const nodes = [];
     for (let i = 0; i < results.length; i++) {
-        if (!cardPool[i]) cardPool[i] = createCardElements();
-        const entry = cardPool[i];
+        if (!ui.cardPool[i]) ui.cardPool[i] = createCardElements();
+        const entry = ui.cardPool[i];
         updateCardFromRow(entry, results[i]);
         nodes.push(entry.card);
     }
 
     container.replaceChildren(...nodes);
-    if (showThumbnails && scrollObserver) {
+    if (ui.showThumbnails && ui.scrollObserver) {
         for (let i = 0; i < results.length; i++) {
-            scrollObserver.observe(cardPool[i].thumbDiv);
+            ui.scrollObserver.observe(ui.cardPool[i].thumbDiv);
         }
     }
 
     const recommendedMode = isRecommendedMode(getSearchState());
 
-    if (!recommendedMode && currentResults.length > displayLimit) {
+    if (!recommendedMode && data.currentResults.length > data.displayLimit) {
         loadMoreContainer.classList.remove('hidden');
     } else {
         loadMoreContainer.classList.add('hidden');
@@ -1028,3 +1140,4 @@ function extractYoutubeInfo(url) {
         return { videoId: id, startSeconds: parseInt(t) || 0 };
     } catch { return { videoId: "", startSeconds: 0 }; }
 }
+})();
