@@ -421,6 +421,7 @@ async function loadInitialData() {
         dataReady = true;
         resetSearchConditions(false);
         scheduleSearch({ immediate: true });
+        requestAnimationFrame(() => ensureYouTubeApi().catch(() => {}));
     } catch (e) {
         const cached = localStorage.getItem(CSV_CACHE_KEY);
         if (cached) {
@@ -433,6 +434,7 @@ async function loadInitialData() {
             dataReady = true;
             resetSearchConditions(false);
             scheduleSearch({ immediate: true });
+            requestAnimationFrame(() => ensureYouTubeApi().catch(() => {}));
         } else {
             resCount.innerText = "読込エラー";
         }
