@@ -747,6 +747,7 @@ function attachEmbeddedPlayer(thumbDiv, iframe, yt) {
         if (!document.body.contains(iframe)) return;
         if (ytPlayers.has(thumbDiv)) return;
         const player = new window.YT.Player(iframe, {
+            host: "https://www.youtube-nocookie.com",
             events: {
                 onStateChange: (event) => {
                     if (event.data === window.YT.PlayerState.PAUSED ||
