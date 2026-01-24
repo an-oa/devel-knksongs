@@ -33,7 +33,8 @@ const state = {
         searchDebounceId: 0,
         cardPool: [],
         emptyStateEl: null,
-        recommendedCache: null
+        recommendedCache: null,
+        activeThumb: null
     },
     youtube: {
         apiPromise: null,
@@ -120,6 +121,7 @@ function setupScrollObserver() {
  * @param {string} videoId
  */
 function restoreThumbnail(thumbDiv, videoId) {
+    if (ui.activeThumb === thumbDiv) ui.activeThumb = null;
     destroyEmbeddedPlayer(thumbDiv);
     const iframe = thumbDiv.querySelector("iframe");
     if (iframe) iframe.src = "about:blank";
@@ -914,6 +916,10 @@ function buildYouTubeOpenUrl(row, yt) {
  * @param {{videoId: string, startSeconds: number}} yt
  */
 function startEmbeddedPlayback(thumbDiv, row, yt) {
+    if (ui.activeThumb && ui.activeThumb !== thumbDiv) {
+        restoreThumbnail(ui.activeThumb, ui.activeThumb.dataset.videoId || "");
+    }
+    ui.activeThumb = thumbDiv;
     thumbDiv.classList.add("playing");
     const ifr = document.createElement("iframe");
     // プライバシー強化モード（nocookie）を維持
