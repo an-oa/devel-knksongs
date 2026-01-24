@@ -82,6 +82,8 @@ function handleScrollObserver(entries) {
             return;
         }
         if (!entry.isIntersecting) {
+            // スクロールアウト時に再生停止しない（必要になれば戻せるように残す）
+            if (true) return;
             const iframe = thumb.querySelector('iframe');
             if (!iframe) return;
             iframe.src = "about:blank";
