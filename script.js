@@ -185,11 +185,16 @@ async function initUI() {
     await loadInitialData();
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+/**
+ * 初期化処理を起動する
+ */
+function boot() {
     initUI().catch((err) => {
         console.error("initUI failed", err);
     });
-});
+}
+
+document.addEventListener('DOMContentLoaded', boot);
 
 /**
  * ブラウザのフォーム復元でフィルタ状態が残るのを防ぐ
@@ -381,19 +386,24 @@ function getEmptyStateDescriptor(searchState) {
 
 /**
  * ペイント復元後のUI状態を同期する
+ * @param {{visual?: boolean, search?: boolean}} [options]
  */
-function syncUiState() {
-    syncVisualUI();
-    syncSearchUI();
+function syncUiState(options) {
+    const opts = options || {};
+    const shouldSyncVisual = opts.visual !== false;
+    const shouldSyncSearch = opts.search !== false;
+    if (shouldSyncVisual) syncVisualUI();
+    if (shouldSyncSearch) syncSearchUI();
 }
 
 /**
  * 2段階でUI状態を同期する
+ * @param {{visual?: boolean, search?: boolean}} [options]
  */
-function scheduleSyncUiState() {
-    syncUiState();
+function scheduleSyncUiState(options) {
+    syncUiState(options);
     if (UI_SYNC_PASSES < 2) return;
-    requestAnimationFrame(syncUiState);
+    requestAnimationFrame(() => syncUiState(options));
 }
 
 /**
@@ -424,7 +434,7 @@ function syncVisualUI() {
  */
 function scheduleDelayedVisualSync(delayMs) {
     const delay = Number.isFinite(delayMs) ? delayMs : 200;
-    setTimeout(syncVisualUI, delay);
+    setTimeout(() => scheduleSyncUiState({ visual: true, search: false }), delay);
 }
 
 /**
