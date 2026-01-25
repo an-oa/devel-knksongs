@@ -167,17 +167,35 @@ function resetEphemeralFilters() {
 }
 
 /**
+ * ページ復元/フォーカスの同期を実行する
+ */
+function handleFocusSync() {
+    scheduleSyncUiState();
+}
+
+/**
+ * 可視状態の変化に合わせて同期する
+ */
+function handleVisibilitySync() {
+    if (document.visibilityState !== "visible") return;
+    scheduleSyncUiState();
+}
+
+/**
+ * ページ復元後の同期をまとめて行う
+ */
+function handlePageShowSync() {
+    scheduleSyncUiState();
+    scheduleDelayedVisualSync();
+}
+
+/**
  * 復元タイミングに合わせたUI同期イベントを登録する
  */
 function setupSyncEvents() {
-    window.addEventListener('focus', scheduleSyncUiState);
-    document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === "visible") scheduleSyncUiState();
-    });
-    window.addEventListener("pageshow", () => {
-        scheduleSyncUiState();
-        scheduleDelayedVisualSync();
-    });
+    window.addEventListener('focus', handleFocusSync);
+    document.addEventListener('visibilitychange', handleVisibilitySync);
+    window.addEventListener("pageshow", handlePageShowSync);
 }
 
 /**
