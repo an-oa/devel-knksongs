@@ -770,21 +770,37 @@ function getPopularSongs(songs) {
 }
 
 /**
- * おすすめ抽出用に、各曲の最新3件セットを作る
+ * おすすめ抽出用に、各曲のセットを作る
  * @param {Array<SongRow>} songs
  * @returns {Array<{key: string, latestRows: SongRow[]}>}
  */
 function buildRecommendedGroups(songs) {
     const groups = new Map();
     for (const row of songs) {
+        if (!isRecommendedCountFormat(row.format)) continue;
         const key = getSongKey(row);
-        if (!groups.has(key)) groups.set(key, []);
-        groups.get(key).push(row);
+        if (!groups.has(key)) {
+            groups.set(key, { rows: [], utamitaRows: [], streamRows: [], shortRows: [] });
+        }
+        const entry = groups.get(key);
+        entry.rows.push(row);
+        if (isUtamitaFormat(row.format)) entry.utamitaRows.push(row);
+        if (isStreamFormat(row.format)) entry.streamRows.push(row);
+        if (isShortFormat(row.format)) entry.shortRows.push(row);
     }
     const result = [];
-    for (const [key, rows] of groups.entries()) {
-        if (rows.length < MIN_PERFORMANCE_FOR_RANDOM) continue;
-        result.push({ key, latestRows: rows.slice(0, MIN_PERFORMANCE_FOR_RANDOM) });
+    for (const [key, entry] of groups.entries()) {
+        if (entry.rows.length < MIN_PERFORMANCE_FOR_RANDOM) continue;
+        let latestRows = [];
+        if (entry.utamitaRows.length > 0) {
+            latestRows = entry.utamitaRows.slice(0, 1);
+        } else if (entry.streamRows.length > 0) {
+            latestRows = entry.streamRows.slice(0, MIN_PERFORMANCE_FOR_RANDOM);
+        } else if (entry.shortRows.length > 0) {
+            latestRows = entry.shortRows.slice(0, MIN_PERFORMANCE_FOR_RANDOM);
+        }
+        if (latestRows.length === 0) continue;
+        result.push({ key, latestRows });
     }
     return result;
 }
@@ -818,6 +834,42 @@ function pickRandomEntry(list) {
  */
 function getSongKey(row) {
     return (row.title || '') + '|||' + (row.artist || '');
+}
+
+/**
+ * おすすめ判定のカウント対象に含める形態かどうか判定する
+ * @param {string} format
+ * @returns {boolean}
+ */
+function isRecommendedCountFormat(format) {
+    return isStreamFormat(format) || isUtamitaFormat(format) || isShortFormat(format);
+}
+
+/**
+ * 歌みた形態かどうか判定する
+ * @param {string} format
+ * @returns {boolean}
+ */
+function isUtamitaFormat(format) {
+    return format === "歌みた";
+}
+
+/**
+ * 配信形態かどうか判定する
+ * @param {string} format
+ * @returns {boolean}
+ */
+function isStreamFormat(format) {
+    return format === "配信";
+}
+
+/**
+ * ショート形態かどうか判定する
+ * @param {string} format
+ * @returns {boolean}
+ */
+function isShortFormat(format) {
+    return format === "ショート";
 }
 
 // ===== Rendering (private) =====
