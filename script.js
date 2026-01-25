@@ -1099,23 +1099,29 @@ function getEmptyStateElement() {
 }
 
 /**
- * 現在の検索結果をカードとして描画する
+ * 現在の表示対象を取得する
+ * @returns {Array<SongRow>}
  */
-function updateDisplay() {
-    const container = document.getElementById("resultList");
-    const loadMoreContainer = document.getElementById('loadMoreContainer');
+function getVisibleResults() {
+    return data.currentResults.slice(0, data.displayLimit);
+}
 
-    if (ui.scrollObserver) ui.scrollObserver.disconnect();
-    if (ui.showThumbnails && !ui.scrollObserver) setupScrollObserver();
+/**
+ * 空状態を表示する
+ * @param {HTMLDivElement} container
+ * @param {HTMLDivElement} loadMoreContainer
+ */
+function renderEmptyResults(container, loadMoreContainer) {
+    container.replaceChildren(getEmptyStateElement());
+    loadMoreContainer.classList.add('hidden');
+}
 
-    const results = data.currentResults.slice(0, data.displayLimit);
-
-    if (results.length === 0) {
-        container.replaceChildren(getEmptyStateElement());
-        loadMoreContainer.classList.add('hidden');
-        return;
-    }
-
+/**
+ * 結果カードのDOM配列を構築する
+ * @param {Array<SongRow>} results
+ * @returns {HTMLDivElement[]}
+ */
+function buildResultNodes(results) {
     const nodes = [];
     for (let i = 0; i < results.length; i++) {
         if (!ui.cardPool[i]) ui.cardPool[i] = createCardElements();
@@ -1123,21 +1129,54 @@ function updateDisplay() {
         updateCardFromRow(entry, results[i]);
         nodes.push(entry.card);
     }
+    return nodes;
+}
 
-    container.replaceChildren(...nodes);
-    if (ui.showThumbnails && ui.scrollObserver) {
-        for (let i = 0; i < results.length; i++) {
-            ui.scrollObserver.observe(ui.cardPool[i].thumbDiv);
-        }
+/**
+ * 表示中のカードに対してサムネ監視を設定する
+ * @param {number} count
+ */
+function observeVisibleThumbnails(count) {
+    if (!ui.showThumbnails || !ui.scrollObserver) return;
+    for (let i = 0; i < count; i++) {
+        ui.scrollObserver.observe(ui.cardPool[i].thumbDiv);
     }
+}
 
-    const recommendedMode = isRecommendedMode(getSearchState());
-
+/**
+ * 追加読み込みボタンの表示状態を更新する
+ * @param {boolean} recommendedMode
+ */
+function updateLoadMoreVisibility(recommendedMode) {
+    const loadMoreContainer = document.getElementById('loadMoreContainer');
     if (!recommendedMode && data.currentResults.length > data.displayLimit) {
         loadMoreContainer.classList.remove('hidden');
     } else {
         loadMoreContainer.classList.add('hidden');
     }
+}
+
+/**
+ * 現在の検索結果をカードとして描画する
+ */
+function updateDisplay() {
+    const container = document.getElementById("resultList");
+
+    if (ui.scrollObserver) ui.scrollObserver.disconnect();
+    if (ui.showThumbnails && !ui.scrollObserver) setupScrollObserver();
+
+    const results = getVisibleResults();
+
+    if (results.length === 0) {
+        renderEmptyResults(container, document.getElementById('loadMoreContainer'));
+        return;
+    }
+
+    const nodes = buildResultNodes(results);
+
+    container.replaceChildren(...nodes);
+    observeVisibleThumbnails(results.length);
+    updateLoadMoreVisibility(isRecommendedMode(getSearchState()));
 }
 
 /**
