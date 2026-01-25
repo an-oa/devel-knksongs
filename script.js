@@ -669,8 +669,14 @@ function isPreferredRow(nextRow, currentRow) {
  */
 function pickRecommended() {
     if (ui.recommendedCache) return ui.recommendedCache;
-    const popular = getPopularSongs(data.allSongsUnique);
-    ui.recommendedCache = shuffleInPlace(popular).slice(0, RANDOM_DISPLAY_COUNT);
+    const groups = buildRecommendedGroups(data.allSongsRaw);
+    const pickedGroups = shuffleInPlace(groups.slice()).slice(0, RANDOM_DISPLAY_COUNT);
+    const picks = pickedGroups.map(group => {
+        const candidates = group.latestRows;
+        const idx = Math.floor(Math.random() * candidates.length);
+        return candidates[idx];
+    });
+    ui.recommendedCache = picks;
     return ui.recommendedCache;
 }
 
@@ -681,6 +687,35 @@ function pickRecommended() {
  */
 function getPopularSongs(songs) {
     return songs.filter(s => (s.count || 0) >= MIN_PERFORMANCE_FOR_RANDOM);
+}
+
+/**
+ * おすすめ抽出用に、各曲の最新3件セットを作る
+ * @param {Array<SongRow>} songs
+ * @returns {Array<{key: string, latestRows: SongRow[]}>}
+ */
+function buildRecommendedGroups(songs) {
+    const groups = new Map();
+    for (const row of songs) {
+        const key = getSongKey(row);
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(row);
+    }
+    const result = [];
+    for (const [key, rows] of groups.entries()) {
+        if (rows.length < MIN_PERFORMANCE_FOR_RANDOM) continue;
+        result.push({ key, latestRows: rows.slice(0, MIN_PERFORMANCE_FOR_RANDOM) });
+    }
+    return result;
+}
+
+/**
+ * 曲名とアーティストからキーを作る
+ * @param {SongRow} row
+ * @returns {string}
+ */
+function getSongKey(row) {
+    return (row.title || '') + '|||' + (row.artist || '');
 }
 
 /**
