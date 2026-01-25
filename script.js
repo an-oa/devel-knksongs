@@ -124,7 +124,7 @@ function setupScrollObserver() {
  */
 function restoreThumbnail(thumbDiv, videoId) {
     if (ui.activeThumb === thumbDiv) ui.activeThumb = null;
-    destroyEmbeddedPlayer(thumbDiv);
+    youtubeApi.destroyPlayer(thumbDiv);
     const iframe = thumbDiv.querySelector("iframe");
     if (iframe) iframe.src = "about:blank";
     thumbDiv.classList.remove("playing", "paused");
@@ -473,7 +473,7 @@ async function loadInitialData() {
         ui.dataReady = true;
         resetSearchConditions(false);
         scheduleSearch({ immediate: true });
-        requestAnimationFrame(() => ensureYouTubeApi().catch(() => {}));
+        requestAnimationFrame(() => youtubeApi.ensureReady().catch(() => {}));
     } catch (e) {
         const cached = localStorage.getItem(CSV_CACHE_KEY);
         if (cached) {
@@ -486,7 +486,7 @@ async function loadInitialData() {
             ui.dataReady = true;
             resetSearchConditions(false);
             scheduleSearch({ immediate: true });
-            requestAnimationFrame(() => ensureYouTubeApi().catch(() => {}));
+            requestAnimationFrame(() => youtubeApi.ensureReady().catch(() => {}));
         } else {
             resCount.innerText = "読込エラー";
         }
@@ -757,115 +757,147 @@ function createOpenOverlay(openUrl, thumbDiv) {
 }
 
 /**
- * YouTube IFrame APIの準備完了を判定する
- * @returns {boolean}
+ * YouTube IFrame API関連のユーティリティ
  */
-function isYouTubeApiReady() {
-    return Boolean(window.YT && window.YT.Player);
-}
-
-/**
- * YouTube IFrame APIの準備完了を待つ
- * @param {() => void} resolve
- */
-function waitForYouTubeApi(resolve) {
-    if (isYouTubeApiReady()) {
-        resolve();
-        return;
-    }
-    setTimeout(() => waitForYouTubeApi(resolve), YT_IFRAME_READY_POLL_MS);
-}
-
-/**
- * YouTube IFrame APIを必要時に読み込む
- * @returns {Promise<void>}
- */
-function ensureYouTubeApi() {
-    if (isYouTubeApiReady()) return Promise.resolve();
-    if (youtube.apiPromise) return youtube.apiPromise;
-    youtube.apiPromise = new Promise((resolve, reject) => {
-        const existing = document.querySelector(YT_IFRAME_API_SELECTOR);
-        if (existing) {
-            waitForYouTubeApi(resolve);
+const youtubeApi = {
+    /**
+     * APIが利用可能か判定する
+     * @returns {boolean}
+     */
+    isReady() {
+        return Boolean(window.YT && window.YT.Player);
+    },
+    /**
+     * APIの準備完了を待つ
+     * @param {() => void} resolve
+     */
+    waitForReady(resolve) {
+        if (this.isReady()) {
+            resolve();
             return;
         }
-        const script = document.createElement("script");
-        script.src = YT_IFRAME_API_SRC;
-        script.async = true;
-        script.dataset.ytIframeApi = "true";
-        script.onerror = () => reject(new Error("iframe_api load failed"));
-        const prevCallback = window.onYouTubeIframeAPIReady;
-        window.onYouTubeIframeAPIReady = () => {
-            if (typeof prevCallback === "function") prevCallback();
-            resolve();
-        };
-        document.head.appendChild(script);
-    });
-    return youtube.apiPromise;
-}
-
-/**
- * 埋め込みURLを組み立てる（nocookie + API有効化）
- * @param {{videoId: string, startSeconds: number}} yt
- * @returns {string}
- */
-function buildYouTubeEmbedUrl(yt) {
-    return `https://www.youtube-nocookie.com/embed/${yt.videoId}?autoplay=1&playsinline=1&start=${yt.startSeconds}&enablejsapi=1`;
-}
-
-/**
- * プレーヤーの状態変化を処理する
- * @param {HTMLDivElement} thumbDiv
- * @param {{videoId: string}} yt
- * @param {{data: number}} event
- */
-function handleYouTubePlayerStateChange(thumbDiv, yt, event) {
-    if (event.data === window.YT.PlayerState.PAUSED ||
-        event.data === window.YT.PlayerState.ENDED) {
-        thumbDiv.classList.remove("playing");
-        thumbDiv.classList.add("paused");
-        return;
-    }
-    if (event.data === window.YT.PlayerState.PLAYING) {
-        thumbDiv.classList.remove("paused");
-        thumbDiv.classList.add("playing");
-    }
-}
-
-/**
- * 埋め込みプレーヤーを生成してイベントを紐づける
- * @param {HTMLDivElement} thumbDiv
- * @param {HTMLIFrameElement} iframe
- * @param {{videoId: string}} yt
- */
-function attachEmbeddedPlayer(thumbDiv, iframe, yt) {
-    ensureYouTubeApi().then(() => {
-        if (!document.body.contains(iframe)) return;
-        if (youtube.players.has(thumbDiv)) return;
-        const player = new window.YT.Player(iframe, {
-            host: "https://www.youtube-nocookie.com",
-            events: {
-                onStateChange: (event) => handleYouTubePlayerStateChange(thumbDiv, yt, event)
+        setTimeout(() => this.waitForReady(resolve), YT_IFRAME_READY_POLL_MS);
+    },
+    /**
+     * APIを必要時に読み込む
+     * @returns {Promise<void>}
+     */
+    ensureReady() {
+        if (this.isReady()) return Promise.resolve();
+        if (youtube.apiPromise) return youtube.apiPromise;
+        youtube.apiPromise = new Promise((resolve, reject) => {
+            const existing = document.querySelector(YT_IFRAME_API_SELECTOR);
+            if (existing) {
+                this.waitForReady(resolve);
+                return;
             }
+            const script = document.createElement("script");
+            script.src = YT_IFRAME_API_SRC;
+            script.async = true;
+            script.dataset.ytIframeApi = "true";
+            script.onerror = () => reject(new Error("iframe_api load failed"));
+            const prevCallback = window.onYouTubeIframeAPIReady;
+            window.onYouTubeIframeAPIReady = () => {
+                if (typeof prevCallback === "function") prevCallback();
+                resolve();
+            };
+            document.head.appendChild(script);
         });
-        youtube.players.set(thumbDiv, player);
-    }).catch(() => {
-        // API読み込み失敗時は埋め込みのみで継続する
-    });
-}
-
-/**
- * 既存の埋め込みプレーヤーを破棄する
- * @param {HTMLDivElement} thumbDiv
- */
-function destroyEmbeddedPlayer(thumbDiv) {
-    const player = youtube.players.get(thumbDiv);
-    if (!player) return;
-    if (typeof player.destroy === "function") {
-        player.destroy();
+        return youtube.apiPromise;
+    },
+    /**
+     * 埋め込みURLを組み立てる（nocookie + API有効化）
+     * @param {{videoId: string, startSeconds: number}} yt
+     * @returns {string}
+     */
+    buildEmbedUrl(yt) {
+        return `https://www.youtube-nocookie.com/embed/${yt.videoId}?autoplay=1&playsinline=1&start=${yt.startSeconds}&enablejsapi=1`;
+    },
+    /**
+     * 外部再生URLを組み立てる
+     * @param {SongRow} row
+     * @param {{videoId: string, startSeconds: number}} yt
+     * @returns {string}
+     */
+    buildOpenUrl(row, yt) {
+        return row.url || `https://www.youtube.com/watch?v=${yt.videoId}&t=${yt.startSeconds}s`;
+    },
+    /**
+     * プレーヤーの状態変化を処理する
+     * @param {HTMLDivElement} thumbDiv
+     * @param {{videoId: string}} yt
+     * @param {{data: number}} event
+     */
+    handleStateChange(thumbDiv, yt, event) {
+        if (event.data === window.YT.PlayerState.PAUSED ||
+            event.data === window.YT.PlayerState.ENDED) {
+            thumbDiv.classList.remove("playing");
+            thumbDiv.classList.add("paused");
+            return;
+        }
+        if (event.data === window.YT.PlayerState.PLAYING) {
+            thumbDiv.classList.remove("paused");
+            thumbDiv.classList.add("playing");
+        }
+    },
+    /**
+     * 埋め込みプレーヤーを生成してイベントを紐づける
+     * @param {HTMLDivElement} thumbDiv
+     * @param {HTMLIFrameElement} iframe
+     * @param {{videoId: string}} yt
+     */
+    attachPlayer(thumbDiv, iframe, yt) {
+        this.ensureReady().then(() => {
+            if (!document.body.contains(iframe)) return;
+            if (youtube.players.has(thumbDiv)) return;
+            const player = new window.YT.Player(iframe, {
+                host: "https://www.youtube-nocookie.com",
+                events: {
+                    onStateChange: (event) => this.handleStateChange(thumbDiv, yt, event)
+                }
+            });
+            youtube.players.set(thumbDiv, player);
+        }).catch(() => {
+            // API読み込み失敗時は埋め込みのみで継続する
+        });
+    },
+    /**
+     * 既存の埋め込みプレーヤーを破棄する
+     * @param {HTMLDivElement} thumbDiv
+     */
+    destroyPlayer(thumbDiv) {
+        const player = youtube.players.get(thumbDiv);
+        if (!player) return;
+        if (typeof player.destroy === "function") {
+            player.destroy();
+        }
+        youtube.players.delete(thumbDiv);
+    },
+    /**
+     * 埋め込みプレーヤーの再生状態を切り替える
+     * @param {HTMLDivElement} thumbDiv
+     */
+    togglePlayback(thumbDiv) {
+        const player = youtube.players.get(thumbDiv);
+        if (player) {
+            if (thumbDiv.classList.contains("paused") && typeof player.playVideo === "function") {
+                player.playVideo();
+                return;
+            }
+            if (thumbDiv.classList.contains("playing") && typeof player.pauseVideo === "function") {
+                player.pauseVideo();
+                return;
+            }
+        }
+        if (thumbDiv.classList.contains("playing")) {
+            thumbDiv.classList.remove("playing");
+            thumbDiv.classList.add("paused");
+        } else if (thumbDiv.classList.contains("paused")) {
+            thumbDiv.classList.remove("paused");
+            thumbDiv.classList.add("playing");
+        }
     }
-    youtube.players.delete(thumbDiv);
-}
+};
 
 /**
  * サムネイル要素の初期状態を整える
@@ -907,10 +939,6 @@ function shouldLoadThumbnailNow(thumbDiv) {
  * @param {{videoId: string, startSeconds: number}} yt
  * @returns {string}
  */
-function buildYouTubeOpenUrl(row, yt) {
-    return row.url || `https://www.youtube.com/watch?v=${yt.videoId}&t=${yt.startSeconds}s`;
-}
-
 /**
  * 埋め込み再生を開始する
  * @param {HTMLDivElement} thumbDiv
@@ -925,13 +953,13 @@ function startEmbeddedPlayback(thumbDiv, row, yt) {
     thumbDiv.classList.add("playing");
     const ifr = document.createElement("iframe");
     // プライバシー強化モード（nocookie）を維持
-    ifr.src = buildYouTubeEmbedUrl(yt);
+    ifr.src = youtubeApi.buildEmbedUrl(yt);
     ifr.allow = "autoplay; encrypted-media";
     ifr.referrerPolicy = "strict-origin-when-cross-origin";
     ifr.allowFullscreen = true;
     // 右下の YouTube ロゴ経由だと開始秒が落ちる端末があるため、
     // 開始位置つきの外部リンク（CSVのURL）をオーバーレイとして用意する。
-    const openUrl = buildYouTubeOpenUrl(row, yt);
+    const openUrl = youtubeApi.buildOpenUrl(row, yt);
     const open = createOpenOverlay(openUrl, thumbDiv);
     const close = document.createElement("button");
     close.type = "button";
@@ -948,35 +976,10 @@ function startEmbeddedPlayback(thumbDiv, row, yt) {
     pauseOverlay.setAttribute("aria-label", "再生を切り替える");
     pauseOverlay.addEventListener("click", (e) => {
         e.stopPropagation();
-        toggleEmbeddedPlayback(thumbDiv);
+        youtubeApi.togglePlayback(thumbDiv);
     });
     thumbDiv.replaceChildren(ifr, pauseOverlay, open, close);
-    attachEmbeddedPlayer(thumbDiv, ifr, yt);
-}
-
-/**
- * 埋め込みプレーヤーの再生状態を切り替える
- * @param {HTMLDivElement} thumbDiv
- */
-function toggleEmbeddedPlayback(thumbDiv) {
-    const player = youtube.players.get(thumbDiv);
-    if (player) {
-        if (thumbDiv.classList.contains("paused") && typeof player.playVideo === "function") {
-            player.playVideo();
-            return;
-        }
-        if (thumbDiv.classList.contains("playing") && typeof player.pauseVideo === "function") {
-            player.pauseVideo();
-            return;
-        }
-    }
-    if (thumbDiv.classList.contains("playing")) {
-        thumbDiv.classList.remove("playing");
-        thumbDiv.classList.add("paused");
-    } else if (thumbDiv.classList.contains("paused")) {
-        thumbDiv.classList.remove("paused");
-        thumbDiv.classList.add("playing");
-    }
+    youtubeApi.attachPlayer(thumbDiv, ifr, yt);
 }
 
 /**
