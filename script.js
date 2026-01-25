@@ -63,112 +63,7 @@ const youtube = state.youtube;
  * @property {number} [count]
  */
 
-/**
- * IntersectionObserverの通知でサムネ読み込みと再生停止を制御する
- * @param {IntersectionObserverEntry[]} entries
- */
-function handleScrollObserver(entries) {
-    entries.forEach(entry => {
-        const thumb = entry.target;
-        if (entry.isIntersecting) {
-            // 画面内に入ったタイミングでサムネを遅延読み込み
-            const img = thumb.querySelector('img');
-            const srcAttr = img ? img.getAttribute("src") : null;
-            if (img && (!srcAttr || srcAttr === "about:blank")) {
-                const dataSrc = img.dataset.src;
-                if (dataSrc) img.src = dataSrc;
-            }
-            return;
-        }
-        if (!entry.isIntersecting) {
-            // スクロールアウト時に再生停止しない（必要になれば戻せるように残す）
-            if (true) return;
-            const iframe = thumb.querySelector('iframe');
-            if (!iframe) return;
-            iframe.src = "about:blank";
-            const videoId = thumb.dataset.videoId;
-            thumb.classList.remove("playing");
-            if (videoId) {
-                const img = document.createElement("img");
-                img.dataset.src = `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
-                thumb.replaceChildren(img);
-            } else {
-                thumb.replaceChildren();
-            }
-        }
-    });
-}
-
-/**
- * ヘッダーの高さを考慮したIntersectionObserverを構築する
- */
-function setupScrollObserver() {
-    const header = document.querySelector('.header');
-    const headerHeight = header ? header.getBoundingClientRect().height : 0;
-    if (ui.scrollObserver) ui.scrollObserver.disconnect();
-    ui.scrollObserver = new IntersectionObserver(handleScrollObserver, {
-        threshold: 0,
-        rootMargin: `-${headerHeight}px 0px 0px 0px`
-    });
-    if (!ui.showThumbnails) return;
-    document.querySelectorAll('.thumb').forEach(thumb => {
-        ui.scrollObserver.observe(thumb);
-    });
-}
-
-/**
- * 再生中の埋め込みを止めてサムネイルに戻す
- * @param {HTMLDivElement} thumbDiv
- * @param {string} videoId
- */
-function restoreThumbnail(thumbDiv, videoId) {
-    clearActiveThumb(thumbDiv);
-    youtubeApi.destroyPlayer(thumbDiv);
-    const iframe = thumbDiv.querySelector("iframe");
-    if (iframe) iframe.src = "about:blank";
-    setPlaybackState(thumbDiv, "stopped");
-    if (videoId) {
-        const img = document.createElement("img");
-        img.src = `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
-        img.dataset.src = img.src;
-        thumbDiv.replaceChildren(img);
-    } else {
-        thumbDiv.replaceChildren();
-    }
-}
-
-/**
- * 再生状態をUIへ反映する
- * @param {HTMLDivElement} thumbDiv
- * @param {"playing" | "paused" | "stopped"} state
- */
-function setPlaybackState(thumbDiv, state) {
-    thumbDiv.classList.remove("playing", "paused");
-    if (state === "playing") {
-        thumbDiv.classList.add("playing");
-    } else if (state === "paused") {
-        thumbDiv.classList.add("paused");
-    }
-}
-
-/**
- * 再生中カードを更新する（必要なら前の再生を停止）
- * @param {HTMLDivElement} thumbDiv
- */
-function setActiveThumb(thumbDiv) {
-    if (ui.activeThumb && ui.activeThumb !== thumbDiv) {
-        restoreThumbnail(ui.activeThumb, ui.activeThumb.dataset.videoId || "");
-    }
-    ui.activeThumb = thumbDiv;
-}
-
-/**
- * 再生中カードの参照を解除する
- * @param {HTMLDivElement} thumbDiv
- */
-function clearActiveThumb(thumbDiv) {
-    if (ui.activeThumb === thumbDiv) ui.activeThumb = null;
-}
+// ===== Lifecycle (public) =====
 
 /**
  * UI初期化をまとめて実行する
@@ -195,6 +90,8 @@ function boot() {
 }
 
 document.addEventListener('DOMContentLoaded', boot);
+
+// ===== Lifecycle (private) =====
 
 /**
  * ブラウザのフォーム復元でフィルタ状態が残るのを防ぐ
@@ -235,52 +132,7 @@ function setupSyncEvents() {
     window.addEventListener("pageshow", handlePageShowSync);
 }
 
-/**
- * 検索デバウンスを解除する
- */
-function clearSearchDebounce() {
-    if (ui.searchDebounceId) {
-        clearTimeout(ui.searchDebounceId);
-        ui.searchDebounceId = 0;
-    }
-}
-
-/**
- * 検索語を初期状態に戻す
- */
-function resetSearchQuery() {
-    const searchBox = document.getElementById('searchBox');
-    if (searchBox) searchBox.value = "";
-    ui.userTouchedQuery = false;
-}
-
-/**
- * フィルタ条件を初期状態に戻す
- */
-function resetSearchFilters() {
-    const relayOnly = document.getElementById('relayOnly');
-    const harmonyOnly = document.getElementById('harmonyOnly');
-    const formatCheckboxes = document.querySelectorAll('#formatsList input[type="checkbox"]');
-
-    if (relayOnly) relayOnly.checked = false;
-    if (harmonyOnly) harmonyOnly.checked = false;
-
-    ui.selectedFormats.clear();
-    DEFAULT_FORMATS.forEach(f => ui.selectedFormats.add(f));
-    formatCheckboxes.forEach(cb => { cb.checked = true; });
-    ui.userTouchedFilters = false;
-}
-
-/**
- * 検索条件を初期状態に戻す（検索語・チェック・形態）
- * @param {boolean} shouldSearch
- */
-function resetSearchConditions(shouldSearch) {
-    clearSearchDebounce();
-    resetSearchQuery();
-    resetSearchFilters();
-    if (shouldSearch && ui.dataReady) scheduleSearch({ immediate: true });
-}
+// ===== UI Controls (public) =====
 
 /**
  * UIイベント（サイドバー、検索、読み込み）を結び付ける
@@ -343,6 +195,148 @@ function clearSearch() {
 /**
  * 保存済みテーマを反映してUIを同期する
  */
+function setupTheme() {
+    const themeToggle = document.getElementById('theme-toggle');
+    applyThemeFromStorage();
+    if (!themeToggle) return;
+    themeToggle.addEventListener('change', () => {
+        const isDarkNow = themeToggle.checked;
+        document.documentElement.classList.toggle('dark-theme', isDarkNow);
+        localStorage.setItem('theme', isDarkNow ? 'dark' : 'light');
+    });
+}
+
+/**
+ * サムネ表示のオン/オフを初期化する
+ */
+function setupThumbnailToggle() {
+    const thumbToggle = document.getElementById('thumbnail-toggle');
+    const savedSetting = localStorage.getItem('showThumbnails');
+    let isShow = savedSetting !== null ? (savedSetting === 'true') : false;
+    ui.showThumbnails = isShow;
+
+    thumbToggle.checked = isShow;
+    if (!isShow) document.body.classList.add('hide-thumbs');
+
+    thumbToggle.addEventListener('change', () => {
+        const checked = thumbToggle.checked;
+        ui.showThumbnails = checked;
+        document.body.classList.toggle('hide-thumbs', !checked);
+        localStorage.setItem('showThumbnails', checked);
+        updateDisplay();
+        setupScrollObserver();
+    });
+}
+
+// ===== UI Controls (private) =====
+
+/**
+ * 検索デバウンスを解除する
+ */
+function clearSearchDebounce() {
+    if (ui.searchDebounceId) {
+        clearTimeout(ui.searchDebounceId);
+        ui.searchDebounceId = 0;
+    }
+}
+
+/**
+ * 検索語を初期状態に戻す
+ */
+function resetSearchQuery() {
+    const searchBox = document.getElementById('searchBox');
+    if (searchBox) searchBox.value = "";
+    ui.userTouchedQuery = false;
+}
+
+/**
+ * フィルタ条件を初期状態に戻す
+ */
+function resetSearchFilters() {
+    const relayOnly = document.getElementById('relayOnly');
+    const harmonyOnly = document.getElementById('harmonyOnly');
+    const formatCheckboxes = document.querySelectorAll('#formatsList input[type="checkbox"]');
+
+    if (relayOnly) relayOnly.checked = false;
+    if (harmonyOnly) harmonyOnly.checked = false;
+
+    ui.selectedFormats.clear();
+    DEFAULT_FORMATS.forEach(f => ui.selectedFormats.add(f));
+    formatCheckboxes.forEach(cb => { cb.checked = true; });
+    ui.userTouchedFilters = false;
+}
+
+/**
+ * 検索条件を初期状態に戻す（検索語・チェック・形態）
+ * @param {boolean} shouldSearch
+ */
+function resetSearchConditions(shouldSearch) {
+    clearSearchDebounce();
+    resetSearchQuery();
+    resetSearchFilters();
+    if (shouldSearch && ui.dataReady) scheduleSearch({ immediate: true });
+}
+
+// ===== UI Sync (public) =====
+
+/**
+ * ペイント復元後のUI状態を同期する
+ * @param {{visual?: boolean, search?: boolean}} [options]
+ */
+function syncUiState(options) {
+    const opts = options || {};
+    const shouldSyncVisual = opts.visual !== false;
+    const shouldSyncSearch = opts.search !== false;
+    if (shouldSyncVisual) syncVisualUI();
+    if (shouldSyncSearch) syncSearchUI();
+}
+
+/**
+ * 2段階でUI状態を同期する
+ * @param {{visual?: boolean, search?: boolean}} [options]
+ */
+function scheduleSyncUiState(options) {
+    syncUiState(options);
+    if (UI_SYNC_PASSES < 2) return;
+    requestAnimationFrame(() => syncUiState(options));
+}
+
+/**
+ * 復元直後の描画ズレを緩和するために再同期を遅らせる
+ * @param {number} [delayMs]
+ */
+function scheduleDelayedVisualSync(delayMs) {
+    const delay = Number.isFinite(delayMs) ? delayMs : 200;
+    setTimeout(() => scheduleSyncUiState({ visual: true, search: false }), delay);
+}
+
+// ===== UI Sync (private) =====
+
+/**
+ * 見た目系のUIを同期する
+ */
+function syncVisualUI() {
+    syncThemeUI();
+    syncThumbnailUI();
+}
+
+/**
+ * 保存済みテーマを反映してUIを同期する
+ */
+function syncThemeUI() {
+    applyThemeFromStorage();
+}
+
+/**
+ * 保存済みサムネ設定を反映してUIを同期する
+ */
+function syncThumbnailUI() {
+    applyThumbnailFromStorage();
+}
+
+/**
+ * ローカルストレージ/システム設定からテーマを復元する
+ */
 function applyThemeFromStorage() {
     const themeToggle = document.getElementById('theme-toggle');
     const savedTheme = localStorage.getItem('theme');
@@ -369,74 +363,7 @@ function applyThumbnailFromStorage() {
     }
 }
 
-/**
- * 結果一覧の空状態メッセージを決める
- * @param {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean}} searchState
- * @returns {{kind: "loading" | "error" | "empty", message: string}}
- */
-function getEmptyStateDescriptor(searchState) {
-    if (!ui.dataReady) {
-        return { kind: "loading", message: "読み込み中..." };
-    }
-    if (!areAllFormatsSelected() && ui.selectedFormats.size === 0) {
-        return { kind: "error", message: "検索する動画の種類を選択してください" };
-    }
-    return { kind: "empty", message: "見つかりませんでした" };
-}
-
-/**
- * ペイント復元後のUI状態を同期する
- * @param {{visual?: boolean, search?: boolean}} [options]
- */
-function syncUiState(options) {
-    const opts = options || {};
-    const shouldSyncVisual = opts.visual !== false;
-    const shouldSyncSearch = opts.search !== false;
-    if (shouldSyncVisual) syncVisualUI();
-    if (shouldSyncSearch) syncSearchUI();
-}
-
-/**
- * 2段階でUI状態を同期する
- * @param {{visual?: boolean, search?: boolean}} [options]
- */
-function scheduleSyncUiState(options) {
-    syncUiState(options);
-    if (UI_SYNC_PASSES < 2) return;
-    requestAnimationFrame(() => syncUiState(options));
-}
-
-/**
- * 保存済みテーマを反映してUIを同期する
- */
-function syncThemeUI() {
-    applyThemeFromStorage();
-}
-
-/**
- * 保存済みサムネ設定を反映してUIを同期する
- */
-function syncThumbnailUI() {
-    applyThumbnailFromStorage();
-}
-
-/**
- * 見た目系のUIを同期する
- */
-function syncVisualUI() {
-    syncThemeUI();
-    syncThumbnailUI();
-}
-
-/**
- * 復元直後の描画ズレを緩和するために再同期を遅らせる
- * @param {number} [delayMs]
- */
-function scheduleDelayedVisualSync(delayMs) {
-    const delay = Number.isFinite(delayMs) ? delayMs : 200;
-    setTimeout(() => scheduleSyncUiState({ visual: true, search: false }), delay);
-}
-
+// ===== Search Sync / Filters (private) =====
 /**
  * 形態フィルタが初期状態か判定する
  * @returns {boolean}
@@ -444,6 +371,14 @@ function scheduleDelayedVisualSync(delayMs) {
 function areFormatsDefault() {
     if (ui.selectedFormats.size !== DEFAULT_FORMATS.length) return false;
     return areAllFormatsSelected();
+}
+
+/**
+ * すべての形態フィルタが選択されているか判定する
+ * @returns {boolean}
+ */
+function areAllFormatsSelected() {
+    return DEFAULT_FORMATS.every(f => ui.selectedFormats.has(f));
 }
 
 /**
@@ -493,41 +428,7 @@ function syncSearchUI() {
     if (shouldSearch && ui.dataReady) scheduleSearch({ immediate: true });
 }
 
-/**
- * テーマトグルの初期化とイベント設定
- */
-function setupTheme() {
-    const themeToggle = document.getElementById('theme-toggle');
-    applyThemeFromStorage();
-    if (!themeToggle) return;
-    themeToggle.addEventListener('change', () => {
-        const isDarkNow = themeToggle.checked;
-        document.documentElement.classList.toggle('dark-theme', isDarkNow);
-        localStorage.setItem('theme', isDarkNow ? 'dark' : 'light');
-    });
-}
-
-/**
- * サムネ表示のオン/オフを初期化する
- */
-function setupThumbnailToggle() {
-    const thumbToggle = document.getElementById('thumbnail-toggle');
-    const savedSetting = localStorage.getItem('showThumbnails');
-    let isShow = savedSetting !== null ? (savedSetting === 'true') : false;
-    ui.showThumbnails = isShow;
-
-    thumbToggle.checked = isShow;
-    if (!isShow) document.body.classList.add('hide-thumbs');
-
-    thumbToggle.addEventListener('change', () => {
-        const checked = thumbToggle.checked;
-        ui.showThumbnails = checked;
-        document.body.classList.toggle('hide-thumbs', !checked);
-        localStorage.setItem('showThumbnails', checked);
-        updateDisplay();
-        setupScrollObserver();
-    });
-}
+// ===== Data Loading / Parsing (public) =====
 
 /**
  * CSVを読み込み、初期データとフィルタを構築する
@@ -568,6 +469,8 @@ async function loadInitialData() {
     }
 }
 
+// ===== Data Loading / Parsing (private) =====
+
 /**
  * 形態フィルタのチェックボックス一覧を生成する
  */
@@ -596,81 +499,88 @@ function initFilterMenu() {
  * 検索条件の現在値を取得する
  * @returns {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean}}
  */
-function getSearchState() {
-    return {
-        queryRaw: document.getElementById('searchBox').value.trim(),
-        relayOnly: document.getElementById('relayOnly').checked,
-        harmonyOnly: document.getElementById('harmonyOnly').checked
-    };
-}
-
-/**
- * 入力中の検索をまとめて実行する
- * @param {{ immediate?: boolean }} [options]
- */
-function scheduleSearch(options) {
-    if (ui.searchDebounceId) clearTimeout(ui.searchDebounceId);
-    if (options && options.immediate) {
-        search();
-        return;
+function parseCsvToSongs(csvText) {
+    const rows = parseCsvRFC4180(csvText);
+    const header = rows[0];
+    const required = ["公開範囲", "#", "曲名", "アーティスト名", "キョクメイ", "アーティストメイ", "配信日", "形態", "歌枠リレー？", "ハモリあり？", "URL", "メモ"];
+    const missing = required.filter(name => !header.includes(name));
+    if (missing.length > 0) {
+        throw new Error(`CSVヘッダ不足: ${missing.join(", ")}`);
     }
-    ui.searchDebounceId = setTimeout(() => {
-        ui.searchDebounceId = 0;
-        search();
-    }, SEARCH_DEBOUNCE_MS);
-}
-
-/**
- * おすすめ表示条件を満たしているか判定する
- * @param {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean}} searchState
- * @returns {boolean}
- */
-function isRecommendedMode(searchState) {
-    return searchState.queryRaw === "" &&
-           !searchState.relayOnly &&
-           !searchState.harmonyOnly &&
-           areAllFormatsSelected();
-}
-
-/**
- * 検索条件で楽曲を絞り込む
- * @param {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean}} searchState
- * @returns {Array<SongRow>}
- */
-function filterSongs(searchState) {
-    const queryNorm = normalizeForSearch(searchState.queryRaw);
-    const keywords = queryNorm.split(/[\s\u3000]+/).filter(k => k.length > 0);
-    return data.allSongsRaw.filter(row => {
-        const matchText = keywords.every(kw =>
-            row.titleNorm.includes(kw) ||
-            row.artistNorm.includes(kw) ||
-            row.titleYomiNorm.includes(kw) ||
-            row.artistYomiNorm.includes(kw)
-        );
-        return matchText && ui.selectedFormats.has(row.format) && (!searchState.relayOnly || row.isRelay) && (!searchState.harmonyOnly || row.isHarmony);
-    });
-}
-
-/**
- * すべての形態フィルタが選択されているか判定する
- * @returns {boolean}
- */
-function areAllFormatsSelected() {
-    return DEFAULT_FORMATS.every(f => ui.selectedFormats.has(f));
-}
-
-/**
- * 配列を均等にシャッフルする
- * @template T
- * @param {T[]} list
- * @returns {T[]}
- */
-function shuffleInPlace(list) {
-    for (let i = list.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [list[i], list[j]] = [list[j], list[i]];
+    const body = rows.slice(1);
+    const idx = (n) => header.indexOf(n);
+    const songs = [];
+    for (let i = 0; i < body.length; i++) {
+        const r = body[i];
+        const memo = r[idx("メモ")] || "";
+        const memoUpper = memo.toUpperCase();
+        const memoAllows = !memoUpper.includes("URL") && !memoUpper.includes("URI");
+        if (r[idx("公開範囲")] !== "全体" || !r[idx("#")] || !memoAllows) continue;
+        const title = r[idx("曲名")];
+        const artist = r[idx("アーティスト名")];
+        const titleYomi = r[idx("キョクメイ")];
+        const artistYomi = r[idx("アーティストメイ")];
+        songs.push({
+            date: r[idx("配信日")],
+            sourceIndex: i,
+            format: r[idx("形態")],
+            isRelay: r[idx("歌枠リレー？")] === "◯",
+            isHarmony: r[idx("ハモリあり？")] === "◯",
+            title,
+            artist,
+            titleYomi,
+            artistYomi,
+            url: r[idx("URL")],
+            titleNorm: normalizeForSearch(title),
+            artistNorm: normalizeForSearch(artist),
+            titleYomiNorm: normalizeForSearch(titleYomi),
+            artistYomiNorm: normalizeForSearch(artistYomi)
+        });
     }
-    return list;
+    return songs;
+}
+
+/**
+ * RFC4180準拠でCSV文字列を2次元配列にパースする
+ * @param {string} t
+ * @returns {string[][]}
+ */
+function parseCsvRFC4180(t) {
+    let res = [], row = [], field = "", inQ = false;
+    for (let i = 0; i < t.length; i++) {
+        let c = t[i];
+        if (inQ) {
+            if (c === '"' && t[i + 1] === '"') {
+                field += '"';
+                i++;
+            } else if (c === '"') {
+                inQ = false;
+            } else {
+                field += c;
+            }
+        } else {
+            if (c === '"') {
+                inQ = true;
+            } else if (c === ',') {
+                row.push(field);
+                field = "";
+            } else if (c === '\n' || c === '\r') {
+                row.push(field);
+                res.push(row);
+                row = [];
+                field = "";
+                if (c === '\r' && t[i + 1] === '\n') i++;
+            } else {
+                field += c;
+            }
+        }
+    }
+    row.push(field);
+    res.push(row);
+    while (res.length > 0 && res[res.length - 1].every(v => v === "")) {
+        res.pop();
+    }
+    return res;
 }
 
 /**
@@ -704,6 +614,137 @@ function isPreferredRow(nextRow, currentRow) {
         return nextPriority > currentPriority;
     }
     return getRowOrderKey(nextRow) < getRowOrderKey(currentRow);
+}
+
+/**
+ * 曲名とアーティストで重複をまとめ、優先度とCSV順で表示候補を決める
+ * @param {Array<SongRow>} raw
+ * @returns {Array<SongRow>}
+ */
+function generateUniqueList(raw) {
+    const map = new Map();
+    raw.forEach(r => {
+        const key = (r.title||'') + '|||' + (r.artist||'');
+        if (!map.has(key)) map.set(key, { count: 1, data: r });
+        else {
+            const e = map.get(key);
+            e.count++;
+            if (isPreferredRow(r, e.data)) e.data = r;
+        }
+    });
+    return Array.from(map.values()).map(e => ({...e.data, count: e.count}));
+}
+
+// ===== Search / Recommendation (public) =====
+
+/**
+ * 入力中の検索をまとめて実行する
+ * @param {{ immediate?: boolean }} [options]
+ */
+function scheduleSearch(options) {
+    if (ui.searchDebounceId) clearTimeout(ui.searchDebounceId);
+    if (options && options.immediate) {
+        search();
+        return;
+    }
+    ui.searchDebounceId = setTimeout(() => {
+        ui.searchDebounceId = 0;
+        search();
+    }, SEARCH_DEBOUNCE_MS);
+}
+
+/**
+ * 検索条件に応じて結果を更新する
+ */
+function search() {
+    const searchState = getSearchState();
+    const resCount = document.getElementById("resultCount");
+
+    const { results, displayLimit, label } = resolveSearchResults(searchState);
+    data.currentResults = results;
+    data.displayLimit = displayLimit;
+    resCount.innerText = label;
+    updateDisplay();
+}
+
+// ===== Search / Recommendation (private) =====
+
+/**
+ * 検索条件の現在値を取得する
+ * @returns {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean}}
+ */
+function getSearchState() {
+    return {
+        queryRaw: document.getElementById('searchBox').value.trim(),
+        relayOnly: document.getElementById('relayOnly').checked,
+        harmonyOnly: document.getElementById('harmonyOnly').checked
+    };
+}
+
+/**
+ * おすすめ表示条件を満たしているか判定する
+ * @param {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean}} searchState
+ * @returns {boolean}
+ */
+function isRecommendedMode(searchState) {
+    return searchState.queryRaw === "" &&
+           !searchState.relayOnly &&
+           !searchState.harmonyOnly &&
+           areAllFormatsSelected();
+}
+
+/**
+ * 検索結果と表示ラベルをまとめて返す
+ * @param {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean}} searchState
+ * @returns {{results: Array<SongRow>, displayLimit: number, label: string}}
+ */
+function resolveSearchResults(searchState) {
+    if (isRecommendedMode(searchState)) {
+        return {
+            results: pickRecommended(),
+            displayLimit: RANDOM_DISPLAY_COUNT,
+            label: "おすすめを表示中"
+        };
+    }
+    const results = filterSongs(searchState);
+    return {
+        results,
+        displayLimit: INCREMENT_COUNT,
+        label: `${results.length} 件がヒット`
+    };
+}
+
+/**
+ * 検索条件で楽曲を絞り込む
+ * @param {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean}} searchState
+ * @returns {Array<SongRow>}
+ */
+function filterSongs(searchState) {
+    const queryNorm = normalizeForSearch(searchState.queryRaw);
+    const keywords = queryNorm.split(/[\s\u3000]+/).filter(k => k.length > 0);
+    return data.allSongsRaw.filter(row => {
+        const matchText = keywords.every(kw =>
+            row.titleNorm.includes(kw) ||
+            row.artistNorm.includes(kw) ||
+            row.titleYomiNorm.includes(kw) ||
+            row.artistYomiNorm.includes(kw)
+        );
+        return matchText && ui.selectedFormats.has(row.format) && (!searchState.relayOnly || row.isRelay) && (!searchState.harmonyOnly || row.isHarmony);
+    });
+}
+
+/**
+ * 配列を均等にシャッフルする
+ * @template T
+ * @param {T[]} list
+ * @returns {T[]}
+ */
+function shuffleInPlace(list) {
+    for (let i = list.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [list[i], list[j]] = [list[j], list[i]];
+    }
+    return list;
 }
 
 /**
@@ -779,40 +820,7 @@ function getSongKey(row) {
     return (row.title || '') + '|||' + (row.artist || '');
 }
 
-/**
- * 検索条件に応じて結果を更新する
- */
-function search() {
-    const searchState = getSearchState();
-    const resCount = document.getElementById("resultCount");
-
-    const { results, displayLimit, label } = resolveSearchResults(searchState);
-    data.currentResults = results;
-    data.displayLimit = displayLimit;
-    resCount.innerText = label;
-    updateDisplay();
-}
-
-/**
- * 検索結果と表示ラベルをまとめて返す
- * @param {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean}} searchState
- * @returns {{results: Array<SongRow>, displayLimit: number, label: string}}
- */
-function resolveSearchResults(searchState) {
-    if (isRecommendedMode(searchState)) {
-        return {
-            results: pickRecommended(),
-            displayLimit: RANDOM_DISPLAY_COUNT,
-            label: "おすすめを表示中"
-        };
-    }
-    const results = filterSongs(searchState);
-    return {
-        results,
-        displayLimit: INCREMENT_COUNT,
-        label: `${results.length} 件がヒット`
-    };
-}
+// ===== Rendering (private) =====
 
 /**
  * 楽曲カードのベース要素を生成する
@@ -896,6 +904,270 @@ function updateTitleLink(titleEl, row) {
  * @param {HTMLDivElement} thumbDiv
  * @returns {HTMLAnchorElement}
  */
+function updateFooterTags(tags, row) {
+    tags.replaceChildren();
+    if (row.format) {
+        const fmt = document.createElement("span");
+        fmt.className = "tag";
+        fmt.textContent = row.format;
+        tags.appendChild(fmt);
+    }
+    if (row.isRelay) {
+        const relay = document.createElement("span");
+        relay.className = "tag tag-relay";
+        relay.textContent = "🚩リレー";
+        tags.appendChild(relay);
+    }
+    if (row.isHarmony) {
+        const harmony = document.createElement("span");
+        harmony.className = "tag tag-harmony";
+        harmony.textContent = "✨ハモリ";
+        tags.appendChild(harmony);
+    }
+}
+
+/**
+ * 空状態に表示する要素を生成する
+ * @param {string} message
+ * @returns {HTMLDivElement}
+ */
+function createEmptyStateElement(message) {
+    const empty = document.createElement("div");
+    empty.style.gridColumn = "1/-1";
+    empty.style.textAlign = "center";
+    empty.style.padding = "50px";
+    empty.style.color = "var(--text-mute)";
+    empty.textContent = message;
+    return empty;
+}
+
+/**
+ * 結果一覧の空状態メッセージを決める
+ * @param {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean}} searchState
+ * @returns {{kind: "loading" | "error" | "empty", message: string}}
+ */
+function getEmptyStateDescriptor(searchState) {
+    if (!ui.dataReady) {
+        return { kind: "loading", message: "読み込み中..." };
+    }
+    if (!areAllFormatsSelected() && ui.selectedFormats.size === 0) {
+        return { kind: "error", message: "動画の種類を選択してください" };
+    }
+    return { kind: "empty", message: "見つかりませんでした" };
+}
+
+/**
+ * 現在の表示対象を取得する
+ * @returns {Array<SongRow>}
+ */
+function getVisibleResults() {
+    return data.currentResults.slice(0, data.displayLimit);
+}
+
+/**
+ * 空状態を表示する
+ * @param {HTMLDivElement} container
+ * @param {HTMLDivElement} loadMoreContainer
+ */
+function renderEmptyResults(container, loadMoreContainer) {
+    const emptyState = getEmptyStateDescriptor(getSearchState());
+    container.replaceChildren(createEmptyStateElement(emptyState.message));
+    loadMoreContainer.classList.add('hidden');
+}
+
+/**
+ * 結果カードのDOM配列を構築する
+ * @param {Array<SongRow>} results
+ * @returns {HTMLDivElement[]}
+ */
+function buildResultNodes(results) {
+    const nodes = [];
+    for (let i = 0; i < results.length; i++) {
+        if (!ui.cardPool[i]) ui.cardPool[i] = createCardElements();
+        const entry = ui.cardPool[i];
+        updateCardFromRow(entry, results[i]);
+        nodes.push(entry.card);
+    }
+    return nodes;
+}
+
+/**
+ * 表示中のカードに対してサムネ監視を設定する
+ * @param {number} count
+ */
+function observeVisibleThumbnails(count) {
+    if (!ui.showThumbnails || !ui.scrollObserver) return;
+    for (let i = 0; i < count; i++) {
+        ui.scrollObserver.observe(ui.cardPool[i].thumbDiv);
+    }
+}
+
+/**
+ * 追加読み込みボタンの表示状態を更新する
+ * @param {boolean} recommendedMode
+ */
+function updateLoadMoreVisibility(recommendedMode) {
+    const loadMoreContainer = document.getElementById('loadMoreContainer');
+    if (!recommendedMode && data.currentResults.length > data.displayLimit) {
+        loadMoreContainer.classList.remove('hidden');
+    } else {
+        loadMoreContainer.classList.add('hidden');
+    }
+}
+
+// ===== Rendering (public) =====
+
+/**
+ * 現在の検索結果をカードとして描画する
+ */
+function updateDisplay() {
+    const container = document.getElementById("resultList");
+
+    if (ui.scrollObserver) ui.scrollObserver.disconnect();
+    if (ui.showThumbnails && !ui.scrollObserver) setupScrollObserver();
+
+    const results = getVisibleResults();
+
+    if (results.length === 0) {
+        renderEmptyResults(container, document.getElementById('loadMoreContainer'));
+        return;
+    }
+
+    const nodes = buildResultNodes(results);
+
+    container.replaceChildren(...nodes);
+    observeVisibleThumbnails(results.length);
+    updateLoadMoreVisibility(isRecommendedMode(getSearchState()));
+}
+
+// ===== Thumbnail / Embed (private) =====
+
+/**
+ * サムネイル要素の初期状態を整える
+ * @param {HTMLDivElement} thumbDiv
+ * @param {string} videoId
+ */
+function resetThumbnailContainer(thumbDiv, videoId) {
+    thumbDiv.dataset.videoId = videoId;
+    thumbDiv.classList.remove("playing", "paused");
+    thumbDiv.onclick = null;
+    thumbDiv.replaceChildren();
+}
+
+/**
+ * サムネイル画像を生成する
+ * @param {string} videoId
+ * @returns {HTMLImageElement}
+ */
+function createThumbnailImage(videoId) {
+    const img = document.createElement("img");
+    img.dataset.src = `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
+    return img;
+}
+
+/**
+ * サムネイルを今すぐ読み込むべきか判定する
+ * @param {HTMLDivElement} thumbDiv
+ * @returns {boolean}
+ */
+function shouldLoadThumbnailNow(thumbDiv) {
+    const rect = thumbDiv.getBoundingClientRect();
+    const viewHeight = window.innerHeight || document.documentElement.clientHeight;
+    return rect.bottom > 0 && rect.top < viewHeight;
+}
+
+/**
+ * 再生状態をUIへ反映する
+ * @param {HTMLDivElement} thumbDiv
+ * @param {"playing" | "paused" | "stopped"} state
+ */
+function setPlaybackState(thumbDiv, state) {
+    thumbDiv.classList.remove("playing", "paused");
+    if (state === "playing") {
+        thumbDiv.classList.add("playing");
+    } else if (state === "paused") {
+        thumbDiv.classList.add("paused");
+    }
+}
+
+/**
+ * 再生中カードを更新する（必要なら前の再生を停止）
+ * @param {HTMLDivElement} thumbDiv
+ */
+function setActiveThumb(thumbDiv) {
+    if (ui.activeThumb && ui.activeThumb !== thumbDiv) {
+        restoreThumbnail(ui.activeThumb, ui.activeThumb.dataset.videoId || "");
+    }
+    ui.activeThumb = thumbDiv;
+}
+
+/**
+ * 再生中カードの参照を解除する
+ * @param {HTMLDivElement} thumbDiv
+ */
+function clearActiveThumb(thumbDiv) {
+    if (ui.activeThumb === thumbDiv) ui.activeThumb = null;
+}
+
+/**
+ * IntersectionObserverの通知でサムネ読み込みと再生停止を制御する
+ * @param {IntersectionObserverEntry[]} entries
+ */
+function handleScrollObserver(entries) {
+    entries.forEach(entry => {
+        const thumb = entry.target;
+        if (entry.isIntersecting) {
+            // 画面内に入ったタイミングでサムネを遅延読み込み
+            const img = thumb.querySelector('img');
+            const srcAttr = img ? img.getAttribute("src") : null;
+            if (img && (!srcAttr || srcAttr === "about:blank")) {
+                const dataSrc = img.dataset.src;
+                if (dataSrc) img.src = dataSrc;
+            }
+            return;
+        }
+        if (!entry.isIntersecting) {
+            // スクロールアウト時に再生停止しない（必要になれば戻せるように残す）
+            if (true) return;
+            const iframe = thumb.querySelector('iframe');
+            if (!iframe) return;
+            iframe.src = "about:blank";
+            const videoId = thumb.dataset.videoId;
+            thumb.classList.remove("playing");
+            if (videoId) {
+                const img = document.createElement("img");
+                img.dataset.src = `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
+                thumb.replaceChildren(img);
+            } else {
+                thumb.replaceChildren();
+            }
+        }
+    });
+}
+
+/**
+ * ヘッダーの高さを考慮したIntersectionObserverを構築する
+ */
+function setupScrollObserver() {
+    const header = document.querySelector('.header');
+    const headerHeight = header ? header.getBoundingClientRect().height : 0;
+    if (ui.scrollObserver) ui.scrollObserver.disconnect();
+    ui.scrollObserver = new IntersectionObserver(handleScrollObserver, {
+        threshold: 0,
+        rootMargin: `-${headerHeight}px 0px 0px 0px`
+    });
+    if (!ui.showThumbnails) return;
+    document.querySelectorAll('.thumb').forEach(thumb => {
+        ui.scrollObserver.observe(thumb);
+    });
+}
+
+/**
+ * YouTubeの外部再生ボタンを生成する
+ * @param {string} openUrl
+ * @param {HTMLDivElement} thumbDiv
+ * @returns {HTMLAnchorElement}
+ */
 function createOpenOverlay(openUrl, thumbDiv) {
     const open = document.createElement("a");
     open.href = openUrl;
@@ -916,9 +1188,104 @@ function createOpenOverlay(openUrl, thumbDiv) {
     return open;
 }
 
+// ===== Thumbnail / Embed (public) =====
+
+/**
+ * 再生中の埋め込みを止めてサムネイルに戻す
+ * @param {HTMLDivElement} thumbDiv
+ * @param {string} videoId
+ */
+function restoreThumbnail(thumbDiv, videoId) {
+    clearActiveThumb(thumbDiv);
+    youtubeApi.destroyPlayer(thumbDiv);
+    const iframe = thumbDiv.querySelector("iframe");
+    if (iframe) iframe.src = "about:blank";
+    setPlaybackState(thumbDiv, "stopped");
+    if (videoId) {
+        const img = document.createElement("img");
+        img.src = `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
+        img.dataset.src = img.src;
+        thumbDiv.replaceChildren(img);
+    } else {
+        thumbDiv.replaceChildren();
+    }
+}
+
+/**
+ * 埋め込み再生を開始する
+ * @param {HTMLDivElement} thumbDiv
+ * @param {SongRow} row
+ * @param {{videoId: string, startSeconds: number}} yt
+ */
+function startEmbeddedPlayback(thumbDiv, row, yt) {
+    setActiveThumb(thumbDiv);
+    setPlaybackState(thumbDiv, "playing");
+    const ifr = document.createElement("iframe");
+    // プライバシー強化モード（nocookie）を維持
+    ifr.src = youtubeApi.buildEmbedUrl(yt);
+    ifr.allow = "autoplay; encrypted-media";
+    ifr.referrerPolicy = "strict-origin-when-cross-origin";
+    ifr.allowFullscreen = true;
+    // 右下の YouTube ロゴ経由だと開始秒が落ちる端末があるため、
+    // 開始位置つきの外部リンク（CSVのURL）をオーバーレイとして用意する。
+    const openUrl = youtubeApi.buildOpenUrl(row, yt);
+    const open = createOpenOverlay(openUrl, thumbDiv);
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "thumb-close-btn";
+    close.setAttribute("aria-label", "サムネイルに戻す");
+    close.innerHTML = "&times;";
+    close.addEventListener("click", (e) => {
+        e.stopPropagation();
+        restoreThumbnail(thumbDiv, yt.videoId);
+    });
+    const pauseOverlay = document.createElement("button");
+    pauseOverlay.type = "button";
+    pauseOverlay.className = "thumb-pause-overlay";
+    pauseOverlay.setAttribute("aria-label", "再生を切り替える");
+    pauseOverlay.addEventListener("click", (e) => {
+        e.stopPropagation();
+        youtubeApi.togglePlayback(thumbDiv);
+    });
+    thumbDiv.replaceChildren(ifr, pauseOverlay, open, close);
+    youtubeApi.attachPlayer(thumbDiv, ifr, yt);
+}
+
+/**
+ * サムネイル表示を更新する
+ * @param {HTMLDivElement} thumbDiv
+ * @param {SongRow} row
+ * @param {{videoId: string, startSeconds: number}} yt
+ */
+function updateThumbnail(thumbDiv, row, yt) {
+    resetThumbnailContainer(thumbDiv, yt.videoId);
+
+    if (!ui.showThumbnails) return;
+    if (!yt.videoId) return;
+
+    const img = createThumbnailImage(yt.videoId);
+    thumbDiv.onclick = () => {
+        if (thumbDiv.classList.contains("playing")) return;
+        startEmbeddedPlayback(thumbDiv, row, yt);
+    };
+    thumbDiv.appendChild(img);
+    if (shouldLoadThumbnailNow(thumbDiv)) {
+        img.src = img.dataset.src;
+    }
+}
+
+/**
+ * フッター用のタグ群を更新する
+ * @param {HTMLDivElement} tags
+ * @param {SongRow} row
+ */
+
+// ===== YouTube API (private) =====
+
 /**
  * YouTube IFrame API関連のユーティリティ
  */
+
 const youtubeApi = {
     /**
      * APIが利用可能か判定する
@@ -1055,316 +1422,7 @@ const youtubeApi = {
     }
 };
 
-/**
- * サムネイル要素の初期状態を整える
- * @param {HTMLDivElement} thumbDiv
- * @param {string} videoId
- */
-function resetThumbnailContainer(thumbDiv, videoId) {
-    thumbDiv.dataset.videoId = videoId;
-    thumbDiv.classList.remove("playing", "paused");
-    thumbDiv.onclick = null;
-    thumbDiv.replaceChildren();
-}
-
-/**
- * サムネイル画像を生成する
- * @param {string} videoId
- * @returns {HTMLImageElement}
- */
-function createThumbnailImage(videoId) {
-    const img = document.createElement("img");
-    img.dataset.src = `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
-    return img;
-}
-
-/**
- * サムネイルを今すぐ読み込むべきか判定する
- * @param {HTMLDivElement} thumbDiv
- * @returns {boolean}
- */
-function shouldLoadThumbnailNow(thumbDiv) {
-    const rect = thumbDiv.getBoundingClientRect();
-    const viewHeight = window.innerHeight || document.documentElement.clientHeight;
-    return rect.bottom > 0 && rect.top < viewHeight;
-}
-
-/**
- * YouTubeの外部再生URLを組み立てる
- * @param {SongRow} row
- * @param {{videoId: string, startSeconds: number}} yt
- * @returns {string}
- */
-/**
- * 埋め込み再生を開始する
- * @param {HTMLDivElement} thumbDiv
- * @param {SongRow} row
- * @param {{videoId: string, startSeconds: number}} yt
- */
-function startEmbeddedPlayback(thumbDiv, row, yt) {
-    setActiveThumb(thumbDiv);
-    setPlaybackState(thumbDiv, "playing");
-    const ifr = document.createElement("iframe");
-    // プライバシー強化モード（nocookie）を維持
-    ifr.src = youtubeApi.buildEmbedUrl(yt);
-    ifr.allow = "autoplay; encrypted-media";
-    ifr.referrerPolicy = "strict-origin-when-cross-origin";
-    ifr.allowFullscreen = true;
-    // 右下の YouTube ロゴ経由だと開始秒が落ちる端末があるため、
-    // 開始位置つきの外部リンク（CSVのURL）をオーバーレイとして用意する。
-    const openUrl = youtubeApi.buildOpenUrl(row, yt);
-    const open = createOpenOverlay(openUrl, thumbDiv);
-    const close = document.createElement("button");
-    close.type = "button";
-    close.className = "thumb-close-btn";
-    close.setAttribute("aria-label", "サムネイルに戻す");
-    close.innerHTML = "&times;";
-    close.addEventListener("click", (e) => {
-        e.stopPropagation();
-        restoreThumbnail(thumbDiv, yt.videoId);
-    });
-    const pauseOverlay = document.createElement("button");
-    pauseOverlay.type = "button";
-    pauseOverlay.className = "thumb-pause-overlay";
-    pauseOverlay.setAttribute("aria-label", "再生を切り替える");
-    pauseOverlay.addEventListener("click", (e) => {
-        e.stopPropagation();
-        youtubeApi.togglePlayback(thumbDiv);
-    });
-    thumbDiv.replaceChildren(ifr, pauseOverlay, open, close);
-    youtubeApi.attachPlayer(thumbDiv, ifr, yt);
-}
-
-/**
- * サムネイル表示を更新する
- * @param {HTMLDivElement} thumbDiv
- * @param {SongRow} row
- * @param {{videoId: string, startSeconds: number}} yt
- */
-function updateThumbnail(thumbDiv, row, yt) {
-    resetThumbnailContainer(thumbDiv, yt.videoId);
-
-    if (!ui.showThumbnails) return;
-    if (!yt.videoId) return;
-
-    const img = createThumbnailImage(yt.videoId);
-    thumbDiv.onclick = () => {
-        if (thumbDiv.classList.contains("playing")) return;
-        startEmbeddedPlayback(thumbDiv, row, yt);
-    };
-    thumbDiv.appendChild(img);
-    if (shouldLoadThumbnailNow(thumbDiv)) {
-        img.src = img.dataset.src;
-    }
-}
-
-/**
- * フッター用のタグ群を更新する
- * @param {HTMLDivElement} tags
- * @param {SongRow} row
- */
-function updateFooterTags(tags, row) {
-    tags.replaceChildren();
-    if (row.format) {
-        const fmt = document.createElement("span");
-        fmt.className = "tag";
-        fmt.textContent = row.format;
-        tags.appendChild(fmt);
-    }
-    if (row.isRelay) {
-        const relay = document.createElement("span");
-        relay.className = "tag tag-relay";
-        relay.textContent = "🚩リレー";
-        tags.appendChild(relay);
-    }
-    if (row.isHarmony) {
-        const harmony = document.createElement("span");
-        harmony.className = "tag tag-harmony";
-        harmony.textContent = "✨ハモリ";
-        tags.appendChild(harmony);
-    }
-}
-
-/**
- * 空状態に表示する要素を生成する
- * @param {string} message
- * @returns {HTMLDivElement}
- */
-function createEmptyStateElement(message) {
-    const empty = document.createElement("div");
-    empty.style.gridColumn = "1/-1";
-    empty.style.textAlign = "center";
-    empty.style.padding = "50px";
-    empty.style.color = "var(--text-mute)";
-    empty.textContent = message;
-    return empty;
-}
-
-/**
- * 現在の表示対象を取得する
- * @returns {Array<SongRow>}
- */
-function getVisibleResults() {
-    return data.currentResults.slice(0, data.displayLimit);
-}
-
-/**
- * 空状態を表示する
- * @param {HTMLDivElement} container
- * @param {HTMLDivElement} loadMoreContainer
- */
-function renderEmptyResults(container, loadMoreContainer) {
-    const emptyState = getEmptyStateDescriptor(getSearchState());
-    container.replaceChildren(createEmptyStateElement(emptyState.message));
-    loadMoreContainer.classList.add('hidden');
-}
-
-/**
- * 結果カードのDOM配列を構築する
- * @param {Array<SongRow>} results
- * @returns {HTMLDivElement[]}
- */
-function buildResultNodes(results) {
-    const nodes = [];
-    for (let i = 0; i < results.length; i++) {
-        if (!ui.cardPool[i]) ui.cardPool[i] = createCardElements();
-        const entry = ui.cardPool[i];
-        updateCardFromRow(entry, results[i]);
-        nodes.push(entry.card);
-    }
-    return nodes;
-}
-
-/**
- * 表示中のカードに対してサムネ監視を設定する
- * @param {number} count
- */
-function observeVisibleThumbnails(count) {
-    if (!ui.showThumbnails || !ui.scrollObserver) return;
-    for (let i = 0; i < count; i++) {
-        ui.scrollObserver.observe(ui.cardPool[i].thumbDiv);
-    }
-}
-
-/**
- * 追加読み込みボタンの表示状態を更新する
- * @param {boolean} recommendedMode
- */
-function updateLoadMoreVisibility(recommendedMode) {
-    const loadMoreContainer = document.getElementById('loadMoreContainer');
-    if (!recommendedMode && data.currentResults.length > data.displayLimit) {
-        loadMoreContainer.classList.remove('hidden');
-    } else {
-        loadMoreContainer.classList.add('hidden');
-    }
-}
-
-/**
- * 現在の検索結果をカードとして描画する
- */
-function updateDisplay() {
-    const container = document.getElementById("resultList");
-
-    if (ui.scrollObserver) ui.scrollObserver.disconnect();
-    if (ui.showThumbnails && !ui.scrollObserver) setupScrollObserver();
-
-    const results = getVisibleResults();
-
-    if (results.length === 0) {
-        renderEmptyResults(container, document.getElementById('loadMoreContainer'));
-        return;
-    }
-
-    const nodes = buildResultNodes(results);
-
-    container.replaceChildren(...nodes);
-    observeVisibleThumbnails(results.length);
-    updateLoadMoreVisibility(isRecommendedMode(getSearchState()));
-}
-
-/**
- * CSVテキストを曲データの配列に変換する
- * @param {string} csvText
- * @returns {Array<SongRow>}
- */
-function parseCsvToSongs(csvText) {
-    const rows = parseCsvRFC4180(csvText);
-    const header = rows[0];
-    const required = ["公開範囲", "#", "曲名", "アーティスト名", "キョクメイ", "アーティストメイ", "配信日", "形態", "歌枠リレー？", "ハモリあり？", "URL", "メモ"];
-    const missing = required.filter(name => !header.includes(name));
-    if (missing.length > 0) {
-        throw new Error(`CSVヘッダ不足: ${missing.join(", ")}`);
-    }
-    const body = rows.slice(1);
-    const idx = (n) => header.indexOf(n);
-    const songs = [];
-    for (let i = 0; i < body.length; i++) {
-        const r = body[i];
-        const memo = r[idx("メモ")] || "";
-        const memoUpper = memo.toUpperCase();
-        const memoAllows = !memoUpper.includes("URL") && !memoUpper.includes("URI");
-        if (r[idx("公開範囲")] !== "全体" || !r[idx("#")] || !memoAllows) continue;
-        const title = r[idx("曲名")];
-        const artist = r[idx("アーティスト名")];
-        const titleYomi = r[idx("キョクメイ")];
-        const artistYomi = r[idx("アーティストメイ")];
-        songs.push({
-            date: r[idx("配信日")],
-            sourceIndex: i,
-            format: r[idx("形態")],
-            isRelay: r[idx("歌枠リレー？")] === "◯",
-            isHarmony: r[idx("ハモリあり？")] === "◯",
-            title,
-            artist,
-            titleYomi,
-            artistYomi,
-            url: r[idx("URL")],
-            titleNorm: normalizeForSearch(title),
-            artistNorm: normalizeForSearch(artist),
-            titleYomiNorm: normalizeForSearch(titleYomi),
-            artistYomiNorm: normalizeForSearch(artistYomi)
-        });
-    }
-    return songs;
-}
-
-/**
- * RFC4180準拠でCSV文字列を2次元配列にパースする
- * @param {string} t
- * @returns {string[][]}
- */
-function parseCsvRFC4180(t) {
-    let res = [], row = [], field = "", inQ = false;
-    for (let i=0; i<t.length; i++) {
-        let c = t[i];
-        if (inQ) { if(c==='"' && t[i+1]==='"'){ field+='"'; i++; } else if(c==='"'){ inQ=false; } else { field+=c; } }
-        else { if(c==='"'){ inQ=true; } else if(c===','){ row.push(field); field=""; } else if(c==='\n'||c==='\r'){ row.push(field); res.push(row); row=[]; field=""; if(c==='\r'&&t[i+1]==='\n')i++; } else { field+=c; } }
-    }
-    row.push(field); res.push(row);
-    while (res.length > 0 && res[res.length - 1].every(v => v === "")) {
-        res.pop();
-    }
-    return res;
-}
-
-/**
- * 曲名とアーティストで重複をまとめ、優先度とCSV順で表示候補を決める
- * @param {Array<SongRow>} raw
- * @returns {Array<SongRow>}
- */
-function generateUniqueList(raw) {
-    const map = new Map();
-    raw.forEach(r => {
-        const key = (r.title||'') + '|||' + (r.artist||'');
-        if (!map.has(key)) map.set(key, { count: 1, data: r });
-        else {
-            const e = map.get(key);
-            e.count++;
-            if (isPreferredRow(r, e.data)) e.data = r;
-        }
-    });
-    return Array.from(map.values()).map(e => ({...e.data, count: e.count}));
-}
+// ===== Utilities (private) =====
 
 /**
  * 検索用に文字列を正規化する（全角半角・ひらがな・大文字小文字）
@@ -1391,4 +1449,5 @@ function extractYoutubeInfo(url) {
         return { videoId: id, startSeconds: parseInt(t) || 0 };
     } catch { return { videoId: "", startSeconds: 0 }; }
 }
+
 })();
