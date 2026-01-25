@@ -122,11 +122,11 @@ function setupScrollObserver() {
  * @param {string} videoId
  */
 function restoreThumbnail(thumbDiv, videoId) {
-    if (ui.activeThumb === thumbDiv) ui.activeThumb = null;
+    clearActiveThumb(thumbDiv);
     youtubeApi.destroyPlayer(thumbDiv);
     const iframe = thumbDiv.querySelector("iframe");
     if (iframe) iframe.src = "about:blank";
-    thumbDiv.classList.remove("playing", "paused");
+    setPlaybackState(thumbDiv, "stopped");
     if (videoId) {
         const img = document.createElement("img");
         img.src = `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
@@ -135,6 +135,39 @@ function restoreThumbnail(thumbDiv, videoId) {
     } else {
         thumbDiv.replaceChildren();
     }
+}
+
+/**
+ * 再生状態をUIへ反映する
+ * @param {HTMLDivElement} thumbDiv
+ * @param {"playing" | "paused" | "stopped"} state
+ */
+function setPlaybackState(thumbDiv, state) {
+    thumbDiv.classList.remove("playing", "paused");
+    if (state === "playing") {
+        thumbDiv.classList.add("playing");
+    } else if (state === "paused") {
+        thumbDiv.classList.add("paused");
+    }
+}
+
+/**
+ * 再生中カードを更新する（必要なら前の再生を停止）
+ * @param {HTMLDivElement} thumbDiv
+ */
+function setActiveThumb(thumbDiv) {
+    if (ui.activeThumb && ui.activeThumb !== thumbDiv) {
+        restoreThumbnail(ui.activeThumb, ui.activeThumb.dataset.videoId || "");
+    }
+    ui.activeThumb = thumbDiv;
+}
+
+/**
+ * 再生中カードの参照を解除する
+ * @param {HTMLDivElement} thumbDiv
+ */
+function clearActiveThumb(thumbDiv) {
+    if (ui.activeThumb === thumbDiv) ui.activeThumb = null;
 }
 
 /**
@@ -948,13 +981,11 @@ const youtubeApi = {
     handleStateChange(thumbDiv, yt, event) {
         if (event.data === window.YT.PlayerState.PAUSED ||
             event.data === window.YT.PlayerState.ENDED) {
-            thumbDiv.classList.remove("playing");
-            thumbDiv.classList.add("paused");
+            setPlaybackState(thumbDiv, "paused");
             return;
         }
         if (event.data === window.YT.PlayerState.PLAYING) {
-            thumbDiv.classList.remove("paused");
-            thumbDiv.classList.add("playing");
+            setPlaybackState(thumbDiv, "playing");
         }
     },
     /**
@@ -1007,11 +1038,9 @@ const youtubeApi = {
             }
         }
         if (thumbDiv.classList.contains("playing")) {
-            thumbDiv.classList.remove("playing");
-            thumbDiv.classList.add("paused");
+            setPlaybackState(thumbDiv, "paused");
         } else if (thumbDiv.classList.contains("paused")) {
-            thumbDiv.classList.remove("paused");
-            thumbDiv.classList.add("playing");
+            setPlaybackState(thumbDiv, "playing");
         }
     }
 };
@@ -1063,11 +1092,8 @@ function shouldLoadThumbnailNow(thumbDiv) {
  * @param {{videoId: string, startSeconds: number}} yt
  */
 function startEmbeddedPlayback(thumbDiv, row, yt) {
-    if (ui.activeThumb && ui.activeThumb !== thumbDiv) {
-        restoreThumbnail(ui.activeThumb, ui.activeThumb.dataset.videoId || "");
-    }
-    ui.activeThumb = thumbDiv;
-    thumbDiv.classList.add("playing");
+    setActiveThumb(thumbDiv);
+    setPlaybackState(thumbDiv, "playing");
     const ifr = document.createElement("iframe");
     // プライバシー強化モード（nocookie）を維持
     ifr.src = youtubeApi.buildEmbedUrl(yt);
