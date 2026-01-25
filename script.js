@@ -386,7 +386,7 @@ function scheduleDelayedVisualSync(delayMs) {
  */
 function areFormatsDefault() {
     if (ui.selectedFormats.size !== DEFAULT_FORMATS.length) return false;
-    return DEFAULT_FORMATS.every(f => ui.selectedFormats.has(f));
+    return areAllFormatsSelected();
 }
 
 /**
@@ -572,7 +572,7 @@ function isRecommendedMode(searchState) {
     return searchState.queryRaw === "" &&
            !searchState.relayOnly &&
            !searchState.harmonyOnly &&
-           DEFAULT_FORMATS.every(f => ui.selectedFormats.has(f));
+           areAllFormatsSelected();
 }
 
 /**
@@ -592,6 +592,14 @@ function filterSongs(searchState) {
         );
         return matchText && ui.selectedFormats.has(row.format) && (!searchState.relayOnly || row.isRelay) && (!searchState.harmonyOnly || row.isHarmony);
     });
+}
+
+/**
+ * すべての形態フィルタが選択されているか判定する
+ * @returns {boolean}
+ */
+function areAllFormatsSelected() {
+    return DEFAULT_FORMATS.every(f => ui.selectedFormats.has(f));
 }
 
 /**
@@ -647,10 +655,18 @@ function isPreferredRow(nextRow, currentRow) {
  */
 function pickRecommended() {
     if (ui.recommendedCache) return ui.recommendedCache;
-    const popular = data.allSongsUnique.filter(s => (s.count || 0) >= MIN_PERFORMANCE_FOR_RANDOM);
-    const shuffled = shuffleInPlace(popular);
-    ui.recommendedCache = shuffled.slice(0, RANDOM_DISPLAY_COUNT);
+    const popular = getPopularSongs(data.allSongsUnique);
+    ui.recommendedCache = shuffleInPlace(popular).slice(0, RANDOM_DISPLAY_COUNT);
     return ui.recommendedCache;
+}
+
+/**
+ * おすすめ対象の楽曲を抽出する
+ * @param {Array<SongRow>} songs
+ * @returns {Array<SongRow>}
+ */
+function getPopularSongs(songs) {
+    return songs.filter(s => (s.count || 0) >= MIN_PERFORMANCE_FOR_RANDOM);
 }
 
 /**
@@ -660,16 +676,32 @@ function search() {
     const searchState = getSearchState();
     const resCount = document.getElementById("resultCount");
 
-    if (isRecommendedMode(searchState)) {
-        data.currentResults = pickRecommended();
-        data.displayLimit = RANDOM_DISPLAY_COUNT;
-        resCount.innerText = "おすすめを表示中";
-    } else {
-        data.currentResults = filterSongs(searchState);
-        data.displayLimit = INCREMENT_COUNT;
-        resCount.innerText = `${data.currentResults.length} 件がヒット`;
-    }
+    const { results, displayLimit, label } = resolveSearchResults(searchState);
+    data.currentResults = results;
+    data.displayLimit = displayLimit;
+    resCount.innerText = label;
     updateDisplay();
+}
+
+/**
+ * 検索結果と表示ラベルをまとめて返す
+ * @param {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean}} searchState
+ * @returns {{results: Array<SongRow>, displayLimit: number, label: string}}
+ */
+function resolveSearchResults(searchState) {
+    if (isRecommendedMode(searchState)) {
+        return {
+            results: pickRecommended(),
+            displayLimit: RANDOM_DISPLAY_COUNT,
+            label: "おすすめを表示中"
+        };
+    }
+    const results = filterSongs(searchState);
+    return {
+        results,
+        displayLimit: INCREMENT_COUNT,
+        label: `${results.length} 件がヒット`
+    };
 }
 
 /**
