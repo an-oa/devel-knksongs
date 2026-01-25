@@ -32,7 +32,6 @@ const state = {
         userTouchedFilters: false,
         searchDebounceId: 0,
         cardPool: [],
-        emptyStateEl: null,
         recommendedCache: null,
         activeThumb: null
     },
@@ -330,6 +329,21 @@ function applyThumbnailFromStorage() {
         updateDisplay();
         setupScrollObserver();
     }
+}
+
+/**
+ * 結果一覧の空状態メッセージを決める
+ * @param {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean}} searchState
+ * @returns {{kind: "loading" | "error" | "empty", message: string}}
+ */
+function getEmptyStateDescriptor(searchState) {
+    if (!ui.dataReady) {
+        return { kind: "loading", message: "読み込み中..." };
+    }
+    if (!areAllFormatsSelected() && ui.selectedFormats.size === 0) {
+        return { kind: "error", message: "検索する動画の種類を選択してください" };
+    }
+    return { kind: "empty", message: "見つかりませんでした" };
 }
 
 /**
@@ -1083,19 +1097,18 @@ function updateFooterTags(tags, row) {
 }
 
 /**
- * 検索結果が空のときに使う要素を取得する
+ * 空状態に表示する要素を生成する
+ * @param {string} message
  * @returns {HTMLDivElement}
  */
-function getEmptyStateElement() {
-    if (ui.emptyStateEl) return ui.emptyStateEl;
+function createEmptyStateElement(message) {
     const empty = document.createElement("div");
     empty.style.gridColumn = "1/-1";
     empty.style.textAlign = "center";
     empty.style.padding = "50px";
     empty.style.color = "var(--text-mute)";
-    empty.textContent = "見つかりませんでした";
-    ui.emptyStateEl = empty;
-    return ui.emptyStateEl;
+    empty.textContent = message;
+    return empty;
 }
 
 /**
@@ -1112,7 +1125,8 @@ function getVisibleResults() {
  * @param {HTMLDivElement} loadMoreContainer
  */
 function renderEmptyResults(container, loadMoreContainer) {
-    container.replaceChildren(getEmptyStateElement());
+    const emptyState = getEmptyStateDescriptor(getSearchState());
+    container.replaceChildren(createEmptyStateElement(emptyState.message));
     loadMoreContainer.classList.add('hidden');
 }
 
