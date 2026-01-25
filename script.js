@@ -669,14 +669,10 @@ function isPreferredRow(nextRow, currentRow) {
  */
 function pickRecommended() {
     if (ui.recommendedCache) return ui.recommendedCache;
-    const groups = buildRecommendedGroups(data.allSongsRaw);
-    const pickedGroups = shuffleInPlace(groups.slice()).slice(0, RANDOM_DISPLAY_COUNT);
-    const picks = pickedGroups.map(group => {
-        const candidates = group.latestRows;
-        const idx = Math.floor(Math.random() * candidates.length);
-        return candidates[idx];
-    });
-    ui.recommendedCache = picks;
+    ui.recommendedCache = selectRecommendedSongs(
+        buildRecommendedGroups(data.allSongsRaw),
+        RANDOM_DISPLAY_COUNT
+    );
     return ui.recommendedCache;
 }
 
@@ -707,6 +703,28 @@ function buildRecommendedGroups(songs) {
         result.push({ key, latestRows: rows.slice(0, MIN_PERFORMANCE_FOR_RANDOM) });
     }
     return result;
+}
+
+/**
+ * おすすめセットから表示曲を選ぶ
+ * @param {Array<{key: string, latestRows: SongRow[]}>} groups
+ * @param {number} count
+ * @returns {SongRow[]}
+ */
+function selectRecommendedSongs(groups, count) {
+    const pickedGroups = shuffleInPlace(groups.slice()).slice(0, count);
+    return pickedGroups.map(group => pickRandomEntry(group.latestRows));
+}
+
+/**
+ * 配列から1件をランダムに選ぶ
+ * @template T
+ * @param {T[]} list
+ * @returns {T}
+ */
+function pickRandomEntry(list) {
+    const idx = Math.floor(Math.random() * list.length);
+    return list[idx];
 }
 
 /**
