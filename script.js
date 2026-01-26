@@ -1349,7 +1349,10 @@ const youtubeApi = {
      * @returns {string}
      */
     buildEmbedUrl(yt) {
-        return `https://www.youtube-nocookie.com/embed/${yt.videoId}?autoplay=1&playsinline=1&start=${yt.startSeconds}&enablejsapi=1`;
+        const origin = location.origin === "null"
+            ? ""
+            : `&origin=${encodeURIComponent(location.origin)}`;
+        return `https://www.youtube-nocookie.com/embed/${yt.videoId}?autoplay=1&playsinline=1&start=${yt.startSeconds}&enablejsapi=1&rel=0&cc_load_policy=0&iv_load_policy=3${origin}`;
     },
     /**
      * 外部再生URLを取得する
