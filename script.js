@@ -7,7 +7,6 @@ const MIN_PERFORMANCE_FOR_RANDOM = 3;
 const INCREMENT_COUNT = 48;
 const PUBLIC_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR-cSDIsEc3sqIOkmiuuSeaUKmNb2gBvM_NoH8-Se5ZrosaSOdMhPo3RuvxhZirUPJ_ll8PGnbRnJeF/pub?gid=1763338905&single=true&output=csv";
 const DEFAULT_FORMATS = ["配信", "歌みた", "ショート", "切り抜き"];
-const FORMAT_PRIORITY = { "歌みた": 3, "配信": 2, "切り抜き": 1, "ショート": 0 };
 const CSV_CACHE_KEY = "cachedCsv";
 // Paint preview/フォーム復元の後追い対策で複数回同期する。
 const UI_SYNC_PASSES = 2;
@@ -19,7 +18,6 @@ const YT_IFRAME_READY_POLL_MS = 50;
 const state = {
     data: {
         allSongsRaw: [],
-        allSongsUnique: [],
         currentResults: [],
         displayLimit: RANDOM_DISPLAY_COUNT
     },
@@ -60,7 +58,6 @@ const youtube = state.youtube;
  * @property {string} artistNorm
  * @property {string} titleYomiNorm
  * @property {string} artistYomiNorm
- * @property {number} [count]
  */
 
 // ===== Lifecycle (public) =====
@@ -162,19 +159,13 @@ function setupUIHandlers() {
     });
 
     document.getElementById('relayOnly').addEventListener('change', () => {
-        ui.userTouchedFilters = true;
-        ui.recommendedCache = null;
-        scheduleSearch();
+        markFilterTouched();
     });
     document.getElementById('harmonyOnly').addEventListener('change', () => {
-        ui.userTouchedFilters = true;
-        ui.recommendedCache = null;
-        scheduleSearch();
+        markFilterTouched();
     });
     document.getElementById('searchBox').addEventListener('input', () => {
-        ui.userTouchedQuery = true;
-        ui.recommendedCache = null;
-        scheduleSearch();
+        markQueryTouched();
     });
 
     loadMoreBtn.addEventListener('click', () => {
@@ -229,6 +220,24 @@ function setupThumbnailToggle() {
 }
 
 // ===== UI Controls (private) =====
+
+/**
+ * フィルタ変更を検知して再検索を予約する
+ */
+function markFilterTouched() {
+    ui.userTouchedFilters = true;
+    ui.recommendedCache = null;
+    scheduleSearch();
+}
+
+/**
+ * 検索語の変更を検知して再検索を予約する
+ */
+function markQueryTouched() {
+    ui.userTouchedQuery = true;
+    ui.recommendedCache = null;
+    scheduleSearch();
+}
 
 /**
  * 検索デバウンスを解除する
@@ -441,28 +450,11 @@ async function loadInitialData() {
         if (!res.ok) throw new Error("fetch failed");
         const csvText = await res.text();
         localStorage.setItem(CSV_CACHE_KEY, csvText);
-        data.allSongsRaw = parseCsvToSongs(csvText);
-        initFilterMenu();
-        data.allSongsUnique = generateUniqueList(data.allSongsRaw);
-        ui.recommendedCache = null;
-        document.getElementById('searchBox').disabled = false;
-        ui.dataReady = true;
-        resetSearchConditions(false);
-        scheduleSearch({ immediate: true });
-        requestAnimationFrame(() => youtubeApi.ensureReady().catch(() => {}));
+        applyLoadedCsv(csvText, null);
     } catch (e) {
         const cached = localStorage.getItem(CSV_CACHE_KEY);
         if (cached) {
-            data.allSongsRaw = parseCsvToSongs(cached);
-            initFilterMenu();
-            data.allSongsUnique = generateUniqueList(data.allSongsRaw);
-            ui.recommendedCache = null;
-            document.getElementById('searchBox').disabled = false;
-            resCount.innerText = "キャッシュを表示中";
-            ui.dataReady = true;
-            resetSearchConditions(false);
-            scheduleSearch({ immediate: true });
-            requestAnimationFrame(() => youtubeApi.ensureReady().catch(() => {}));
+            applyLoadedCsv(cached, "キャッシュを表示中");
         } else {
             resCount.innerText = "読込エラー";
         }
@@ -496,6 +488,25 @@ function initFilterMenu() {
 }
 
 /**
+ * 読み込んだCSVの内容を状態へ反映する
+ * @param {string} csvText
+ * @param {string | null} statusLabel
+ */
+function applyLoadedCsv(csvText, statusLabel) {
+    data.allSongsRaw = parseCsvToSongs(csvText);
+    initFilterMenu();
+    ui.recommendedCache = null;
+    document.getElementById('searchBox').disabled = false;
+    ui.dataReady = true;
+    if (statusLabel) {
+        document.getElementById("resultCount").innerText = statusLabel;
+    }
+    resetSearchConditions(false);
+    scheduleSearch({ immediate: true });
+    requestAnimationFrame(() => youtubeApi.ensureReady().catch(() => {}));
+}
+
+/**
  * 検索条件の現在値を取得する
  * @returns {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean}}
  */
@@ -515,7 +526,8 @@ function parseCsvToSongs(csvText) {
         const memo = r[idx("メモ")] || "";
         const memoUpper = memo.toUpperCase();
         const memoAllows = !memoUpper.includes("URL") && !memoUpper.includes("URI");
-        if (r[idx("公開範囲")] !== "全体" || !r[idx("#")] || !memoAllows) continue;
+        const url = r[idx("URL")] || "";
+        if (r[idx("公開範囲")] !== "全体" || !r[idx("#")] || !memoAllows || url.trim() === "") continue;
         const title = r[idx("曲名")];
         const artist = r[idx("アーティスト名")];
         const titleYomi = r[idx("キョクメイ")];
@@ -530,7 +542,7 @@ function parseCsvToSongs(csvText) {
             artist,
             titleYomi,
             artistYomi,
-            url: r[idx("URL")],
+            url,
             titleNorm: normalizeForSearch(title),
             artistNorm: normalizeForSearch(artist),
             titleYomiNorm: normalizeForSearch(titleYomi),
@@ -583,57 +595,6 @@ function parseCsvRFC4180(t) {
     return res;
 }
 
-/**
- * 形態の優先度を取得する
- * @param {string} format
- * @returns {number}
- */
-function getFormatPriority(format) {
-    return Object.prototype.hasOwnProperty.call(FORMAT_PRIORITY, format) ? FORMAT_PRIORITY[format] : -1;
-}
-
-/**
- * CSVの並び順で新しさを判定するための値
- * @param {SongRow} row
- * @returns {number}
- */
-function getRowOrderKey(row) {
-    return Number.isFinite(row.sourceIndex) ? row.sourceIndex : Number.MAX_SAFE_INTEGER;
-}
-
-/**
- * 優先度とCSV順で表示候補を比較する
- * @param {SongRow} nextRow
- * @param {SongRow} currentRow
- * @returns {boolean}
- */
-function isPreferredRow(nextRow, currentRow) {
-    const nextPriority = getFormatPriority(nextRow.format);
-    const currentPriority = getFormatPriority(currentRow.format);
-    if (nextPriority !== currentPriority) {
-        return nextPriority > currentPriority;
-    }
-    return getRowOrderKey(nextRow) < getRowOrderKey(currentRow);
-}
-
-/**
- * 曲名とアーティストで重複をまとめ、優先度とCSV順で表示候補を決める
- * @param {Array<SongRow>} raw
- * @returns {Array<SongRow>}
- */
-function generateUniqueList(raw) {
-    const map = new Map();
-    raw.forEach(r => {
-        const key = (r.title||'') + '|||' + (r.artist||'');
-        if (!map.has(key)) map.set(key, { count: 1, data: r });
-        else {
-            const e = map.get(key);
-            e.count++;
-            if (isPreferredRow(r, e.data)) e.data = r;
-        }
-    });
-    return Array.from(map.values()).map(e => ({...e.data, count: e.count}));
-}
 
 // ===== Search / Recommendation (public) =====
 
@@ -758,15 +719,6 @@ function pickRecommended() {
         RANDOM_DISPLAY_COUNT
     );
     return ui.recommendedCache;
-}
-
-/**
- * おすすめ対象の楽曲を抽出する
- * @param {Array<SongRow>} songs
- * @returns {Array<SongRow>}
- */
-function getPopularSongs(songs) {
-    return songs.filter(s => (s.count || 0) >= MIN_PERFORMANCE_FOR_RANDOM);
 }
 
 /**
@@ -1118,6 +1070,18 @@ function createThumbnailImage(videoId) {
 }
 
 /**
+ * サムネイル画像を生成して要素へ反映する
+ * @param {HTMLDivElement} thumbDiv
+ * @param {string} videoId
+ * @param {{eager?: boolean}} [options]
+ */
+function applyThumbnailImage(thumbDiv, videoId, options) {
+    const img = createThumbnailImage(videoId);
+    if (options && options.eager) img.src = img.dataset.src;
+    thumbDiv.replaceChildren(img);
+}
+
+/**
  * サムネイルを今すぐ読み込むべきか判定する
  * @param {HTMLDivElement} thumbDiv
  * @returns {boolean}
@@ -1187,9 +1151,7 @@ function handleScrollObserver(entries) {
             const videoId = thumb.dataset.videoId;
             thumb.classList.remove("playing");
             if (videoId) {
-                const img = document.createElement("img");
-                img.dataset.src = `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
-                thumb.replaceChildren(img);
+                applyThumbnailImage(thumb, videoId);
             } else {
                 thumb.replaceChildren();
             }
@@ -1254,10 +1216,7 @@ function restoreThumbnail(thumbDiv, videoId) {
     if (iframe) iframe.src = "about:blank";
     setPlaybackState(thumbDiv, "stopped");
     if (videoId) {
-        const img = document.createElement("img");
-        img.src = `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
-        img.dataset.src = img.src;
-        thumbDiv.replaceChildren(img);
+        applyThumbnailImage(thumbDiv, videoId, { eager: true });
     } else {
         thumbDiv.replaceChildren();
     }
@@ -1280,7 +1239,7 @@ function startEmbeddedPlayback(thumbDiv, row, yt) {
     ifr.allowFullscreen = true;
     // 右下の YouTube ロゴ経由だと開始秒が落ちる端末があるため、
     // 開始位置つきの外部リンク（CSVのURL）をオーバーレイとして用意する。
-    const openUrl = youtubeApi.buildOpenUrl(row, yt);
+    const openUrl = youtubeApi.buildOpenUrl(row);
     const open = createOpenOverlay(openUrl, thumbDiv);
     const close = document.createElement("button");
     close.type = "button";
@@ -1393,13 +1352,12 @@ const youtubeApi = {
         return `https://www.youtube-nocookie.com/embed/${yt.videoId}?autoplay=1&playsinline=1&start=${yt.startSeconds}&enablejsapi=1`;
     },
     /**
-     * 外部再生URLを組み立てる
+     * 外部再生URLを取得する
      * @param {SongRow} row
-     * @param {{videoId: string, startSeconds: number}} yt
      * @returns {string}
      */
-    buildOpenUrl(row, yt) {
-        return row.url || `https://www.youtube.com/watch?v=${yt.videoId}&t=${yt.startSeconds}s`;
+    buildOpenUrl(row) {
+        return row.url;
     },
     /**
      * プレーヤーの状態変化を処理する
