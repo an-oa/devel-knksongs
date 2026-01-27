@@ -41,10 +41,10 @@
 
   <div id="sidebar-overlay" class="overlay"></div>
 
-  <aside id="sidebar" class="sidebar">
+  <aside id="sidebar" class="sidebar" role="dialog" aria-modal="true" aria-labelledby="sidebar-title" aria-hidden="true">
     <div class="sidebar-header">
       <div class="sidebar-title-group">
-        <h2>検索・設定</h2>
+        <h2 id="sidebar-title">検索・設定</h2>
         <div id="resultCount">接続中...</div>
       </div>
       <button id="close-sidebar" class="close-btn" aria-label="閉じる">&times;</button>

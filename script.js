@@ -142,23 +142,38 @@ function setupUIHandlers() {
     const openBtn = document.getElementById('open-sidebar');
     const closeBtn = document.getElementById('close-sidebar');
     const overlay = document.getElementById('sidebar-overlay');
+    const sidebarScrollArea = document.querySelector('.sidebar-scroll-area');
     const loadMoreBtn = document.getElementById('loadMoreBtn');
     const clearBtn = document.getElementById('clearBtn');
+    let lastFocusedElement = null;
 
     openBtn.addEventListener('click', () => {
         sidebar.classList.add('active');
         overlay.classList.add('show');
+        sidebar.setAttribute('aria-hidden', 'false');
+        scrollLock.enable({ allowScrollElement: sidebarScrollArea });
+        lastFocusedElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        focusSidebarFirst();
     });
 
     const closeMenu = () => {
+        blurSidebarActiveElement(sidebar);
         sidebar.classList.remove('active');
         overlay.classList.remove('show');
+        sidebar.setAttribute('aria-hidden', 'true');
+        scrollLock.disable();
+        if (lastFocusedElement) {
+            lastFocusedElement.focus();
+        } else {
+            openBtn.focus();
+        }
     };
 
     closeBtn.addEventListener('click', closeMenu);
     overlay.addEventListener('click', closeMenu);
     document.addEventListener('keydown', (e) => {
         if (e.key === "Escape") closeMenu();
+        if (e.key === "Tab") trapSidebarFocus(e, sidebar);
     });
 
     document.getElementById('relayOnly').addEventListener('change', () => {
@@ -178,6 +193,268 @@ function setupUIHandlers() {
 
     clearBtn.addEventListener('click', clearSearch);
 }
+
+// ===== Sidebar Accessibility =====
+
+/**
+ * サイドバー内にフォーカスが残っている場合はフォーカスを外す
+ * @param {HTMLElement | null} sidebar
+ */
+function blurSidebarActiveElement(sidebar) {
+    const active = document.activeElement;
+    if (!sidebar || !(active instanceof HTMLElement)) return;
+    if (!sidebar.contains(active)) return;
+    if (typeof active.blur === "function") {
+        active.blur();
+    }
+}
+
+/**
+ * サイドバー内のフォーカス可能要素を列挙する
+ * @param {HTMLElement | null} sidebar
+ * @returns {HTMLElement[]}
+ */
+function getFocusableInSidebar(sidebar) {
+    if (!sidebar) return [];
+    const focusable = sidebar.querySelectorAll([
+        'a[href]',
+        'button:not([disabled])',
+        'input:not([disabled])',
+        'select:not([disabled])',
+        'textarea:not([disabled])',
+        '[tabindex]:not([tabindex="-1"])'
+    ].join(','));
+    return Array.from(focusable).filter((el) => !el.hasAttribute('inert'));
+}
+
+/**
+ * サイドバー内の最初のフォーカス可能要素へ移動する
+ */
+function focusSidebarFirst() {
+    const sidebar = document.getElementById('sidebar');
+    const focusable = getFocusableInSidebar(sidebar);
+    if (focusable.length > 0) {
+        focusable[0].focus();
+    } else if (sidebar) {
+        sidebar.setAttribute('tabindex', '-1');
+        sidebar.focus();
+    }
+}
+
+/**
+ * サイドバー内にフォーカスを閉じ込める簡易トラップ
+ * @param {KeyboardEvent} event
+ * @param {HTMLElement | null} sidebar
+ */
+function trapSidebarFocus(event, sidebar) {
+    if (!sidebar || !sidebar.classList.contains('active')) return;
+    const focusable = getFocusableInSidebar(sidebar);
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+        return;
+    }
+    if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+    }
+}
+
+// ===== Scroll Lock (Sidebar) =====
+
+/**
+ * サイドバー表示中の背景スクロールを抑止するユーティリティ
+ * @returns {{ enable: (options?: { allowScrollElement?: Element | null }) => void, disable: () => void }}
+ */
+const scrollLock = (() => {
+    let locked = false;
+    let lockedScrollY = 0;
+    let scrollArea = null;
+    let lastTouchY = 0;
+    let viewportResizeHandler = null;
+    let viewportScrollHandler = null;
+    let windowScrollLockHandler = null;
+    let docScrollBlocker = null;
+    let scrollAreaStartHandler = null;
+    let scrollAreaMoveHandler = null;
+
+    /**
+     * ルート要素へスクロール抑止クラスを付与/解除する
+     * @param {boolean} isLocked
+     */
+    function setLockedClasses(isLocked) {
+        document.documentElement.classList.toggle('no-scroll', isLocked);
+        document.body.classList.toggle('no-scroll', isLocked);
+    }
+
+    /**
+     * visualViewport の高さに合わせて固定サイズを更新する
+     */
+    function updateViewportHeight() {
+        const vv = window.visualViewport;
+        if (!vv) return;
+        document.body.style.height = `${vv.height}px`;
+        enforceScrollPosition();
+    }
+
+    /**
+     * 固定スクロール位置へ強制的に戻す
+     */
+    function enforceScrollPosition() {
+        if (!locked) return;
+        if (window.scrollY !== lockedScrollY) {
+            window.scrollTo(0, lockedScrollY);
+            document.body.style.top = `-${lockedScrollY}px`;
+        }
+    }
+
+    /**
+     * visualViewport 変化の監視を開始する
+     */
+    function installViewportHandlers() {
+        const vv = window.visualViewport;
+        if (!vv || viewportResizeHandler) return;
+        viewportResizeHandler = () => updateViewportHeight();
+        viewportScrollHandler = () => updateViewportHeight();
+        vv.addEventListener('resize', viewportResizeHandler);
+        vv.addEventListener('scroll', viewportScrollHandler);
+    }
+
+    /**
+     * visualViewport 変化の監視を解除する
+     */
+    function removeViewportHandlers() {
+        const vv = window.visualViewport;
+        if (!vv || !viewportResizeHandler) return;
+        vv.removeEventListener('resize', viewportResizeHandler);
+        vv.removeEventListener('scroll', viewportScrollHandler);
+        viewportResizeHandler = null;
+        viewportScrollHandler = null;
+    }
+
+    /**
+     * window スクロールを監視して位置固定を維持する
+     */
+    function installWindowScrollLock() {
+        if (windowScrollLockHandler) return;
+        windowScrollLockHandler = () => enforceScrollPosition();
+        window.addEventListener('scroll', windowScrollLockHandler, { passive: true });
+    }
+
+    /**
+     * window スクロール監視を解除する
+     */
+    function removeWindowScrollLock() {
+        if (!windowScrollLockHandler) return;
+        window.removeEventListener('scroll', windowScrollLockHandler);
+        windowScrollLockHandler = null;
+    }
+
+    /**
+     * ドキュメント全体のスクロールイベントを遮断する
+     */
+    function installDocumentBlocker() {
+        if (docScrollBlocker) return;
+        docScrollBlocker = (e) => {
+            if (!locked) return;
+            const target = e.target;
+            if (scrollArea && target instanceof Element && target.closest('.sidebar-scroll-area')) return;
+            e.preventDefault();
+        };
+        document.addEventListener('touchmove', docScrollBlocker, { passive: false, capture: true });
+        document.addEventListener('wheel', docScrollBlocker, { passive: false, capture: true });
+    }
+
+    /**
+     * ドキュメントのスクロール遮断を解除する
+     */
+    function removeDocumentBlocker() {
+        if (!docScrollBlocker) return;
+        document.removeEventListener('touchmove', docScrollBlocker, { capture: true });
+        document.removeEventListener('wheel', docScrollBlocker, { capture: true });
+        docScrollBlocker = null;
+    }
+
+    /**
+     * スクロール領域の端で背景に伝播する動作を抑止する
+     */
+    function installScrollAreaGuard() {
+        if (!scrollArea || scrollAreaMoveHandler) return;
+        scrollAreaStartHandler = (e) => {
+            if (e.touches && e.touches.length > 0) {
+                lastTouchY = e.touches[0].clientY;
+            }
+        };
+        scrollAreaMoveHandler = (e) => {
+            if (!e.touches || e.touches.length === 0) return;
+            const currentY = e.touches[0].clientY;
+            const deltaY = currentY - lastTouchY;
+            const atTop = scrollArea.scrollTop <= 0;
+            const atBottom = scrollArea.scrollTop + scrollArea.clientHeight >= scrollArea.scrollHeight - 1;
+            if ((atTop && deltaY > 0) || (atBottom && deltaY < 0)) {
+                e.preventDefault();
+            }
+            e.stopPropagation();
+            lastTouchY = currentY;
+        };
+        scrollArea.addEventListener('touchstart', scrollAreaStartHandler, { passive: true });
+        scrollArea.addEventListener('touchmove', scrollAreaMoveHandler, { passive: false });
+    }
+
+    /**
+     * スクロール領域ガードを解除する
+     */
+    function removeScrollAreaGuard() {
+        if (!scrollArea || !scrollAreaMoveHandler) return;
+        scrollArea.removeEventListener('touchmove', scrollAreaMoveHandler);
+        if (scrollAreaStartHandler) {
+            scrollArea.removeEventListener('touchstart', scrollAreaStartHandler);
+        }
+        scrollAreaStartHandler = null;
+        scrollAreaMoveHandler = null;
+    }
+
+    /**
+     * 背景スクロール抑止を有効化する
+     * @param {{ allowScrollElement?: Element | null }} [options]
+     */
+    function enable({ allowScrollElement } = {}) {
+        if (locked) return;
+        locked = true;
+        scrollArea = allowScrollElement || null;
+        lockedScrollY = window.scrollY || window.pageYOffset || 0;
+        setLockedClasses(true);
+        document.body.style.top = `-${lockedScrollY}px`;
+        updateViewportHeight();
+        installViewportHandlers();
+        installWindowScrollLock();
+        installDocumentBlocker();
+        installScrollAreaGuard();
+        requestAnimationFrame(() => enforceScrollPosition());
+    }
+
+    /**
+     * 背景スクロール抑止を解除する
+     */
+    function disable() {
+        if (!locked) return;
+        locked = false;
+        setLockedClasses(false);
+        removeViewportHandlers();
+        removeWindowScrollLock();
+        removeDocumentBlocker();
+        removeScrollAreaGuard();
+        document.body.style.top = "";
+        document.body.style.height = "";
+        window.scrollTo(0, lockedScrollY);
+        scrollArea = null;
+    }
+
+    return { enable, disable };
+})();
 
 /**
  * すべての検索・フィルタ条件を初期状態にリセットする

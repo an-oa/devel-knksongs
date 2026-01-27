@@ -29,6 +29,18 @@ body {
   color: var(--text-color);
   transition: background-color var(--transition-speed);
 }
+html.no-scroll,
+body.no-scroll {
+  overflow: hidden;
+  touch-action: none;
+}
+body.no-scroll {
+  position: fixed;
+  width: 100%;
+  left: 0;
+  right: 0;
+  height: 100vh;
+}
 
 input, button { font-family: inherit; }
 
@@ -72,13 +84,20 @@ body.hide-thumbs .thumb {
   transition: transform var(--transition-speed) cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: -5px 0 15px rgba(0,0,0,0.1);
   display: flex; flex-direction: column;
+  overscroll-behavior: contain;
 }
 
 .sidebar.active { transform: translateX(0); }
 .sidebar-header { padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); }
 .sidebar-title-group h2 { margin: 0; font-size: 18px; }
 #resultCount { font-size: 13px; color: var(--primary-color); font-weight: bold; }
-.sidebar-scroll-area { padding: 20px; overflow-y: auto; flex-grow: 1; }
+.sidebar-scroll-area {
+  padding: 20px;
+  overflow-y: auto;
+  flex-grow: 1;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
 .sidebar-section { margin-bottom: 25px; }
 
 .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
@@ -88,6 +107,7 @@ body.hide-thumbs .thumb {
 input[type="text"] {
   width: 100%; padding: 10px; border: 2px solid var(--border-color);
   border-radius: 8px; background: var(--card-bg); color: var(--text-color); outline: none; box-sizing: border-box;
+  font-size: 16px;
 }
 
 .filter-group-stack { display: flex; flex-direction: column; gap: 8px; }
