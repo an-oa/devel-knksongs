@@ -69,6 +69,7 @@ const youtube = state.youtube;
 async function initUI() {
     resetEphemeralFilters();
     setupUIHandlers();
+    initFilterMenu();
     setupTheme();
     setupThumbnailToggle();
     setupScrollObserver();
@@ -468,6 +469,7 @@ async function loadInitialData() {
  */
 function initFilterMenu() {
     const container = document.getElementById('formatsList');
+    if (!container || container.childElementCount > 0) return;
     DEFAULT_FORMATS.forEach(fmt => {
         const label = document.createElement('label');
         label.className = 'checkbox-item';
@@ -494,7 +496,6 @@ function initFilterMenu() {
  */
 function applyLoadedCsv(csvText, statusLabel) {
     data.allSongsRaw = parseCsvToSongs(csvText);
-    initFilterMenu();
     ui.recommendedCache = null;
     document.getElementById('searchBox').disabled = false;
     ui.dataReady = true;
