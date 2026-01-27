@@ -8,6 +8,7 @@ const INCREMENT_COUNT = 48;
 const PUBLIC_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR-cSDIsEc3sqIOkmiuuSeaUKmNb2gBvM_NoH8-Se5ZrosaSOdMhPo3RuvxhZirUPJ_ll8PGnbRnJeF/pub?gid=1763338905&single=true&output=csv";
 const DEFAULT_FORMATS = ["配信", "歌みた", "ショート", "切り抜き"];
 const CSV_CACHE_KEY = "cachedCsv";
+const SEARCH_STATE_KEY = "searchStateV1";
 // Paint preview/フォーム復元の後追い対策で複数回同期する。
 const UI_SYNC_PASSES = 2;
 const SEARCH_DEBOUNCE_MS = 200;
@@ -28,6 +29,7 @@ const state = {
         dataReady: false,
         userTouchedQuery: false,
         userTouchedFilters: false,
+        hasRestoredSearchState: false,
         searchDebounceId: 0,
         cardPool: [],
         recommendedCache: null,
@@ -67,7 +69,6 @@ const youtube = state.youtube;
  * @returns {Promise<void>}
  */
 async function initUI() {
-    resetEphemeralFilters();
     setupUIHandlers();
     initFilterMenu();
     setupTheme();
@@ -75,6 +76,7 @@ async function initUI() {
     setupScrollObserver();
     setupSyncEvents();
     window.addEventListener('resize', setupScrollObserver);
+    restoreSearchState();
     await loadInitialData();
 }
 
@@ -182,6 +184,7 @@ function setupUIHandlers() {
  */
 function clearSearch() {
     resetSearchConditions(true);
+    saveSearchState();
 }
 
 /**
@@ -229,6 +232,7 @@ function markFilterTouched() {
     ui.userTouchedFilters = true;
     ui.recommendedCache = null;
     scheduleSearch();
+    saveSearchState();
 }
 
 /**
@@ -238,6 +242,7 @@ function markQueryTouched() {
     ui.userTouchedQuery = true;
     ui.recommendedCache = null;
     scheduleSearch();
+    saveSearchState();
 }
 
 /**
@@ -483,6 +488,7 @@ function initFilterMenu() {
             if (e.target.checked) ui.selectedFormats.add(e.target.value);
             else ui.selectedFormats.delete(e.target.value);
             scheduleSearch();
+            saveSearchState();
         });
         label.append(cb, " " + fmt);
         container.appendChild(label);
@@ -502,9 +508,64 @@ function applyLoadedCsv(csvText, statusLabel) {
     if (statusLabel) {
         document.getElementById("resultCount").innerText = statusLabel;
     }
-    resetSearchConditions(false);
+    if (!ui.hasRestoredSearchState) {
+        resetSearchConditions(false);
+    }
     scheduleSearch({ immediate: true });
     requestAnimationFrame(() => youtubeApi.ensureReady().catch(() => {}));
+}
+
+/**
+ * 現在の検索状態を保存する
+ */
+function saveSearchState() {
+    try {
+        const searchBox = document.getElementById('searchBox');
+        const relayOnly = document.getElementById('relayOnly');
+        const harmonyOnly = document.getElementById('harmonyOnly');
+        const payload = {
+            query: searchBox ? searchBox.value : "",
+            relayOnly: relayOnly ? !!relayOnly.checked : false,
+            harmonyOnly: harmonyOnly ? !!harmonyOnly.checked : false,
+            formats: Array.from(ui.selectedFormats)
+        };
+        localStorage.setItem(SEARCH_STATE_KEY, JSON.stringify(payload));
+    } catch (e) {}
+}
+
+/**
+ * 保存済み検索状態を復元する
+ */
+function restoreSearchState() {
+    try {
+        const raw = localStorage.getItem(SEARCH_STATE_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        const searchBox = document.getElementById('searchBox');
+        const relayOnly = document.getElementById('relayOnly');
+        const harmonyOnly = document.getElementById('harmonyOnly');
+        const formatCheckboxes = document.querySelectorAll('#formatsList input[type="checkbox"]');
+        const formats = Array.isArray(parsed.formats) ? parsed.formats : [];
+        const allowed = new Set(DEFAULT_FORMATS);
+        ui.selectedFormats.clear();
+        formats.forEach((f) => {
+            if (allowed.has(f)) ui.selectedFormats.add(f);
+        });
+        if (ui.selectedFormats.size === 0) {
+            DEFAULT_FORMATS.forEach((f) => ui.selectedFormats.add(f));
+        }
+        formatCheckboxes.forEach((cb) => {
+            cb.checked = ui.selectedFormats.has(cb.value);
+        });
+        if (searchBox && typeof parsed.query === "string") {
+            searchBox.value = parsed.query;
+        }
+        if (relayOnly) relayOnly.checked = !!parsed.relayOnly;
+        if (harmonyOnly) harmonyOnly.checked = !!parsed.harmonyOnly;
+        ui.userTouchedQuery = true;
+        ui.userTouchedFilters = true;
+        ui.hasRestoredSearchState = true;
+    } catch (e) {}
 }
 
 /**
