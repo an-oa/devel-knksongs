@@ -47,6 +47,7 @@ const youtube = state.youtube;
 /**
  * @typedef {Object} SongRow
  * @property {string} date
+ * @property {number | null} dateKey
  * @property {number} sourceIndex
  * @property {string} format
  * @property {boolean} isRelay
@@ -145,6 +146,8 @@ function setupUIHandlers() {
     const sidebarScrollArea = document.querySelector('.sidebar-scroll-area');
     const loadMoreBtn = document.getElementById('loadMoreBtn');
     const clearBtn = document.getElementById('clearBtn');
+    const dateFrom = document.getElementById('dateFrom');
+    const dateTo = document.getElementById('dateTo');
     let lastFocusedElement = null;
 
     openBtn.addEventListener('click', () => {
@@ -184,6 +187,12 @@ function setupUIHandlers() {
     });
     document.getElementById('searchBox').addEventListener('input', () => {
         markQueryTouched();
+    });
+    dateFrom.addEventListener('input', () => {
+        markFilterTouched();
+    });
+    dateTo.addEventListener('input', () => {
+        markFilterTouched();
     });
 
     loadMoreBtn.addEventListener('click', () => {
@@ -547,10 +556,14 @@ function resetSearchQuery() {
 function resetSearchFilters() {
     const relayOnly = document.getElementById('relayOnly');
     const harmonyOnly = document.getElementById('harmonyOnly');
+    const dateFrom = document.getElementById('dateFrom');
+    const dateTo = document.getElementById('dateTo');
     const formatCheckboxes = document.querySelectorAll('#formatsList input[type="checkbox"]');
 
     if (relayOnly) relayOnly.checked = false;
     if (harmonyOnly) harmonyOnly.checked = false;
+    if (dateFrom) dateFrom.value = "";
+    if (dateTo) dateTo.value = "";
 
     ui.selectedFormats.clear();
     DEFAULT_FORMATS.forEach(f => ui.selectedFormats.add(f));
@@ -680,8 +693,12 @@ function areAllFormatsSelected() {
 function needsFilterReset() {
     const relayOnly = document.getElementById('relayOnly');
     const harmonyOnly = document.getElementById('harmonyOnly');
+    const dateFrom = document.getElementById('dateFrom');
+    const dateTo = document.getElementById('dateTo');
     if (relayOnly && relayOnly.checked) return true;
     if (harmonyOnly && harmonyOnly.checked) return true;
+    if (dateFrom && dateFrom.value.trim() !== "") return true;
+    if (dateTo && dateTo.value.trim() !== "") return true;
     const formatCheckboxes = document.querySelectorAll('#formatsList input[type="checkbox"]');
     for (const cb of formatCheckboxes) {
         if (!cb.checked) return true;
@@ -780,6 +797,10 @@ function initFilterMenu() {
 function applyLoadedCsv(csvText, statusLabel) {
     data.allSongsRaw = parseCsvToSongs(csvText);
     ui.recommendedCache = null;
+    const dateBounds = applyDateInputRange(data.allSongsRaw);
+    if (dateBounds) {
+        clampDateInputsToBounds(dateBounds.minKey, dateBounds.maxKey);
+    }
     document.getElementById('searchBox').disabled = false;
     ui.dataReady = true;
     if (statusLabel) {
@@ -800,10 +821,14 @@ function saveSearchState() {
         const searchBox = document.getElementById('searchBox');
         const relayOnly = document.getElementById('relayOnly');
         const harmonyOnly = document.getElementById('harmonyOnly');
+        const dateFrom = document.getElementById('dateFrom');
+        const dateTo = document.getElementById('dateTo');
         const payload = {
             query: searchBox ? searchBox.value : "",
             relayOnly: relayOnly ? !!relayOnly.checked : false,
             harmonyOnly: harmonyOnly ? !!harmonyOnly.checked : false,
+            dateFrom: dateFrom ? dateFrom.value : "",
+            dateTo: dateTo ? dateTo.value : "",
             formats: Array.from(ui.selectedFormats)
         };
         localStorage.setItem(SEARCH_STATE_KEY, JSON.stringify(payload));
@@ -821,6 +846,8 @@ function restoreSearchState() {
         const searchBox = document.getElementById('searchBox');
         const relayOnly = document.getElementById('relayOnly');
         const harmonyOnly = document.getElementById('harmonyOnly');
+        const dateFrom = document.getElementById('dateFrom');
+        const dateTo = document.getElementById('dateTo');
         const formatCheckboxes = document.querySelectorAll('#formatsList input[type="checkbox"]');
         const formats = Array.isArray(parsed.formats) ? parsed.formats : [];
         const allowed = new Set(DEFAULT_FORMATS);
@@ -839,6 +866,8 @@ function restoreSearchState() {
         }
         if (relayOnly) relayOnly.checked = !!parsed.relayOnly;
         if (harmonyOnly) harmonyOnly.checked = !!parsed.harmonyOnly;
+        if (dateFrom && typeof parsed.dateFrom === "string") dateFrom.value = parsed.dateFrom;
+        if (dateTo && typeof parsed.dateTo === "string") dateTo.value = parsed.dateTo;
         ui.userTouchedQuery = true;
         ui.userTouchedFilters = true;
         ui.hasRestoredSearchState = true;
@@ -846,8 +875,9 @@ function restoreSearchState() {
 }
 
 /**
- * 検索条件の現在値を取得する
- * @returns {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean}}
+ * CSVを解析してSongRowの配列へ変換する
+ * @param {string} csvText
+ * @returns {Array<SongRow>}
  */
 function parseCsvToSongs(csvText) {
     const rows = parseCsvRFC4180(csvText);
@@ -873,6 +903,7 @@ function parseCsvToSongs(csvText) {
         const artistYomi = r[idx("アーティストメイ")];
         songs.push({
             date: r[idx("配信日")],
+            dateKey: parseDateKey(r[idx("配信日")]),
             sourceIndex: i,
             format: r[idx("形態")],
             isRelay: r[idx("歌枠リレー？")] === "◯",
@@ -971,31 +1002,39 @@ function search() {
 
 /**
  * 検索条件の現在値を取得する
- * @returns {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean}}
+ * @returns {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean, dateFromRaw: string, dateToRaw: string, dateFromKey: number | null, dateToKey: number | null}}
  */
 function getSearchState() {
+    const dateFromRaw = document.getElementById('dateFrom').value.trim();
+    const dateToRaw = document.getElementById('dateTo').value.trim();
     return {
         queryRaw: document.getElementById('searchBox').value.trim(),
         relayOnly: document.getElementById('relayOnly').checked,
-        harmonyOnly: document.getElementById('harmonyOnly').checked
+        harmonyOnly: document.getElementById('harmonyOnly').checked,
+        dateFromRaw,
+        dateToRaw,
+        dateFromKey: parseDateKey(dateFromRaw),
+        dateToKey: parseDateKey(dateToRaw)
     };
 }
 
 /**
  * おすすめ表示条件を満たしているか判定する
- * @param {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean}} searchState
+ * @param {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean, dateFromRaw: string, dateToRaw: string}} searchState
  * @returns {boolean}
  */
 function isRecommendedMode(searchState) {
     return searchState.queryRaw === "" &&
            !searchState.relayOnly &&
            !searchState.harmonyOnly &&
+           searchState.dateFromRaw === "" &&
+           searchState.dateToRaw === "" &&
            areAllFormatsSelected();
 }
 
 /**
  * 検索結果と表示ラベルをまとめて返す
- * @param {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean}} searchState
+ * @param {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean, dateFromKey: number | null, dateToKey: number | null}} searchState
  * @returns {{results: Array<SongRow>, displayLimit: number, label: string}}
  */
 function resolveSearchResults(searchState) {
@@ -1014,9 +1053,107 @@ function resolveSearchResults(searchState) {
     };
 }
 
+// ===== Date Filters (private) =====
+
+/**
+ * 入力された日付文字列を YYYYMMDD の数値に変換する
+ * @param {string} raw
+ * @returns {number | null}
+ */
+function parseDateKey(raw) {
+    if (!raw) return null;
+    const trimmed = raw.trim();
+    const match = /^(\d{4})[/-](\d{2})[/-](\d{2})$/.exec(trimmed);
+    if (!match) return null;
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+    const date = new Date(year, month - 1, day);
+    if (Number.isNaN(date.getTime())) return null;
+    if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null;
+    return year * 10000 + month * 100 + day;
+}
+
+/**
+ * YYYYMMDD の数値を input[type="date"] 向けの YYYY-MM-DD に変換する
+ * @param {number} key
+ * @returns {string}
+ */
+function formatDateKeyForInput(key) {
+    const year = Math.floor(key / 10000);
+    const month = Math.floor((key % 10000) / 100);
+    const day = key % 100;
+    const mm = String(month).padStart(2, "0");
+    const dd = String(day).padStart(2, "0");
+    return `${year}-${mm}-${dd}`;
+}
+
+/**
+ * 読み込み済みデータから日付範囲を算出し入力のmin/maxを更新する
+ * @param {Array<SongRow>} songs
+ */
+function applyDateInputRange(songs) {
+    const dateFrom = document.getElementById('dateFrom');
+    const dateTo = document.getElementById('dateTo');
+    if (!dateFrom || !dateTo) return;
+    let minKey = null;
+    let maxKey = null;
+    for (const row of songs) {
+        if (!row.dateKey) continue;
+        if (minKey === null || row.dateKey < minKey) minKey = row.dateKey;
+        if (maxKey === null || row.dateKey > maxKey) maxKey = row.dateKey;
+    }
+    if (minKey === null || maxKey === null) return null;
+    dateFrom.min = formatDateKeyForInput(minKey);
+    dateFrom.max = formatDateKeyForInput(maxKey);
+    dateTo.min = formatDateKeyForInput(minKey);
+    dateTo.max = formatDateKeyForInput(maxKey);
+    return { minKey, maxKey };
+}
+
+/**
+ * 入力された日付を範囲内に収める
+ * @param {number} minKey
+ * @param {number} maxKey
+ */
+function clampDateInputsToBounds(minKey, maxKey) {
+    const dateFrom = document.getElementById('dateFrom');
+    const dateTo = document.getElementById('dateTo');
+    if (!dateFrom || !dateTo) return;
+    const clampKey = (key) => {
+        if (key === null) return null;
+        if (key < minKey) return minKey;
+        if (key > maxKey) return maxKey;
+        return key;
+    };
+    let fromKey = clampKey(parseDateKey(dateFrom.value));
+    let toKey = clampKey(parseDateKey(dateTo.value));
+    if (fromKey !== null && toKey !== null && fromKey > toKey) {
+        toKey = fromKey;
+    }
+    if (fromKey !== null) dateFrom.value = formatDateKeyForInput(fromKey);
+    if (toKey !== null) dateTo.value = formatDateKeyForInput(toKey);
+}
+
+/**
+ * 日付フィルタに一致するか判定する
+ * @param {SongRow} row
+ * @param {number | null} fromKey
+ * @param {number | null} toKey
+ * @returns {boolean}
+ */
+function isWithinDateRange(row, fromKey, toKey) {
+    if (!fromKey && !toKey) return true;
+    if (!row.dateKey) return false;
+    if (fromKey && row.dateKey < fromKey) return false;
+    if (toKey && row.dateKey > toKey) return false;
+    return true;
+}
+
 /**
  * 検索条件で楽曲を絞り込む
- * @param {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean}} searchState
+ * @param {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean, dateFromKey: number | null, dateToKey: number | null}} searchState
  * @returns {Array<SongRow>}
  */
 function filterSongs(searchState) {
@@ -1029,7 +1166,12 @@ function filterSongs(searchState) {
             row.titleYomiNorm.includes(kw) ||
             row.artistYomiNorm.includes(kw)
         );
-        return matchText && ui.selectedFormats.has(row.format) && (!searchState.relayOnly || row.isRelay) && (!searchState.harmonyOnly || row.isHarmony);
+        const matchDate = isWithinDateRange(row, searchState.dateFromKey, searchState.dateToKey);
+        return matchText &&
+            matchDate &&
+            ui.selectedFormats.has(row.format) &&
+            (!searchState.relayOnly || row.isRelay) &&
+            (!searchState.harmonyOnly || row.isHarmony);
     });
 }
 
@@ -1286,7 +1428,7 @@ function createEmptyStateElement(message) {
 
 /**
  * 結果一覧の空状態メッセージを決める
- * @param {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean}} searchState
+ * @param {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean, dateFromRaw: string, dateToRaw: string, dateFromKey: number | null, dateToKey: number | null}} searchState
  * @returns {{kind: "loading" | "error" | "empty", message: string}}
  */
 function getEmptyStateDescriptor(searchState) {

@@ -97,6 +97,7 @@ body.hide-thumbs .thumb {
   flex-grow: 1;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
+  container-type: inline-size;
 }
 .sidebar-section { margin-bottom: 25px; }
 
@@ -112,6 +113,25 @@ input[type="text"] {
 
 .filter-group-stack { display: flex; flex-direction: column; gap: 8px; }
 .checkbox-item { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; margin-bottom: 8px; }
+.date-range { display: grid; grid-template-columns: 1fr; gap: 10px; }
+.date-label { display: flex; flex-direction: column; gap: 6px; }
+.date-input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--card-bg);
+  color: var(--text-color);
+  font-size: 16px;
+  font-family: inherit;
+  outline: none;
+}
+.dark-theme .date-input::-webkit-calendar-picker-indicator { filter: invert(0.8); }
+@container (min-width: 360px) {
+  .date-range { grid-template-columns: 1fr 1fr; }
+}
+.date-separator { color: var(--text-mute); font-size: 12px; }
 
 .container {
   max-width: 1920px;
