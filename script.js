@@ -33,7 +33,8 @@ const state = {
         searchDebounceId: 0,
         cardPool: [],
         recommendedCache: null,
-        activeThumb: null
+        activeThumb: null,
+        el: {} // DOM要素のキャッシュ用
     },
     youtube: {
         apiPromise: null,
@@ -70,6 +71,21 @@ const youtube = state.youtube;
  * @returns {Promise<void>}
  */
 async function initUI() {
+    // 主要なDOM要素をキャッシュ
+    ui.el = {
+        resultList: document.getElementById('resultList'),
+        resultCount: document.getElementById('resultCount'),
+        loadMoreContainer: document.getElementById('loadMoreContainer'),
+        searchBox: document.getElementById('searchBox'),
+        relayOnly: document.getElementById('relayOnly'),
+        harmonyOnly: document.getElementById('harmonyOnly'),
+        dateFrom: document.getElementById('dateFrom'),
+        dateTo: document.getElementById('dateTo'),
+        themeToggle: document.getElementById('theme-toggle'),
+        thumbToggle: document.getElementById('thumbnail-toggle'),
+        formatsList: document.getElementById('formatsList')
+    };
+
     setupUIHandlers();
     initFilterMenu();
     setupTheme();
@@ -146,8 +162,8 @@ function setupUIHandlers() {
     const sidebarScrollArea = document.querySelector('.sidebar-scroll-area');
     const loadMoreBtn = document.getElementById('loadMoreBtn');
     const clearBtn = document.getElementById('clearBtn');
-    const dateFrom = document.getElementById('dateFrom');
-    const dateTo = document.getElementById('dateTo');
+    const dateFrom = ui.el.dateFrom;
+    const dateTo = ui.el.dateTo;
     let lastFocusedElement = null;
 
     openBtn.addEventListener('click', () => {
@@ -179,13 +195,13 @@ function setupUIHandlers() {
         if (e.key === "Tab") trapSidebarFocus(e, sidebar);
     });
 
-    document.getElementById('relayOnly').addEventListener('change', () => {
+    ui.el.relayOnly.addEventListener('change', () => {
         markFilterTouched();
     });
-    document.getElementById('harmonyOnly').addEventListener('change', () => {
+    ui.el.harmonyOnly.addEventListener('change', () => {
         markFilterTouched();
     });
-    document.getElementById('searchBox').addEventListener('input', () => {
+    ui.el.searchBox.addEventListener('input', () => {
         markQueryTouched();
     });
     dateFrom.addEventListener('input', () => {
@@ -477,7 +493,7 @@ function clearSearch() {
  * 保存済みテーマを反映してUIを同期する
  */
 function setupTheme() {
-    const themeToggle = document.getElementById('theme-toggle');
+    const themeToggle = ui.el.themeToggle;
     applyThemeFromStorage();
     if (!themeToggle) return;
     themeToggle.addEventListener('change', () => {
@@ -491,7 +507,7 @@ function setupTheme() {
  * サムネ表示のオン/オフを初期化する
  */
 function setupThumbnailToggle() {
-    const thumbToggle = document.getElementById('thumbnail-toggle');
+    const thumbToggle = ui.el.thumbToggle;
     const savedSetting = localStorage.getItem('showThumbnails');
     let isShow = savedSetting !== null ? (savedSetting === 'true') : false;
     ui.showThumbnails = isShow;
@@ -545,8 +561,7 @@ function clearSearchDebounce() {
  * 検索語を初期状態に戻す
  */
 function resetSearchQuery() {
-    const searchBox = document.getElementById('searchBox');
-    if (searchBox) searchBox.value = "";
+    if (ui.el.searchBox) ui.el.searchBox.value = "";
     ui.userTouchedQuery = false;
 }
 
@@ -554,10 +569,10 @@ function resetSearchQuery() {
  * フィルタ条件を初期状態に戻す
  */
 function resetSearchFilters() {
-    const relayOnly = document.getElementById('relayOnly');
-    const harmonyOnly = document.getElementById('harmonyOnly');
-    const dateFrom = document.getElementById('dateFrom');
-    const dateTo = document.getElementById('dateTo');
+    const relayOnly = ui.el.relayOnly;
+    const harmonyOnly = ui.el.harmonyOnly;
+    const dateFrom = ui.el.dateFrom;
+    const dateTo = ui.el.dateTo;
     const formatCheckboxes = document.querySelectorAll('#formatsList input[type="checkbox"]');
 
     if (relayOnly) relayOnly.checked = false;
@@ -589,11 +604,11 @@ function resetSearchConditions(shouldSearch) {
  */
 function saveSearchState() {
     try {
-        const searchBox = document.getElementById('searchBox');
-        const relayOnly = document.getElementById('relayOnly');
-        const harmonyOnly = document.getElementById('harmonyOnly');
-        const dateFrom = document.getElementById('dateFrom');
-        const dateTo = document.getElementById('dateTo');
+        const searchBox = ui.el.searchBox;
+        const relayOnly = ui.el.relayOnly;
+        const harmonyOnly = ui.el.harmonyOnly;
+        const dateFrom = ui.el.dateFrom;
+        const dateTo = ui.el.dateTo;
         const payload = {
             query: searchBox ? searchBox.value : "",
             relayOnly: relayOnly ? !!relayOnly.checked : false,
@@ -614,11 +629,11 @@ function restoreSearchState() {
         const raw = localStorage.getItem(SEARCH_STATE_KEY);
         if (!raw) return;
         const parsed = JSON.parse(raw);
-        const searchBox = document.getElementById('searchBox');
-        const relayOnly = document.getElementById('relayOnly');
-        const harmonyOnly = document.getElementById('harmonyOnly');
-        const dateFrom = document.getElementById('dateFrom');
-        const dateTo = document.getElementById('dateTo');
+        const searchBox = ui.el.searchBox;
+        const relayOnly = ui.el.relayOnly;
+        const harmonyOnly = ui.el.harmonyOnly;
+        const dateFrom = ui.el.dateFrom;
+        const dateTo = ui.el.dateTo;
         const formatCheckboxes = document.querySelectorAll('#formatsList input[type="checkbox"]');
         const formats = Array.isArray(parsed.formats) ? parsed.formats : [];
         const allowed = new Set(DEFAULT_FORMATS);
@@ -706,7 +721,7 @@ function syncThumbnailUI() {
  * ローカルストレージ/システム設定からテーマを復元する
  */
 function applyThemeFromStorage() {
-    const themeToggle = document.getElementById('theme-toggle');
+    const themeToggle = ui.el.themeToggle;
     const savedTheme = localStorage.getItem('theme');
     const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     const isDarkMode = savedTheme ? (savedTheme === 'dark') : systemPrefersDark;
@@ -718,7 +733,7 @@ function applyThemeFromStorage() {
  * 保存済みサムネ設定を反映してUIを同期する
  */
 function applyThumbnailFromStorage() {
-    const thumbToggle = document.getElementById('thumbnail-toggle');
+    const thumbToggle = ui.el.thumbToggle;
     const savedSetting = localStorage.getItem('showThumbnails');
     const isShow = savedSetting !== null ? (savedSetting === 'true') : false;
     const prev = ui.showThumbnails;
@@ -754,10 +769,10 @@ function areAllFormatsSelected() {
  * @returns {boolean}
  */
 function needsFilterReset() {
-    const relayOnly = document.getElementById('relayOnly');
-    const harmonyOnly = document.getElementById('harmonyOnly');
-    const dateFrom = document.getElementById('dateFrom');
-    const dateTo = document.getElementById('dateTo');
+    const relayOnly = ui.el.relayOnly;
+    const harmonyOnly = ui.el.harmonyOnly;
+    const dateFrom = ui.el.dateFrom;
+    const dateTo = ui.el.dateTo;
     if (relayOnly && relayOnly.checked) return true;
     if (harmonyOnly && harmonyOnly.checked) return true;
     if (dateFrom && dateFrom.value.trim() !== "") return true;
@@ -775,7 +790,7 @@ function needsFilterReset() {
  */
 function syncSearchQueryIfNeeded() {
     if (ui.userTouchedQuery) return false;
-    const searchBox = document.getElementById('searchBox');
+    const searchBox = ui.el.searchBox;
     if (!searchBox || searchBox.value === "") return false;
     resetSearchQuery();
     return true;
@@ -806,7 +821,7 @@ function syncSearchUI() {
  * CSVを読み込み、初期データとフィルタを構築する
  */
 async function loadInitialData() {
-    const resCount = document.getElementById("resultCount");
+    const resCount = ui.el.resultCount;
     try {
         resCount.innerText = "データを読み込み中...";
         const res = await fetch(PUBLIC_CSV_URL, { cache: "no-store" });
@@ -830,7 +845,7 @@ async function loadInitialData() {
  * 形態フィルタのチェックボックス一覧を生成する
  */
 function initFilterMenu() {
-    const container = document.getElementById('formatsList');
+    const container = ui.el.formatsList;
     if (!container || container.childElementCount > 0) return;
     DEFAULT_FORMATS.forEach(fmt => {
         const label = document.createElement('label');
@@ -864,10 +879,10 @@ function applyLoadedCsv(csvText, statusLabel) {
     if (dateBounds) {
         clampDateInputsToBounds(dateBounds.minKey, dateBounds.maxKey);
     }
-    document.getElementById('searchBox').disabled = false;
+    ui.el.searchBox.disabled = false;
     ui.dataReady = true;
     if (statusLabel) {
-        document.getElementById("resultCount").innerText = statusLabel;
+        ui.el.resultCount.innerText = statusLabel;
     }
     if (!ui.hasRestoredSearchState) {
         resetSearchConditions(false);
@@ -890,7 +905,8 @@ function parseCsvToSongs(csvText) {
         throw new Error(`CSVヘッダ不足: ${missing.join(", ")}`);
     }
     const body = rows.slice(1);
-    const idx = (n) => header.indexOf(n);
+    const idxMap = Object.fromEntries(header.map((name, index) => [name, index]));
+    const idx = (n) => idxMap[n];
     const songs = [];
     for (let i = 0; i < body.length; i++) {
         const r = body[i];
@@ -991,7 +1007,7 @@ function scheduleSearch(options) {
  */
 function search() {
     const searchState = getSearchState();
-    const resCount = document.getElementById("resultCount");
+    const resCount = ui.el.resultCount;
 
     const { results, displayLimit, label } = resolveSearchResults(searchState);
     data.currentResults = results;
@@ -1007,12 +1023,12 @@ function search() {
  * @returns {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean, dateFromRaw: string, dateToRaw: string, dateFromKey: number | null, dateToKey: number | null}}
  */
 function getSearchState() {
-    const dateFromRaw = document.getElementById('dateFrom').value.trim();
-    const dateToRaw = document.getElementById('dateTo').value.trim();
+    const dateFromRaw = ui.el.dateFrom.value.trim();
+    const dateToRaw = ui.el.dateTo.value.trim();
     return {
-        queryRaw: document.getElementById('searchBox').value.trim(),
-        relayOnly: document.getElementById('relayOnly').checked,
-        harmonyOnly: document.getElementById('harmonyOnly').checked,
+        queryRaw: ui.el.searchBox.value.trim(),
+        relayOnly: ui.el.relayOnly.checked,
+        harmonyOnly: ui.el.harmonyOnly.checked,
         dateFromRaw,
         dateToRaw,
         dateFromKey: parseDateKey(dateFromRaw),
@@ -1096,8 +1112,8 @@ function formatDateKeyForInput(key) {
  * @param {Array<SongRow>} songs
  */
 function applyDateInputRange(songs) {
-    const dateFrom = document.getElementById('dateFrom');
-    const dateTo = document.getElementById('dateTo');
+    const dateFrom = ui.el.dateFrom;
+    const dateTo = ui.el.dateTo;
     if (!dateFrom || !dateTo) return;
     let minKey = null;
     let maxKey = null;
@@ -1120,8 +1136,8 @@ function applyDateInputRange(songs) {
  * @param {number} maxKey
  */
 function clampDateInputsToBounds(minKey, maxKey) {
-    const dateFrom = document.getElementById('dateFrom');
-    const dateTo = document.getElementById('dateTo');
+    const dateFrom = ui.el.dateFrom;
+    const dateTo = ui.el.dateTo;
     if (!dateFrom || !dateTo) return;
     const clampKey = (key) => {
         if (key === null) return null;
@@ -1494,7 +1510,7 @@ function observeVisibleThumbnails(count) {
  * @param {boolean} recommendedMode
  */
 function updateLoadMoreVisibility(recommendedMode) {
-    const loadMoreContainer = document.getElementById('loadMoreContainer');
+    const loadMoreContainer = ui.el.loadMoreContainer;
     if (!recommendedMode && data.currentResults.length > data.displayLimit) {
         loadMoreContainer.classList.remove('hidden');
     } else {
@@ -1508,7 +1524,7 @@ function updateLoadMoreVisibility(recommendedMode) {
  * 現在の検索結果をカードとして描画する
  */
 function updateDisplay() {
-    const container = document.getElementById("resultList");
+    const container = ui.el.resultList;
 
     if (ui.scrollObserver) ui.scrollObserver.disconnect();
     if (ui.showThumbnails && !ui.scrollObserver) setupScrollObserver();
@@ -1516,7 +1532,7 @@ function updateDisplay() {
     const results = getVisibleResults();
 
     if (results.length === 0) {
-        renderEmptyResults(container, document.getElementById('loadMoreContainer'));
+        renderEmptyResults(container, ui.el.loadMoreContainer);
         return;
     }
 
@@ -1768,12 +1784,6 @@ function updateThumbnail(thumbDiv, row, yt) {
     }
 }
 
-/**
- * フッター用のタグ群を更新する
- * @param {HTMLDivElement} tags
- * @param {SongRow} row
- */
-
 // ===== YouTube API (private) =====
 
 /**
@@ -1808,6 +1818,11 @@ const youtubeApi = {
         if (youtube.apiPromise) return youtube.apiPromise;
         youtube.apiPromise = new Promise((resolve, reject) => {
             const existing = document.querySelector(YT_IFRAME_API_SELECTOR);
+            const prevCallback = window.onYouTubeIframeAPIReady;
+            window.onYouTubeIframeAPIReady = () => {
+                if (typeof prevCallback === "function") prevCallback();
+                resolve();
+            };
             if (existing) {
                 this.waitForReady(resolve);
                 return;
@@ -1817,11 +1832,6 @@ const youtubeApi = {
             script.async = true;
             script.dataset.ytIframeApi = "true";
             script.onerror = () => reject(new Error("iframe_api load failed"));
-            const prevCallback = window.onYouTubeIframeAPIReady;
-            window.onYouTubeIframeAPIReady = () => {
-                if (typeof prevCallback === "function") prevCallback();
-                resolve();
-            };
             document.head.appendChild(script);
         });
         return youtube.apiPromise;
