@@ -582,6 +582,69 @@ function resetSearchConditions(shouldSearch) {
     if (shouldSearch && ui.dataReady) scheduleSearch({ immediate: true });
 }
 
+// ===== Search State Persistence (private) =====
+
+/**
+ * 現在の検索状態を保存する
+ */
+function saveSearchState() {
+    try {
+        const searchBox = document.getElementById('searchBox');
+        const relayOnly = document.getElementById('relayOnly');
+        const harmonyOnly = document.getElementById('harmonyOnly');
+        const dateFrom = document.getElementById('dateFrom');
+        const dateTo = document.getElementById('dateTo');
+        const payload = {
+            query: searchBox ? searchBox.value : "",
+            relayOnly: relayOnly ? !!relayOnly.checked : false,
+            harmonyOnly: harmonyOnly ? !!harmonyOnly.checked : false,
+            dateFrom: dateFrom ? dateFrom.value : "",
+            dateTo: dateTo ? dateTo.value : "",
+            formats: Array.from(ui.selectedFormats)
+        };
+        localStorage.setItem(SEARCH_STATE_KEY, JSON.stringify(payload));
+    } catch (e) {}
+}
+
+/**
+ * 保存済み検索状態を復元する
+ */
+function restoreSearchState() {
+    try {
+        const raw = localStorage.getItem(SEARCH_STATE_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        const searchBox = document.getElementById('searchBox');
+        const relayOnly = document.getElementById('relayOnly');
+        const harmonyOnly = document.getElementById('harmonyOnly');
+        const dateFrom = document.getElementById('dateFrom');
+        const dateTo = document.getElementById('dateTo');
+        const formatCheckboxes = document.querySelectorAll('#formatsList input[type="checkbox"]');
+        const formats = Array.isArray(parsed.formats) ? parsed.formats : [];
+        const allowed = new Set(DEFAULT_FORMATS);
+        ui.selectedFormats.clear();
+        formats.forEach((f) => {
+            if (allowed.has(f)) ui.selectedFormats.add(f);
+        });
+        if (ui.selectedFormats.size === 0) {
+            DEFAULT_FORMATS.forEach((f) => ui.selectedFormats.add(f));
+        }
+        formatCheckboxes.forEach((cb) => {
+            cb.checked = ui.selectedFormats.has(cb.value);
+        });
+        if (searchBox && typeof parsed.query === "string") {
+            searchBox.value = parsed.query;
+        }
+        if (relayOnly) relayOnly.checked = !!parsed.relayOnly;
+        if (harmonyOnly) harmonyOnly.checked = !!parsed.harmonyOnly;
+        if (dateFrom && typeof parsed.dateFrom === "string") dateFrom.value = parsed.dateFrom;
+        if (dateTo && typeof parsed.dateTo === "string") dateTo.value = parsed.dateTo;
+        ui.userTouchedQuery = true;
+        ui.userTouchedFilters = true;
+        ui.hasRestoredSearchState = true;
+    } catch (e) {}
+}
+
 // ===== UI Sync (public) =====
 
 /**
@@ -811,67 +874,6 @@ function applyLoadedCsv(csvText, statusLabel) {
     }
     scheduleSearch({ immediate: true });
     requestAnimationFrame(() => youtubeApi.ensureReady().catch(() => {}));
-}
-
-/**
- * 現在の検索状態を保存する
- */
-function saveSearchState() {
-    try {
-        const searchBox = document.getElementById('searchBox');
-        const relayOnly = document.getElementById('relayOnly');
-        const harmonyOnly = document.getElementById('harmonyOnly');
-        const dateFrom = document.getElementById('dateFrom');
-        const dateTo = document.getElementById('dateTo');
-        const payload = {
-            query: searchBox ? searchBox.value : "",
-            relayOnly: relayOnly ? !!relayOnly.checked : false,
-            harmonyOnly: harmonyOnly ? !!harmonyOnly.checked : false,
-            dateFrom: dateFrom ? dateFrom.value : "",
-            dateTo: dateTo ? dateTo.value : "",
-            formats: Array.from(ui.selectedFormats)
-        };
-        localStorage.setItem(SEARCH_STATE_KEY, JSON.stringify(payload));
-    } catch (e) {}
-}
-
-/**
- * 保存済み検索状態を復元する
- */
-function restoreSearchState() {
-    try {
-        const raw = localStorage.getItem(SEARCH_STATE_KEY);
-        if (!raw) return;
-        const parsed = JSON.parse(raw);
-        const searchBox = document.getElementById('searchBox');
-        const relayOnly = document.getElementById('relayOnly');
-        const harmonyOnly = document.getElementById('harmonyOnly');
-        const dateFrom = document.getElementById('dateFrom');
-        const dateTo = document.getElementById('dateTo');
-        const formatCheckboxes = document.querySelectorAll('#formatsList input[type="checkbox"]');
-        const formats = Array.isArray(parsed.formats) ? parsed.formats : [];
-        const allowed = new Set(DEFAULT_FORMATS);
-        ui.selectedFormats.clear();
-        formats.forEach((f) => {
-            if (allowed.has(f)) ui.selectedFormats.add(f);
-        });
-        if (ui.selectedFormats.size === 0) {
-            DEFAULT_FORMATS.forEach((f) => ui.selectedFormats.add(f));
-        }
-        formatCheckboxes.forEach((cb) => {
-            cb.checked = ui.selectedFormats.has(cb.value);
-        });
-        if (searchBox && typeof parsed.query === "string") {
-            searchBox.value = parsed.query;
-        }
-        if (relayOnly) relayOnly.checked = !!parsed.relayOnly;
-        if (harmonyOnly) harmonyOnly.checked = !!parsed.harmonyOnly;
-        if (dateFrom && typeof parsed.dateFrom === "string") dateFrom.value = parsed.dateFrom;
-        if (dateTo && typeof parsed.dateTo === "string") dateTo.value = parsed.dateTo;
-        ui.userTouchedQuery = true;
-        ui.userTouchedFilters = true;
-        ui.hasRestoredSearchState = true;
-    } catch (e) {}
 }
 
 /**
