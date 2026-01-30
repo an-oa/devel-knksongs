@@ -218,7 +218,8 @@ function setupUIHandlers() {
     [dateFromYear, dateFromMonth, dateFromDay, dateToYear, dateToMonth, dateToDay].forEach((el) => {
         if (!el) return;
         el.addEventListener('change', () => {
-            markFilterTouched();
+            moveDateFocusIfNeeded(el, dateFromYear, dateFromMonth, dateToYear, dateToMonth);
+            markFilterTouched({ immediate: true });
             clampDateInputsIfNeeded();
             syncDateSelectOptions();
         });
@@ -234,6 +235,38 @@ function setupUIHandlers() {
 }
 
 // ===== Sidebar Accessibility =====
+
+/**
+ * 年選択時に月セレクトへフォーカスを移す
+ * @param {HTMLSelectElement} target
+ * @param {HTMLSelectElement | null} fromYear
+ * @param {HTMLSelectElement | null} fromMonth
+ * @param {HTMLSelectElement | null} toYear
+ * @param {HTMLSelectElement | null} toMonth
+ */
+function moveDateFocusIfNeeded(target, fromYear, fromMonth, toYear, toMonth) {
+    if (fromYear && target === fromYear && fromMonth && fromYear.value) {
+        fromMonth.focus();
+        return;
+    }
+    if (fromMonth && target === fromMonth && fromMonth.value) {
+        const fromDay = ui.el.dateFromDay;
+        if (fromDay) {
+            fromDay.focus();
+            return;
+        }
+    }
+    if (toYear && target === toYear && toMonth && toYear.value) {
+        toMonth.focus();
+        return;
+    }
+    if (toMonth && target === toMonth && toMonth.value) {
+        const toDay = ui.el.dateToDay;
+        if (toDay) {
+            toDay.focus();
+        }
+    }
+}
 
 /**
  * サイドバー内にフォーカスが残っている場合はフォーカスを外す
@@ -543,11 +576,12 @@ function setupThumbnailToggle() {
 
 /**
  * フィルタ変更を検知して再検索を予約する
+ * @param {{ immediate?: boolean }} [options]
  */
-function markFilterTouched() {
+function markFilterTouched(options) {
     ui.userTouchedFilters = true;
     ui.recommendedCache = null;
-    scheduleSearch();
+    scheduleSearch(options);
     saveSearchState();
 }
 
@@ -1033,39 +1067,37 @@ function search() {
 
 /**
  * 検索条件の現在値を取得する
- * @returns {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean, dateFromRaw: string, dateToRaw: string, dateFromKey: number | null, dateToKey: number | null}}
+ * @returns {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean, dateFromKey: number | null, dateToKey: number | null, hasDateFilter: boolean}}
  */
 function getSearchState() {
-    const dateFromRaw = getDateSelectValue("from");
-    const dateToRaw = getDateSelectValue("to");
+    const fromRange = getPartialDateRange("from");
+    const toRange = getPartialDateRange("to");
     return {
         queryRaw: ui.el.searchBox.value.trim(),
         relayOnly: ui.el.relayOnly.checked,
         harmonyOnly: ui.el.harmonyOnly.checked,
-        dateFromRaw,
-        dateToRaw,
-        dateFromKey: parseDateKey(dateFromRaw),
-        dateToKey: parseDateKey(dateToRaw)
+        dateFromKey: fromRange ? fromRange.minKey : null,
+        dateToKey: toRange ? toRange.maxKey : null,
+        hasDateFilter: Boolean(fromRange || toRange)
     };
 }
 
 /**
  * おすすめ表示条件を満たしているか判定する
- * @param {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean, dateFromRaw: string, dateToRaw: string}} searchState
+ * @param {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean, hasDateFilter: boolean}} searchState
  * @returns {boolean}
  */
 function isRecommendedMode(searchState) {
     return searchState.queryRaw === "" &&
            !searchState.relayOnly &&
            !searchState.harmonyOnly &&
-           searchState.dateFromRaw === "" &&
-           searchState.dateToRaw === "" &&
+           !searchState.hasDateFilter &&
            areAllFormatsSelected();
 }
 
 /**
  * 検索結果と表示ラベルをまとめて返す
- * @param {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean, dateFromKey: number | null, dateToKey: number | null}} searchState
+ * @param {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean, dateFromKey: number | null, dateToKey: number | null, hasDateFilter: boolean}} searchState
  * @returns {{results: Array<SongRow>, displayLimit: number, label: string}}
  */
 function resolveSearchResults(searchState) {
@@ -1494,7 +1526,7 @@ function isWithinDateRange(row, fromKey, toKey) {
 
 /**
  * 検索条件で楽曲を絞り込む
- * @param {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean, dateFromKey: number | null, dateToKey: number | null}} searchState
+ * @param {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean, dateFromKey: number | null, dateToKey: number | null, hasDateFilter: boolean}} searchState
  * @returns {Array<SongRow>}
  */
 function filterSongs(searchState) {
