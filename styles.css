@@ -157,6 +157,25 @@ input[type="text"] {
 .date-select.month,
 .date-select.day { flex: 0 0 3.1em; }
 
+.date-clear-btn {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--card-bg);
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-mute);
+  cursor: pointer;
+  font-size: 18px;
+  padding: 0;
+  box-sizing: border-box;
+  transition: all 0.2s;
+}
+.date-clear-btn:hover { border-color: var(--primary-color); color: var(--primary-color); }
+
 @supports not (appearance: none) {
   .date-select { -webkit-appearance: none; -moz-appearance: none; appearance: none; }
 }

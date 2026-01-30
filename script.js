@@ -88,6 +88,8 @@ async function initUI() {
         dateToYear: document.getElementById('dateToYear'),
         dateToMonth: document.getElementById('dateToMonth'),
         dateToDay: document.getElementById('dateToDay'),
+        clearDateFromBtn: document.getElementById('clearDateFromBtn'),
+        clearDateToBtn: document.getElementById('clearDateToBtn'),
         themeToggle: document.getElementById('theme-toggle'),
         thumbToggle: document.getElementById('thumbnail-toggle'),
         formatsList: document.getElementById('formatsList')
@@ -226,12 +228,35 @@ function setupUIHandlers() {
         el.addEventListener('blur', clampDateInputsIfNeeded);
     });
 
+    [ui.el.clearDateFromBtn, ui.el.clearDateToBtn].forEach((btn, idx) => {
+        if (!btn) return;
+        btn.addEventListener('click', () => {
+            resetDateSelectGroup(idx === 0 ? "from" : "to");
+            markFilterTouched({ immediate: true });
+        });
+    });
+
     loadMoreBtn.addEventListener('click', () => {
         data.displayLimit += INCREMENT_COUNT;
         updateDisplay();
     });
 
     clearBtn.addEventListener('click', clearSearch);
+}
+
+/**
+ * 特定の日付セレクトグループをリセットする
+ * @param {"from" | "to"} kind
+ */
+function resetDateSelectGroup(kind) {
+    const isFrom = kind === "from";
+    const year = isFrom ? ui.el.dateFromYear : ui.el.dateToYear;
+    const month = isFrom ? ui.el.dateFromMonth : ui.el.dateToMonth;
+    const day = isFrom ? ui.el.dateFromDay : ui.el.dateToDay;
+    if (year) year.value = "";
+    if (month) month.value = "";
+    if (day) day.value = "";
+    syncDateSelectOptions();
 }
 
 // ===== Sidebar Accessibility =====
