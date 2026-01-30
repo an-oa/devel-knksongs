@@ -400,7 +400,7 @@ const scrollLock = (() => {
         docScrollBlocker = (e) => {
             if (!locked) return;
             const target = e.target;
-            if (scrollArea && target instanceof Element && target.closest('.sidebar-scroll-area')) return;
+            if (target instanceof Element && target.closest('#sidebar')) return;
             e.preventDefault();
         };
         document.addEventListener('touchmove', docScrollBlocker, { passive: false, capture: true });
@@ -1086,6 +1086,8 @@ function resolveSearchResults(searchState) {
 
 // ===== Date Filters (private) =====
 
+// --- Date Index ---
+
 /**
  * 配信日インデックスを構築する
  * @param {Array<SongRow>} songs
@@ -1119,6 +1121,8 @@ function getAvailableDays(year, month) {
     return ui.dateIndex.get(key) || [];
 }
 
+// --- Date Select State ---
+
 /**
  * 日付セレクトが選択済みか判定する
  * @returns {boolean}
@@ -1148,52 +1152,6 @@ function getDateSelectParts(kind) {
     const month = (isFrom ? ui.el.dateFromMonth : ui.el.dateToMonth)?.value ?? "";
     const day = (isFrom ? ui.el.dateFromDay : ui.el.dateToDay)?.value ?? "";
     return { year, month, day };
-}
-
-/**
- * 部分的に入力された日付の範囲を取得する
- * @param {"from" | "to"} kind
- * @returns {{minKey: number, maxKey: number} | null}
- */
-function getPartialDateRange(kind) {
-    const { year, month, day } = getDateSelectParts(kind);
-    if (!year) return null;
-    const y = Number(year);
-    if (!month) {
-        return { minKey: y * 10000 + 101, maxKey: y * 10000 + 1231 };
-    }
-    const m = Number(month);
-    const daysInMonth = new Date(y, m, 0).getDate();
-    if (!day) {
-        return { minKey: y * 10000 + m * 100 + 1, maxKey: y * 10000 + m * 100 + daysInMonth };
-    }
-    const d = Number(day);
-    return { minKey: y * 10000 + m * 100 + d, maxKey: y * 10000 + m * 100 + d };
-}
-
-/**
- * 反対側の入力に基づいて範囲を制約する
- * @param {"from" | "to"} kind
- * @returns {{minKey: number, maxKey: number} | null}
- */
-function getConstrainedBounds(kind) {
-    if (!ui.dateBounds) return null;
-    let minKey = ui.dateBounds.minKey;
-    let maxKey = ui.dateBounds.maxKey;
-    const otherKind = kind === "from" ? "to" : "from";
-    const otherRange = getPartialDateRange(otherKind);
-    if (otherRange) {
-        if (kind === "to") {
-            minKey = Math.max(minKey, otherRange.minKey);
-        } else {
-            maxKey = Math.min(maxKey, otherRange.maxKey);
-        }
-    }
-    if (minKey > maxKey) {
-        if (kind === "to") minKey = maxKey;
-        else maxKey = minKey;
-    }
-    return { minKey, maxKey };
 }
 
 /**
@@ -1244,6 +1202,56 @@ function resetDateSelects() {
     });
     syncDateSelectOptions();
 }
+
+// --- Date Range Constraints ---
+
+/**
+ * 部分的に入力された日付の範囲を取得する
+ * @param {"from" | "to"} kind
+ * @returns {{minKey: number, maxKey: number} | null}
+ */
+function getPartialDateRange(kind) {
+    const { year, month, day } = getDateSelectParts(kind);
+    if (!year) return null;
+    const y = Number(year);
+    if (!month) {
+        return { minKey: y * 10000 + 101, maxKey: y * 10000 + 1231 };
+    }
+    const m = Number(month);
+    const daysInMonth = new Date(y, m, 0).getDate();
+    if (!day) {
+        return { minKey: y * 10000 + m * 100 + 1, maxKey: y * 10000 + m * 100 + daysInMonth };
+    }
+    const d = Number(day);
+    return { minKey: y * 10000 + m * 100 + d, maxKey: y * 10000 + m * 100 + d };
+}
+
+/**
+ * 反対側の入力に基づいて範囲を制約する
+ * @param {"from" | "to"} kind
+ * @returns {{minKey: number, maxKey: number} | null}
+ */
+function getConstrainedBounds(kind) {
+    if (!ui.dateBounds) return null;
+    let minKey = ui.dateBounds.minKey;
+    let maxKey = ui.dateBounds.maxKey;
+    const otherKind = kind === "from" ? "to" : "from";
+    const otherRange = getPartialDateRange(otherKind);
+    if (otherRange) {
+        if (kind === "to") {
+            minKey = Math.max(minKey, otherRange.minKey);
+        } else {
+            maxKey = Math.min(maxKey, otherRange.maxKey);
+        }
+    }
+    if (minKey > maxKey) {
+        if (kind === "to") minKey = maxKey;
+        else maxKey = minKey;
+    }
+    return { minKey, maxKey };
+}
+
+// --- Date Select UI ---
 
 /**
  * 日付セレクトを初期化する

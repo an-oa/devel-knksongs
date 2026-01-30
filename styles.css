@@ -78,6 +78,7 @@ body.hide-thumbs .thumb {
   position: fixed;
   top: 0; right: 0;
   width: 280px; max-width: 80vw; height: 100vh;
+  box-sizing: border-box;
   background-color: var(--sidebar-bg);
   z-index: 1000;
   transform: translateX(100%);
@@ -93,11 +94,14 @@ body.hide-thumbs .thumb {
 #resultCount { font-size: 13px; color: var(--primary-color); font-weight: bold; }
 .sidebar-scroll-area {
   padding: 20px;
+  padding-bottom: 40px;
   overflow-y: auto;
+  overflow-x: hidden;
   flex-grow: 1;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   container-type: inline-size;
+  box-sizing: border-box;
 }
 .sidebar-section { margin-bottom: 25px; }
 
@@ -250,7 +254,10 @@ input[type="text"] {
   justify-content: space-between;
   align-items: center;
   width: 100%;
+  gap: 8px;
+  min-width: 0;
 }
+.menu-item-toggle span { flex: 1; min-width: 0; }
 
 .switch { position: relative; width: 34px; height: 18px; display: inline-block; flex-shrink: 0; }
 .switch input { opacity: 0; width: 0; height: 0; }
