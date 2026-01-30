@@ -115,29 +115,50 @@ input[type="text"] {
   font-size: 16px;
 }
 
-.filter-group-stack { display: flex; flex-direction: column; gap: 8px; }
+#formatsList {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 12px;
+  row-gap: 8px;
+  width: 100%;
+}
+#formatsList .checkbox-item {
+  margin-bottom: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
 .checkbox-item { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; margin-bottom: 8px; }
-.date-range { display: grid; grid-template-columns: 1fr; gap: 10px; }
-.date-label { display: flex; flex-direction: column; gap: 6px; }
-.date-select-group { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.date-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.date-row-label {
+  width: 40px;
+  flex-shrink: 0;
+}
+.date-select-group { display: flex; gap: 6px; flex-wrap: nowrap; flex-grow: 1; }
 .date-select {
-  flex: 1 1 30%;
+  flex: 1 1 auto;
   min-width: 0;
-  padding: 8px;
-  border: 2px solid var(--border-color);
-  border-radius: 8px;
+  padding: 4px 6px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
   background: var(--card-bg);
   color: var(--text-color);
-  font-size: 16px;
+  font-size: 13px;
   font-family: inherit;
   outline: none;
   appearance: none;
 }
+.date-select.year { flex: 0 0 4.6em; }
+.date-select.month,
+.date-select.day { flex: 0 0 3.1em; }
+
 @supports not (appearance: none) {
   .date-select { -webkit-appearance: none; -moz-appearance: none; appearance: none; }
-}
-@container (min-width: 360px) {
-  .date-range { grid-template-columns: 1fr 1fr; }
 }
 
 .container {
