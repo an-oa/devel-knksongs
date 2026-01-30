@@ -63,11 +63,19 @@
         <div class="date-range">
           <label class="date-label">
             <span class="section-label">From</span>
-            <input type="date" id="dateFrom" class="date-input" aria-label="開始日">
+            <div class="date-select-group" aria-label="開始日">
+              <select id="dateFromYear" class="date-select" aria-label="開始年"></select>
+              <select id="dateFromMonth" class="date-select" aria-label="開始月"></select>
+              <select id="dateFromDay" class="date-select" aria-label="開始日"></select>
+            </div>
           </label>
           <label class="date-label">
             <span class="section-label">To</span>
-            <input type="date" id="dateTo" class="date-input" aria-label="終了日">
+            <div class="date-select-group" aria-label="終了日">
+              <select id="dateToYear" class="date-select" aria-label="終了年"></select>
+              <select id="dateToMonth" class="date-select" aria-label="終了月"></select>
+              <select id="dateToDay" class="date-select" aria-label="終了日"></select>
+            </div>
           </label>
         </div>
       </div>

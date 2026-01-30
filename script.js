@@ -22,7 +22,7 @@ const state = {
         currentResults: [],
         displayLimit: RANDOM_DISPLAY_COUNT
     },
-    ui: {
+        ui: {
         selectedFormats: new Set(),
         scrollObserver: null,
         showThumbnails: false,
@@ -34,7 +34,10 @@ const state = {
         cardPool: [],
         recommendedCache: null,
         activeThumb: null,
-        el: {} // DOM要素のキャッシュ用
+        el: {}, // DOM要素のキャッシュ用
+        dateBounds: null,
+        dateIndex: null,
+        pendingDateValues: null
     },
     youtube: {
         apiPromise: null,
@@ -79,8 +82,12 @@ async function initUI() {
         searchBox: document.getElementById('searchBox'),
         relayOnly: document.getElementById('relayOnly'),
         harmonyOnly: document.getElementById('harmonyOnly'),
-        dateFrom: document.getElementById('dateFrom'),
-        dateTo: document.getElementById('dateTo'),
+        dateFromYear: document.getElementById('dateFromYear'),
+        dateFromMonth: document.getElementById('dateFromMonth'),
+        dateFromDay: document.getElementById('dateFromDay'),
+        dateToYear: document.getElementById('dateToYear'),
+        dateToMonth: document.getElementById('dateToMonth'),
+        dateToDay: document.getElementById('dateToDay'),
         themeToggle: document.getElementById('theme-toggle'),
         thumbToggle: document.getElementById('thumbnail-toggle'),
         formatsList: document.getElementById('formatsList')
@@ -162,8 +169,12 @@ function setupUIHandlers() {
     const sidebarScrollArea = document.querySelector('.sidebar-scroll-area');
     const loadMoreBtn = document.getElementById('loadMoreBtn');
     const clearBtn = document.getElementById('clearBtn');
-    const dateFrom = ui.el.dateFrom;
-    const dateTo = ui.el.dateTo;
+    const dateFromYear = ui.el.dateFromYear;
+    const dateFromMonth = ui.el.dateFromMonth;
+    const dateFromDay = ui.el.dateFromDay;
+    const dateToYear = ui.el.dateToYear;
+    const dateToMonth = ui.el.dateToMonth;
+    const dateToDay = ui.el.dateToDay;
     let lastFocusedElement = null;
 
     openBtn.addEventListener('click', () => {
@@ -204,11 +215,14 @@ function setupUIHandlers() {
     ui.el.searchBox.addEventListener('input', () => {
         markQueryTouched();
     });
-    dateFrom.addEventListener('input', () => {
-        markFilterTouched();
-    });
-    dateTo.addEventListener('input', () => {
-        markFilterTouched();
+    [dateFromYear, dateFromMonth, dateFromDay, dateToYear, dateToMonth, dateToDay].forEach((el) => {
+        if (!el) return;
+        el.addEventListener('change', () => {
+            markFilterTouched();
+            clampDateInputsIfNeeded();
+            syncDateSelectOptions();
+        });
+        el.addEventListener('blur', clampDateInputsIfNeeded);
     });
 
     loadMoreBtn.addEventListener('click', () => {
@@ -571,14 +585,12 @@ function resetSearchQuery() {
 function resetSearchFilters() {
     const relayOnly = ui.el.relayOnly;
     const harmonyOnly = ui.el.harmonyOnly;
-    const dateFrom = ui.el.dateFrom;
-    const dateTo = ui.el.dateTo;
     const formatCheckboxes = document.querySelectorAll('#formatsList input[type="checkbox"]');
 
     if (relayOnly) relayOnly.checked = false;
     if (harmonyOnly) harmonyOnly.checked = false;
-    if (dateFrom) dateFrom.value = "";
-    if (dateTo) dateTo.value = "";
+    resetDateSelects();
+    ui.pendingDateValues = null;
 
     ui.selectedFormats.clear();
     DEFAULT_FORMATS.forEach(f => ui.selectedFormats.add(f));
@@ -607,14 +619,14 @@ function saveSearchState() {
         const searchBox = ui.el.searchBox;
         const relayOnly = ui.el.relayOnly;
         const harmonyOnly = ui.el.harmonyOnly;
-        const dateFrom = ui.el.dateFrom;
-        const dateTo = ui.el.dateTo;
+        const dateFrom = getDateSelectValue("from");
+        const dateTo = getDateSelectValue("to");
         const payload = {
             query: searchBox ? searchBox.value : "",
             relayOnly: relayOnly ? !!relayOnly.checked : false,
             harmonyOnly: harmonyOnly ? !!harmonyOnly.checked : false,
-            dateFrom: dateFrom ? dateFrom.value : "",
-            dateTo: dateTo ? dateTo.value : "",
+            dateFrom,
+            dateTo,
             formats: Array.from(ui.selectedFormats)
         };
         localStorage.setItem(SEARCH_STATE_KEY, JSON.stringify(payload));
@@ -632,8 +644,6 @@ function restoreSearchState() {
         const searchBox = ui.el.searchBox;
         const relayOnly = ui.el.relayOnly;
         const harmonyOnly = ui.el.harmonyOnly;
-        const dateFrom = ui.el.dateFrom;
-        const dateTo = ui.el.dateTo;
         const formatCheckboxes = document.querySelectorAll('#formatsList input[type="checkbox"]');
         const formats = Array.isArray(parsed.formats) ? parsed.formats : [];
         const allowed = new Set(DEFAULT_FORMATS);
@@ -652,8 +662,14 @@ function restoreSearchState() {
         }
         if (relayOnly) relayOnly.checked = !!parsed.relayOnly;
         if (harmonyOnly) harmonyOnly.checked = !!parsed.harmonyOnly;
-        if (dateFrom && typeof parsed.dateFrom === "string") dateFrom.value = parsed.dateFrom;
-        if (dateTo && typeof parsed.dateTo === "string") dateTo.value = parsed.dateTo;
+        const pending = {
+            from: typeof parsed.dateFrom === "string" ? parsed.dateFrom : "",
+            to: typeof parsed.dateTo === "string" ? parsed.dateTo : ""
+        };
+        ui.pendingDateValues = pending;
+        if (ui.dateBounds) {
+            applyPendingDateValues();
+        }
         ui.userTouchedQuery = true;
         ui.userTouchedFilters = true;
         ui.hasRestoredSearchState = true;
@@ -771,12 +787,9 @@ function areAllFormatsSelected() {
 function needsFilterReset() {
     const relayOnly = ui.el.relayOnly;
     const harmonyOnly = ui.el.harmonyOnly;
-    const dateFrom = ui.el.dateFrom;
-    const dateTo = ui.el.dateTo;
     if (relayOnly && relayOnly.checked) return true;
     if (harmonyOnly && harmonyOnly.checked) return true;
-    if (dateFrom && dateFrom.value.trim() !== "") return true;
-    if (dateTo && dateTo.value.trim() !== "") return true;
+    if (hasDateSelection()) return true;
     const formatCheckboxes = document.querySelectorAll('#formatsList input[type="checkbox"]');
     for (const cb of formatCheckboxes) {
         if (!cb.checked) return true;
@@ -1023,8 +1036,8 @@ function search() {
  * @returns {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean, dateFromRaw: string, dateToRaw: string, dateFromKey: number | null, dateToKey: number | null}}
  */
 function getSearchState() {
-    const dateFromRaw = ui.el.dateFrom.value.trim();
-    const dateToRaw = ui.el.dateTo.value.trim();
+    const dateFromRaw = getDateSelectValue("from");
+    const dateToRaw = getDateSelectValue("to");
     return {
         queryRaw: ui.el.searchBox.value.trim(),
         relayOnly: ui.el.relayOnly.checked,
@@ -1074,6 +1087,284 @@ function resolveSearchResults(searchState) {
 // ===== Date Filters (private) =====
 
 /**
+ * 配信日インデックスを構築する
+ * @param {Array<SongRow>} songs
+ * @returns {Map<string, number[]>}
+ */
+function buildDateIndex(songs) {
+    const index = new Map();
+    for (const row of songs) {
+        if (!row.dateKey) continue;
+        const { year, month, day } = dateKeyToParts(row.dateKey);
+        const key = `${year}-${String(month).padStart(2, "0")}`;
+        if (!index.has(key)) index.set(key, new Set());
+        index.get(key).add(day);
+    }
+    const normalized = new Map();
+    for (const [key, set] of index.entries()) {
+        normalized.set(key, Array.from(set).sort((a, b) => a - b));
+    }
+    return normalized;
+}
+
+/**
+ * 指定年月の配信日リストを取得する
+ * @param {string} year
+ * @param {string} month
+ * @returns {number[]}
+ */
+function getAvailableDays(year, month) {
+    if (!ui.dateIndex) return [];
+    const key = `${year}-${month}`;
+    return ui.dateIndex.get(key) || [];
+}
+
+/**
+ * 日付セレクトが選択済みか判定する
+ * @returns {boolean}
+ */
+function hasDateSelection() {
+    return hasPartialDateSelection("from") || hasPartialDateSelection("to");
+}
+
+/**
+ * 日付セレクトのいずれかが入力されているか判定する
+ * @param {"from" | "to"} kind
+ * @returns {boolean}
+ */
+function hasPartialDateSelection(kind) {
+    const parts = getDateSelectParts(kind);
+    return parts.year !== "" || parts.month !== "" || parts.day !== "";
+}
+
+/**
+ * 日付セレクトの選択値を取得する
+ * @param {"from" | "to"} kind
+ * @returns {{year: string, month: string, day: string}}
+ */
+function getDateSelectParts(kind) {
+    const isFrom = kind === "from";
+    const year = (isFrom ? ui.el.dateFromYear : ui.el.dateToYear)?.value ?? "";
+    const month = (isFrom ? ui.el.dateFromMonth : ui.el.dateToMonth)?.value ?? "";
+    const day = (isFrom ? ui.el.dateFromDay : ui.el.dateToDay)?.value ?? "";
+    return { year, month, day };
+}
+
+/**
+ * 部分的に入力された日付の範囲を取得する
+ * @param {"from" | "to"} kind
+ * @returns {{minKey: number, maxKey: number} | null}
+ */
+function getPartialDateRange(kind) {
+    const { year, month, day } = getDateSelectParts(kind);
+    if (!year) return null;
+    const y = Number(year);
+    if (!month) {
+        return { minKey: y * 10000 + 101, maxKey: y * 10000 + 1231 };
+    }
+    const m = Number(month);
+    const daysInMonth = new Date(y, m, 0).getDate();
+    if (!day) {
+        return { minKey: y * 10000 + m * 100 + 1, maxKey: y * 10000 + m * 100 + daysInMonth };
+    }
+    const d = Number(day);
+    return { minKey: y * 10000 + m * 100 + d, maxKey: y * 10000 + m * 100 + d };
+}
+
+/**
+ * 反対側の入力に基づいて範囲を制約する
+ * @param {"from" | "to"} kind
+ * @returns {{minKey: number, maxKey: number} | null}
+ */
+function getConstrainedBounds(kind) {
+    if (!ui.dateBounds) return null;
+    let minKey = ui.dateBounds.minKey;
+    let maxKey = ui.dateBounds.maxKey;
+    const otherKind = kind === "from" ? "to" : "from";
+    const otherRange = getPartialDateRange(otherKind);
+    if (otherRange) {
+        if (kind === "to") {
+            minKey = Math.max(minKey, otherRange.minKey);
+        } else {
+            maxKey = Math.min(maxKey, otherRange.maxKey);
+        }
+    }
+    if (minKey > maxKey) {
+        if (kind === "to") minKey = maxKey;
+        else maxKey = minKey;
+    }
+    return { minKey, maxKey };
+}
+
+/**
+ * 日付セレクトの値を YYYY-MM-DD で返す
+ * @param {"from" | "to"} kind
+ * @returns {string}
+ */
+function getDateSelectValue(kind) {
+    const { year, month, day } = getDateSelectParts(kind);
+    if (!year || !month || !day) return "";
+    return `${year}-${month}-${day}`;
+}
+
+/**
+ * 日付セレクトへ YYYY-MM-DD を反映する
+ * @param {"from" | "to"} kind
+ * @param {string} value
+ */
+function applyDateSelectValue(kind, value) {
+    if (!value) return;
+    const key = parseDateKey(value);
+    if (!key) return;
+    const { year, month, day } = dateKeyToParts(key);
+    const isFrom = kind === "from";
+    const yearSelect = isFrom ? ui.el.dateFromYear : ui.el.dateToYear;
+    const monthSelect = isFrom ? ui.el.dateFromMonth : ui.el.dateToMonth;
+    const daySelect = isFrom ? ui.el.dateFromDay : ui.el.dateToDay;
+    if (!yearSelect || !monthSelect || !daySelect) return;
+    yearSelect.value = String(year);
+    syncDateSelectOptions(kind);
+    monthSelect.value = String(month).padStart(2, "0");
+    syncDateSelectOptions(kind);
+    daySelect.value = String(day).padStart(2, "0");
+}
+
+/**
+ * 日付セレクトを初期状態へ戻す
+ */
+function resetDateSelects() {
+    ["from", "to"].forEach((kind) => {
+        const isFrom = kind === "from";
+        const year = isFrom ? ui.el.dateFromYear : ui.el.dateToYear;
+        const month = isFrom ? ui.el.dateFromMonth : ui.el.dateToMonth;
+        const day = isFrom ? ui.el.dateFromDay : ui.el.dateToDay;
+        if (year) year.value = "";
+        if (month) month.value = "";
+        if (day) day.value = "";
+    });
+    syncDateSelectOptions();
+}
+
+/**
+ * 日付セレクトを初期化する
+ * @param {{minKey: number, maxKey: number}} bounds
+ */
+function initDateSelects(bounds) {
+    const { minKey, maxKey } = bounds;
+    const minParts = dateKeyToParts(minKey);
+    const maxParts = dateKeyToParts(maxKey);
+    const years = [];
+    for (let y = minParts.year; y <= maxParts.year; y++) {
+        years.push(String(y));
+    }
+    buildSelectOptions(ui.el.dateFromYear, years, "年");
+    buildSelectOptions(ui.el.dateToYear, years, "年");
+    buildSelectOptions(ui.el.dateFromMonth, [], "月");
+    buildSelectOptions(ui.el.dateToMonth, [], "月");
+    buildSelectOptions(ui.el.dateFromDay, [], "日");
+    buildSelectOptions(ui.el.dateToDay, [], "日");
+    syncDateSelectOptions();
+    applyPendingDateValues();
+}
+
+/**
+ * セレクトに選択肢を反映する
+ * @param {HTMLSelectElement | null} select
+ * @param {string[]} values
+ * @param {string} placeholder
+ */
+function buildSelectOptions(select, values, placeholder) {
+    if (!select) return;
+    const current = select.value;
+    const fragment = document.createDocumentFragment();
+    const empty = document.createElement("option");
+    empty.value = "";
+    empty.textContent = placeholder;
+    fragment.appendChild(empty);
+    values.forEach((val) => {
+        const opt = document.createElement("option");
+        opt.value = val;
+        opt.textContent = val;
+        fragment.appendChild(opt);
+    });
+    select.replaceChildren(fragment);
+    if (values.includes(current)) {
+        select.value = current;
+    } else {
+        select.value = "";
+    }
+}
+
+/**
+ * 日付セレクトの選択肢を現在の範囲に合わせて更新する
+ * @param {"from" | "to"} [kind]
+ */
+function syncDateSelectOptions(kind) {
+    if (!ui.dateBounds) return;
+    const targets = kind ? [kind] : ["from", "to"];
+    targets.forEach((k) => {
+        const bounds = getConstrainedBounds(k) || ui.dateBounds;
+        const isFrom = k === "from";
+        const yearSelect = isFrom ? ui.el.dateFromYear : ui.el.dateToYear;
+        const monthSelect = isFrom ? ui.el.dateFromMonth : ui.el.dateToMonth;
+        const daySelect = isFrom ? ui.el.dateFromDay : ui.el.dateToDay;
+        if (!yearSelect || !monthSelect || !daySelect) return;
+        const minParts = dateKeyToParts(bounds.minKey);
+        const maxParts = dateKeyToParts(bounds.maxKey);
+        const yearVal = yearSelect.value;
+        const years = buildNumberRange(minParts.year, maxParts.year).map((y) => String(y));
+        buildSelectOptions(yearSelect, years, "年");
+        const selectedYear = yearSelect.value;
+        const minMonth = selectedYear === String(minParts.year) ? minParts.month : 1;
+        const maxMonth = selectedYear === String(maxParts.year) ? maxParts.month : 12;
+        const months = selectedYear ? buildNumberRange(minMonth, maxMonth).map((m) => String(m).padStart(2, "0")) : [];
+        buildSelectOptions(monthSelect, months, "月");
+        const monthVal = monthSelect.value;
+        if (!selectedYear || !monthVal) {
+            buildSelectOptions(daySelect, [], "日");
+            return;
+        }
+        const monthNum = Number(monthVal);
+        const availableDays = getAvailableDays(selectedYear, monthVal);
+        if (availableDays.length === 0) {
+            buildSelectOptions(daySelect, [], "日");
+            return;
+        }
+        let minDay = availableDays[0];
+        let maxDay = availableDays[availableDays.length - 1];
+        if (selectedYear === String(minParts.year) && monthNum === minParts.month) minDay = Math.max(minDay, minParts.day);
+        if (selectedYear === String(maxParts.year) && monthNum === maxParts.month) maxDay = Math.min(maxDay, maxParts.day);
+        const days = availableDays
+            .filter((d) => d >= minDay && d <= maxDay)
+            .map((d) => String(d).padStart(2, "0"));
+        buildSelectOptions(daySelect, days, "日");
+    });
+}
+
+/**
+ * 保留されている日付の復元値を適用する
+ */
+function applyPendingDateValues() {
+    if (!ui.pendingDateValues) return;
+    const { from, to } = ui.pendingDateValues;
+    if (from) applyDateSelectValue("from", from);
+    if (to) applyDateSelectValue("to", to);
+    ui.pendingDateValues = null;
+}
+
+/**
+ * 数値レンジ配列を生成する
+ * @param {number} start
+ * @param {number} end
+ * @returns {number[]}
+ */
+function buildNumberRange(start, end) {
+    const list = [];
+    for (let i = start; i <= end; i++) list.push(i);
+    return list;
+}
+
+/**
  * 入力された日付文字列を YYYYMMDD の数値に変換する
  * @param {string} raw
  * @returns {number | null}
@@ -1108,13 +1399,29 @@ function formatDateKeyForInput(key) {
 }
 
 /**
+ * YYYYMMDD を年/月/日に分解する
+ * @param {number} key
+ * @returns {{year: number, month: number, day: number}}
+ */
+function dateKeyToParts(key) {
+    const year = Math.floor(key / 10000);
+    const month = Math.floor((key % 10000) / 100);
+    const day = key % 100;
+    return { year, month, day };
+}
+
+/**
  * 読み込み済みデータから日付範囲を算出し入力のmin/maxを更新する
  * @param {Array<SongRow>} songs
  */
 function applyDateInputRange(songs) {
-    const dateFrom = ui.el.dateFrom;
-    const dateTo = ui.el.dateTo;
-    if (!dateFrom || !dateTo) return;
+    const dateFromYear = ui.el.dateFromYear;
+    const dateFromMonth = ui.el.dateFromMonth;
+    const dateFromDay = ui.el.dateFromDay;
+    const dateToYear = ui.el.dateToYear;
+    const dateToMonth = ui.el.dateToMonth;
+    const dateToDay = ui.el.dateToDay;
+    if (!dateFromYear || !dateFromMonth || !dateFromDay || !dateToYear || !dateToMonth || !dateToDay) return null;
     let minKey = null;
     let maxKey = null;
     for (const row of songs) {
@@ -1123,11 +1430,11 @@ function applyDateInputRange(songs) {
         if (maxKey === null || row.dateKey > maxKey) maxKey = row.dateKey;
     }
     if (minKey === null || maxKey === null) return null;
-    dateFrom.min = formatDateKeyForInput(minKey);
-    dateFrom.max = formatDateKeyForInput(maxKey);
-    dateTo.min = formatDateKeyForInput(minKey);
-    dateTo.max = formatDateKeyForInput(maxKey);
-    return { minKey, maxKey };
+    const bounds = { minKey, maxKey };
+    ui.dateBounds = bounds;
+    ui.dateIndex = buildDateIndex(songs);
+    initDateSelects(bounds);
+    return bounds;
 }
 
 /**
@@ -1136,8 +1443,8 @@ function applyDateInputRange(songs) {
  * @param {number} maxKey
  */
 function clampDateInputsToBounds(minKey, maxKey) {
-    const dateFrom = ui.el.dateFrom;
-    const dateTo = ui.el.dateTo;
+    const dateFrom = ui.el.dateFromYear;
+    const dateTo = ui.el.dateToYear;
     if (!dateFrom || !dateTo) return;
     const clampKey = (key) => {
         if (key === null) return null;
@@ -1145,13 +1452,21 @@ function clampDateInputsToBounds(minKey, maxKey) {
         if (key > maxKey) return maxKey;
         return key;
     };
-    let fromKey = clampKey(parseDateKey(dateFrom.value));
-    let toKey = clampKey(parseDateKey(dateTo.value));
+    let fromKey = clampKey(parseDateKey(getDateSelectValue("from")));
+    let toKey = clampKey(parseDateKey(getDateSelectValue("to")));
     if (fromKey !== null && toKey !== null && fromKey > toKey) {
         toKey = fromKey;
     }
-    if (fromKey !== null) dateFrom.value = formatDateKeyForInput(fromKey);
-    if (toKey !== null) dateTo.value = formatDateKeyForInput(toKey);
+    if (fromKey !== null) applyDateSelectValue("from", formatDateKeyForInput(fromKey));
+    if (toKey !== null) applyDateSelectValue("to", formatDateKeyForInput(toKey));
+}
+
+/**
+ * 現在の範囲に基づいて日付入力を補正する
+ */
+function clampDateInputsIfNeeded() {
+    if (!ui.dateBounds) return;
+    clampDateInputsToBounds(ui.dateBounds.minKey, ui.dateBounds.maxKey);
 }
 
 /**
