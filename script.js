@@ -629,7 +629,6 @@ function setupThumbnailToggle() {
  */
 function markFilterTouched(options) {
     ui.userTouchedFilters = true;
-    ui.recommendedCache = null;
     scheduleSearch(options);
     saveSearchState();
 }
@@ -639,7 +638,6 @@ function markFilterTouched(options) {
  */
 function markQueryTouched() {
     ui.userTouchedQuery = true;
-    ui.recommendedCache = null;
     scheduleSearch();
     saveSearchState();
 }
@@ -1616,6 +1614,8 @@ function shuffleInPlace(list) {
  * @returns {Array<SongRow>}
  */
 function pickRecommended() {
+    // おすすめの並びは「同条件では固定」する方針。
+    // 条件を一度変えて元に戻しても並びは維持し、CSV再読込時のみリセットされる。
     if (ui.recommendedCache) return ui.recommendedCache;
     ui.recommendedCache = selectRecommendedSongs(
         buildRecommendedGroups(data.allSongsRaw),
