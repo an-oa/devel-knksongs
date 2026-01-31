@@ -156,8 +156,8 @@ input[type="text"] {
 .date-select.year { flex: 0 0 4.6em; }
 .date-select.month,
 .date-select.day { flex: 0 0 3.1em; }
-.date-select-group.is-updating .date-select.month,
-.date-select-group.is-updating .date-select.day {
+.ios .date-select-group.is-updating .date-select.month,
+.ios .date-select-group.is-updating .date-select.day {
   visibility: hidden;
   pointer-events: none;
 }

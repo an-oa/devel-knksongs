@@ -94,6 +94,7 @@ async function initUI() {
         thumbToggle: document.getElementById('thumbnail-toggle'),
         formatsList: document.getElementById('formatsList')
     };
+    if (isIOSWebKit()) document.documentElement.classList.add('ios');
 
     setupUIHandlers();
     initFilterMenu();
@@ -220,16 +221,17 @@ function setupUIHandlers() {
     [dateFromYear, dateFromMonth, dateFromDay, dateToYear, dateToMonth, dateToDay].forEach((el) => {
         if (!el) return;
         el.addEventListener('change', () => {
+            const isIOS = isIOSWebKit();
             const group = el.closest('.date-select-group');
             const isYearChange = el === dateFromYear || el === dateToYear;
             const isMonthChange = el === dateFromMonth || el === dateToMonth;
-            if (group && isYearChange) {
+            if (isIOS && group && isYearChange) {
                 group.classList.add('is-updating');
                 const month = el === dateFromYear ? ui.el.dateFromMonth : ui.el.dateToMonth;
                 const day = el === dateFromYear ? ui.el.dateFromDay : ui.el.dateToDay;
                 if (month) month.value = "";
                 if (day) day.value = "";
-            } else if (group && isMonthChange) {
+            } else if (isIOS && group && isMonthChange) {
                 group.classList.add('is-updating');
                 const day = el === dateFromMonth ? ui.el.dateFromDay : ui.el.dateToDay;
                 if (day) day.value = "";
@@ -239,7 +241,7 @@ function setupUIHandlers() {
             markFilterTouched({ immediate: true });
             clampDateInputsIfNeeded();
             syncDateSelectOptions();
-            if (group && (isYearChange || isMonthChange)) {
+            if (isIOS && group && (isYearChange || isMonthChange)) {
                 requestAnimationFrame(() => {
                     requestAnimationFrame(() => {
                         group.classList.remove('is-updating');
@@ -2202,10 +2204,11 @@ function updateThumbnail(thumbDiv, row, yt) {
  * @returns {boolean}
  */
 function isIOSWebKit() {
-    const ua = navigator.userAgent || "";
-    const isIOS = /iPad|iPhone|iPod/.test(ua);
-    const isIPadOS = navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
-    return isIOS || isIPadOS;
+    const hasTouch = navigator.maxTouchPoints > 0 || "ontouchstart" in window;
+    const webkitTouchCallout = CSS.supports && CSS.supports("-webkit-touch-callout", "none");
+    const webkitOverflowScrolling = CSS.supports && CSS.supports("-webkit-overflow-scrolling", "touch");
+    const isWebKit = webkitTouchCallout || webkitOverflowScrolling;
+    return hasTouch && isWebKit;
 }
 
 const youtubeApi = {
