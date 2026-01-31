@@ -2129,15 +2129,20 @@ function startEmbeddedPlayback(thumbDiv, row, yt) {
         e.stopPropagation();
         restoreThumbnail(thumbDiv, yt.videoId);
     });
-    const pauseOverlay = document.createElement("button");
-    pauseOverlay.type = "button";
-    pauseOverlay.className = "thumb-pause-overlay";
-    pauseOverlay.setAttribute("aria-label", "再生を切り替える");
-    pauseOverlay.addEventListener("click", (e) => {
-        e.stopPropagation();
-        youtubeApi.togglePlayback(thumbDiv);
-    });
-    thumbDiv.replaceChildren(ifr, pauseOverlay, open, close);
+    if (isIOSWebKit()) {
+        // iOSではiframe内の再生操作を優先する
+        thumbDiv.replaceChildren(ifr, open, close);
+    } else {
+        const pauseOverlay = document.createElement("button");
+        pauseOverlay.type = "button";
+        pauseOverlay.className = "thumb-pause-overlay";
+        pauseOverlay.setAttribute("aria-label", "再生を切り替える");
+        pauseOverlay.addEventListener("click", (e) => {
+            e.stopPropagation();
+            youtubeApi.togglePlayback(thumbDiv);
+        });
+        thumbDiv.replaceChildren(ifr, pauseOverlay, open, close);
+    }
     youtubeApi.attachPlayer(thumbDiv, ifr, yt);
 }
 
@@ -2169,6 +2174,17 @@ function updateThumbnail(thumbDiv, row, yt) {
 /**
  * YouTube IFrame API関連のユーティリティ
  */
+
+/**
+ * iOS WebKit 環境か判定する
+ * @returns {boolean}
+ */
+function isIOSWebKit() {
+    const ua = navigator.userAgent || "";
+    const isIOS = /iPad|iPhone|iPod/.test(ua);
+    const isIPadOS = navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
+    return isIOS || isIPadOS;
+}
 
 const youtubeApi = {
     /**
