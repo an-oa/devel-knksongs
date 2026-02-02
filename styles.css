@@ -29,19 +29,6 @@ body {
   color: var(--text-color);
   transition: background-color var(--transition-speed);
 }
-html.no-scroll,
-body.no-scroll {
-  overflow: hidden;
-  touch-action: none;
-}
-body.no-scroll {
-  position: fixed;
-  width: 100%;
-  left: 0;
-  right: 0;
-  height: 100vh;
-}
-
 input, button { font-family: inherit; }
 
 /* サムネイル非表示設定 */
