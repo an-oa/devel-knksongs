@@ -1263,7 +1263,7 @@ function buildNumberRange(start, end) {
 function parseDateKey(raw) {
     if (!raw) return null;
     const trimmed = raw.trim();
-    const match = /^(\d{4})[/-](\d{2})[/-](\d{2})$/.exec(trimmed);
+    const match = /^(\d{4})[/-](\d{1,2})[/-](\d{1,2})$/.exec(trimmed);
     if (!match) return null;
     const year = Number(match[1]);
     const month = Number(match[2]);
