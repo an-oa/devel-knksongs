@@ -1881,32 +1881,6 @@ function setupScrollObserver() {
     });
 }
 
-/**
- * YouTubeの外部再生ボタンを生成する
- * @param {string} openUrl
- * @param {HTMLDivElement} thumbDiv
- * @returns {HTMLAnchorElement}
- */
-function createOpenOverlay(openUrl, thumbDiv) {
-    const open = document.createElement("a");
-    open.href = openUrl;
-    open.target = "_blank";
-    open.rel = "noopener noreferrer";
-    open.className = "open-youtube-overlay";
-    open.textContent = "YouTubeで開く";
-    open.title = "YouTubeで開く（開始位置から）";
-    open.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const opened = window.open(openUrl, "_blank");
-        if (opened) opened.opener = null;
-        if (thumbDiv.classList.contains("playing") || thumbDiv.querySelector("iframe")) {
-            restoreThumbnail(thumbDiv, thumbDiv.dataset.videoId || "");
-        }
-    });
-    return open;
-}
-
 // ===== Thumbnail / Embed (public) =====
 
 /**
@@ -1930,10 +1904,9 @@ function restoreThumbnail(thumbDiv, videoId) {
 /**
  * 埋め込み再生を開始する
  * @param {HTMLDivElement} thumbDiv
- * @param {SongRow} row
  * @param {{videoId: string, startSeconds: number}} yt
  */
-function startEmbeddedPlayback(thumbDiv, row, yt) {
+function startEmbeddedPlayback(thumbDiv, yt) {
     setActiveThumb(thumbDiv);
     setPlaybackState(thumbDiv, "playing");
     const ifr = document.createElement("iframe");
@@ -1942,10 +1915,6 @@ function startEmbeddedPlayback(thumbDiv, row, yt) {
     ifr.allow = "autoplay; encrypted-media";
     ifr.referrerPolicy = "strict-origin-when-cross-origin";
     ifr.allowFullscreen = true;
-    // 右下の YouTube ロゴ経由だと開始秒が落ちる端末があるため、
-    // 開始位置つきの外部リンク（CSVのURL）をオーバーレイとして用意する。
-    const openUrl = youtubeApi.buildOpenUrl(row);
-    const open = createOpenOverlay(openUrl, thumbDiv);
     const close = document.createElement("button");
     close.type = "button";
     close.className = "thumb-close-btn";
@@ -1956,7 +1925,7 @@ function startEmbeddedPlayback(thumbDiv, row, yt) {
         restoreThumbnail(thumbDiv, yt.videoId);
     });
     // iframe上の全面オーバーレイは広告UIのクリックを妨げるため配置しない
-    thumbDiv.replaceChildren(ifr, open, close);
+    thumbDiv.replaceChildren(ifr, close);
     youtubeApi.attachPlayer(thumbDiv, ifr, yt);
 }
 
@@ -1975,7 +1944,7 @@ function updateThumbnail(thumbDiv, row, yt) {
     const img = createThumbnailImage(yt.videoId);
     thumbDiv.onclick = () => {
         if (thumbDiv.classList.contains("playing")) return;
-        startEmbeddedPlayback(thumbDiv, row, yt);
+        startEmbeddedPlayback(thumbDiv, yt);
     };
     thumbDiv.appendChild(img);
     if (shouldLoadThumbnailNow(thumbDiv)) {
@@ -2057,14 +2026,6 @@ const youtubeApi = {
             ? ""
             : `&origin=${encodeURIComponent(location.origin)}`;
         return `https://www.youtube-nocookie.com/embed/${yt.videoId}?autoplay=1&playsinline=1&start=${yt.startSeconds}&enablejsapi=1&rel=0&cc_load_policy=0&iv_load_policy=3${origin}`;
-    },
-    /**
-     * 外部再生URLを取得する
-     * @param {SongRow} row
-     * @returns {string}
-     */
-    buildOpenUrl(row) {
-        return row.url;
     },
     /**
      * プレーヤーの状態変化を処理する

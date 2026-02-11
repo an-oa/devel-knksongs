@@ -288,23 +288,3 @@ input[type="text"] {
 input:checked + .slider { background: var(--primary-color); }
 input:checked + .slider:before { transform: translateX(16px); }
 hr { border: 0; border-top: 1px solid var(--border-color); margin: 15px 0; }
-
-/* 埋め込み再生中：開始位置つきで外部を開く導線（ロゴ押下の時間指定落ち対策） */
-.open-youtube-overlay {
-  position: absolute;
-  right: 8px;
-  bottom: 8px;
-  z-index: 3;
-  display: inline-block;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.65);
-  color: #fff;
-  font-size: 0.85rem;
-  line-height: 1;
-  text-decoration: none;
-  -webkit-user-select: none;
-  user-select: none;
-}
-.open-youtube-overlay:hover { text-decoration: underline; }
-.open-youtube-overlay:active { transform: translateY(1px); }
