@@ -1760,7 +1760,7 @@ function updateDisplay() {
  */
 function resetThumbnailContainer(thumbDiv, videoId) {
     thumbDiv.dataset.videoId = videoId;
-    thumbDiv.classList.remove("playing", "paused");
+    thumbDiv.classList.remove("playing");
     thumbDiv.onclick = null;
     thumbDiv.replaceChildren();
 }
@@ -1802,14 +1802,12 @@ function shouldLoadThumbnailNow(thumbDiv) {
 /**
  * 再生状態をUIへ反映する
  * @param {HTMLDivElement} thumbDiv
- * @param {"playing" | "paused" | "stopped"} state
+ * @param {"playing" | "stopped"} state
  */
 function setPlaybackState(thumbDiv, state) {
-    thumbDiv.classList.remove("playing", "paused");
+    thumbDiv.classList.remove("playing");
     if (state === "playing") {
         thumbDiv.classList.add("playing");
-    } else if (state === "paused") {
-        thumbDiv.classList.add("paused");
     }
 }
 
@@ -1957,20 +1955,8 @@ function startEmbeddedPlayback(thumbDiv, row, yt) {
         e.stopPropagation();
         restoreThumbnail(thumbDiv, yt.videoId);
     });
-    if (isIOSWebKit()) {
-        // iOSではiframe内の再生操作を優先する
-        thumbDiv.replaceChildren(ifr, open, close);
-    } else {
-        const pauseOverlay = document.createElement("button");
-        pauseOverlay.type = "button";
-        pauseOverlay.className = "thumb-pause-overlay";
-        pauseOverlay.setAttribute("aria-label", "再生を切り替える");
-        pauseOverlay.addEventListener("click", (e) => {
-            e.stopPropagation();
-            youtubeApi.togglePlayback(thumbDiv);
-        });
-        thumbDiv.replaceChildren(ifr, pauseOverlay, open, close);
-    }
+    // iframe上の全面オーバーレイは広告UIのクリックを妨げるため配置しない
+    thumbDiv.replaceChildren(ifr, open, close);
     youtubeApi.attachPlayer(thumbDiv, ifr, yt);
 }
 
@@ -2083,13 +2069,12 @@ const youtubeApi = {
     /**
      * プレーヤーの状態変化を処理する
      * @param {HTMLDivElement} thumbDiv
-     * @param {{videoId: string}} yt
      * @param {{data: number}} event
      */
-    handleStateChange(thumbDiv, yt, event) {
+    handleStateChange(thumbDiv, event) {
         if (event.data === window.YT.PlayerState.PAUSED ||
             event.data === window.YT.PlayerState.ENDED) {
-            setPlaybackState(thumbDiv, "paused");
+            setPlaybackState(thumbDiv, "stopped");
             return;
         }
         if (event.data === window.YT.PlayerState.PLAYING) {
@@ -2109,7 +2094,7 @@ const youtubeApi = {
             const player = new window.YT.Player(iframe, {
                 host: "https://www.youtube-nocookie.com",
                 events: {
-                    onStateChange: (event) => this.handleStateChange(thumbDiv, yt, event)
+                    onStateChange: (event) => this.handleStateChange(thumbDiv, event)
                 }
             });
             youtube.players.set(thumbDiv, player);
@@ -2128,28 +2113,6 @@ const youtubeApi = {
             player.destroy();
         }
         youtube.players.delete(thumbDiv);
-    },
-    /**
-     * 埋め込みプレーヤーの再生状態を切り替える
-     * @param {HTMLDivElement} thumbDiv
-     */
-    togglePlayback(thumbDiv) {
-        const player = youtube.players.get(thumbDiv);
-        if (player) {
-            if (thumbDiv.classList.contains("paused") && typeof player.playVideo === "function") {
-                player.playVideo();
-                return;
-            }
-            if (thumbDiv.classList.contains("playing") && typeof player.pauseVideo === "function") {
-                player.pauseVideo();
-                return;
-            }
-        }
-        if (thumbDiv.classList.contains("playing")) {
-            setPlaybackState(thumbDiv, "paused");
-        } else if (thumbDiv.classList.contains("paused")) {
-            setPlaybackState(thumbDiv, "playing");
-        }
     }
 };
 
