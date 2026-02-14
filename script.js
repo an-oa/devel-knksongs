@@ -414,12 +414,14 @@ function setupThumbnailToggle() {
 
     thumbToggle.checked = isShow;
     if (!isShow) document.body.classList.add('hide-thumbs');
+    ensureYoutubeApiForThumbnails();
 
     thumbToggle.addEventListener('change', () => {
         const checked = thumbToggle.checked;
         ui.showThumbnails = checked;
         document.body.classList.toggle('hide-thumbs', !checked);
         localStorage.setItem('showThumbnails', checked);
+        ensureYoutubeApiForThumbnails();
         updateDisplay();
         setupScrollObserver();
     });
@@ -641,10 +643,19 @@ function applyThumbnailFromStorage() {
     ui.showThumbnails = isShow;
     if (thumbToggle) thumbToggle.checked = isShow;
     document.body.classList.toggle('hide-thumbs', !isShow);
+    ensureYoutubeApiForThumbnails();
     if (prev !== isShow && ui.dataReady) {
         updateDisplay();
         setupScrollObserver();
     }
+}
+
+/**
+ * サムネ表示が有効なときにのみYouTube IFrame APIを読み込む
+ */
+function ensureYoutubeApiForThumbnails() {
+    if (!ui.showThumbnails) return;
+    requestAnimationFrame(() => youtubeApi.ensureReady().catch(() => {}));
 }
 
 // ===== Search Sync / Filters (private) =====
@@ -786,7 +797,6 @@ function applyLoadedCsv(csvText, statusLabel) {
         resetSearchConditions(false);
     }
     scheduleSearch({ immediate: true });
-    requestAnimationFrame(() => youtubeApi.ensureReady().catch(() => {}));
 }
 
 /**
