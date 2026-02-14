@@ -1627,7 +1627,7 @@ function createCardElements() {
  */
 function updateCardFromRow(entry, row) {
     const yt = extractYoutubeInfo(row.url);
-    updateThumbnail(entry.thumbDiv, row, yt);
+    updateThumbnail(entry.thumbDiv, yt);
     updateTitleLink(entry.titleEl, row);
     entry.artistEl.textContent = row.artist || "不明";
     entry.dateEl.textContent = row.date;
@@ -1748,6 +1748,28 @@ function buildResultNodes(results) {
 }
 
 /**
+ * 結果カードのDOM差分を反映する（既存カードは可能な限り維持する）
+ * @param {HTMLDivElement} container
+ * @param {HTMLDivElement[]} nodes
+ */
+function reconcileResultNodes(container, nodes) {
+    const children = container.children;
+    // 既存ノードを差し替えずに位置だけ合わせ、再生中のiframeを維持する。
+    for (let i = 0; i < nodes.length; i++) {
+        const node = nodes[i];
+        const current = children[i];
+        if (current !== node) {
+            container.insertBefore(node, current || null);
+        }
+    }
+    while (container.children.length > nodes.length) {
+        const last = container.lastElementChild;
+        if (!last) break;
+        container.removeChild(last);
+    }
+}
+
+/**
  * 表示中のカードに対してサムネ監視を設定する
  * @param {number} count
  */
@@ -1791,7 +1813,7 @@ function updateDisplay() {
 
     const nodes = buildResultNodes(results);
 
-    container.replaceChildren(...nodes);
+    reconcileResultNodes(container, nodes);
     observeVisibleThumbnails(results.length);
     updateLoadMoreVisibility(isRecommendedMode(getSearchState()));
 }
@@ -1802,9 +1824,17 @@ function updateDisplay() {
  * サムネイル要素の初期状態を整える
  * @param {HTMLDivElement} thumbDiv
  * @param {string} videoId
+ * @param {string} playbackKey
  */
-function resetThumbnailContainer(thumbDiv, videoId) {
+function resetThumbnailContainer(thumbDiv, videoId, playbackKey) {
+    const iframe = thumbDiv.querySelector("iframe");
+    if (iframe) {
+        clearActiveThumb(thumbDiv);
+        youtubeApi.destroyPlayer(thumbDiv);
+        iframe.src = "about:blank";
+    }
     thumbDiv.dataset.videoId = videoId;
+    thumbDiv.dataset.playbackKey = playbackKey;
     thumbDiv.classList.remove("playing");
     thumbDiv.onclick = null;
     thumbDiv.replaceChildren();
@@ -1854,6 +1884,28 @@ function setPlaybackState(thumbDiv, state) {
     if (state === "playing") {
         thumbDiv.classList.add("playing");
     }
+}
+
+/**
+ * 埋め込み再生ターゲットを表すキーを組み立てる
+ * @param {{videoId: string, startSeconds: number}} yt
+ * @returns {string}
+ */
+function buildPlaybackKey(yt) {
+    if (!yt.videoId) return "";
+    return `${yt.videoId}:${yt.startSeconds}`;
+}
+
+/**
+ * 現在の埋め込み再生ターゲットが次の描画対象と同一か判定する
+ * @param {HTMLDivElement} thumbDiv
+ * @param {string} nextPlaybackKey
+ * @returns {boolean}
+ */
+function isSamePlaybackTarget(thumbDiv, nextPlaybackKey) {
+    if (!ui.showThumbnails) return false;
+    if (!thumbDiv.querySelector("iframe")) return false;
+    return (thumbDiv.dataset.playbackKey || "") === nextPlaybackKey;
 }
 
 /**
@@ -1938,6 +1990,8 @@ function restoreThumbnail(thumbDiv, videoId) {
     youtubeApi.destroyPlayer(thumbDiv);
     const iframe = thumbDiv.querySelector("iframe");
     if (iframe) iframe.src = "about:blank";
+    thumbDiv.dataset.videoId = videoId;
+    thumbDiv.dataset.playbackKey = "";
     setPlaybackState(thumbDiv, "stopped");
     if (videoId) {
         applyThumbnailImage(thumbDiv, videoId, { eager: true });
@@ -1953,6 +2007,8 @@ function restoreThumbnail(thumbDiv, videoId) {
  */
 function startEmbeddedPlayback(thumbDiv, yt) {
     setActiveThumb(thumbDiv);
+    thumbDiv.dataset.videoId = yt.videoId;
+    thumbDiv.dataset.playbackKey = buildPlaybackKey(yt);
     setPlaybackState(thumbDiv, "playing");
     const ifr = document.createElement("iframe");
     // プライバシー強化モード（nocookie）を維持
@@ -1977,11 +2033,16 @@ function startEmbeddedPlayback(thumbDiv, yt) {
 /**
  * サムネイル表示を更新する
  * @param {HTMLDivElement} thumbDiv
- * @param {SongRow} row
  * @param {{videoId: string, startSeconds: number}} yt
  */
-function updateThumbnail(thumbDiv, row, yt) {
-    resetThumbnailContainer(thumbDiv, yt.videoId);
+function updateThumbnail(thumbDiv, yt) {
+    const nextPlaybackKey = buildPlaybackKey(yt);
+    // 表示更新時でも同一動画の再生中iframeは保持し、再読み込みを防ぐ。
+    if (isSamePlaybackTarget(thumbDiv, nextPlaybackKey)) {
+        thumbDiv.dataset.videoId = yt.videoId;
+        return;
+    }
+    resetThumbnailContainer(thumbDiv, yt.videoId, nextPlaybackKey);
 
     if (!ui.showThumbnails) return;
     if (!yt.videoId) return;
