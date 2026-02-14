@@ -387,6 +387,7 @@ function trapSidebarFocus(event, sidebar) {
 function clearSearch() {
     resetSearchConditions(true);
     saveSearchState();
+    scrollResultsPaneToTop();
 }
 
 /**
@@ -401,6 +402,40 @@ function setupTheme() {
         document.documentElement.classList.toggle('dark-theme', isDarkNow);
         localStorage.setItem('theme', isDarkNow ? 'dark' : 'light');
     });
+}
+
+/**
+ * 結果リストを含むスクロール領域を先頭に戻す
+ */
+function scrollResultsPaneToTop() {
+    const resultList = ui.el.resultList;
+    if (!resultList) return;
+
+    const scrollContainer = findScrollableAncestor(resultList);
+    if (!scrollContainer) return;
+
+    if (scrollContainer === document.body || scrollContainer === document.documentElement) {
+        window.scrollTo({ top: 0, behavior: 'auto' });
+        return;
+    }
+    scrollContainer.scrollTo({ top: 0, behavior: 'auto' });
+}
+
+/**
+ * 指定要素を含む最寄りのスクロール可能コンテナを探す
+ * @param {HTMLElement} element
+ * @returns {HTMLElement | null}
+ */
+function findScrollableAncestor(element) {
+    let current = element.parentElement;
+    while (current) {
+        const style = window.getComputedStyle(current);
+        const overflowY = style.overflowY;
+        const isScrollable = (overflowY === 'auto' || overflowY === 'scroll') && current.scrollHeight > current.clientHeight;
+        if (isScrollable) return current;
+        current = current.parentElement;
+    }
+    return document.scrollingElement instanceof HTMLElement ? document.scrollingElement : document.documentElement;
 }
 
 /**
