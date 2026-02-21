@@ -387,7 +387,6 @@ function trapSidebarFocus(event, sidebar) {
 function clearSearch() {
     resetSearchConditions(true);
     saveSearchState();
-    scrollResultsPaneToTop();
 }
 
 /**
@@ -957,6 +956,7 @@ function search() {
     data.displayLimit = displayLimit;
     resCount.innerText = label;
     updateDisplay();
+    scrollResultsPaneToTop();
 }
 
 // ===== Search / Recommendation (private) =====
