@@ -1871,29 +1871,63 @@ function updateLoadMoreVisibility(recommendedMode) {
     }
 }
 
+/**
+ * 表示更新に必要な入力を収集する
+ * @returns {{container: HTMLDivElement, results: SongRow[], recommendedMode: boolean}}
+ */
+function collectDisplayState() {
+    return {
+        container: ui.el.resultList,
+        results: getVisibleResults(),
+        recommendedMode: isRecommendedMode(getSearchState())
+    };
+}
+
+/**
+ * 監視系の前処理（既存監視解除と必要時の再構築）を行う
+ */
+function prepareDisplayObservation() {
+    if (ui.scrollObserver) ui.scrollObserver.disconnect();
+    if (ui.showThumbnails && !ui.scrollObserver) setupScrollObserver();
+}
+
+/**
+ * 取得済みの表示対象を描画する
+ * @param {{container: HTMLDivElement, results: SongRow[]}} displayState
+ * @returns {{entries: CardEntry[]} | null}
+ */
+function renderDisplayState(displayState) {
+    const { container, results } = displayState;
+    if (results.length === 0) {
+        renderEmptyResults(container, ui.el.loadMoreContainer);
+        return null;
+    }
+    const { nodes, entries } = buildResultNodes(results);
+    reconcileResultNodes(container, nodes);
+    return { entries };
+}
+
+/**
+ * 描画後の監視設定と補助UI更新を適用する
+ * @param {{entries: CardEntry[]}} rendered
+ * @param {{recommendedMode: boolean}} displayState
+ */
+function monitorDisplayState(rendered, displayState) {
+    observeVisibleThumbnails(rendered.entries);
+    updateLoadMoreVisibility(displayState.recommendedMode);
+}
+
 // ===== Rendering (public) =====
 
 /**
  * 現在の検索結果をカードとして描画する
  */
 function updateDisplay() {
-    const container = ui.el.resultList;
-
-    if (ui.scrollObserver) ui.scrollObserver.disconnect();
-    if (ui.showThumbnails && !ui.scrollObserver) setupScrollObserver();
-
-    const results = getVisibleResults();
-
-    if (results.length === 0) {
-        renderEmptyResults(container, ui.el.loadMoreContainer);
-        return;
-    }
-
-    const { nodes, entries } = buildResultNodes(results);
-
-    reconcileResultNodes(container, nodes);
-    observeVisibleThumbnails(entries);
-    updateLoadMoreVisibility(isRecommendedMode(getSearchState()));
+    const displayState = collectDisplayState();
+    prepareDisplayObservation();
+    const rendered = renderDisplayState(displayState);
+    if (!rendered) return;
+    monitorDisplayState(rendered, displayState);
 }
 
 // ===== Thumbnail / Embed (private) =====
