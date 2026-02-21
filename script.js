@@ -67,6 +67,16 @@ const youtube = state.youtube;
  * @property {string} artistYomiNorm
  */
 
+/**
+ * @typedef {Object} CardEntry
+ * @property {HTMLDivElement} card
+ * @property {HTMLDivElement} thumbDiv
+ * @property {HTMLAnchorElement} titleEl
+ * @property {HTMLDivElement} artistEl
+ * @property {HTMLSpanElement} dateEl
+ * @property {HTMLDivElement} tagsEl
+ */
+
 // ===== Lifecycle (public) =====
 
 /**
@@ -1580,7 +1590,7 @@ function isShortFormat(format) {
 
 /**
  * 楽曲カードのベース要素を生成する
- * @returns {{card: HTMLDivElement, thumbDiv: HTMLDivElement, titleEl: HTMLAnchorElement, artistEl: HTMLDivElement, dateEl: HTMLSpanElement, tagsEl: HTMLDivElement}}
+ * @returns {CardEntry}
  */
 function createCardElements() {
     const card = document.createElement("div");
@@ -1622,7 +1632,7 @@ function createCardElements() {
 
 /**
  * 楽曲データでカード内容を更新する
- * @param {{card: HTMLDivElement, thumbDiv: HTMLDivElement, titleEl: HTMLAnchorElement, artistEl: HTMLDivElement, dateEl: HTMLSpanElement, tagsEl: HTMLDivElement}} entry
+ * @param {CardEntry} entry
  * @param {SongRow} row
  */
 function updateCardFromRow(entry, row) {
@@ -1734,7 +1744,7 @@ function renderEmptyResults(container, loadMoreContainer) {
 /**
  * 結果カードのDOM配列を構築する
  * @param {Array<SongRow>} results
- * @returns {{nodes: HTMLDivElement[], entries: Array<{card: HTMLDivElement, thumbDiv: HTMLDivElement, titleEl: HTMLAnchorElement, artistEl: HTMLDivElement, dateEl: HTMLSpanElement, tagsEl: HTMLDivElement}>}}
+ * @returns {{nodes: HTMLDivElement[], entries: CardEntry[]}}
  */
 function buildResultNodes(results) {
     const nextEntriesBySourceKey = new Map();
@@ -1755,44 +1765,56 @@ function buildResultNodes(results) {
 }
 
 /**
- * 結果カードのDOM差分を反映する（既存カードは可能な限り維持する）
+ * 再生中カードを固定すべき状況か判定し、固定対象カードを返す
  * @param {HTMLDivElement} container
  * @param {HTMLDivElement[]} nodes
+ * @returns {HTMLDivElement | null}
  */
-function reconcileResultNodes(container, nodes) {
+function getPinnedActiveCard(container, nodes) {
     const activeThumb = ui.activeThumb;
     const activeCard = activeThumb ? activeThumb.closest(".song-card") : null;
-    const hasPinnedActive =
+    const shouldPin =
         Boolean(activeCard) &&
         activeCard instanceof HTMLElement &&
         container.contains(activeCard) &&
         nodes.includes(activeCard) &&
         Boolean(activeThumb && activeThumb.querySelector("iframe"));
+    return shouldPin ? activeCard : null;
+}
 
-    // 再生中カードをinsertBeforeで動かすと、環境によってiframeが頭出し再読み込みされる。
-    // 再生中のみカードをその場に固定し、周囲ノードだけを並び替えて再生継続を優先する。
-    if (hasPinnedActive) {
-        const keepSet = new Set(nodes);
-        Array.from(container.children).forEach((child) => {
-            if (child === activeCard) return;
-            if (!keepSet.has(child)) container.removeChild(child);
-        });
+/**
+ * 再生中カードを固定しつつ、周囲ノードだけを並び替える
+ * @param {HTMLDivElement} container
+ * @param {HTMLDivElement[]} nodes
+ * @param {HTMLDivElement} pinnedActiveCard
+ */
+function reconcileNodesWithPinnedActive(container, nodes, pinnedActiveCard) {
+    const keepSet = new Set(nodes);
+    Array.from(container.children).forEach((child) => {
+        if (child === pinnedActiveCard) return;
+        if (!keepSet.has(child)) container.removeChild(child);
+    });
 
-        let cursor = container.firstChild;
-        for (const node of nodes) {
-            if (node === activeCard) {
-                if (cursor === activeCard) cursor = cursor.nextSibling;
-                continue;
-            }
-            if (node === cursor) {
-                cursor = cursor.nextSibling;
-                continue;
-            }
-            container.insertBefore(node, cursor);
+    let cursor = container.firstChild;
+    for (const node of nodes) {
+        if (node === pinnedActiveCard) {
+            if (cursor === pinnedActiveCard) cursor = cursor.nextSibling;
+            continue;
         }
-        return;
+        if (node === cursor) {
+            cursor = cursor.nextSibling;
+            continue;
+        }
+        container.insertBefore(node, cursor);
     }
+}
 
+/**
+ * 結果カードのDOM差分を通常モードで反映する
+ * @param {HTMLDivElement} container
+ * @param {HTMLDivElement[]} nodes
+ */
+function reconcileNodesByOrder(container, nodes) {
     const children = container.children;
     // 既存ノードを差し替えずに位置だけ合わせ、再生中のiframeを維持する。
     for (let i = 0; i < nodes.length; i++) {
@@ -1810,8 +1832,24 @@ function reconcileResultNodes(container, nodes) {
 }
 
 /**
+ * 結果カードのDOM差分を反映する（既存カードは可能な限り維持する）
+ * @param {HTMLDivElement} container
+ * @param {HTMLDivElement[]} nodes
+ */
+function reconcileResultNodes(container, nodes) {
+    const pinnedActiveCard = getPinnedActiveCard(container, nodes);
+    // 再生中カードをinsertBeforeで動かすと、環境によってiframeが頭出し再読み込みされる。
+    // 再生中のみカードをその場に固定し、再生継続を優先する。
+    if (pinnedActiveCard) {
+        reconcileNodesWithPinnedActive(container, nodes, pinnedActiveCard);
+        return;
+    }
+    reconcileNodesByOrder(container, nodes);
+}
+
+/**
  * 表示中のカードに対してサムネ監視を設定する
- * @param {Array<{card: HTMLDivElement, thumbDiv: HTMLDivElement, titleEl: HTMLAnchorElement, artistEl: HTMLDivElement, dateEl: HTMLSpanElement, tagsEl: HTMLDivElement}>} entries
+ * @param {CardEntry[]} entries
  */
 function observeVisibleThumbnails(entries) {
     if (!ui.showThumbnails || !ui.scrollObserver) return;
