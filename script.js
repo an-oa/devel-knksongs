@@ -31,7 +31,7 @@ const state = {
         userTouchedFilters: false,
         hasRestoredSearchState: false,
         searchDebounceId: 0,
-        cardPool: [],
+        cardEntriesBySourceKey: new Map(),
         recommendedCache: null,
         activeThumb: null,
         el: {}, // DOM要素のキャッシュ用
@@ -1734,17 +1734,24 @@ function renderEmptyResults(container, loadMoreContainer) {
 /**
  * 結果カードのDOM配列を構築する
  * @param {Array<SongRow>} results
- * @returns {HTMLDivElement[]}
+ * @returns {{nodes: HTMLDivElement[], entries: Array<{card: HTMLDivElement, thumbDiv: HTMLDivElement, titleEl: HTMLAnchorElement, artistEl: HTMLDivElement, dateEl: HTMLSpanElement, tagsEl: HTMLDivElement}>}}
  */
 function buildResultNodes(results) {
+    const nextEntriesBySourceKey = new Map();
+    const entries = [];
     const nodes = [];
     for (let i = 0; i < results.length; i++) {
-        if (!ui.cardPool[i]) ui.cardPool[i] = createCardElements();
-        const entry = ui.cardPool[i];
+        const row = results[i];
+        const rowKey = row && Number.isFinite(row.sourceIndex) ? String(row.sourceIndex) : `idx:${i}`;
+        let entry = ui.cardEntriesBySourceKey.get(rowKey);
+        if (!entry) entry = createCardElements();
         updateCardFromRow(entry, results[i]);
+        nextEntriesBySourceKey.set(rowKey, entry);
+        entries.push(entry);
         nodes.push(entry.card);
     }
-    return nodes;
+    ui.cardEntriesBySourceKey = nextEntriesBySourceKey;
+    return { nodes, entries };
 }
 
 /**
@@ -1753,6 +1760,39 @@ function buildResultNodes(results) {
  * @param {HTMLDivElement[]} nodes
  */
 function reconcileResultNodes(container, nodes) {
+    const activeThumb = ui.activeThumb;
+    const activeCard = activeThumb ? activeThumb.closest(".song-card") : null;
+    const hasPinnedActive =
+        Boolean(activeCard) &&
+        activeCard instanceof HTMLElement &&
+        container.contains(activeCard) &&
+        nodes.includes(activeCard) &&
+        Boolean(activeThumb && activeThumb.querySelector("iframe"));
+
+    // 再生中カードをinsertBeforeで動かすと、環境によってiframeが頭出し再読み込みされる。
+    // 再生中のみカードをその場に固定し、周囲ノードだけを並び替えて再生継続を優先する。
+    if (hasPinnedActive) {
+        const keepSet = new Set(nodes);
+        Array.from(container.children).forEach((child) => {
+            if (child === activeCard) return;
+            if (!keepSet.has(child)) container.removeChild(child);
+        });
+
+        let cursor = container.firstChild;
+        for (const node of nodes) {
+            if (node === activeCard) {
+                if (cursor === activeCard) cursor = cursor.nextSibling;
+                continue;
+            }
+            if (node === cursor) {
+                cursor = cursor.nextSibling;
+                continue;
+            }
+            container.insertBefore(node, cursor);
+        }
+        return;
+    }
+
     const children = container.children;
     // 既存ノードを差し替えずに位置だけ合わせ、再生中のiframeを維持する。
     for (let i = 0; i < nodes.length; i++) {
@@ -1771,12 +1811,12 @@ function reconcileResultNodes(container, nodes) {
 
 /**
  * 表示中のカードに対してサムネ監視を設定する
- * @param {number} count
+ * @param {Array<{card: HTMLDivElement, thumbDiv: HTMLDivElement, titleEl: HTMLAnchorElement, artistEl: HTMLDivElement, dateEl: HTMLSpanElement, tagsEl: HTMLDivElement}>} entries
  */
-function observeVisibleThumbnails(count) {
+function observeVisibleThumbnails(entries) {
     if (!ui.showThumbnails || !ui.scrollObserver) return;
-    for (let i = 0; i < count; i++) {
-        ui.scrollObserver.observe(ui.cardPool[i].thumbDiv);
+    for (const entry of entries) {
+        ui.scrollObserver.observe(entry.thumbDiv);
     }
 }
 
@@ -1811,10 +1851,10 @@ function updateDisplay() {
         return;
     }
 
-    const nodes = buildResultNodes(results);
+    const { nodes, entries } = buildResultNodes(results);
 
     reconcileResultNodes(container, nodes);
-    observeVisibleThumbnails(results.length);
+    observeVisibleThumbnails(entries);
     updateLoadMoreVisibility(isRecommendedMode(getSearchState()));
 }
 
