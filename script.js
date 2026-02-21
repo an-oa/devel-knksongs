@@ -5,7 +5,7 @@
 const RANDOM_DISPLAY_COUNT = 48;
 const MIN_PERFORMANCE_FOR_RANDOM = 3;
 const INCREMENT_COUNT = 48;
-const PUBLIC_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR-cSDIsEc3sqIOkmiuuSeaUKmNb2gBvM_NoH8-Se5ZrosaSOdMhPo3RuvxhZirUPJ_ll8PGnbRnJeF/pub?gid=1763338905&single=true&output=csv";
+const PUBLIC_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR-cSDIsEc3sqIOkmiuuSeaUKmNb2gBvM_NoH8-Se5ZrosaSOdMhPo3RuvxhZirUPJ_ll8PGnbRnJeF/pub?gid=457223586&single=true&output=csv";
 const DEFAULT_FORMATS = ["配信", "歌みた", "ショート", "切り抜き"];
 const CSV_CACHE_KEY = "cachedCsv";
 const SEARCH_STATE_KEY = "searchStateV1";
