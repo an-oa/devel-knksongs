@@ -958,18 +958,45 @@ function scheduleSearch(options) {
  * 検索条件に応じて結果を更新する
  */
 function search() {
-    const searchState = getSearchState();
-    const resCount = ui.el.resultCount;
-
-    const { results, displayLimit, label } = resolveSearchResults(searchState);
-    data.currentResults = results;
-    data.displayLimit = displayLimit;
-    resCount.innerText = label;
-    updateDisplay();
-    scrollResultsPaneToTop();
+    const searchInput = collectSearchInput();
+    const outcome = resolveSearchOutcome(searchInput.searchState);
+    applySearchOutcome(searchInput, outcome);
 }
 
 // ===== Search / Recommendation (private) =====
+
+/**
+ * 検索実行に必要な入力を収集する
+ * @returns {{searchState: {queryRaw: string, relayOnly: boolean, harmonyOnly: boolean, dateFromKey: number | null, dateToKey: number | null, hasDateFilter: boolean}, resultCountEl: HTMLElement | null}}
+ */
+function collectSearchInput() {
+    return {
+        searchState: getSearchState(),
+        resultCountEl: ui.el.resultCount
+    };
+}
+
+/**
+ * 検索条件から表示内容を解決する
+ * @param {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean, dateFromKey: number | null, dateToKey: number | null, hasDateFilter: boolean}} searchState
+ * @returns {{results: SongRow[], displayLimit: number, label: string}}
+ */
+function resolveSearchOutcome(searchState) {
+    return resolveSearchResults(searchState);
+}
+
+/**
+ * 解決済み検索結果を状態とUIへ反映する
+ * @param {{resultCountEl: HTMLElement | null}} searchInput
+ * @param {{results: SongRow[], displayLimit: number, label: string}} outcome
+ */
+function applySearchOutcome(searchInput, outcome) {
+    data.currentResults = outcome.results;
+    data.displayLimit = outcome.displayLimit;
+    if (searchInput.resultCountEl) searchInput.resultCountEl.innerText = outcome.label;
+    updateDisplay();
+    scrollResultsPaneToTop();
+}
 
 /**
  * 検索条件の現在値を取得する
