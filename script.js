@@ -52,6 +52,8 @@ const youtube = state.youtube;
  * @typedef {Object} SongRow
  * @property {string} date
  * @property {number | null} dateKey
+ * @property {string} archiveId
+ * @property {number | null} archiveOrder
  * @property {number} sourceIndex
  * @property {string} format
  * @property {boolean} isRelay
@@ -851,7 +853,7 @@ function applyLoadedCsv(csvText, statusLabel) {
 function parseCsvToSongs(csvText) {
     const rows = parseCsvRFC4180(csvText);
     const header = rows[0];
-    const required = ["公開範囲", "#", "曲名", "アーティスト名", "キョクメイ", "アーティストメイ", "配信日", "形態", "歌枠リレー？", "ハモリあり？", "URL", "メモ"];
+    const required = ["公開範囲", "#", "##", "曲名", "アーティスト名", "キョクメイ", "アーティストメイ", "配信日", "形態", "歌枠リレー？", "ハモリあり？", "URL", "メモ"];
     const missing = required.filter(name => !header.includes(name));
     if (missing.length > 0) {
         throw new Error(`CSVヘッダ不足: ${missing.join(", ")}`);
@@ -866,7 +868,8 @@ function parseCsvToSongs(csvText) {
         const memoUpper = memo.toUpperCase();
         const memoAllows = !memoUpper.includes("URL") && !memoUpper.includes("URI");
         const url = r[idx("URL")] || "";
-        if (r[idx("公開範囲")] !== "全体" || !r[idx("#")] || !memoAllows || url.trim() === "") continue;
+        const archiveId = (r[idx("#")] || "").trim();
+        if (r[idx("公開範囲")] !== "全体" || archiveId === "" || !memoAllows || url.trim() === "") continue;
         const title = r[idx("曲名")];
         const artist = r[idx("アーティスト名")];
         const titleYomi = r[idx("キョクメイ")];
@@ -874,6 +877,8 @@ function parseCsvToSongs(csvText) {
         songs.push({
             date: r[idx("配信日")],
             dateKey: parseDateKey(r[idx("配信日")]),
+            archiveId,
+            archiveOrder: parseArchiveOrder(r[idx("##")]),
             sourceIndex: i,
             format: r[idx("形態")],
             isRelay: r[idx("歌枠リレー？")] === "◯",
@@ -890,6 +895,17 @@ function parseCsvToSongs(csvText) {
         });
     }
     return songs;
+}
+
+/**
+ * 同一アーカイブ内の曲順（##）を数値化する
+ * @param {string} raw
+ * @returns {number | null}
+ */
+function parseArchiveOrder(raw) {
+    if (!raw) return null;
+    const value = Number.parseInt(String(raw).trim(), 10);
+    return Number.isFinite(value) ? value : null;
 }
 
 /**
@@ -1516,9 +1532,17 @@ function pickRecommended() {
  * @returns {Array<{key: string, latestRows: SongRow[]}>}
  */
 function buildRecommendedGroups(songs) {
-    const groups = new Map();
+    const songRowsByArchive = new Map();
     for (const row of songs) {
         if (!isRecommendedCountFormat(row.format)) continue;
+        const archiveKey = getSongArchiveKey(row);
+        const existing = songRowsByArchive.get(archiveKey);
+        if (!existing || isHigherArchiveOrder(row, existing)) {
+            songRowsByArchive.set(archiveKey, row);
+        }
+    }
+    const groups = new Map();
+    for (const row of songRowsByArchive.values()) {
         const key = getSongKey(row);
         if (!groups.has(key)) {
             groups.set(key, { rows: [], utamitaRows: [], streamRows: [], shortRows: [] });
@@ -1569,12 +1593,39 @@ function pickRandomEntry(list) {
 }
 
 /**
- * 曲名とアーティストからキーを作る
+ * 曲の同一性判定キーを作る（曲名/アーティスト名/読み）
  * @param {SongRow} row
  * @returns {string}
  */
 function getSongKey(row) {
-    return (row.title || '') + '|||' + (row.artist || '');
+    return [
+        row.titleNorm || '',
+        row.artistNorm || '',
+        row.titleYomiNorm || '',
+        row.artistYomiNorm || ''
+    ].join('|||');
+}
+
+/**
+ * 曲キーとアーカイブIDを結合したキーを作る
+ * @param {SongRow} row
+ * @returns {string}
+ */
+function getSongArchiveKey(row) {
+    return `${getSongKey(row)}|||${row.archiveId || ''}`;
+}
+
+/**
+ * 同一曲・同一アーカイブ内で、##が大きい方を優先する
+ * @param {SongRow} candidate
+ * @param {SongRow} current
+ * @returns {boolean}
+ */
+function isHigherArchiveOrder(candidate, current) {
+    const candidateOrder = candidate.archiveOrder ?? -1;
+    const currentOrder = current.archiveOrder ?? -1;
+    if (candidateOrder !== currentOrder) return candidateOrder > currentOrder;
+    return candidate.sourceIndex > current.sourceIndex;
 }
 
 /**
