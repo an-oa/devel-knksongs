@@ -1532,18 +1532,45 @@ function pickRecommended() {
  * @returns {Array<{key: string, latestRows: SongRow[]}>}
  */
 function buildRecommendedGroups(songs) {
+    const dedupedRows = collapseRecommendedRowsByArchive(songs);
+    const groups = groupRecommendedRowsBySong(dedupedRows);
+    const result = [];
+    for (const [key, entry] of groups.entries()) {
+        if (entry.rows.length < MIN_PERFORMANCE_FOR_RANDOM) continue;
+        const latestRows = pickRecommendedLatestRows(entry);
+        if (latestRows.length === 0) continue;
+        result.push({ key, latestRows });
+    }
+    return result;
+}
+
+/**
+ * 同一曲・同一アーカイブの重複を取り除き、##最大の1件に絞る
+ * @param {Array<SongRow>} songs
+ * @returns {Array<SongRow>}
+ */
+function collapseRecommendedRowsByArchive(songs) {
     const songRowsByArchive = new Map();
     for (const row of songs) {
         if (!isRecommendedCountFormat(row.format)) continue;
-        const archiveKey = getSongArchiveKey(row);
+        const archiveKey = getRecommendedSongArchiveKey(row);
         const existing = songRowsByArchive.get(archiveKey);
         if (!existing || isHigherArchiveOrder(row, existing)) {
             songRowsByArchive.set(archiveKey, row);
         }
     }
+    return Array.from(songRowsByArchive.values());
+}
+
+/**
+ * おすすめ判定用に同一曲単位で行を束ねる
+ * @param {Array<SongRow>} rows
+ * @returns {Map<string, {rows: SongRow[], utamitaRows: SongRow[], streamRows: SongRow[], shortRows: SongRow[]}>}
+ */
+function groupRecommendedRowsBySong(rows) {
     const groups = new Map();
-    for (const row of songRowsByArchive.values()) {
-        const key = getSongKey(row);
+    for (const row of rows) {
+        const key = getRecommendedSongKey(row);
         if (!groups.has(key)) {
             groups.set(key, { rows: [], utamitaRows: [], streamRows: [], shortRows: [] });
         }
@@ -1553,21 +1580,25 @@ function buildRecommendedGroups(songs) {
         if (isStreamFormat(row.format)) entry.streamRows.push(row);
         if (isShortFormat(row.format)) entry.shortRows.push(row);
     }
-    const result = [];
-    for (const [key, entry] of groups.entries()) {
-        if (entry.rows.length < MIN_PERFORMANCE_FOR_RANDOM) continue;
-        let latestRows = [];
-        if (entry.utamitaRows.length > 0) {
-            latestRows = entry.utamitaRows.slice(0, 1);
-        } else if (entry.streamRows.length > 0) {
-            latestRows = entry.streamRows.slice(0, MIN_PERFORMANCE_FOR_RANDOM);
-        } else if (entry.shortRows.length > 0) {
-            latestRows = entry.shortRows.slice(0, MIN_PERFORMANCE_FOR_RANDOM);
-        }
-        if (latestRows.length === 0) continue;
-        result.push({ key, latestRows });
+    return groups;
+}
+
+/**
+ * 同一曲の候補群から、表示に使う最新候補を選ぶ
+ * @param {{utamitaRows: SongRow[], streamRows: SongRow[], shortRows: SongRow[]}} entry
+ * @returns {SongRow[]}
+ */
+function pickRecommendedLatestRows(entry) {
+    if (entry.utamitaRows.length > 0) {
+        return entry.utamitaRows.slice(0, 1);
     }
-    return result;
+    if (entry.streamRows.length > 0) {
+        return entry.streamRows.slice(0, MIN_PERFORMANCE_FOR_RANDOM);
+    }
+    if (entry.shortRows.length > 0) {
+        return entry.shortRows.slice(0, MIN_PERFORMANCE_FOR_RANDOM);
+    }
+    return [];
 }
 
 /**
@@ -1597,7 +1628,7 @@ function pickRandomEntry(list) {
  * @param {SongRow} row
  * @returns {string}
  */
-function getSongKey(row) {
+function getRecommendedSongKey(row) {
     return [
         row.titleNorm || '',
         row.artistNorm || '',
@@ -1611,8 +1642,8 @@ function getSongKey(row) {
  * @param {SongRow} row
  * @returns {string}
  */
-function getSongArchiveKey(row) {
-    return `${getSongKey(row)}|||${row.archiveId || ''}`;
+function getRecommendedSongArchiveKey(row) {
+    return `${getRecommendedSongKey(row)}|||${row.archiveId || ''}`;
 }
 
 /**
