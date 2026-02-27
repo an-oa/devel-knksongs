@@ -1,56 +1,26 @@
-(() => {
-/**
- * かねきかう 歌サーチ
- */
-const RANDOM_DISPLAY_COUNT = 48;
-const MIN_PERFORMANCE_FOR_RANDOM = 3;
-const INCREMENT_COUNT = 48;
-const PUBLIC_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR-cSDIsEc3sqIOkmiuuSeaUKmNb2gBvM_NoH8-Se5ZrosaSOdMhPo3RuvxhZirUPJ_ll8PGnbRnJeF/pub?gid=457223586&single=true&output=csv";
-const DEFAULT_FORMATS = ["配信", "歌みた", "ショート", "切り抜き"];
-const CSV_CACHE_KEY = "cachedCsv";
-const SEARCH_STATE_KEY = "searchStateV1";
-const PLAYLIST_STORAGE_KEY = "playlistsV1";
-// Paint preview/フォーム復元の後追い対策で複数回同期する。
-const UI_SYNC_PASSES = 2;
-const SEARCH_DEBOUNCE_MS = 200;
-const YT_IFRAME_API_SRC = "https://www.youtube.com/iframe_api";
-const YT_IFRAME_API_SELECTOR = 'script[data-yt-iframe-api="true"]';
-const YT_IFRAME_READY_POLL_MS = 50;
-
-const state = {
-    data: {
-        allSongsRaw: [],
-        currentResults: [],
-        displayLimit: RANDOM_DISPLAY_COUNT,
-        playlists: {},
-        activePlaylist: null
-    },
-        ui: {
-        selectedFormats: new Set(),
-        scrollObserver: null,
-        showThumbnails: false,
-        dataReady: false,
-        userTouchedQuery: false,
-        userTouchedFilters: false,
-        hasRestoredSearchState: false,
-        searchDebounceId: 0,
-        cardEntriesBySourceKey: new Map(),
-        recommendedCache: null,
-        activeThumb: null,
-        el: {}, // DOM要素のキャッシュ用
-        dateBounds: null,
-        dateIndex: null,
-        pendingDateValues: null,
-        pendingPlaylistAction: null
-    },
-    youtube: {
-        apiPromise: null,
-        players: new WeakMap()
-    }
-};
-const data = state.data;
-const ui = state.ui;
-const youtube = state.youtube;
+import {
+    RANDOM_DISPLAY_COUNT,
+    MIN_PERFORMANCE_FOR_RANDOM,
+    INCREMENT_COUNT,
+    PUBLIC_CSV_URL,
+    DEFAULT_FORMATS,
+    CSV_CACHE_KEY,
+    SEARCH_STATE_KEY,
+    PLAYLIST_STORAGE_KEY,
+    UI_SYNC_PASSES,
+    SEARCH_DEBOUNCE_MS,
+    YT_IFRAME_API_SRC,
+    YT_IFRAME_API_SELECTOR,
+    YT_IFRAME_READY_POLL_MS,
+    STOP_PLAYBACK_ON_SCROLL_OUT,
+    data,
+    ui,
+    youtube
+} from "./state.mjs";
+import { createSearchController, normalizeForSearch, parseDateKey } from "./search.mjs";
+import { createRenderController } from "./render.mjs";
+import { createYoutubeController, extractYoutubeInfo } from "./youtube.mjs";
+import { createStorageController } from "./storage.mjs";
 
 /**
  * @typedef {Object} SongRow
@@ -74,25 +44,99 @@ const youtube = state.youtube;
  * @property {string} artistYomiNorm
  */
 
-/**
- * @typedef {Object} CardEntry
- * @property {HTMLDivElement} card
- * @property {HTMLDivElement} thumbDiv
- * @property {HTMLAnchorElement} titleEl
- * @property {HTMLDivElement} artistEl
- * @property {HTMLSpanElement} dateEl
- * @property {HTMLDivElement} tagsEl
- * @property {HTMLButtonElement} addToPlaylistBtn
- */
+const searchController = createSearchController({
+    data,
+    ui,
+    constants: {
+        RANDOM_DISPLAY_COUNT,
+        MIN_PERFORMANCE_FOR_RANDOM,
+        INCREMENT_COUNT,
+        SEARCH_DEBOUNCE_MS,
+        DEFAULT_FORMATS
+    }
+});
+
+const renderController = createRenderController({
+    data,
+    ui,
+    isAllFormatsSelected: () => searchController.areAllFormatsSelected()
+});
+
+const youtubeController = createYoutubeController({
+    ui,
+    youtube,
+    constants: {
+        YT_IFRAME_API_SRC,
+        YT_IFRAME_API_SELECTOR,
+        YT_IFRAME_READY_POLL_MS,
+        STOP_PLAYBACK_ON_SCROLL_OUT
+    }
+});
+
+const storageController = createStorageController({
+    data,
+    ui,
+    constants: {
+        DEFAULT_FORMATS,
+        SEARCH_STATE_KEY,
+        PLAYLIST_STORAGE_KEY
+    },
+    callbacks: {
+        getDateSelectValue: (kind) => searchController.getDateSelectValue(kind),
+        applyPendingDateValues: () => searchController.applyPendingDateValues(),
+        renderPlaylists: () => renderPlaylists()
+    }
+});
+
+renderController.setDependencies({
+    getSearchState: () => searchController.getSearchState(),
+    isRecommendedMode: (state) => searchController.isRecommendedMode(state),
+    updateThumbnail: (thumbDiv, yt) => youtubeController.updateThumbnail(thumbDiv, yt),
+    extractYoutubeInfo,
+    openPlaylistModal: (songKey) => openPlaylistModal(songKey),
+    setupScrollObserver: () => youtubeController.setupScrollObserver()
+});
+searchController.setRenderHooks({
+    updateDisplay: () => renderController.updateDisplay(),
+    scrollResultsPaneToTop
+});
+youtubeController.setDisplayHook(() => renderController.updateDisplay());
+
+function scheduleSearch(options) { searchController.scheduleSearch(options); }
+function getSearchState() { return searchController.getSearchState(); }
+function isRecommendedMode(state) { return searchController.isRecommendedMode(state); }
+function areAllFormatsSelected() { return searchController.areAllFormatsSelected(); }
+function areFormatsDefault() { return searchController.areFormatsDefault(); }
+function hasDateSelection() { return searchController.hasDateSelection(); }
+function getDateSelectValue(kind) { return searchController.getDateSelectValue(kind); }
+function applyDateSelectValue(kind, value) { searchController.applyDateSelectValue(kind, value); }
+function resetDateSelects() { searchController.resetDateSelects(); }
+function getPartialDateRange(kind) { return searchController.getPartialDateRange(kind); }
+function syncDateSelectOptions(kind) { searchController.syncDateSelectOptions(kind); }
+function applyPendingDateValues() { searchController.applyPendingDateValues(); }
+function applyDateInputRange(songs) { return searchController.applyDateInputRange(songs); }
+function clampDateInputsToBounds(minKey, maxKey) { searchController.clampDateInputsToBounds(minKey, maxKey); }
+function clampDateInputsIfNeeded() { searchController.clampDateInputsIfNeeded(); }
+function setupThumbnailToggle() { youtubeController.setupThumbnailToggle(); }
+function applyThumbnailFromStorage() { youtubeController.applyThumbnailFromStorage(); }
+function setupScrollObserver() { youtubeController.setupScrollObserver(); }
+function isIOSWebKit() { return youtubeController.isIOSWebKit(); }
+function updateDisplay() { renderController.updateDisplay(); }
+
+function setSelectedFormatsToDefault() { storageController.setSelectedFormatsToDefault(); }
+function syncFormatCheckboxesFromState() { storageController.syncFormatCheckboxesFromState(); }
+function loadPlaylists() { storageController.loadPlaylists(); }
+function savePlaylists() { storageController.savePlaylists(); }
+function migrateLegacyPlaylistSongRefs() { storageController.migrateLegacyPlaylistSongRefs(); }
+function saveSearchState() { storageController.saveSearchState(); }
+function restoreSearchState() { storageController.restoreSearchState(); }
 
 // ===== Lifecycle (public) =====
 
 /**
- * UI初期化をまとめて実行する
- * @returns {Promise<void>}
+ * initUI を実行する
  */
 async function initUI() {
-    // 主要なDOM要素をキャッシュ
     ui.el = {
         resultList: document.getElementById('resultList'),
         resultCount: document.getElementById('resultCount'),
@@ -133,7 +177,7 @@ async function initUI() {
 }
 
 /**
- * 初期化処理を起動する
+ * boot を実行する
  */
 function boot() {
     initUI().catch((err) => {
@@ -146,21 +190,14 @@ document.addEventListener('DOMContentLoaded', boot);
 // ===== Lifecycle (private) =====
 
 /**
- * ブラウザのフォーム復元でフィルタ状態が残るのを防ぐ
- */
-function resetEphemeralFilters() {
-    resetSearchFilters();
-}
-
-/**
- * ページ復元/フォーカスの同期を実行する
+ * handleFocusSync を実行する
  */
 function handleFocusSync() {
     scheduleSyncUiState();
 }
 
 /**
- * 可視状態の変化に合わせて同期する
+ * handleVisibilitySync を実行する
  */
 function handleVisibilitySync() {
     if (document.visibilityState !== "visible") return;
@@ -168,7 +205,7 @@ function handleVisibilitySync() {
 }
 
 /**
- * ページ復元後の同期をまとめて行う
+ * handlePageShowSync を実行する
  */
 function handlePageShowSync() {
     scheduleSyncUiState();
@@ -176,7 +213,7 @@ function handlePageShowSync() {
 }
 
 /**
- * 復元タイミングに合わせたUI同期イベントを登録する
+ * setupSyncEvents を実行する
  */
 function setupSyncEvents() {
     window.addEventListener('focus', handleFocusSync);
@@ -187,7 +224,7 @@ function setupSyncEvents() {
 // ===== UI Controls (public) =====
 
 /**
- * UIイベント（サイドバー、検索、読み込み）を結び付ける
+ * setupUIHandlers を実行する
  */
 function setupUIHandlers() {
     const sidebar = document.getElementById('sidebar');
@@ -240,6 +277,7 @@ function setupUIHandlers() {
     ui.el.searchBox.addEventListener('input', () => {
         markQueryTouched();
     });
+
     [dateFromYear, dateFromMonth, dateFromDay, dateToYear, dateToMonth, dateToDay].forEach((el) => {
         if (!el) return;
         el.addEventListener('change', () => {
@@ -292,8 +330,8 @@ function setupUIHandlers() {
 }
 
 /**
- * 特定の日付セレクトグループをリセットする
- * @param {"from" | "to"} kind
+ * resetDateSelectGroup を実行する
+ * @param {*} kind
  */
 function resetDateSelectGroup(kind) {
     const isFrom = kind === "from";
@@ -309,7 +347,7 @@ function resetDateSelectGroup(kind) {
 // ===== Playlist =====
 
 /**
- * プレイリスト関連のUIイベントを登録する
+ * setupPlaylistHandlers を実行する
  */
 function setupPlaylistHandlers() {
     const modal = ui.el.playlistModal;
@@ -324,7 +362,7 @@ function setupPlaylistHandlers() {
             createPlaylistAndAdd(newName, ui.pendingPlaylistAction.songKey);
         }
     });
-    
+
     ui.el.playlistModalNewName.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             ui.el.playlistModalCreateBtn.click();
@@ -341,99 +379,7 @@ function setupPlaylistHandlers() {
 }
 
 /**
- * 保存データをプレイリスト構造へ正規化する
- * @param {unknown} raw
- * @returns {Object<string, {name: string, createdAt: number, songs: Array<string | number>}>}
- */
-function sanitizePlaylists(raw) {
-    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
-    const sanitized = {};
-    for (const [id, playlist] of Object.entries(raw)) {
-        if (!playlist || typeof playlist !== "object" || Array.isArray(playlist)) continue;
-        const name = typeof playlist.name === "string" ? playlist.name.trim() : "";
-        if (!name) continue;
-        const createdAt = Number.isFinite(playlist.createdAt) ? playlist.createdAt : 0;
-        const songs = [];
-        const seen = new Set();
-        const rawSongs = Array.isArray(playlist.songs) ? playlist.songs : [];
-        rawSongs.forEach((ref) => {
-            let normalized = null;
-            if (typeof ref === "string") {
-                const value = ref.trim();
-                if (value) normalized = value;
-            } else if (Number.isFinite(ref)) {
-                normalized = ref;
-            }
-            if (normalized === null) return;
-            const dedupeKey = typeof normalized === "number" ? `n:${normalized}` : `s:${normalized}`;
-            if (seen.has(dedupeKey)) return;
-            seen.add(dedupeKey);
-            songs.push(normalized);
-        });
-        sanitized[id] = { name, createdAt, songs };
-    }
-    return sanitized;
-}
-
-/**
- * 旧形式（sourceIndex）で保存された楽曲参照を永続識別子へ移行する
- */
-function migrateLegacyPlaylistSongRefs() {
-    const legacyMap = new Map(data.allSongsRaw.map((row) => [row.sourceIndex, row.songKey]));
-    let updated = false;
-    Object.values(data.playlists).forEach((playlist) => {
-        const nextSongs = [];
-        const seen = new Set();
-        const prevSongs = Array.isArray(playlist.songs) ? playlist.songs : [];
-        prevSongs.forEach((ref) => {
-            let normalized = null;
-            if (typeof ref === "string") {
-                normalized = ref;
-            } else if (Number.isFinite(ref)) {
-                normalized = legacyMap.get(ref) || null;
-            }
-            if (!normalized) return;
-            if (seen.has(normalized)) return;
-            seen.add(normalized);
-            nextSongs.push(normalized);
-        });
-        if (prevSongs.length !== nextSongs.length || prevSongs.some((ref, idx) => ref !== nextSongs[idx])) {
-            playlist.songs = nextSongs;
-            updated = true;
-        }
-    });
-    if (updated) savePlaylists();
-}
-
-/**
- * ローカルストレージからプレイリストを読み込み、一覧表示を更新する
- */
-function loadPlaylists() {
-    try {
-        const stored = localStorage.getItem(PLAYLIST_STORAGE_KEY);
-        if (stored) {
-            data.playlists = sanitizePlaylists(JSON.parse(stored));
-        }
-    } catch (e) {
-        console.error("Failed to load playlists", e);
-        data.playlists = {};
-    }
-    renderPlaylists();
-}
-
-/**
- * 現在のプレイリスト状態をローカルストレージへ保存する
- */
-function savePlaylists() {
-    try {
-        localStorage.setItem(PLAYLIST_STORAGE_KEY, JSON.stringify(data.playlists));
-    } catch (e) {
-        console.error("Failed to save playlists", e);
-    }
-}
-
-/**
- * サイドバーのプレイリスト一覧を再描画する
+ * renderPlaylists を実行する
  */
 function renderPlaylists() {
     const container = ui.el.playlistList;
@@ -443,7 +389,7 @@ function renderPlaylists() {
         return (data.playlists[a].createdAt || 0) - (data.playlists[b].createdAt || 0);
     });
 
-    container.replaceChildren(...sortedIds.map(id => {
+    container.replaceChildren(...sortedIds.map((id) => {
         const p = data.playlists[id];
         const item = document.createElement('div');
         item.className = 'playlist-item';
@@ -470,13 +416,13 @@ function renderPlaylists() {
 }
 
 /**
- * 指定楽曲の追加先を選ぶモーダルを開く
- * @param {string} songKey
+ * openPlaylistModal を実行する
+ * @param {*} songKey
  */
 function openPlaylistModal(songKey) {
     ui.pendingPlaylistAction = { songKey };
     ui.el.playlistModal.hidden = false;
-    
+
     const modalList = ui.el.playlistModalList;
     modalList.replaceChildren();
 
@@ -484,7 +430,7 @@ function openPlaylistModal(songKey) {
         return (data.playlists[a].createdAt || 0) - (data.playlists[b].createdAt || 0);
     });
 
-    sortedIds.forEach(id => {
+    sortedIds.forEach((id) => {
         const p = data.playlists[id];
         const item = document.createElement('div');
         item.className = 'playlist-modal-item';
@@ -494,13 +440,13 @@ function openPlaylistModal(songKey) {
         });
         modalList.appendChild(item);
     });
-    
+
     ui.el.playlistModalNewName.value = '';
     ui.el.playlistModalNewName.focus();
 }
 
 /**
- * プレイリスト追加モーダルを閉じて保留状態を解除する
+ * closePlaylistModal を実行する
  */
 function closePlaylistModal() {
     ui.el.playlistModal.hidden = true;
@@ -508,9 +454,9 @@ function closePlaylistModal() {
 }
 
 /**
- * 楽曲を既存プレイリストへ追加する
- * @param {string} playlistId
- * @param {string} songKey
+ * addSongToPlaylist を実行する
+ * @param {*} playlistId
+ * @param {*} songKey
  */
 function addSongToPlaylist(playlistId, songKey) {
     const playlist = data.playlists[playlistId];
@@ -523,16 +469,17 @@ function addSongToPlaylist(playlistId, songKey) {
 }
 
 /**
- * 新規プレイリストを作成し、楽曲を追加する
- * @param {string} playlistName
- * @param {string} songKey
+ * createPlaylistAndAdd を実行する
+ * @param {*} playlistName
+ * @param {*} songKey
  */
 function createPlaylistAndAdd(playlistName, songKey) {
-    const newId = `p_${Date.now()}`;
+    const now = Date.now();
+    const newId = `p_${now}`;
     data.playlists[newId] = {
         name: playlistName,
         songs: [songKey],
-        createdAt: Date.now()
+        createdAt: now
     };
     savePlaylists();
     renderPlaylists();
@@ -540,8 +487,8 @@ function createPlaylistAndAdd(playlistName, songKey) {
 }
 
 /**
- * プレイリストをアクティブ化して検索結果を切り替える
- * @param {string} playlistId
+ * setActivePlaylist を実行する
+ * @param {*} playlistId
  */
 function setActivePlaylist(playlistId) {
     clearSearchDebounce();
@@ -553,8 +500,8 @@ function setActivePlaylist(playlistId) {
 }
 
 /**
- * アクティブなプレイリスト選択を解除する
- * @param {{skipSearch?: boolean}} [options]
+ * clearActivePlaylist を実行する
+ * @param {*} options
  */
 function clearActivePlaylist(options) {
     if (!data.activePlaylist) return;
@@ -568,12 +515,12 @@ function clearActivePlaylist(options) {
 // ===== Sidebar Accessibility =====
 
 /**
- * 年選択時に月セレクトへフォーカスを移す
- * @param {HTMLSelectElement} target
- * @param {HTMLSelectElement | null} fromYear
- * @param {HTMLSelectElement | null} fromMonth
- * @param {HTMLSelectElement | null} toYear
- * @param {HTMLSelectElement | null} toMonth
+ * moveDateFocusIfNeeded を実行する
+ * @param {*} target
+ * @param {*} fromYear
+ * @param {*} fromMonth
+ * @param {*} toYear
+ * @param {*} toMonth
  */
 function moveDateFocusIfNeeded(target, fromYear, fromMonth, toYear, toMonth) {
     if (fromYear && target === fromYear && fromMonth && fromYear.value) {
@@ -600,8 +547,8 @@ function moveDateFocusIfNeeded(target, fromYear, fromMonth, toYear, toMonth) {
 }
 
 /**
- * サイドバー内にフォーカスが残っている場合はフォーカスを外す
- * @param {HTMLElement | null} sidebar
+ * blurSidebarActiveElement を実行する
+ * @param {*} sidebar
  */
 function blurSidebarActiveElement(sidebar) {
     const active = document.activeElement;
@@ -613,9 +560,8 @@ function blurSidebarActiveElement(sidebar) {
 }
 
 /**
- * サイドバー内のフォーカス可能要素を列挙する
- * @param {HTMLElement | null} sidebar
- * @returns {HTMLElement[]}
+ * getFocusableInSidebar を実行する
+ * @param {*} sidebar
  */
 function getFocusableInSidebar(sidebar) {
     if (!sidebar) return [];
@@ -631,7 +577,7 @@ function getFocusableInSidebar(sidebar) {
 }
 
 /**
- * サイドバー内の最初のフォーカス可能要素へ移動する
+ * focusSidebarFirst を実行する
  */
 function focusSidebarFirst() {
     const sidebar = document.getElementById('sidebar');
@@ -645,9 +591,9 @@ function focusSidebarFirst() {
 }
 
 /**
- * サイドバー内にフォーカスを閉じ込める簡易トラップ
- * @param {KeyboardEvent} event
- * @param {HTMLElement | null} sidebar
+ * trapSidebarFocus を実行する
+ * @param {*} event
+ * @param {*} sidebar
  */
 function trapSidebarFocus(event, sidebar) {
     if (!sidebar || !sidebar.classList.contains('active')) return;
@@ -667,7 +613,7 @@ function trapSidebarFocus(event, sidebar) {
 }
 
 /**
- * すべての検索・フィルタ条件を初期状態にリセットする
+ * clearSearch を実行する
  */
 function clearSearch() {
     clearActivePlaylist({ skipSearch: true });
@@ -676,7 +622,7 @@ function clearSearch() {
 }
 
 /**
- * 保存済みテーマを反映してUIを同期する
+ * setupTheme を実行する
  */
 function setupTheme() {
     const themeToggle = ui.el.themeToggle;
@@ -690,7 +636,7 @@ function setupTheme() {
 }
 
 /**
- * 結果リストを含むスクロール領域を先頭に戻す
+ * scrollResultsPaneToTop を実行する
  */
 function scrollResultsPaneToTop() {
     const resultList = ui.el.resultList;
@@ -707,9 +653,8 @@ function scrollResultsPaneToTop() {
 }
 
 /**
- * 指定要素を含む最寄りのスクロール可能コンテナを探す
- * @param {HTMLElement} element
- * @returns {HTMLElement | null}
+ * findScrollableAncestor を実行する
+ * @param {*} element
  */
 function findScrollableAncestor(element) {
     let current = element.parentElement;
@@ -723,35 +668,11 @@ function findScrollableAncestor(element) {
     return document.scrollingElement instanceof HTMLElement ? document.scrollingElement : document.documentElement;
 }
 
-/**
- * サムネ表示のオン/オフを初期化する
- */
-function setupThumbnailToggle() {
-    const thumbToggle = ui.el.thumbToggle;
-    const savedSetting = localStorage.getItem('showThumbnails');
-    let isShow = savedSetting !== null ? (savedSetting === 'true') : false;
-    ui.showThumbnails = isShow;
-
-    thumbToggle.checked = isShow;
-    if (!isShow) document.body.classList.add('hide-thumbs');
-    ensureYoutubeApiForThumbnails();
-
-    thumbToggle.addEventListener('change', () => {
-        const checked = thumbToggle.checked;
-        ui.showThumbnails = checked;
-        document.body.classList.toggle('hide-thumbs', !checked);
-        localStorage.setItem('showThumbnails', checked);
-        ensureYoutubeApiForThumbnails();
-        updateDisplay();
-        setupScrollObserver();
-    });
-}
-
 // ===== UI Controls (private) =====
 
 /**
- * フィルタ変更を検知して再検索を予約する
- * @param {{ immediate?: boolean }} [options]
+ * markFilterTouched を実行する
+ * @param {*} options
  */
 function markFilterTouched(options) {
     ui.userTouchedFilters = true;
@@ -760,7 +681,7 @@ function markFilterTouched(options) {
 }
 
 /**
- * 検索語の変更を検知して再検索を予約する
+ * markQueryTouched を実行する
  */
 function markQueryTouched() {
     ui.userTouchedQuery = true;
@@ -769,7 +690,7 @@ function markQueryTouched() {
 }
 
 /**
- * 検索デバウンスを解除する
+ * clearSearchDebounce を実行する
  */
 function clearSearchDebounce() {
     if (ui.searchDebounceId) {
@@ -779,7 +700,7 @@ function clearSearchDebounce() {
 }
 
 /**
- * 検索語を初期状態に戻す
+ * resetSearchQuery を実行する
  */
 function resetSearchQuery() {
     if (ui.el.searchBox) ui.el.searchBox.value = "";
@@ -787,27 +708,25 @@ function resetSearchQuery() {
 }
 
 /**
- * フィルタ条件を初期状態に戻す
+ * resetSearchFilters を実行する
  */
 function resetSearchFilters() {
     const relayOnly = ui.el.relayOnly;
     const harmonyOnly = ui.el.harmonyOnly;
-    const formatCheckboxes = document.querySelectorAll('#formatsList input[type="checkbox"]');
 
     if (relayOnly) relayOnly.checked = false;
     if (harmonyOnly) harmonyOnly.checked = false;
     resetDateSelects();
     ui.pendingDateValues = null;
 
-    ui.selectedFormats.clear();
-    DEFAULT_FORMATS.forEach(f => ui.selectedFormats.add(f));
-    formatCheckboxes.forEach(cb => { cb.checked = true; });
+    setSelectedFormatsToDefault();
+    syncFormatCheckboxesFromState();
     ui.userTouchedFilters = false;
 }
 
 /**
- * 検索条件を初期状態に戻す（検索語・チェック・形態）
- * @param {boolean} shouldSearch
+ * resetSearchConditions を実行する
+ * @param {*} shouldSearch
  */
 function resetSearchConditions(shouldSearch) {
     clearSearchDebounce();
@@ -816,78 +735,11 @@ function resetSearchConditions(shouldSearch) {
     if (shouldSearch && ui.dataReady) scheduleSearch({ immediate: true });
 }
 
-// ===== Search State Persistence (private) =====
-
-/**
- * 現在の検索状態を保存する
- */
-function saveSearchState() {
-    try {
-        const searchBox = ui.el.searchBox;
-        const relayOnly = ui.el.relayOnly;
-        const harmonyOnly = ui.el.harmonyOnly;
-        const dateFrom = getDateSelectValue("from");
-        const dateTo = getDateSelectValue("to");
-        const payload = {
-            query: searchBox ? searchBox.value : "",
-            relayOnly: relayOnly ? !!relayOnly.checked : false,
-            harmonyOnly: harmonyOnly ? !!harmonyOnly.checked : false,
-            dateFrom,
-            dateTo,
-            formats: Array.from(ui.selectedFormats)
-        };
-        localStorage.setItem(SEARCH_STATE_KEY, JSON.stringify(payload));
-    } catch (e) {}
-}
-
-/**
- * 保存済み検索状態を復元する
- */
-function restoreSearchState() {
-    try {
-        const raw = localStorage.getItem(SEARCH_STATE_KEY);
-        if (!raw) return;
-        const parsed = JSON.parse(raw);
-        const searchBox = ui.el.searchBox;
-        const relayOnly = ui.el.relayOnly;
-        const harmonyOnly = ui.el.harmonyOnly;
-        const formatCheckboxes = document.querySelectorAll('#formatsList input[type="checkbox"]');
-        const formats = Array.isArray(parsed.formats) ? parsed.formats : [];
-        const allowed = new Set(DEFAULT_FORMATS);
-        ui.selectedFormats.clear();
-        formats.forEach((f) => {
-            if (allowed.has(f)) ui.selectedFormats.add(f);
-        });
-        if (ui.selectedFormats.size === 0) {
-            DEFAULT_FORMATS.forEach((f) => ui.selectedFormats.add(f));
-        }
-        formatCheckboxes.forEach((cb) => {
-            cb.checked = ui.selectedFormats.has(cb.value);
-        });
-        if (searchBox && typeof parsed.query === "string") {
-            searchBox.value = parsed.query;
-        }
-        if (relayOnly) relayOnly.checked = !!parsed.relayOnly;
-        if (harmonyOnly) harmonyOnly.checked = !!parsed.harmonyOnly;
-        const pending = {
-            from: typeof parsed.dateFrom === "string" ? parsed.dateFrom : "",
-            to: typeof parsed.dateTo === "string" ? parsed.dateTo : ""
-        };
-        ui.pendingDateValues = pending;
-        if (ui.dateBounds) {
-            applyPendingDateValues();
-        }
-        ui.userTouchedQuery = true;
-        ui.userTouchedFilters = true;
-        ui.hasRestoredSearchState = true;
-    } catch (e) {}
-}
-
 // ===== UI Sync (public) =====
 
 /**
- * ペイント復元後のUI状態を同期する
- * @param {{visual?: boolean, search?: boolean}} [options]
+ * syncUiState を実行する
+ * @param {*} options
  */
 function syncUiState(options) {
     const opts = options || {};
@@ -898,8 +750,8 @@ function syncUiState(options) {
 }
 
 /**
- * 2段階でUI状態を同期する
- * @param {{visual?: boolean, search?: boolean}} [options]
+ * scheduleSyncUiState を実行する
+ * @param {*} options
  */
 function scheduleSyncUiState(options) {
     syncUiState(options);
@@ -908,8 +760,8 @@ function scheduleSyncUiState(options) {
 }
 
 /**
- * 復元直後の描画ズレを緩和するために再同期を遅らせる
- * @param {number} [delayMs]
+ * scheduleDelayedVisualSync を実行する
+ * @param {*} delayMs
  */
 function scheduleDelayedVisualSync(delayMs) {
     const delay = Number.isFinite(delayMs) ? delayMs : 200;
@@ -919,7 +771,7 @@ function scheduleDelayedVisualSync(delayMs) {
 // ===== UI Sync (private) =====
 
 /**
- * 見た目系のUIを同期する
+ * syncVisualUI を実行する
  */
 function syncVisualUI() {
     syncThemeUI();
@@ -927,21 +779,21 @@ function syncVisualUI() {
 }
 
 /**
- * 保存済みテーマを反映してUIを同期する
+ * syncThemeUI を実行する
  */
 function syncThemeUI() {
     applyThemeFromStorage();
 }
 
 /**
- * 保存済みサムネ設定を反映してUIを同期する
+ * syncThumbnailUI を実行する
  */
 function syncThumbnailUI() {
     applyThumbnailFromStorage();
 }
 
 /**
- * ローカルストレージ/システム設定からテーマを復元する
+ * applyThemeFromStorage を実行する
  */
 function applyThemeFromStorage() {
     const themeToggle = ui.el.themeToggle;
@@ -952,53 +804,10 @@ function applyThemeFromStorage() {
     if (themeToggle) themeToggle.checked = isDarkMode;
 }
 
-/**
- * 保存済みサムネ設定を反映してUIを同期する
- */
-function applyThumbnailFromStorage() {
-    const thumbToggle = ui.el.thumbToggle;
-    const savedSetting = localStorage.getItem('showThumbnails');
-    const isShow = savedSetting !== null ? (savedSetting === 'true') : false;
-    const prev = ui.showThumbnails;
-    ui.showThumbnails = isShow;
-    if (thumbToggle) thumbToggle.checked = isShow;
-    document.body.classList.toggle('hide-thumbs', !isShow);
-    ensureYoutubeApiForThumbnails();
-    if (prev !== isShow && ui.dataReady) {
-        updateDisplay();
-        setupScrollObserver();
-    }
-}
-
-/**
- * サムネ表示が有効なときにのみYouTube IFrame APIを読み込む
- */
-function ensureYoutubeApiForThumbnails() {
-    if (!ui.showThumbnails) return;
-    requestAnimationFrame(() => youtubeApi.ensureReady().catch(() => {}));
-}
-
 // ===== Search Sync / Filters (private) =====
-/**
- * 形態フィルタが初期状態か判定する
- * @returns {boolean}
- */
-function areFormatsDefault() {
-    if (ui.selectedFormats.size !== DEFAULT_FORMATS.length) return false;
-    return areAllFormatsSelected();
-}
 
 /**
- * すべての形態フィルタが選択されているか判定する
- * @returns {boolean}
- */
-function areAllFormatsSelected() {
-    return DEFAULT_FORMATS.every(f => ui.selectedFormats.has(f));
-}
-
-/**
- * フィルタが初期状態からずれているか判定する
- * @returns {boolean}
+ * needsFilterReset を実行する
  */
 function needsFilterReset() {
     const relayOnly = ui.el.relayOnly;
@@ -1006,16 +815,11 @@ function needsFilterReset() {
     if (relayOnly && relayOnly.checked) return true;
     if (harmonyOnly && harmonyOnly.checked) return true;
     if (hasDateSelection()) return true;
-    const formatCheckboxes = document.querySelectorAll('#formatsList input[type="checkbox"]');
-    for (const cb of formatCheckboxes) {
-        if (!cb.checked) return true;
-    }
     return !areFormatsDefault();
 }
 
 /**
- * 検索語を初期条件に戻すべきか判定し同期する
- * @returns {boolean}
+ * syncSearchQueryIfNeeded を実行する
  */
 function syncSearchQueryIfNeeded() {
     if (ui.userTouchedQuery) return false;
@@ -1026,10 +830,10 @@ function syncSearchQueryIfNeeded() {
 }
 
 /**
- * フィルタを初期条件に戻すべきか判定し同期する
- * @returns {boolean}
+ * syncSearchFiltersIfNeeded を実行する
  */
 function syncSearchFiltersIfNeeded() {
+    syncFormatCheckboxesFromState();
     if (ui.userTouchedFilters) return false;
     if (!needsFilterReset()) return false;
     resetSearchFilters();
@@ -1037,7 +841,7 @@ function syncSearchFiltersIfNeeded() {
 }
 
 /**
- * 検索UIの状態を初期条件と同期する
+ * syncSearchUI を実行する
  */
 function syncSearchUI() {
     const shouldSearch = syncSearchQueryIfNeeded() || syncSearchFiltersIfNeeded();
@@ -1047,7 +851,7 @@ function syncSearchUI() {
 // ===== Data Loading / Parsing (public) =====
 
 /**
- * CSVを読み込み、初期データとフィルタを構築する
+ * loadInitialData を実行する
  */
 async function loadInitialData() {
     const resCount = ui.el.resultCount;
@@ -1071,19 +875,18 @@ async function loadInitialData() {
 // ===== Data Loading / Parsing (private) =====
 
 /**
- * 形態フィルタのチェックボックス一覧を生成する
+ * initFilterMenu を実行する
  */
 function initFilterMenu() {
     const container = ui.el.formatsList;
     if (!container || container.childElementCount > 0) return;
-    DEFAULT_FORMATS.forEach(fmt => {
+    if (ui.selectedFormats.size === 0) setSelectedFormatsToDefault();
+    DEFAULT_FORMATS.forEach((fmt) => {
         const label = document.createElement('label');
         label.className = 'checkbox-item';
         const cb = document.createElement('input');
         cb.type = 'checkbox';
         cb.value = fmt;
-        cb.checked = true;
-        ui.selectedFormats.add(fmt);
         cb.addEventListener('change', (e) => {
             ui.userTouchedFilters = true;
             if (e.target.checked) ui.selectedFormats.add(e.target.value);
@@ -1091,15 +894,16 @@ function initFilterMenu() {
             scheduleSearch();
             saveSearchState();
         });
-        label.append(cb, " " + fmt);
+        label.append(cb, ` ${fmt}`);
         container.appendChild(label);
     });
+    syncFormatCheckboxesFromState();
 }
 
 /**
- * 読み込んだCSVの内容を状態へ反映する
- * @param {string} csvText
- * @param {string | null} statusLabel
+ * applyLoadedCsv を実行する
+ * @param {*} csvText
+ * @param {*} statusLabel
  */
 function applyLoadedCsv(csvText, statusLabel) {
     data.allSongsRaw = parseCsvToSongs(csvText);
@@ -1121,9 +925,8 @@ function applyLoadedCsv(csvText, statusLabel) {
 }
 
 /**
- * 楽曲の永続識別子を構築する
- * @param {{archiveId: string, archiveOrder: number | null, url: string}} input
- * @returns {string}
+ * buildSongKey を実行する
+ * @param {*} input
  */
 function buildSongKey(input) {
     const { archiveId, archiveOrder, url } = input;
@@ -1136,15 +939,14 @@ function buildSongKey(input) {
 }
 
 /**
- * CSVを解析してSongRowの配列へ変換する
- * @param {string} csvText
- * @returns {Array<SongRow>}
+ * parseCsvToSongs を実行する
+ * @param {*} csvText
  */
 function parseCsvToSongs(csvText) {
     const rows = parseCsvRFC4180(csvText);
     const header = rows[0];
     const required = ["公開範囲", "#", "##", "曲名", "アーティスト名", "キョクメイ", "アーティストメイ", "配信日", "形態", "歌枠リレー？", "ハモリあり？", "URL", "メモ"];
-    const missing = required.filter(name => !header.includes(name));
+    const missing = required.filter((name) => !header.includes(name));
     if (missing.length > 0) {
         throw new Error(`CSVヘッダ不足: ${missing.join(", ")}`);
     }
@@ -1190,9 +992,8 @@ function parseCsvToSongs(csvText) {
 }
 
 /**
- * 同一アーカイブ内の曲順（##）を数値化する
- * @param {string} raw
- * @returns {number | null}
+ * parseArchiveOrder を実行する
+ * @param {*} raw
  */
 function parseArchiveOrder(raw) {
     if (!raw) return null;
@@ -1201,14 +1002,16 @@ function parseArchiveOrder(raw) {
 }
 
 /**
- * RFC4180準拠でCSV文字列を2次元配列にパースする
- * @param {string} t
- * @returns {string[][]}
+ * parseCsvRFC4180 を実行する
+ * @param {*} t
  */
 function parseCsvRFC4180(t) {
-    let res = [], row = [], field = "", inQ = false;
+    let res = [];
+    let row = [];
+    let field = "";
+    let inQ = false;
     for (let i = 0; i < t.length; i++) {
-        let c = t[i];
+        const c = t[i];
         if (inQ) {
             if (c === '"' && t[i + 1] === '"') {
                 field += '"';
@@ -1237,1533 +1040,8 @@ function parseCsvRFC4180(t) {
     }
     row.push(field);
     res.push(row);
-    while (res.length > 0 && res[res.length - 1].every(v => v === "")) {
+    while (res.length > 0 && res[res.length - 1].every((v) => v === "")) {
         res.pop();
     }
     return res;
 }
-
-
-// ===== Search / Recommendation (public) =====
-
-/**
- * 入力中の検索をまとめて実行する
- * @param {{ immediate?: boolean }} [options]
- */
-function scheduleSearch(options) {
-    if (ui.searchDebounceId) clearTimeout(ui.searchDebounceId);
-    if (options && options.immediate) {
-        search();
-        return;
-    }
-    ui.searchDebounceId = setTimeout(() => {
-        ui.searchDebounceId = 0;
-        search();
-    }, SEARCH_DEBOUNCE_MS);
-}
-
-/**
- * 検索条件に応じて結果を更新する
- */
-function search() {
-    const searchInput = collectSearchInput();
-    const outcome = resolveSearchOutcome(searchInput.searchState);
-    applySearchOutcome(searchInput, outcome);
-}
-
-// ===== Search / Recommendation (private) =====
-
-/**
- * 検索実行に必要な入力を収集する
- * @returns {{searchState: {queryRaw: string, relayOnly: boolean, harmonyOnly: boolean, dateFromKey: number | null, dateToKey: number | null, hasDateFilter: boolean}, resultCountEl: HTMLElement | null}}
- */
-function collectSearchInput() {
-    return {
-        searchState: getSearchState(),
-        resultCountEl: ui.el.resultCount
-    };
-}
-
-/**
- * 検索条件から表示内容を解決する
- * @param {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean, dateFromKey: number | null, dateToKey: number | null, hasDateFilter: boolean}} searchState
- * @returns {{results: SongRow[], displayLimit: number, label: string}}
- */
-function resolveSearchOutcome(searchState) {
-    return resolveSearchResults(searchState);
-}
-
-/**
- * 解決済み検索結果を状態とUIへ反映する
- * @param {{resultCountEl: HTMLElement | null}} searchInput
- * @param {{results: SongRow[], displayLimit: number, label: string}} outcome
- */
-function applySearchOutcome(searchInput, outcome) {
-    data.currentResults = outcome.results;
-    data.displayLimit = outcome.displayLimit;
-    if (searchInput.resultCountEl) searchInput.resultCountEl.innerText = outcome.label;
-    updateDisplay();
-    scrollResultsPaneToTop();
-}
-
-/**
- * 検索条件の現在値を取得する
- * @returns {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean, dateFromKey: number | null, dateToKey: number | null, hasDateFilter: boolean}}
- */
-function getSearchState() {
-    const fromRange = getPartialDateRange("from");
-    const toRange = getPartialDateRange("to");
-    return {
-        queryRaw: ui.el.searchBox.value.trim(),
-        relayOnly: ui.el.relayOnly.checked,
-        harmonyOnly: ui.el.harmonyOnly.checked,
-        dateFromKey: fromRange ? fromRange.minKey : null,
-        dateToKey: toRange ? toRange.maxKey : null,
-        hasDateFilter: Boolean(fromRange || toRange)
-    };
-}
-
-/**
- * おすすめ表示条件を満たしているか判定する
- * @param {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean, hasDateFilter: boolean}} searchState
- * @returns {boolean}
- */
-function isRecommendedMode(searchState) {
-    return !data.activePlaylist &&
-           searchState.queryRaw === "" &&
-           !searchState.relayOnly &&
-           !searchState.harmonyOnly &&
-           !searchState.hasDateFilter &&
-           areAllFormatsSelected();
-}
-
-/**
- * プレイリスト内の参照を現在の楽曲行へ解決する
- * @param {{songs: Array<string | number>}} playlist
- * @returns {SongRow[]}
- */
-function resolvePlaylistRows(playlist) {
-    const songMapByKey = new Map(data.allSongsRaw.map((row) => [row.songKey, row]));
-    const songMapByLegacyIndex = new Map(data.allSongsRaw.map((row) => [row.sourceIndex, row]));
-    const songs = Array.isArray(playlist.songs) ? playlist.songs : [];
-    return songs
-        .map((songRef) => {
-            if (typeof songRef === "string") return songMapByKey.get(songRef);
-            if (Number.isFinite(songRef)) return songMapByLegacyIndex.get(songRef);
-            return null;
-        })
-        .filter(Boolean);
-}
-
-/**
- * 検索結果と表示ラベルをまとめて返す
- * @param {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean, dateFromKey: number | null, dateToKey: number | null, hasDateFilter: boolean}} searchState
- * @returns {{results: Array<SongRow>, displayLimit: number, label: string}}
- */
-function resolveSearchResults(searchState) {
-    if (data.activePlaylist) {
-        const playlist = data.playlists[data.activePlaylist];
-        if (playlist) {
-            const results = resolvePlaylistRows(playlist);
-            return {
-                results,
-                displayLimit: results.length,
-                label: `プレイリスト: ${playlist.name}`
-            };
-        }
-    }
-
-    if (isRecommendedMode(searchState)) {
-        return {
-            results: pickRecommended(),
-            displayLimit: RANDOM_DISPLAY_COUNT,
-            label: "おすすめを表示中"
-        };
-    }
-    const results = filterSongs(searchState);
-    return {
-        results,
-        displayLimit: INCREMENT_COUNT,
-        label: `${results.length} 件がヒット`
-    };
-}
-
-// ===== Date Filters (private) =====
-
-// --- Date Index ---
-
-/**
- * 配信日インデックスを構築する
- * @param {Array<SongRow>} songs
- * @returns {Map<string, number[]>}
- */
-function buildDateIndex(songs) {
-    const index = new Map();
-    for (const row of songs) {
-        if (!row.dateKey) continue;
-        const { year, month, day } = dateKeyToParts(row.dateKey);
-        const key = `${year}-${String(month).padStart(2, "0")}`;
-        if (!index.has(key)) index.set(key, new Set());
-        index.get(key).add(day);
-    }
-    const normalized = new Map();
-    for (const [key, set] of index.entries()) {
-        normalized.set(key, Array.from(set).sort((a, b) => a - b));
-    }
-    return normalized;
-}
-
-/**
- * 指定年月の配信日リストを取得する
- * @param {string} year
- * @param {string} month
- * @returns {number[]}
- */
-function getAvailableDays(year, month) {
-    if (!ui.dateIndex) return [];
-    const key = `${year}-${month}`;
-    return ui.dateIndex.get(key) || [];
-}
-
-// --- Date Select State ---
-
-/**
- * 日付セレクトが選択済みか判定する
- * @returns {boolean}
- */
-function hasDateSelection() {
-    return hasPartialDateSelection("from") || hasPartialDateSelection("to");
-}
-
-/**
- * 日付セレクトのいずれかが入力されているか判定する
- * @param {"from" | "to"} kind
- * @returns {boolean}
- */
-function hasPartialDateSelection(kind) {
-    const parts = getDateSelectParts(kind);
-    return parts.year !== "" || parts.month !== "" || parts.day !== "";
-}
-
-/**
- * 日付セレクトの選択値を取得する
- * @param {"from" | "to"} kind
- * @returns {{year: string, month: string, day: string}}
- */
-function getDateSelectParts(kind) {
-    const isFrom = kind === "from";
-    const year = (isFrom ? ui.el.dateFromYear : ui.el.dateToYear)?.value ?? "";
-    const month = (isFrom ? ui.el.dateFromMonth : ui.el.dateToMonth)?.value ?? "";
-    const day = (isFrom ? ui.el.dateFromDay : ui.el.dateToDay)?.value ?? "";
-    return { year, month, day };
-}
-
-/**
- * 日付セレクトの値を YYYY-MM-DD で返す
- * @param {"from" | "to"} kind
- * @returns {string}
- */
-function getDateSelectValue(kind) {
-    const { year, month, day } = getDateSelectParts(kind);
-    if (!year || !month || !day) return "";
-    return `${year}-${month}-${day}`;
-}
-
-/**
- * 日付セレクトへ YYYY-MM-DD を反映する
- * @param {"from" | "to"} kind
- * @param {string} value
- */
-function applyDateSelectValue(kind, value) {
-    if (!value) return;
-    const key = parseDateKey(value);
-    if (!key) return;
-    const { year, month, day } = dateKeyToParts(key);
-    const isFrom = kind === "from";
-    const yearSelect = isFrom ? ui.el.dateFromYear : ui.el.dateToYear;
-    const monthSelect = isFrom ? ui.el.dateFromMonth : ui.el.dateToMonth;
-    const daySelect = isFrom ? ui.el.dateFromDay : ui.el.dateToDay;
-    if (!yearSelect || !monthSelect || !daySelect) return;
-    yearSelect.value = String(year);
-    syncDateSelectOptions(kind);
-    monthSelect.value = String(month).padStart(2, "0");
-    syncDateSelectOptions(kind);
-    daySelect.value = String(day).padStart(2, "0");
-}
-
-/**
- * 日付セレクトを初期状態へ戻す
- */
-function resetDateSelects() {
-    ["from", "to"].forEach((kind) => {
-        const isFrom = kind === "from";
-        const year = isFrom ? ui.el.dateFromYear : ui.el.dateToYear;
-        const month = isFrom ? ui.el.dateFromMonth : ui.el.dateToMonth;
-        const day = isFrom ? ui.el.dateFromDay : ui.el.dateToDay;
-        if (year) year.value = "";
-        if (month) month.value = "";
-        if (day) day.value = "";
-    });
-    syncDateSelectOptions();
-}
-
-// --- Date Range Constraints ---
-
-/**
- * 部分的に入力された日付の範囲を取得する
- * @param {"from" | "to"} kind
- * @returns {{minKey: number, maxKey: number} | null}
- */
-function getPartialDateRange(kind) {
-    const { year, month, day } = getDateSelectParts(kind);
-    if (!year) return null;
-    const y = Number(year);
-    if (!month) {
-        return { minKey: y * 10000 + 101, maxKey: y * 10000 + 1231 };
-    }
-    const m = Number(month);
-    const daysInMonth = new Date(y, m, 0).getDate();
-    if (!day) {
-        return { minKey: y * 10000 + m * 100 + 1, maxKey: y * 10000 + m * 100 + daysInMonth };
-    }
-    const d = Number(day);
-    return { minKey: y * 10000 + m * 100 + d, maxKey: y * 10000 + m * 100 + d };
-}
-
-/**
- * 反対側の入力に基づいて範囲を制約する
- * @param {"from" | "to"} kind
- * @returns {{minKey: number, maxKey: number} | null}
- */
-function getConstrainedBounds(kind) {
-    if (!ui.dateBounds) return null;
-    let minKey = ui.dateBounds.minKey;
-    let maxKey = ui.dateBounds.maxKey;
-    const otherKind = kind === "from" ? "to" : "from";
-    const otherRange = getPartialDateRange(otherKind);
-    if (otherRange) {
-        if (kind === "to") {
-            minKey = Math.max(minKey, otherRange.minKey);
-        } else {
-            maxKey = Math.min(maxKey, otherRange.maxKey);
-        }
-    }
-    if (minKey > maxKey) {
-        if (kind === "to") minKey = maxKey;
-        else maxKey = minKey;
-    }
-    return { minKey, maxKey };
-}
-
-// --- Date Select UI ---
-
-/**
- * 日付セレクトを初期化する
- * @param {{minKey: number, maxKey: number}} bounds
- */
-function initDateSelects(bounds) {
-    const { minKey, maxKey } = bounds;
-    const minParts = dateKeyToParts(minKey);
-    const maxParts = dateKeyToParts(maxKey);
-    const years = [];
-    for (let y = minParts.year; y <= maxParts.year; y++) {
-        years.push(String(y));
-    }
-    buildSelectOptions(ui.el.dateFromYear, years, "年");
-    buildSelectOptions(ui.el.dateToYear, years, "年");
-    buildSelectOptions(ui.el.dateFromMonth, [], "月");
-    buildSelectOptions(ui.el.dateToMonth, [], "月");
-    buildSelectOptions(ui.el.dateFromDay, [], "日");
-    buildSelectOptions(ui.el.dateToDay, [], "日");
-    syncDateSelectOptions();
-    applyPendingDateValues();
-}
-
-/**
- * セレクトに選択肢を反映する
- * @param {HTMLSelectElement | null} select
- * @param {string[]} values
- * @param {string} placeholder
- */
-function buildSelectOptions(select, values, placeholder) {
-    if (!select) return;
-    const current = select.value;
-    const fragment = document.createDocumentFragment();
-    const empty = document.createElement("option");
-    empty.value = "";
-    empty.textContent = placeholder;
-    fragment.appendChild(empty);
-    values.forEach((val) => {
-        const opt = document.createElement("option");
-        opt.value = val;
-        opt.textContent = val;
-        fragment.appendChild(opt);
-    });
-    select.replaceChildren(fragment);
-    if (values.includes(current)) {
-        select.value = current;
-    } else {
-        select.value = "";
-    }
-}
-
-/**
- * 日付セレクトの選択肢を現在の範囲に合わせて更新する
- * @param {"from" | "to"} [kind]
- */
-function syncDateSelectOptions(kind) {
-    if (!ui.dateBounds) return;
-    const targets = kind ? [kind] : ["from", "to"];
-    targets.forEach((k) => {
-        const bounds = getConstrainedBounds(k) || ui.dateBounds;
-        const isFrom = k === "from";
-        const yearSelect = isFrom ? ui.el.dateFromYear : ui.el.dateToYear;
-        const monthSelect = isFrom ? ui.el.dateFromMonth : ui.el.dateToMonth;
-        const daySelect = isFrom ? ui.el.dateFromDay : ui.el.dateToDay;
-        if (!yearSelect || !monthSelect || !daySelect) return;
-        const minParts = dateKeyToParts(bounds.minKey);
-        const maxParts = dateKeyToParts(bounds.maxKey);
-        const yearVal = yearSelect.value;
-        const years = buildNumberRange(minParts.year, maxParts.year).map((y) => String(y));
-        buildSelectOptions(yearSelect, years, "年");
-        const selectedYear = yearSelect.value;
-        const minMonth = selectedYear === String(minParts.year) ? minParts.month : 1;
-        const maxMonth = selectedYear === String(maxParts.year) ? maxParts.month : 12;
-        const months = selectedYear ? buildNumberRange(minMonth, maxMonth).map((m) => String(m).padStart(2, "0")) : [];
-        buildSelectOptions(monthSelect, months, "月");
-        const monthVal = monthSelect.value;
-        if (!selectedYear || !monthVal) {
-            buildSelectOptions(daySelect, [], "日");
-            return;
-        }
-        const monthNum = Number(monthVal);
-        const availableDays = getAvailableDays(selectedYear, monthVal);
-        if (availableDays.length === 0) {
-            buildSelectOptions(daySelect, [], "日");
-            return;
-        }
-        let minDay = availableDays[0];
-        let maxDay = availableDays[availableDays.length - 1];
-        if (selectedYear === String(minParts.year) && monthNum === minParts.month) minDay = Math.max(minDay, minParts.day);
-        if (selectedYear === String(maxParts.year) && monthNum === maxParts.month) maxDay = Math.min(maxDay, maxParts.day);
-        const days = availableDays
-            .filter((d) => d >= minDay && d <= maxDay)
-            .map((d) => String(d).padStart(2, "0"));
-        buildSelectOptions(daySelect, days, "日");
-    });
-}
-
-/**
- * 保留されている日付の復元値を適用する
- */
-function applyPendingDateValues() {
-    if (!ui.pendingDateValues) return;
-    const { from, to } = ui.pendingDateValues;
-    if (from) applyDateSelectValue("from", from);
-    if (to) applyDateSelectValue("to", to);
-    ui.pendingDateValues = null;
-}
-
-/**
- * 数値レンジ配列を生成する
- * @param {number} start
- * @param {number} end
- * @returns {number[]}
- */
-function buildNumberRange(start, end) {
-    const list = [];
-    for (let i = start; i <= end; i++) list.push(i);
-    return list;
-}
-
-/**
- * 入力された日付文字列を YYYYMMDD の数値に変換する
- * @param {string} raw
- * @returns {number | null}
- */
-function parseDateKey(raw) {
-    if (!raw) return null;
-    const trimmed = raw.trim();
-    const match = /^(\d{4})[/-](\d{1,2})[/-](\d{1,2})$/.exec(trimmed);
-    if (!match) return null;
-    const year = Number(match[1]);
-    const month = Number(match[2]);
-    const day = Number(match[3]);
-    if (month < 1 || month > 12 || day < 1 || day > 31) return null;
-    const date = new Date(year, month - 1, day);
-    if (Number.isNaN(date.getTime())) return null;
-    if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null;
-    return year * 10000 + month * 100 + day;
-}
-
-/**
- * YYYYMMDD の数値を input[type="date"] 向けの YYYY-MM-DD に変換する
- * @param {number} key
- * @returns {string}
- */
-function formatDateKeyForInput(key) {
-    const year = Math.floor(key / 10000);
-    const month = Math.floor((key % 10000) / 100);
-    const day = key % 100;
-    const mm = String(month).padStart(2, "0");
-    const dd = String(day).padStart(2, "0");
-    return `${year}-${mm}-${dd}`;
-}
-
-/**
- * YYYYMMDD を年/月/日に分解する
- * @param {number} key
- * @returns {{year: number, month: number, day: number}}
- */
-function dateKeyToParts(key) {
-    const year = Math.floor(key / 10000);
-    const month = Math.floor((key % 10000) / 100);
-    const day = key % 100;
-    return { year, month, day };
-}
-
-/**
- * 読み込み済みデータから日付範囲を算出し入力のmin/maxを更新する
- * @param {Array<SongRow>} songs
- */
-function applyDateInputRange(songs) {
-    const dateFromYear = ui.el.dateFromYear;
-    const dateFromMonth = ui.el.dateFromMonth;
-    const dateFromDay = ui.el.dateFromDay;
-    const dateToYear = ui.el.dateToYear;
-    const dateToMonth = ui.el.dateToMonth;
-    const dateToDay = ui.el.dateToDay;
-    if (!dateFromYear || !dateFromMonth || !dateFromDay || !dateToYear || !dateToMonth || !dateToDay) return null;
-    let minKey = null;
-    let maxKey = null;
-    for (const row of songs) {
-        if (!row.dateKey) continue;
-        if (minKey === null || row.dateKey < minKey) minKey = row.dateKey;
-        if (maxKey === null || row.dateKey > maxKey) maxKey = row.dateKey;
-    }
-    if (minKey === null || maxKey === null) return null;
-    const bounds = { minKey, maxKey };
-    ui.dateBounds = bounds;
-    ui.dateIndex = buildDateIndex(songs);
-    initDateSelects(bounds);
-    return bounds;
-}
-
-/**
- * 入力された日付を範囲内に収める
- * @param {number} minKey
- * @param {number} maxKey
- */
-function clampDateInputsToBounds(minKey, maxKey) {
-    const dateFrom = ui.el.dateFromYear;
-    const dateTo = ui.el.dateToYear;
-    if (!dateFrom || !dateTo) return;
-    const clampKey = (key) => {
-        if (key === null) return null;
-        if (key < minKey) return minKey;
-        if (key > maxKey) return maxKey;
-        return key;
-    };
-    let fromKey = clampKey(parseDateKey(getDateSelectValue("from")));
-    let toKey = clampKey(parseDateKey(getDateSelectValue("to")));
-    if (fromKey !== null && toKey !== null && fromKey > toKey) {
-        toKey = fromKey;
-    }
-    if (fromKey !== null) applyDateSelectValue("from", formatDateKeyForInput(fromKey));
-    if (toKey !== null) applyDateSelectValue("to", formatDateKeyForInput(toKey));
-}
-
-/**
- * 現在の範囲に基づいて日付入力を補正する
- */
-function clampDateInputsIfNeeded() {
-    if (!ui.dateBounds) return;
-    clampDateInputsToBounds(ui.dateBounds.minKey, ui.dateBounds.maxKey);
-}
-
-/**
- * 日付フィルタに一致するか判定する
- * @param {SongRow} row
- * @param {number | null} fromKey
- * @param {number | null} toKey
- * @returns {boolean}
- */
-function isWithinDateRange(row, fromKey, toKey) {
-    if (!fromKey && !toKey) return true;
-    if (!row.dateKey) return false;
-    if (fromKey && row.dateKey < fromKey) return false;
-    if (toKey && row.dateKey > toKey) return false;
-    return true;
-}
-
-/**
- * 検索条件で楽曲を絞り込む
- * @param {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean, dateFromKey: number | null, dateToKey: number | null, hasDateFilter: boolean}} searchState
- * @returns {Array<SongRow>}
- */
-function filterSongs(searchState) {
-    const queryNorm = normalizeForSearch(searchState.queryRaw);
-    const keywords = queryNorm.split(/[\s\u3000]+/).filter(k => k.length > 0);
-    return data.allSongsRaw.filter(row => {
-        const matchText = keywords.every(kw =>
-            row.titleNorm.includes(kw) ||
-            row.artistNorm.includes(kw) ||
-            row.titleYomiNorm.includes(kw) ||
-            row.artistYomiNorm.includes(kw)
-        );
-        const matchDate = isWithinDateRange(row, searchState.dateFromKey, searchState.dateToKey);
-        return matchText &&
-            matchDate &&
-            ui.selectedFormats.has(row.format) &&
-            (!searchState.relayOnly || row.isRelay) &&
-            (!searchState.harmonyOnly || row.isHarmony);
-    });
-}
-
-/**
- * 配列を均等にシャッフルする
- * @template T
- * @param {T[]} list
- * @returns {T[]}
- */
-function shuffleInPlace(list) {
-    for (let i = list.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [list[i], list[j]] = [list[j], list[i]];
-    }
-    return list;
-}
-
-/**
- * おすすめ表示用の楽曲を抽出する
- * @returns {Array<SongRow>}
- */
-function pickRecommended() {
-    // おすすめの並びは「同条件では固定」する方針。
-    // 条件を一度変えて元に戻しても並びは維持し、CSV再読込時のみリセットされる。
-    if (ui.recommendedCache) return ui.recommendedCache;
-    ui.recommendedCache = selectRecommendedSongs(
-        buildRecommendedGroups(data.allSongsRaw),
-        RANDOM_DISPLAY_COUNT
-    );
-    return ui.recommendedCache;
-}
-
-/**
- * おすすめ抽出用に、各曲のセットを作る
- * @param {Array<SongRow>} songs
- * @returns {Array<{key: string, latestRows: SongRow[]}>}
- */
-function buildRecommendedGroups(songs) {
-    const dedupedRows = collapseRecommendedRowsByArchive(songs);
-    const groups = groupRecommendedRowsBySong(dedupedRows);
-    const result = [];
-    for (const [key, entry] of groups.entries()) {
-        if (entry.rows.length < MIN_PERFORMANCE_FOR_RANDOM) continue;
-        const latestRows = pickRecommendedLatestRows(entry);
-        if (latestRows.length === 0) continue;
-        result.push({ key, latestRows });
-    }
-    return result;
-}
-
-/**
- * 同一曲・同一アーカイブの重複を取り除き、##最大の1件に絞る
- * @param {Array<SongRow>} songs
- * @returns {Array<SongRow>}
- */
-function collapseRecommendedRowsByArchive(songs) {
-    const songRowsByArchive = new Map();
-    for (const row of songs) {
-        if (!isRecommendedCountFormat(row.format)) continue;
-        const archiveKey = getRecommendedSongArchiveKey(row);
-        const existing = songRowsByArchive.get(archiveKey);
-        if (!existing || isHigherArchiveOrder(row, existing)) {
-            songRowsByArchive.set(archiveKey, row);
-        }
-    }
-    return Array.from(songRowsByArchive.values());
-}
-
-/**
- * おすすめ判定用に同一曲単位で行を束ねる
- * @param {Array<SongRow>} rows
- * @returns {Map<string, {rows: SongRow[], utamitaRows: SongRow[], streamRows: SongRow[], shortRows: SongRow[]}>}
- */
-function groupRecommendedRowsBySong(rows) {
-    const groups = new Map();
-    for (const row of rows) {
-        const key = getRecommendedSongKey(row);
-        if (!groups.has(key)) {
-            groups.set(key, { rows: [], utamitaRows: [], streamRows: [], shortRows: [] });
-        }
-        const entry = groups.get(key);
-        entry.rows.push(row);
-        if (isUtamitaFormat(row.format)) entry.utamitaRows.push(row);
-        if (isStreamFormat(row.format)) entry.streamRows.push(row);
-        if (isShortFormat(row.format)) entry.shortRows.push(row);
-    }
-    return groups;
-}
-
-/**
- * 同一曲の候補群から、表示に使う最新候補を選ぶ
- * @param {{utamitaRows: SongRow[], streamRows: SongRow[], shortRows: SongRow[]}} entry
- * @returns {SongRow[]}
- */
-function pickRecommendedLatestRows(entry) {
-    if (entry.utamitaRows.length > 0) {
-        return entry.utamitaRows.slice(0, 1);
-    }
-    if (entry.streamRows.length > 0) {
-        return entry.streamRows.slice(0, MIN_PERFORMANCE_FOR_RANDOM);
-    }
-    if (entry.shortRows.length > 0) {
-        return entry.shortRows.slice(0, MIN_PERFORMANCE_FOR_RANDOM);
-    }
-    return [];
-}
-
-/**
- * おすすめセットから表示曲を選ぶ
- * @param {Array<{key: string, latestRows: SongRow[]}>} groups
- * @param {number} count
- * @returns {SongRow[]}
- */
-function selectRecommendedSongs(groups, count) {
-    const pickedGroups = shuffleInPlace(groups.slice()).slice(0, count);
-    return pickedGroups.map(group => pickRandomEntry(group.latestRows));
-}
-
-/**
- * 配列から1件をランダムに選ぶ
- * @template T
- * @param {T[]} list
- * @returns {T}
- */
-function pickRandomEntry(list) {
-    const idx = Math.floor(Math.random() * list.length);
-    return list[idx];
-}
-
-/**
- * 曲の同一性判定キーを作る（曲名/アーティスト名/読み）
- * @param {SongRow} row
- * @returns {string}
- */
-function getRecommendedSongKey(row) {
-    return [
-        row.titleNorm || '',
-        row.artistNorm || '',
-        row.titleYomiNorm || '',
-        row.artistYomiNorm || ''
-    ].join('|||');
-}
-
-/**
- * 曲キーとアーカイブIDを結合したキーを作る
- * @param {SongRow} row
- * @returns {string}
- */
-function getRecommendedSongArchiveKey(row) {
-    return `${getRecommendedSongKey(row)}|||${row.archiveId || ''}`;
-}
-
-/**
- * 同一曲・同一アーカイブ内で、##が大きい方を優先する
- * @param {SongRow} candidate
- * @param {SongRow} current
- * @returns {boolean}
- */
-function isHigherArchiveOrder(candidate, current) {
-    const candidateOrder = candidate.archiveOrder ?? -1;
-    const currentOrder = current.archiveOrder ?? -1;
-    if (candidateOrder !== currentOrder) return candidateOrder > currentOrder;
-    return candidate.sourceIndex > current.sourceIndex;
-}
-
-/**
- * おすすめ判定のカウント対象に含める形態かどうか判定する
- * @param {string} format
- * @returns {boolean}
- */
-function isRecommendedCountFormat(format) {
-    return isStreamFormat(format) || isUtamitaFormat(format) || isShortFormat(format);
-}
-
-/**
- * 歌みた形態かどうか判定する
- * @param {string} format
- * @returns {boolean}
- */
-function isUtamitaFormat(format) {
-    return format === "歌みた";
-}
-
-/**
- * 配信形態かどうか判定する
- * @param {string} format
- * @returns {boolean}
- */
-function isStreamFormat(format) {
-    return format === "配信";
-}
-
-/**
- * ショート形態かどうか判定する
- * @param {string} format
- * @returns {boolean}
- */
-function isShortFormat(format) {
-    return format === "ショート";
-}
-
-// ===== Rendering (private) =====
-
-/**
- * 楽曲カードのベース要素を生成する
- * @returns {CardEntry}
- */
-function createCardElements() {
-    const card = document.createElement("div");
-    card.className = "song-card";
-
-    const thumbDiv = document.createElement("div");
-    thumbDiv.className = "thumb";
-
-    const content = document.createElement("div");
-    content.className = "content";
-
-    const title = document.createElement("a");
-    title.className = "title";
-
-    const artist = document.createElement("div");
-    artist.className = "artist";
-
-    const footer = document.createElement("div");
-    footer.className = "card-footer";
-
-    const leftGroup = document.createElement("div");
-    leftGroup.className = "footer-left";
-    const date = document.createElement("span");
-    leftGroup.append(date);
-
-    const rightGroup = document.createElement("div");
-    rightGroup.className = "footer-right";
-
-    const tags = document.createElement("div");
-    tags.className = "footer-tags";
-    
-    const addToPlaylistBtn = document.createElement("button");
-    addToPlaylistBtn.type = "button";
-    addToPlaylistBtn.className = "add-to-playlist-btn";
-    addToPlaylistBtn.innerHTML = `+`;
-    addToPlaylistBtn.setAttribute("aria-label", "プレイリストに追加");
-    addToPlaylistBtn.setAttribute("title", "プレイリストに追加");
-
-    rightGroup.append(tags);
-    footer.append(leftGroup, rightGroup, addToPlaylistBtn);
-    content.append(title, artist, footer);
-    card.append(thumbDiv, content);
-
-    return { card, thumbDiv, titleEl: title, artistEl: artist, dateEl: date, tagsEl: tags, addToPlaylistBtn };
-}
-
-/**
- * 楽曲データでカード内容を更新する
- * @param {CardEntry} entry
- * @param {SongRow} row
- */
-function updateCardFromRow(entry, row) {
-    const yt = extractYoutubeInfo(row.url);
-    updateThumbnail(entry.thumbDiv, yt);
-    updateTitleLink(entry.titleEl, row);
-    entry.artistEl.textContent = row.artist || "不明";
-    entry.dateEl.textContent = row.date;
-    updateFooterTags(entry.tagsEl, row);
-
-    entry.addToPlaylistBtn.onclick = () => {
-        openPlaylistModal(row.songKey);
-    };
-}
-
-/**
- * タイトルのリンク状態を更新する
- * @param {HTMLAnchorElement} titleEl
- * @param {SongRow} row
- */
-function updateTitleLink(titleEl, row) {
-    titleEl.textContent = row.title || "無題";
-    if (row.url) {
-        titleEl.classList.add("title-link");
-        titleEl.setAttribute("href", row.url);
-        titleEl.setAttribute("target", "_blank");
-        titleEl.setAttribute("rel", "noopener noreferrer");
-    } else {
-        titleEl.classList.remove("title-link");
-        titleEl.removeAttribute("href");
-        titleEl.removeAttribute("target");
-        titleEl.removeAttribute("rel");
-    }
-}
-
-/**
- * YouTubeの外部再生ボタンを生成する
- * @param {string} openUrl
- * @param {HTMLDivElement} thumbDiv
- * @returns {HTMLAnchorElement}
- */
-function updateFooterTags(tags, row) {
-    tags.replaceChildren();
-    if (row.format) {
-        const fmt = document.createElement("span");
-        fmt.className = "tag";
-        fmt.textContent = row.format;
-        tags.appendChild(fmt);
-    }
-    if (row.isRelay) {
-        const relay = document.createElement("span");
-        relay.className = "tag tag-relay";
-        relay.textContent = "🚩リレー";
-        tags.appendChild(relay);
-    }
-    if (row.isHarmony) {
-        const harmony = document.createElement("span");
-        harmony.className = "tag tag-harmony";
-        harmony.textContent = "✨ハモリ";
-        tags.appendChild(harmony);
-    }
-}
-
-/**
- * 空状態に表示する要素を生成する
- * @param {string} message
- * @returns {HTMLDivElement}
- */
-function createEmptyStateElement(message) {
-    const empty = document.createElement("div");
-    empty.style.gridColumn = "1/-1";
-    empty.style.textAlign = "center";
-    empty.style.padding = "50px";
-    empty.style.color = "var(--text-mute)";
-    empty.textContent = message;
-    return empty;
-}
-
-/**
- * 結果一覧の空状態メッセージを決める
- * @param {{queryRaw: string, relayOnly: boolean, harmonyOnly: boolean, dateFromRaw: string, dateToRaw: string, dateFromKey: number | null, dateToKey: number | null}} searchState
- * @returns {{kind: "loading" | "error" | "empty", message: string}}
- */
-function getEmptyStateDescriptor(searchState) {
-    if (!ui.dataReady) {
-        return { kind: "loading", message: "読み込み中..." };
-    }
-    if (!areAllFormatsSelected() && ui.selectedFormats.size === 0) {
-        return { kind: "error", message: "動画の種類を選択してください" };
-    }
-    return { kind: "empty", message: "見つかりませんでした" };
-}
-
-/**
- * 現在の表示対象を取得する
- * @returns {Array<SongRow>}
- */
-function getVisibleResults() {
-    return data.currentResults.slice(0, data.displayLimit);
-}
-
-/**
- * 空状態を表示する
- * @param {HTMLDivElement} container
- * @param {HTMLDivElement} loadMoreContainer
- */
-function renderEmptyResults(container, loadMoreContainer) {
-    const emptyState = getEmptyStateDescriptor(getSearchState());
-    container.replaceChildren(createEmptyStateElement(emptyState.message));
-    loadMoreContainer.classList.add('hidden');
-}
-
-/**
- * 結果カードのDOM配列を構築する
- * @param {Array<SongRow>} results
- * @returns {{nodes: HTMLDivElement[], entries: CardEntry[]}}
- */
-function buildResultNodes(results) {
-    const nextEntriesBySourceKey = new Map();
-    const entries = [];
-    const nodes = [];
-    for (let i = 0; i < results.length; i++) {
-        const row = results[i];
-        const rowKey = row && Number.isFinite(row.sourceIndex) ? String(row.sourceIndex) : `idx:${i}`;
-        let entry = ui.cardEntriesBySourceKey.get(rowKey);
-        if (!entry) entry = createCardElements();
-        updateCardFromRow(entry, results[i]);
-        nextEntriesBySourceKey.set(rowKey, entry);
-        entries.push(entry);
-        nodes.push(entry.card);
-    }
-    ui.cardEntriesBySourceKey = nextEntriesBySourceKey;
-    return { nodes, entries };
-}
-
-/**
- * 再生中カードを固定すべき状況か判定し、固定対象カードを返す
- * @param {HTMLDivElement} container
- * @param {HTMLDivElement[]} nodes
- * @returns {HTMLDivElement | null}
- */
-function getPinnedActiveCard(container, nodes) {
-    const activeThumb = ui.activeThumb;
-    const activeCard = activeThumb ? activeThumb.closest(".song-card") : null;
-    const shouldPin =
-        Boolean(activeCard) &&
-        activeCard instanceof HTMLElement &&
-        container.contains(activeCard) &&
-        nodes.includes(activeCard) &&
-        Boolean(activeThumb && activeThumb.querySelector("iframe"));
-    return shouldPin ? activeCard : null;
-}
-
-/**
- * 再生中カードを固定しつつ、周囲ノードだけを並び替える
- * @param {HTMLDivElement} container
- * @param {HTMLDivElement[]} nodes
- * @param {HTMLDivElement} pinnedActiveCard
- */
-function reconcileNodesWithPinnedActive(container, nodes, pinnedActiveCard) {
-    const keepSet = new Set(nodes);
-    Array.from(container.children).forEach((child) => {
-        if (child === pinnedActiveCard) return;
-        if (!keepSet.has(child)) container.removeChild(child);
-    });
-
-    let cursor = container.firstChild;
-    for (const node of nodes) {
-        if (node === pinnedActiveCard) {
-            if (cursor === pinnedActiveCard) cursor = cursor.nextSibling;
-            continue;
-        }
-        if (node === cursor) {
-            cursor = cursor.nextSibling;
-            continue;
-        }
-        container.insertBefore(node, cursor);
-    }
-}
-
-/**
- * 結果カードのDOM差分を通常モードで反映する
- * @param {HTMLDivElement} container
- * @param {HTMLDivElement[]} nodes
- */
-function reconcileNodesByOrder(container, nodes) {
-    const children = container.children;
-    // 既存ノードを差し替えずに位置だけ合わせ、再生中のiframeを維持する。
-    for (let i = 0; i < nodes.length; i++) {
-        const node = nodes[i];
-        const current = children[i];
-        if (current !== node) {
-            container.insertBefore(node, current || null);
-        }
-    }
-    while (container.children.length > nodes.length) {
-        const last = container.lastElementChild;
-        if (!last) break;
-        container.removeChild(last);
-    }
-}
-
-/**
- * 結果カードのDOM差分を反映する（既存カードは可能な限り維持する）
- * @param {HTMLDivElement} container
- * @param {HTMLDivElement[]} nodes
- */
-function reconcileResultNodes(container, nodes) {
-    const pinnedActiveCard = getPinnedActiveCard(container, nodes);
-    // 再生中カードをinsertBeforeで動かすと、環境によってiframeが頭出し再読み込みされる。
-    // 再生中のみカードをその場に固定し、再生継続を優先する。
-    if (pinnedActiveCard) {
-        reconcileNodesWithPinnedActive(container, nodes, pinnedActiveCard);
-        return;
-    }
-    reconcileNodesByOrder(container, nodes);
-}
-
-/**
- * 表示中のカードに対してサムネ監視を設定する
- * @param {CardEntry[]} entries
- */
-function observeVisibleThumbnails(entries) {
-    if (!ui.showThumbnails || !ui.scrollObserver) return;
-    for (const entry of entries) {
-        ui.scrollObserver.observe(entry.thumbDiv);
-    }
-}
-
-/**
- * 追加読み込みボタンの表示状態を更新する
- * @param {boolean} recommendedMode
- */
-function updateLoadMoreVisibility(recommendedMode) {
-    const loadMoreContainer = ui.el.loadMoreContainer;
-    if (!recommendedMode && data.currentResults.length > data.displayLimit) {
-        loadMoreContainer.classList.remove('hidden');
-    } else {
-        loadMoreContainer.classList.add('hidden');
-    }
-}
-
-/**
- * 表示更新に必要な入力を収集する
- * @returns {{container: HTMLDivElement, results: SongRow[], recommendedMode: boolean}}
- */
-function collectDisplayState() {
-    return {
-        container: ui.el.resultList,
-        results: getVisibleResults(),
-        recommendedMode: isRecommendedMode(getSearchState())
-    };
-}
-
-/**
- * 監視系の前処理（既存監視解除と必要時の再構築）を行う
- */
-function prepareDisplayObservation() {
-    if (ui.scrollObserver) ui.scrollObserver.disconnect();
-    if (ui.showThumbnails && !ui.scrollObserver) setupScrollObserver();
-}
-
-/**
- * 取得済みの表示対象を描画する
- * @param {{container: HTMLDivElement, results: SongRow[]}} displayState
- * @returns {{entries: CardEntry[]} | null}
- */
-function renderDisplayState(displayState) {
-    const { container, results } = displayState;
-    if (results.length === 0) {
-        renderEmptyResults(container, ui.el.loadMoreContainer);
-        return null;
-    }
-    const { nodes, entries } = buildResultNodes(results);
-    reconcileResultNodes(container, nodes);
-    return { entries };
-}
-
-/**
- * 描画後の監視設定と補助UI更新を適用する
- * @param {{entries: CardEntry[]}} rendered
- * @param {{recommendedMode: boolean}} displayState
- */
-function monitorDisplayState(rendered, displayState) {
-    observeVisibleThumbnails(rendered.entries);
-    updateLoadMoreVisibility(displayState.recommendedMode);
-}
-
-// ===== Rendering (public) =====
-
-/**
- * 現在の検索結果をカードとして描画する
- */
-function updateDisplay() {
-    const displayState = collectDisplayState();
-    prepareDisplayObservation();
-    const rendered = renderDisplayState(displayState);
-    if (!rendered) return;
-    monitorDisplayState(rendered, displayState);
-}
-
-// ===== Thumbnail / Embed (private) =====
-
-/**
- * サムネイル要素の初期状態を整える
- * @param {HTMLDivElement} thumbDiv
- * @param {string} videoId
- * @param {string} playbackKey
- */
-function resetThumbnailContainer(thumbDiv, videoId, playbackKey) {
-    const iframe = thumbDiv.querySelector("iframe");
-    if (iframe) {
-        clearActiveThumb(thumbDiv);
-        youtubeApi.destroyPlayer(thumbDiv);
-        iframe.src = "about:blank";
-    }
-    thumbDiv.dataset.videoId = videoId;
-    thumbDiv.dataset.playbackKey = playbackKey;
-    thumbDiv.classList.remove("playing");
-    thumbDiv.onclick = null;
-    thumbDiv.replaceChildren();
-}
-
-/**
- * サムネイル画像を生成する
- * @param {string} videoId
- * @returns {HTMLImageElement}
- */
-function createThumbnailImage(videoId) {
-    const img = document.createElement("img");
-    img.dataset.src = `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
-    return img;
-}
-
-/**
- * サムネイル画像を生成して要素へ反映する
- * @param {HTMLDivElement} thumbDiv
- * @param {string} videoId
- * @param {{eager?: boolean}} [options]
- */
-function applyThumbnailImage(thumbDiv, videoId, options) {
-    const img = createThumbnailImage(videoId);
-    if (options && options.eager) img.src = img.dataset.src;
-    thumbDiv.replaceChildren(img);
-}
-
-/**
- * サムネイルを今すぐ読み込むべきか判定する
- * @param {HTMLDivElement} thumbDiv
- * @returns {boolean}
- */
-function shouldLoadThumbnailNow(thumbDiv) {
-    const rect = thumbDiv.getBoundingClientRect();
-    const viewHeight = window.innerHeight || document.documentElement.clientHeight;
-    return rect.bottom > 0 && rect.top < viewHeight;
-}
-
-/**
- * 再生状態をUIへ反映する
- * @param {HTMLDivElement} thumbDiv
- * @param {"playing" | "stopped"} state
- */
-function setPlaybackState(thumbDiv, state) {
-    thumbDiv.classList.remove("playing");
-    if (state === "playing") {
-        thumbDiv.classList.add("playing");
-    }
-}
-
-/**
- * 埋め込み再生ターゲットを表すキーを組み立てる
- * @param {{videoId: string, startSeconds: number}} yt
- * @returns {string}
- */
-function buildPlaybackKey(yt) {
-    if (!yt.videoId) return "";
-    return `${yt.videoId}:${yt.startSeconds}`;
-}
-
-/**
- * 現在の埋め込み再生ターゲットが次の描画対象と同一か判定する
- * @param {HTMLDivElement} thumbDiv
- * @param {string} nextPlaybackKey
- * @returns {boolean}
- */
-function isSamePlaybackTarget(thumbDiv, nextPlaybackKey) {
-    if (!ui.showThumbnails) return false;
-    if (!thumbDiv.querySelector("iframe")) return false;
-    return (thumbDiv.dataset.playbackKey || "") === nextPlaybackKey;
-}
-
-/**
- * 再生中カードを更新する（必要なら前の再生を停止）
- * @param {HTMLDivElement} thumbDiv
- */
-function setActiveThumb(thumbDiv) {
-    if (ui.activeThumb && ui.activeThumb !== thumbDiv) {
-        restoreThumbnail(ui.activeThumb, ui.activeThumb.dataset.videoId || "");
-    }
-    ui.activeThumb = thumbDiv;
-}
-
-/**
- * 再生中カードの参照を解除する
- * @param {HTMLDivElement} thumbDiv
- */
-function clearActiveThumb(thumbDiv) {
-    if (ui.activeThumb === thumbDiv) ui.activeThumb = null;
-}
-
-/**
- * IntersectionObserverの通知でサムネ読み込みと再生停止を制御する
- * @param {IntersectionObserverEntry[]} entries
- */
-function handleScrollObserver(entries) {
-    entries.forEach(entry => {
-        const thumb = entry.target;
-        if (entry.isIntersecting) {
-            // 画面内に入ったタイミングでサムネを遅延読み込み
-            const img = thumb.querySelector('img');
-            const srcAttr = img ? img.getAttribute("src") : null;
-            if (img && (!srcAttr || srcAttr === "about:blank")) {
-                const dataSrc = img.dataset.src;
-                if (dataSrc) img.src = dataSrc;
-            }
-            return;
-        }
-        if (!entry.isIntersecting) {
-            // スクロールアウト時に再生停止しない（必要になれば戻せるように残す）
-            if (true) return;
-            const iframe = thumb.querySelector('iframe');
-            if (!iframe) return;
-            iframe.src = "about:blank";
-            const videoId = thumb.dataset.videoId;
-            thumb.classList.remove("playing");
-            if (videoId) {
-                applyThumbnailImage(thumb, videoId);
-            } else {
-                thumb.replaceChildren();
-            }
-        }
-    });
-}
-
-/**
- * ヘッダーの高さを考慮したIntersectionObserverを構築する
- */
-function setupScrollObserver() {
-    const header = document.querySelector('.header');
-    const headerHeight = header ? header.getBoundingClientRect().height : 0;
-    if (ui.scrollObserver) ui.scrollObserver.disconnect();
-    ui.scrollObserver = new IntersectionObserver(handleScrollObserver, {
-        threshold: 0,
-        rootMargin: `-${headerHeight}px 0px 0px 0px`
-    });
-    if (!ui.showThumbnails) return;
-    document.querySelectorAll('.thumb').forEach(thumb => {
-        ui.scrollObserver.observe(thumb);
-    });
-}
-
-// ===== Thumbnail / Embed (public) =====
-
-/**
- * 再生中の埋め込みを止めてサムネイルに戻す
- * @param {HTMLDivElement} thumbDiv
- * @param {string} videoId
- */
-function restoreThumbnail(thumbDiv, videoId) {
-    clearActiveThumb(thumbDiv);
-    youtubeApi.destroyPlayer(thumbDiv);
-    const iframe = thumbDiv.querySelector("iframe");
-    if (iframe) iframe.src = "about:blank";
-    thumbDiv.dataset.videoId = videoId;
-    thumbDiv.dataset.playbackKey = "";
-    setPlaybackState(thumbDiv, "stopped");
-    if (videoId) {
-        applyThumbnailImage(thumbDiv, videoId, { eager: true });
-    } else {
-        thumbDiv.replaceChildren();
-    }
-}
-
-/**
- * 埋め込み再生を開始する
- * @param {HTMLDivElement} thumbDiv
- * @param {{videoId: string, startSeconds: number}} yt
- */
-function startEmbeddedPlayback(thumbDiv, yt) {
-    setActiveThumb(thumbDiv);
-    thumbDiv.dataset.videoId = yt.videoId;
-    thumbDiv.dataset.playbackKey = buildPlaybackKey(yt);
-    setPlaybackState(thumbDiv, "playing");
-    const ifr = document.createElement("iframe");
-    // プライバシー強化モード（nocookie）を維持
-    ifr.src = youtubeApi.buildEmbedUrl(yt);
-    ifr.allow = "autoplay; encrypted-media";
-    ifr.referrerPolicy = "strict-origin-when-cross-origin";
-    ifr.allowFullscreen = true;
-    const close = document.createElement("button");
-    close.type = "button";
-    close.className = "thumb-close-btn";
-    close.setAttribute("aria-label", "サムネイルに戻す");
-    close.innerHTML = "&times;";
-    close.addEventListener("click", (e) => {
-        e.stopPropagation();
-        restoreThumbnail(thumbDiv, yt.videoId);
-    });
-    // iframe上の全面オーバーレイは広告UIのクリックを妨げるため配置しない
-    thumbDiv.replaceChildren(ifr, close);
-    youtubeApi.attachPlayer(thumbDiv, ifr, yt);
-}
-
-/**
- * サムネイル表示を更新する
- * @param {HTMLDivElement} thumbDiv
- * @param {{videoId: string, startSeconds: number}} yt
- */
-function updateThumbnail(thumbDiv, yt) {
-    const nextPlaybackKey = buildPlaybackKey(yt);
-    // 表示更新時でも同一動画の再生中iframeは保持し、再読み込みを防ぐ。
-    if (isSamePlaybackTarget(thumbDiv, nextPlaybackKey)) {
-        thumbDiv.dataset.videoId = yt.videoId;
-        return;
-    }
-    resetThumbnailContainer(thumbDiv, yt.videoId, nextPlaybackKey);
-
-    if (!ui.showThumbnails) return;
-    if (!yt.videoId) return;
-
-    const img = createThumbnailImage(yt.videoId);
-    thumbDiv.onclick = () => {
-        if (thumbDiv.classList.contains("playing")) return;
-        startEmbeddedPlayback(thumbDiv, yt);
-    };
-    thumbDiv.appendChild(img);
-    if (shouldLoadThumbnailNow(thumbDiv)) {
-        img.src = img.dataset.src;
-    }
-}
-
-// ===== YouTube API (private) =====
-
-/**
- * YouTube IFrame API関連のユーティリティ
- */
-
-/**
- * iOS WebKit 環境か判定する
- * @returns {boolean}
- */
-function isIOSWebKit() {
-    const hasTouch = navigator.maxTouchPoints > 0 || "ontouchstart" in window;
-    const webkitTouchCallout = CSS.supports && CSS.supports("-webkit-touch-callout", "none");
-    const webkitOverflowScrolling = CSS.supports && CSS.supports("-webkit-overflow-scrolling", "touch");
-    const isWebKit = webkitTouchCallout || webkitOverflowScrolling;
-    return hasTouch && isWebKit;
-}
-
-const youtubeApi = {
-    /**
-     * APIが利用可能か判定する
-     * @returns {boolean}
-     */
-    isReady() {
-        return Boolean(window.YT && window.YT.Player);
-    },
-    /**
-     * APIの準備完了を待つ
-     * @param {() => void} resolve
-     */
-    waitForReady(resolve) {
-        if (this.isReady()) {
-            resolve();
-            return;
-        }
-        setTimeout(() => this.waitForReady(resolve), YT_IFRAME_READY_POLL_MS);
-    },
-    /**
-     * APIを必要時に読み込む
-     * @returns {Promise<void>}
-     */
-    ensureReady() {
-        if (this.isReady()) return Promise.resolve();
-        if (youtube.apiPromise) return youtube.apiPromise;
-        youtube.apiPromise = new Promise((resolve, reject) => {
-            const existing = document.querySelector(YT_IFRAME_API_SELECTOR);
-            const prevCallback = window.onYouTubeIframeAPIReady;
-            window.onYouTubeIframeAPIReady = () => {
-                if (typeof prevCallback === "function") prevCallback();
-                resolve();
-            };
-            if (existing) {
-                this.waitForReady(resolve);
-                return;
-            }
-            const script = document.createElement("script");
-            script.src = YT_IFRAME_API_SRC;
-            script.async = true;
-            script.dataset.ytIframeApi = "true";
-            script.onerror = () => reject(new Error("iframe_api load failed"));
-            document.head.appendChild(script);
-        });
-        return youtube.apiPromise;
-    },
-    /**
-     * 埋め込みURLを組み立てる（nocookie + API有効化）
-     * @param {{videoId: string, startSeconds: number}} yt
-     * @returns {string}
-     */
-    buildEmbedUrl(yt) {
-        const origin = location.origin === "null"
-            ? ""
-            : `&origin=${encodeURIComponent(location.origin)}`;
-        return `https://www.youtube-nocookie.com/embed/${yt.videoId}?autoplay=1&playsinline=1&start=${yt.startSeconds}&enablejsapi=1&rel=0&cc_load_policy=0&iv_load_policy=3${origin}`;
-    },
-    /**
-     * プレーヤーの状態変化を処理する
-     * @param {HTMLDivElement} thumbDiv
-     * @param {{data: number}} event
-     */
-    handleStateChange(thumbDiv, event) {
-        if (event.data === window.YT.PlayerState.PAUSED ||
-            event.data === window.YT.PlayerState.ENDED) {
-            setPlaybackState(thumbDiv, "stopped");
-            return;
-        }
-        if (event.data === window.YT.PlayerState.PLAYING) {
-            setPlaybackState(thumbDiv, "playing");
-        }
-    },
-    /**
-     * 埋め込みプレーヤーを生成してイベントを紐づける
-     * @param {HTMLDivElement} thumbDiv
-     * @param {HTMLIFrameElement} iframe
-     * @param {{videoId: string}} yt
-     */
-    attachPlayer(thumbDiv, iframe, yt) {
-        this.ensureReady().then(() => {
-            if (!document.body.contains(iframe)) return;
-            if (youtube.players.has(thumbDiv)) return;
-            const player = new window.YT.Player(iframe, {
-                host: "https://www.youtube-nocookie.com",
-                events: {
-                    onStateChange: (event) => this.handleStateChange(thumbDiv, event)
-                }
-            });
-            youtube.players.set(thumbDiv, player);
-        }).catch(() => {
-            // API読み込み失敗時は埋め込みのみで継続する
-        });
-    },
-    /**
-     * 既存の埋め込みプレーヤーを破棄する
-     * @param {HTMLDivElement} thumbDiv
-     */
-    destroyPlayer(thumbDiv) {
-        const player = youtube.players.get(thumbDiv);
-        if (!player) return;
-        if (typeof player.destroy === "function") {
-            player.destroy();
-        }
-        youtube.players.delete(thumbDiv);
-    }
-};
-
-// ===== Utilities (private) =====
-
-/**
- * 検索用に文字列を正規化する（全角半角・ひらがな・大文字小文字）
- * @param {string} s
- * @returns {string}
- */
-function normalizeForSearch(s) {
-    return (s||"")
-        .normalize("NFKC")
-        .replace(/[\u3041-\u3096\u309D-\u309F]/g, m => String.fromCharCode(m.charCodeAt(0) + 0x60))
-        .toLowerCase();
-}
-
-/**
- * YouTube URLから動画IDと開始秒を抽出する
- * @param {string} url
- * @returns {{videoId: string, startSeconds: number}}
- */
-function extractYoutubeInfo(url) {
-    try {
-        const u = new URL(url);
-        let id = u.hostname === "youtu.be" ? u.pathname.slice(1) : (u.searchParams.get("v") || u.pathname.match(/\/shorts\/([^/?#]+)/)?.[1] || u.pathname.match(/\/live\/([^/?#]+)/)?.[1]);
-        const t = u.searchParams.get("t") || u.searchParams.get("start") || "0";
-        return { videoId: id, startSeconds: parseInt(t) || 0 };
-    } catch { return { videoId: "", startSeconds: 0 }; }
-}
-
-})();
