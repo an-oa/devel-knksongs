@@ -56,9 +56,16 @@
 
 ## データソース(開発者向けメモ)
 
-- 公開スプレッドシートをCSVとして参照します(`script.js` の `PUBLIC_CSV_URL` で指定します)。
+- 公開スプレッドシートをCSVとして参照します(`state.mjs` の `PUBLIC_CSV_URL` で指定します)。
 - フロントエンドのみで動作します(静的ホスティング想定)。
-- 依存はありません(HTML/CSS/JavaScriptのみ)。
+- 本番実行時の外部ライブラリ依存はありません(HTML/CSS/JavaScriptのみ)。
+- 開発時テストは Node.js 標準の `node:test` を利用します。
+
+## テスト(開発者向け)
+
+- 現在は検索/日付フィルタのユニットテストを用意しています(`tests/search-date.test.mjs`)。
+- 実行コマンド:
+  - `node tests/search-date.test.mjs`
 
 ---
 
