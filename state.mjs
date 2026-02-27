@@ -37,6 +37,9 @@ export const state = {
         cardEntriesBySourceKey: new Map(),
         recommendedCache: null,
         activeThumb: null,
+        songMapByKey: new Map(),
+        songMapByLegacyIndex: new Map(),
+        songLookupSourceRef: null,
         el: {}, // DOM要素のキャッシュ用
         dateBounds: null,
         dateIndex: null,

@@ -17,10 +17,12 @@ import {
     ui,
     youtube
 } from "./state.mjs";
-import { createSearchController, normalizeForSearch, parseDateKey } from "./search.mjs";
+import { createSearchController } from "./search.mjs";
 import { createRenderController } from "./render.mjs";
 import { createYoutubeController, extractYoutubeInfo } from "./youtube.mjs";
 import { createStorageController } from "./storage.mjs";
+import { createPlaylistUiController } from "./playlist-ui.mjs";
+import { parseCsvToSongs } from "./csv-parser.mjs";
 
 /**
  * @typedef {Object} SongRow
@@ -73,6 +75,8 @@ const youtubeController = createYoutubeController({
     }
 });
 
+let playlistUiController = null;
+
 const storageController = createStorageController({
     data,
     ui,
@@ -84,7 +88,25 @@ const storageController = createStorageController({
     callbacks: {
         getDateSelectValue: (kind) => searchController.getDateSelectValue(kind),
         applyPendingDateValues: () => searchController.applyPendingDateValues(),
-        renderPlaylists: () => renderPlaylists()
+        renderPlaylists: () => {
+            if (playlistUiController) playlistUiController.renderPlaylists();
+        },
+        scheduleSearch: (options) => scheduleSearch(options)
+    }
+});
+
+playlistUiController = createPlaylistUiController({
+    data,
+    ui,
+    callbacks: {
+        clearSearchDebounce,
+        resetSearchQuery,
+        resetSearchFilters,
+        scheduleSearch,
+        onAddSongToPlaylist: (playlistId, songKey) => storageController.addSongToPlaylist(playlistId, songKey),
+        onCreatePlaylistAndAdd: (playlistName, songKey) => storageController.createPlaylistAndAdd(playlistName, songKey),
+        onDeletePlaylist: (playlistId) => storageController.deletePlaylist(playlistId),
+        onRemoveSongFromPlaylist: (playlistId, songKey) => storageController.removeSongFromPlaylist(playlistId, songKey)
     }
 });
 
@@ -94,7 +116,8 @@ renderController.setDependencies({
     updateThumbnail: (thumbDiv, yt) => youtubeController.updateThumbnail(thumbDiv, yt),
     extractYoutubeInfo,
     openPlaylistModal: (songKey) => openPlaylistModal(songKey),
-    setupScrollObserver: () => youtubeController.setupScrollObserver()
+    setupScrollObserver: () => youtubeController.setupScrollObserver(),
+    removeSongFromActivePlaylist: (songKey) => removeSongFromActivePlaylist(songKey)
 });
 searchController.setRenderHooks({
     updateDisplay: () => renderController.updateDisplay(),
@@ -126,7 +149,6 @@ function updateDisplay() { renderController.updateDisplay(); }
 function setSelectedFormatsToDefault() { storageController.setSelectedFormatsToDefault(); }
 function syncFormatCheckboxesFromState() { storageController.syncFormatCheckboxesFromState(); }
 function loadPlaylists() { storageController.loadPlaylists(); }
-function savePlaylists() { storageController.savePlaylists(); }
 function migrateLegacyPlaylistSongRefs() { storageController.migrateLegacyPlaylistSongRefs(); }
 function saveSearchState() { storageController.saveSearchState(); }
 function restoreSearchState() { storageController.restoreSearchState(); }
@@ -350,69 +372,7 @@ function resetDateSelectGroup(kind) {
  * setupPlaylistHandlers を実行する
  */
 function setupPlaylistHandlers() {
-    const modal = ui.el.playlistModal;
-    ui.el.playlistModalClose.addEventListener('click', closePlaylistModal);
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) closePlaylistModal();
-    });
-
-    ui.el.playlistModalCreateBtn.addEventListener('click', () => {
-        const newName = ui.el.playlistModalNewName.value.trim();
-        if (newName && ui.pendingPlaylistAction) {
-            createPlaylistAndAdd(newName, ui.pendingPlaylistAction.songKey);
-        }
-    });
-
-    ui.el.playlistModalNewName.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            ui.el.playlistModalCreateBtn.click();
-        }
-    });
-
-    document.addEventListener('keydown', (e) => {
-        if (e.key !== 'Escape') return;
-        if (ui.el.playlistModal.hidden) return;
-        e.preventDefault();
-        e.stopPropagation();
-        closePlaylistModal();
-    }, true);
-}
-
-/**
- * renderPlaylists を実行する
- */
-function renderPlaylists() {
-    const container = ui.el.playlistList;
-    if (!container) return;
-
-    const sortedIds = Object.keys(data.playlists).sort((a, b) => {
-        return (data.playlists[a].createdAt || 0) - (data.playlists[b].createdAt || 0);
-    });
-
-    container.replaceChildren(...sortedIds.map((id) => {
-        const p = data.playlists[id];
-        const item = document.createElement('div');
-        item.className = 'playlist-item';
-        item.dataset.playlistId = id;
-        item.innerHTML = `
-            <span class="playlist-item-name"></span>
-            <span class="playlist-item-count">${p.songs.length}</span>
-        `;
-        item.querySelector('.playlist-item-name').textContent = p.name;
-
-        if (data.activePlaylist === id) {
-            item.classList.add('active');
-        }
-
-        item.addEventListener('click', () => {
-            if (data.activePlaylist === id) {
-                clearActivePlaylist();
-            } else {
-                setActivePlaylist(id);
-            }
-        });
-        return item;
-    }));
+    playlistUiController.setupPlaylistHandlers();
 }
 
 /**
@@ -420,83 +380,15 @@ function renderPlaylists() {
  * @param {*} songKey
  */
 function openPlaylistModal(songKey) {
-    ui.pendingPlaylistAction = { songKey };
-    ui.el.playlistModal.hidden = false;
-
-    const modalList = ui.el.playlistModalList;
-    modalList.replaceChildren();
-
-    const sortedIds = Object.keys(data.playlists).sort((a, b) => {
-        return (data.playlists[a].createdAt || 0) - (data.playlists[b].createdAt || 0);
-    });
-
-    sortedIds.forEach((id) => {
-        const p = data.playlists[id];
-        const item = document.createElement('div');
-        item.className = 'playlist-modal-item';
-        item.textContent = p.name;
-        item.addEventListener('click', () => {
-            addSongToPlaylist(id, songKey);
-        });
-        modalList.appendChild(item);
-    });
-
-    ui.el.playlistModalNewName.value = '';
-    ui.el.playlistModalNewName.focus();
+    playlistUiController.openPlaylistModal(songKey);
 }
 
 /**
- * closePlaylistModal を実行する
- */
-function closePlaylistModal() {
-    ui.el.playlistModal.hidden = true;
-    ui.pendingPlaylistAction = null;
-}
-
-/**
- * addSongToPlaylist を実行する
- * @param {*} playlistId
+ * removeSongFromActivePlaylist を実行する
  * @param {*} songKey
  */
-function addSongToPlaylist(playlistId, songKey) {
-    const playlist = data.playlists[playlistId];
-    if (playlist && !playlist.songs.includes(songKey)) {
-        playlist.songs.push(songKey);
-        savePlaylists();
-        renderPlaylists();
-    }
-    closePlaylistModal();
-}
-
-/**
- * createPlaylistAndAdd を実行する
- * @param {*} playlistName
- * @param {*} songKey
- */
-function createPlaylistAndAdd(playlistName, songKey) {
-    const now = Date.now();
-    const newId = `p_${now}`;
-    data.playlists[newId] = {
-        name: playlistName,
-        songs: [songKey],
-        createdAt: now
-    };
-    savePlaylists();
-    renderPlaylists();
-    closePlaylistModal();
-}
-
-/**
- * setActivePlaylist を実行する
- * @param {*} playlistId
- */
-function setActivePlaylist(playlistId) {
-    clearSearchDebounce();
-    resetSearchQuery();
-    resetSearchFilters();
-    data.activePlaylist = playlistId;
-    renderPlaylists();
-    scheduleSearch({ immediate: true });
+function removeSongFromActivePlaylist(songKey) {
+    playlistUiController.removeSongFromActivePlaylist(songKey);
 }
 
 /**
@@ -504,12 +396,7 @@ function setActivePlaylist(playlistId) {
  * @param {*} options
  */
 function clearActivePlaylist(options) {
-    if (!data.activePlaylist) return;
-    data.activePlaylist = null;
-    renderPlaylists();
-    if (!(options && options.skipSearch)) {
-        scheduleSearch({ immediate: true });
-    }
+    playlistUiController.clearActivePlaylist(options);
 }
 
 // ===== Sidebar Accessibility =====
@@ -922,126 +809,4 @@ function applyLoadedCsv(csvText, statusLabel) {
         resetSearchConditions(false);
     }
     scheduleSearch({ immediate: true });
-}
-
-/**
- * buildSongKey を実行する
- * @param {*} input
- */
-function buildSongKey(input) {
-    const { archiveId, archiveOrder, url } = input;
-    const orderPart = Number.isFinite(archiveOrder) ? String(archiveOrder) : "";
-    return [
-        String(archiveId || "").trim(),
-        orderPart,
-        String(url || "").trim()
-    ].join("::");
-}
-
-/**
- * parseCsvToSongs を実行する
- * @param {*} csvText
- */
-function parseCsvToSongs(csvText) {
-    const rows = parseCsvRFC4180(csvText);
-    const header = rows[0];
-    const required = ["公開範囲", "#", "##", "曲名", "アーティスト名", "キョクメイ", "アーティストメイ", "配信日", "形態", "歌枠リレー？", "ハモリあり？", "URL", "メモ"];
-    const missing = required.filter((name) => !header.includes(name));
-    if (missing.length > 0) {
-        throw new Error(`CSVヘッダ不足: ${missing.join(", ")}`);
-    }
-    const body = rows.slice(1);
-    const idxMap = Object.fromEntries(header.map((name, index) => [name, index]));
-    const idx = (n) => idxMap[n];
-    const songs = [];
-    for (let i = 0; i < body.length; i++) {
-        const r = body[i];
-        const memo = r[idx("メモ")] || "";
-        const memoUpper = memo.toUpperCase();
-        const memoAllows = !memoUpper.includes("URL") && !memoUpper.includes("URI");
-        const url = r[idx("URL")] || "";
-        const archiveId = (r[idx("#")] || "").trim();
-        if (r[idx("公開範囲")] !== "全体" || archiveId === "" || !memoAllows || url.trim() === "") continue;
-        const title = r[idx("曲名")];
-        const artist = r[idx("アーティスト名")];
-        const titleYomi = r[idx("キョクメイ")];
-        const artistYomi = r[idx("アーティストメイ")];
-        const archiveOrder = parseArchiveOrder(r[idx("##")]);
-        songs.push({
-            date: r[idx("配信日")],
-            dateKey: parseDateKey(r[idx("配信日")]),
-            archiveId,
-            archiveOrder,
-            sourceIndex: i,
-            songKey: buildSongKey({ archiveId, archiveOrder, url }),
-            format: r[idx("形態")],
-            isRelay: r[idx("歌枠リレー？")] === "◯",
-            isHarmony: r[idx("ハモリあり？")] === "◯",
-            title,
-            artist,
-            titleYomi,
-            artistYomi,
-            url,
-            titleNorm: normalizeForSearch(title),
-            artistNorm: normalizeForSearch(artist),
-            titleYomiNorm: normalizeForSearch(titleYomi),
-            artistYomiNorm: normalizeForSearch(artistYomi)
-        });
-    }
-    return songs;
-}
-
-/**
- * parseArchiveOrder を実行する
- * @param {*} raw
- */
-function parseArchiveOrder(raw) {
-    if (!raw) return null;
-    const value = Number.parseInt(String(raw).trim(), 10);
-    return Number.isFinite(value) ? value : null;
-}
-
-/**
- * parseCsvRFC4180 を実行する
- * @param {*} t
- */
-function parseCsvRFC4180(t) {
-    let res = [];
-    let row = [];
-    let field = "";
-    let inQ = false;
-    for (let i = 0; i < t.length; i++) {
-        const c = t[i];
-        if (inQ) {
-            if (c === '"' && t[i + 1] === '"') {
-                field += '"';
-                i++;
-            } else if (c === '"') {
-                inQ = false;
-            } else {
-                field += c;
-            }
-        } else {
-            if (c === '"') {
-                inQ = true;
-            } else if (c === ',') {
-                row.push(field);
-                field = "";
-            } else if (c === '\n' || c === '\r') {
-                row.push(field);
-                res.push(row);
-                row = [];
-                field = "";
-                if (c === '\r' && t[i + 1] === '\n') i++;
-            } else {
-                field += c;
-            }
-        }
-    }
-    row.push(field);
-    res.push(row);
-    while (res.length > 0 && res[res.length - 1].every((v) => v === "")) {
-        res.pop();
-    }
-    return res;
 }

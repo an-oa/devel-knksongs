@@ -8,7 +8,8 @@ export function createStorageController({ data, ui, constants, callbacks }) {
     const {
         getDateSelectValue,
         applyPendingDateValues,
-        renderPlaylists
+        renderPlaylists,
+        scheduleSearch
     } = callbacks;
 
     /**
@@ -137,6 +138,77 @@ export function createStorageController({ data, ui, constants, callbacks }) {
     }
 
     /**
+     * removeSongFromPlaylist を実行する
+     * @param {*} playlistId
+     * @param {*} songKey
+     */
+    function removeSongFromPlaylist(playlistId, songKey) {
+        const playlist = data.playlists[playlistId];
+        if (!playlist) return;
+
+        const songIndex = playlist.songs.indexOf(songKey);
+        if (songIndex > -1) {
+            playlist.songs.splice(songIndex, 1);
+            savePlaylists();
+            renderPlaylists();
+            if (data.activePlaylist === playlistId) {
+                scheduleSearch({ immediate: true });
+            }
+        }
+    }
+
+    /**
+     * addSongToPlaylist を実行する
+     * @param {*} playlistId
+     * @param {*} songKey
+     */
+    function addSongToPlaylist(playlistId, songKey) {
+        const playlist = data.playlists[playlistId];
+        if (!playlist || playlist.songs.includes(songKey)) return false;
+        playlist.songs.push(songKey);
+        savePlaylists();
+        renderPlaylists();
+        if (data.activePlaylist === playlistId) {
+            scheduleSearch({ immediate: true });
+        }
+        return true;
+    }
+
+    /**
+     * createPlaylistAndAdd を実行する
+     * @param {*} playlistName
+     * @param {*} songKey
+     */
+    function createPlaylistAndAdd(playlistName, songKey) {
+        const now = Date.now();
+        const newId = `p_${now}`;
+        data.playlists[newId] = {
+            name: playlistName,
+            songs: [songKey],
+            createdAt: now
+        };
+        savePlaylists();
+        renderPlaylists();
+        return newId;
+    }
+
+    /**
+     * deletePlaylist を実行する
+     * @param {*} playlistId
+     */
+    function deletePlaylist(playlistId) {
+        const playlist = data.playlists[playlistId];
+        if (!playlist) return false;
+        const wasActive = data.activePlaylist === playlistId;
+        delete data.playlists[playlistId];
+        if (wasActive) data.activePlaylist = null;
+        savePlaylists();
+        renderPlaylists();
+        if (wasActive) scheduleSearch({ immediate: true });
+        return true;
+    }
+
+    /**
      * saveSearchState を実行する
      */
     function saveSearchState() {
@@ -201,7 +273,11 @@ export function createStorageController({ data, ui, constants, callbacks }) {
         loadPlaylists,
         savePlaylists,
         migrateLegacyPlaylistSongRefs,
+        addSongToPlaylist,
+        createPlaylistAndAdd,
+        deletePlaylist,
         saveSearchState,
-        restoreSearchState
+        restoreSearchState,
+        removeSongFromPlaylist
     };
 }

@@ -16,6 +16,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
     let extractYoutubeInfo = () => ({ videoId: "", startSeconds: 0 });
     let openPlaylistModal = () => {};
     let setupScrollObserver = () => {};
+    let removeSongFromActivePlaylist = () => {};
 
     /**
      * setDependencies を実行する
@@ -29,6 +30,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
         if (typeof next.extractYoutubeInfo === "function") extractYoutubeInfo = next.extractYoutubeInfo;
         if (typeof next.openPlaylistModal === "function") openPlaylistModal = next.openPlaylistModal;
         if (typeof next.setupScrollObserver === "function") setupScrollObserver = next.setupScrollObserver;
+        if (typeof next.removeSongFromActivePlaylist === "function") removeSongFromActivePlaylist = next.removeSongFromActivePlaylist;
     }
 
     /**
@@ -71,12 +73,20 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
         addToPlaylistBtn.setAttribute("aria-label", "プレイリストに追加");
         addToPlaylistBtn.setAttribute("title", "プレイリストに追加");
 
+        const removeFromPlaylistBtn = document.createElement("button");
+        removeFromPlaylistBtn.type = "button";
+        removeFromPlaylistBtn.className = "remove-from-playlist-btn";
+        removeFromPlaylistBtn.innerHTML = "&times;";
+        removeFromPlaylistBtn.setAttribute("aria-label", "プレイリストから削除");
+        removeFromPlaylistBtn.setAttribute("title", "プレイリストから削除");
+        removeFromPlaylistBtn.hidden = true;
+
         rightGroup.append(tags);
         footer.append(leftGroup, rightGroup, addToPlaylistBtn);
         content.append(title, artist, footer);
-        card.append(thumbDiv, content);
+        card.append(thumbDiv, content, removeFromPlaylistBtn);
 
-        return { card, thumbDiv, titleEl: title, artistEl: artist, dateEl: date, tagsEl: tags, addToPlaylistBtn };
+        return { card, thumbDiv, titleEl: title, artistEl: artist, dateEl: date, tagsEl: tags, addToPlaylistBtn, removeFromPlaylistBtn };
     }
 
     /**
@@ -92,8 +102,15 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
         entry.dateEl.textContent = row.date;
         updateFooterTags(entry.tagsEl, row);
 
+        const isPlaylistActive = !!data.activePlaylist;
+        entry.addToPlaylistBtn.hidden = isPlaylistActive;
+        entry.removeFromPlaylistBtn.hidden = !isPlaylistActive;
+
         entry.addToPlaylistBtn.onclick = () => {
             openPlaylistModal(row.songKey);
+        };
+        entry.removeFromPlaylistBtn.onclick = () => {
+            removeSongFromActivePlaylist(row.songKey);
         };
     }
 

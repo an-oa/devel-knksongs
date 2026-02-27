@@ -211,16 +211,29 @@ export function createSearchController({ data, ui, constants }) {
      * @param {*} playlist
      */
     function resolvePlaylistRows(playlist) {
-        const songMapByKey = new Map(data.allSongsRaw.map((row) => [row.songKey, row]));
-        const songMapByLegacyIndex = new Map(data.allSongsRaw.map((row) => [row.sourceIndex, row]));
+        ensureSongLookupMaps();
         const songs = Array.isArray(playlist.songs) ? playlist.songs : [];
         return songs
             .map((songRef) => {
-                if (typeof songRef === "string") return songMapByKey.get(songRef);
-                if (Number.isFinite(songRef)) return songMapByLegacyIndex.get(songRef);
+                if (typeof songRef === "string") return ui.songMapByKey.get(songRef);
+                if (Number.isFinite(songRef)) return ui.songMapByLegacyIndex.get(songRef);
                 return null;
             })
             .filter(Boolean);
+    }
+
+    /**
+     * ensureSongLookupMaps を実行する
+     */
+    function ensureSongLookupMaps() {
+        if (ui.songLookupSourceRef === data.allSongsRaw &&
+            ui.songMapByKey instanceof Map &&
+            ui.songMapByLegacyIndex instanceof Map) {
+            return;
+        }
+        ui.songMapByKey = new Map(data.allSongsRaw.map((row) => [row.songKey, row]));
+        ui.songMapByLegacyIndex = new Map(data.allSongsRaw.map((row) => [row.sourceIndex, row]));
+        ui.songLookupSourceRef = data.allSongsRaw;
     }
 
     /**
