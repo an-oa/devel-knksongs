@@ -9,6 +9,7 @@ const PUBLIC_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR-cSDIs
 const DEFAULT_FORMATS = ["配信", "歌みた", "ショート", "切り抜き"];
 const CSV_CACHE_KEY = "cachedCsv";
 const SEARCH_STATE_KEY = "searchStateV1";
+const PLAYLIST_STORAGE_KEY = "playlistsV1";
 // Paint preview/フォーム復元の後追い対策で複数回同期する。
 const UI_SYNC_PASSES = 2;
 const SEARCH_DEBOUNCE_MS = 200;
@@ -20,7 +21,9 @@ const state = {
     data: {
         allSongsRaw: [],
         currentResults: [],
-        displayLimit: RANDOM_DISPLAY_COUNT
+        displayLimit: RANDOM_DISPLAY_COUNT,
+        playlists: {},
+        activePlaylist: null
     },
         ui: {
         selectedFormats: new Set(),
@@ -37,7 +40,8 @@ const state = {
         el: {}, // DOM要素のキャッシュ用
         dateBounds: null,
         dateIndex: null,
-        pendingDateValues: null
+        pendingDateValues: null,
+        pendingPlaylistAction: null
     },
     youtube: {
         apiPromise: null,
@@ -55,6 +59,7 @@ const youtube = state.youtube;
  * @property {string} archiveId
  * @property {number | null} archiveOrder
  * @property {number} sourceIndex
+ * @property {string} songKey
  * @property {string} format
  * @property {boolean} isRelay
  * @property {boolean} isHarmony
@@ -77,6 +82,7 @@ const youtube = state.youtube;
  * @property {HTMLDivElement} artistEl
  * @property {HTMLSpanElement} dateEl
  * @property {HTMLDivElement} tagsEl
+ * @property {HTMLButtonElement} addToPlaylistBtn
  */
 
 // ===== Lifecycle (public) =====
@@ -104,12 +110,19 @@ async function initUI() {
         clearDateToBtn: document.getElementById('clearDateToBtn'),
         themeToggle: document.getElementById('theme-toggle'),
         thumbToggle: document.getElementById('thumbnail-toggle'),
-        formatsList: document.getElementById('formatsList')
+        formatsList: document.getElementById('formatsList'),
+        playlistList: document.getElementById('playlist-list'),
+        playlistModal: document.getElementById('playlist-modal'),
+        playlistModalClose: document.getElementById('playlist-modal-close'),
+        playlistModalList: document.getElementById('playlist-modal-list'),
+        playlistModalNewName: document.getElementById('playlist-modal-new-name'),
+        playlistModalCreateBtn: document.getElementById('playlist-modal-create-btn')
     };
     if (isIOSWebKit()) document.documentElement.classList.add('ios');
 
     setupUIHandlers();
     initFilterMenu();
+    loadPlaylists();
     setupTheme();
     setupThumbnailToggle();
     setupScrollObserver();
@@ -275,6 +288,7 @@ function setupUIHandlers() {
     });
 
     clearBtn.addEventListener('click', clearSearch);
+    setupPlaylistHandlers();
 }
 
 /**
@@ -290,6 +304,265 @@ function resetDateSelectGroup(kind) {
     if (month) month.value = "";
     if (day) day.value = "";
     syncDateSelectOptions();
+}
+
+// ===== Playlist =====
+
+/**
+ * プレイリスト関連のUIイベントを登録する
+ */
+function setupPlaylistHandlers() {
+    const modal = ui.el.playlistModal;
+    ui.el.playlistModalClose.addEventListener('click', closePlaylistModal);
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closePlaylistModal();
+    });
+
+    ui.el.playlistModalCreateBtn.addEventListener('click', () => {
+        const newName = ui.el.playlistModalNewName.value.trim();
+        if (newName && ui.pendingPlaylistAction) {
+            createPlaylistAndAdd(newName, ui.pendingPlaylistAction.songKey);
+        }
+    });
+    
+    ui.el.playlistModalNewName.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            ui.el.playlistModalCreateBtn.click();
+        }
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
+        if (ui.el.playlistModal.hidden) return;
+        e.preventDefault();
+        e.stopPropagation();
+        closePlaylistModal();
+    }, true);
+}
+
+/**
+ * 保存データをプレイリスト構造へ正規化する
+ * @param {unknown} raw
+ * @returns {Object<string, {name: string, createdAt: number, songs: Array<string | number>}>}
+ */
+function sanitizePlaylists(raw) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+    const sanitized = {};
+    for (const [id, playlist] of Object.entries(raw)) {
+        if (!playlist || typeof playlist !== "object" || Array.isArray(playlist)) continue;
+        const name = typeof playlist.name === "string" ? playlist.name.trim() : "";
+        if (!name) continue;
+        const createdAt = Number.isFinite(playlist.createdAt) ? playlist.createdAt : 0;
+        const songs = [];
+        const seen = new Set();
+        const rawSongs = Array.isArray(playlist.songs) ? playlist.songs : [];
+        rawSongs.forEach((ref) => {
+            let normalized = null;
+            if (typeof ref === "string") {
+                const value = ref.trim();
+                if (value) normalized = value;
+            } else if (Number.isFinite(ref)) {
+                normalized = ref;
+            }
+            if (normalized === null) return;
+            const dedupeKey = typeof normalized === "number" ? `n:${normalized}` : `s:${normalized}`;
+            if (seen.has(dedupeKey)) return;
+            seen.add(dedupeKey);
+            songs.push(normalized);
+        });
+        sanitized[id] = { name, createdAt, songs };
+    }
+    return sanitized;
+}
+
+/**
+ * 旧形式（sourceIndex）で保存された楽曲参照を永続識別子へ移行する
+ */
+function migrateLegacyPlaylistSongRefs() {
+    const legacyMap = new Map(data.allSongsRaw.map((row) => [row.sourceIndex, row.songKey]));
+    let updated = false;
+    Object.values(data.playlists).forEach((playlist) => {
+        const nextSongs = [];
+        const seen = new Set();
+        const prevSongs = Array.isArray(playlist.songs) ? playlist.songs : [];
+        prevSongs.forEach((ref) => {
+            let normalized = null;
+            if (typeof ref === "string") {
+                normalized = ref;
+            } else if (Number.isFinite(ref)) {
+                normalized = legacyMap.get(ref) || null;
+            }
+            if (!normalized) return;
+            if (seen.has(normalized)) return;
+            seen.add(normalized);
+            nextSongs.push(normalized);
+        });
+        if (prevSongs.length !== nextSongs.length || prevSongs.some((ref, idx) => ref !== nextSongs[idx])) {
+            playlist.songs = nextSongs;
+            updated = true;
+        }
+    });
+    if (updated) savePlaylists();
+}
+
+/**
+ * ローカルストレージからプレイリストを読み込み、一覧表示を更新する
+ */
+function loadPlaylists() {
+    try {
+        const stored = localStorage.getItem(PLAYLIST_STORAGE_KEY);
+        if (stored) {
+            data.playlists = sanitizePlaylists(JSON.parse(stored));
+        }
+    } catch (e) {
+        console.error("Failed to load playlists", e);
+        data.playlists = {};
+    }
+    renderPlaylists();
+}
+
+/**
+ * 現在のプレイリスト状態をローカルストレージへ保存する
+ */
+function savePlaylists() {
+    try {
+        localStorage.setItem(PLAYLIST_STORAGE_KEY, JSON.stringify(data.playlists));
+    } catch (e) {
+        console.error("Failed to save playlists", e);
+    }
+}
+
+/**
+ * サイドバーのプレイリスト一覧を再描画する
+ */
+function renderPlaylists() {
+    const container = ui.el.playlistList;
+    if (!container) return;
+
+    const sortedIds = Object.keys(data.playlists).sort((a, b) => {
+        return (data.playlists[a].createdAt || 0) - (data.playlists[b].createdAt || 0);
+    });
+
+    container.replaceChildren(...sortedIds.map(id => {
+        const p = data.playlists[id];
+        const item = document.createElement('div');
+        item.className = 'playlist-item';
+        item.dataset.playlistId = id;
+        item.innerHTML = `
+            <span class="playlist-item-name"></span>
+            <span class="playlist-item-count">${p.songs.length}</span>
+        `;
+        item.querySelector('.playlist-item-name').textContent = p.name;
+
+        if (data.activePlaylist === id) {
+            item.classList.add('active');
+        }
+
+        item.addEventListener('click', () => {
+            if (data.activePlaylist === id) {
+                clearActivePlaylist();
+            } else {
+                setActivePlaylist(id);
+            }
+        });
+        return item;
+    }));
+}
+
+/**
+ * 指定楽曲の追加先を選ぶモーダルを開く
+ * @param {string} songKey
+ */
+function openPlaylistModal(songKey) {
+    ui.pendingPlaylistAction = { songKey };
+    ui.el.playlistModal.hidden = false;
+    
+    const modalList = ui.el.playlistModalList;
+    modalList.replaceChildren();
+
+    const sortedIds = Object.keys(data.playlists).sort((a, b) => {
+        return (data.playlists[a].createdAt || 0) - (data.playlists[b].createdAt || 0);
+    });
+
+    sortedIds.forEach(id => {
+        const p = data.playlists[id];
+        const item = document.createElement('div');
+        item.className = 'playlist-modal-item';
+        item.textContent = p.name;
+        item.addEventListener('click', () => {
+            addSongToPlaylist(id, songKey);
+        });
+        modalList.appendChild(item);
+    });
+    
+    ui.el.playlistModalNewName.value = '';
+    ui.el.playlistModalNewName.focus();
+}
+
+/**
+ * プレイリスト追加モーダルを閉じて保留状態を解除する
+ */
+function closePlaylistModal() {
+    ui.el.playlistModal.hidden = true;
+    ui.pendingPlaylistAction = null;
+}
+
+/**
+ * 楽曲を既存プレイリストへ追加する
+ * @param {string} playlistId
+ * @param {string} songKey
+ */
+function addSongToPlaylist(playlistId, songKey) {
+    const playlist = data.playlists[playlistId];
+    if (playlist && !playlist.songs.includes(songKey)) {
+        playlist.songs.push(songKey);
+        savePlaylists();
+        renderPlaylists();
+    }
+    closePlaylistModal();
+}
+
+/**
+ * 新規プレイリストを作成し、楽曲を追加する
+ * @param {string} playlistName
+ * @param {string} songKey
+ */
+function createPlaylistAndAdd(playlistName, songKey) {
+    const newId = `p_${Date.now()}`;
+    data.playlists[newId] = {
+        name: playlistName,
+        songs: [songKey],
+        createdAt: Date.now()
+    };
+    savePlaylists();
+    renderPlaylists();
+    closePlaylistModal();
+}
+
+/**
+ * プレイリストをアクティブ化して検索結果を切り替える
+ * @param {string} playlistId
+ */
+function setActivePlaylist(playlistId) {
+    clearSearchDebounce();
+    resetSearchQuery();
+    resetSearchFilters();
+    data.activePlaylist = playlistId;
+    renderPlaylists();
+    scheduleSearch({ immediate: true });
+}
+
+/**
+ * アクティブなプレイリスト選択を解除する
+ * @param {{skipSearch?: boolean}} [options]
+ */
+function clearActivePlaylist(options) {
+    if (!data.activePlaylist) return;
+    data.activePlaylist = null;
+    renderPlaylists();
+    if (!(options && options.skipSearch)) {
+        scheduleSearch({ immediate: true });
+    }
 }
 
 // ===== Sidebar Accessibility =====
@@ -397,6 +670,7 @@ function trapSidebarFocus(event, sidebar) {
  * すべての検索・フィルタ条件を初期状態にリセットする
  */
 function clearSearch() {
+    clearActivePlaylist({ skipSearch: true });
     resetSearchConditions(true);
     saveSearchState();
 }
@@ -829,6 +1103,7 @@ function initFilterMenu() {
  */
 function applyLoadedCsv(csvText, statusLabel) {
     data.allSongsRaw = parseCsvToSongs(csvText);
+    migrateLegacyPlaylistSongRefs();
     ui.recommendedCache = null;
     const dateBounds = applyDateInputRange(data.allSongsRaw);
     if (dateBounds) {
@@ -843,6 +1118,21 @@ function applyLoadedCsv(csvText, statusLabel) {
         resetSearchConditions(false);
     }
     scheduleSearch({ immediate: true });
+}
+
+/**
+ * 楽曲の永続識別子を構築する
+ * @param {{archiveId: string, archiveOrder: number | null, url: string}} input
+ * @returns {string}
+ */
+function buildSongKey(input) {
+    const { archiveId, archiveOrder, url } = input;
+    const orderPart = Number.isFinite(archiveOrder) ? String(archiveOrder) : "";
+    return [
+        String(archiveId || "").trim(),
+        orderPart,
+        String(url || "").trim()
+    ].join("::");
 }
 
 /**
@@ -874,12 +1164,14 @@ function parseCsvToSongs(csvText) {
         const artist = r[idx("アーティスト名")];
         const titleYomi = r[idx("キョクメイ")];
         const artistYomi = r[idx("アーティストメイ")];
+        const archiveOrder = parseArchiveOrder(r[idx("##")]);
         songs.push({
             date: r[idx("配信日")],
             dateKey: parseDateKey(r[idx("配信日")]),
             archiveId,
-            archiveOrder: parseArchiveOrder(r[idx("##")]),
+            archiveOrder,
             sourceIndex: i,
+            songKey: buildSongKey({ archiveId, archiveOrder, url }),
             format: r[idx("形態")],
             isRelay: r[idx("歌枠リレー？")] === "◯",
             isHarmony: r[idx("ハモリあり？")] === "◯",
@@ -1037,11 +1329,30 @@ function getSearchState() {
  * @returns {boolean}
  */
 function isRecommendedMode(searchState) {
-    return searchState.queryRaw === "" &&
+    return !data.activePlaylist &&
+           searchState.queryRaw === "" &&
            !searchState.relayOnly &&
            !searchState.harmonyOnly &&
            !searchState.hasDateFilter &&
            areAllFormatsSelected();
+}
+
+/**
+ * プレイリスト内の参照を現在の楽曲行へ解決する
+ * @param {{songs: Array<string | number>}} playlist
+ * @returns {SongRow[]}
+ */
+function resolvePlaylistRows(playlist) {
+    const songMapByKey = new Map(data.allSongsRaw.map((row) => [row.songKey, row]));
+    const songMapByLegacyIndex = new Map(data.allSongsRaw.map((row) => [row.sourceIndex, row]));
+    const songs = Array.isArray(playlist.songs) ? playlist.songs : [];
+    return songs
+        .map((songRef) => {
+            if (typeof songRef === "string") return songMapByKey.get(songRef);
+            if (Number.isFinite(songRef)) return songMapByLegacyIndex.get(songRef);
+            return null;
+        })
+        .filter(Boolean);
 }
 
 /**
@@ -1050,6 +1361,18 @@ function isRecommendedMode(searchState) {
  * @returns {{results: Array<SongRow>, displayLimit: number, label: string}}
  */
 function resolveSearchResults(searchState) {
+    if (data.activePlaylist) {
+        const playlist = data.playlists[data.activePlaylist];
+        if (playlist) {
+            const results = resolvePlaylistRows(playlist);
+            return {
+                results,
+                displayLimit: results.length,
+                label: `プレイリスト: ${playlist.name}`
+            };
+        }
+    }
+
     if (isRecommendedMode(searchState)) {
         return {
             results: pickRecommended(),
@@ -1730,13 +2053,20 @@ function createCardElements() {
 
     const tags = document.createElement("div");
     tags.className = "footer-tags";
+    
+    const addToPlaylistBtn = document.createElement("button");
+    addToPlaylistBtn.type = "button";
+    addToPlaylistBtn.className = "add-to-playlist-btn";
+    addToPlaylistBtn.innerHTML = `+`;
+    addToPlaylistBtn.setAttribute("aria-label", "プレイリストに追加");
+    addToPlaylistBtn.setAttribute("title", "プレイリストに追加");
 
     rightGroup.append(tags);
-    footer.append(leftGroup, rightGroup);
+    footer.append(leftGroup, rightGroup, addToPlaylistBtn);
     content.append(title, artist, footer);
     card.append(thumbDiv, content);
 
-    return { card, thumbDiv, titleEl: title, artistEl: artist, dateEl: date, tagsEl: tags };
+    return { card, thumbDiv, titleEl: title, artistEl: artist, dateEl: date, tagsEl: tags, addToPlaylistBtn };
 }
 
 /**
@@ -1751,6 +2081,10 @@ function updateCardFromRow(entry, row) {
     entry.artistEl.textContent = row.artist || "不明";
     entry.dateEl.textContent = row.date;
     updateFooterTags(entry.tagsEl, row);
+
+    entry.addToPlaylistBtn.onclick = () => {
+        openPlaylistModal(row.songKey);
+    };
 }
 
 /**

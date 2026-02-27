@@ -92,6 +92,15 @@
       <hr>
 
       <div class="sidebar-section">
+        <div class="section-header">
+          <label class="section-label">プレイリスト</label>
+        </div>
+        <div id="playlist-list" class="playlist-list"></div>
+      </div>
+
+      <hr>
+
+      <div class="sidebar-section">
         <div class="menu-item-toggle">
           <span>サムネイル表示</span>
           <label class="switch">
@@ -136,6 +145,22 @@
       </p>
     </footer>
   </main>
+
+  <div id="playlist-modal" class="playlist-modal-overlay" aria-modal="true" role="dialog" aria-labelledby="playlist-modal-title" hidden>
+    <div class="playlist-modal-content">
+      <div class="playlist-modal-header">
+        <h3 id="playlist-modal-title">プレイリストに追加</h3>
+        <button id="playlist-modal-close" class="close-btn" aria-label="閉じる">&times;</button>
+      </div>
+      <div id="playlist-modal-body" class="playlist-modal-body">
+        <div id="playlist-modal-list"></div>
+        <div class="playlist-modal-actions">
+          <input type="text" id="playlist-modal-new-name" placeholder="新規プレイリスト名">
+          <button id="playlist-modal-create-btn">作成して追加</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script src="script.js"></script>
 </body>

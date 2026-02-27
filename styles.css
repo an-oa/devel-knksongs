@@ -233,9 +233,16 @@ input[type="text"] {
 .title-link:hover { text-decoration: underline; }
 .artist { font-size: 12px; color: var(--text-mute); margin-bottom: 6px; }
 
-.card-footer { display: flex; justify-content: space-between; align-items: center; font-size: 10px; border-top: 1px solid var(--border-color); padding-top: 4px; }
+.card-footer {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  font-size: 10px;
+  border-top: 1px solid var(--border-color);
+  padding: 4px 2px 4px 6px;
+  gap: 4px;
+}
 
-/* 日付は左、タグは右にまとめる */
 .footer-left { display: flex; align-items: center; gap: 8px; }
 .footer-right { display: flex; align-items: center; justify-content: flex-end; }
 .footer-tags { display: flex; align-items: center; gap: 6px; }
@@ -270,7 +277,6 @@ input[type="text"] {
 .overlay { position: fixed; inset: 0; background: var(--overlay-color); z-index: 900; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
 .overlay.show { opacity: 1; pointer-events: auto; }
 
-/* スイッチの位置合わせ */
 .menu-item-toggle {
   display: flex;
   justify-content: space-between;
@@ -288,3 +294,157 @@ input[type="text"] {
 input:checked + .slider { background: var(--primary-color); }
 input:checked + .slider:before { transform: translateX(16px); }
 hr { border: 0; border-top: 1px solid var(--border-color); margin: 15px 0; }
+
+/* Playlist */
+.playlist-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.playlist-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  font-size: 13px;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+.playlist-item:hover, .playlist-item.active {
+  background-color: var(--bg-color);
+  border-color: var(--primary-color);
+}
+
+.playlist-item.active {
+  color: var(--primary-color);
+  font-weight: bold;
+}
+
+.playlist-item-name {
+  flex-grow: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.playlist-item-count {
+  font-size: 11px;
+  color: var(--text-mute);
+  margin-left: 8px;
+}
+
+.add-to-playlist-btn {
+  background: none;
+  border: none;
+  color: var(--text-mute);
+  cursor: pointer;
+  padding: 4px;
+  font-size: 18px;
+  line-height: 1;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.add-to-playlist-btn:hover {
+  color: var(--primary-color);
+  background-color: var(--bg-color);
+}
+
+/* Playlist Modal */
+.playlist-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+
+.playlist-modal-overlay:not([hidden]) {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.playlist-modal-content {
+  background: var(--sidebar-bg);
+  border-radius: 8px;
+  width: 90%;
+  max-width: 320px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+}
+
+.playlist-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.playlist-modal-header h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.playlist-modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  flex-grow: 1;
+}
+
+#playlist-modal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.playlist-modal-item {
+  padding: 12px;
+  border-radius: 6px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  font-size: 14px;
+}
+.playlist-modal-item:hover {
+  border-color: var(--primary-color);
+}
+
+
+.playlist-modal-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.playlist-modal-actions input {
+  flex-grow: 1;
+  font-size: 14px;
+}
+
+.playlist-modal-actions button {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  padding: 0 15px;
+  font-size: 13px;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
