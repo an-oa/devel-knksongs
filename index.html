@@ -115,9 +115,9 @@
 
       <div class="sidebar-section">
         <div class="section-header">
-          <label class="section-label">プレイリスト</label>
+          <label class="section-label">ブックマーク</label>
         </div>
-        <div id="playlist-list" class="playlist-list"></div>
+        <div id="bookmark-list" class="bookmark-list"></div>
       </div>
     </div>
   </aside>
@@ -146,17 +146,17 @@
     </footer>
   </main>
 
-  <div id="playlist-modal" class="playlist-modal-overlay" aria-modal="true" role="dialog" aria-labelledby="playlist-modal-title" hidden>
-    <div class="playlist-modal-content">
-      <div class="playlist-modal-header">
-        <h3 id="playlist-modal-title">プレイリストに追加</h3>
-        <button id="playlist-modal-close" class="close-btn" aria-label="閉じる">&times;</button>
+  <div id="bookmark-modal" class="bookmark-modal-overlay" aria-modal="true" role="dialog" aria-labelledby="bookmark-modal-title" hidden>
+    <div class="bookmark-modal-content">
+      <div class="bookmark-modal-header">
+        <h3 id="bookmark-modal-title">ブックマークに追加</h3>
+        <button id="bookmark-modal-close" class="close-btn" aria-label="閉じる">&times;</button>
       </div>
-      <div id="playlist-modal-body" class="playlist-modal-body">
-        <div id="playlist-modal-list"></div>
-        <div class="playlist-modal-actions">
-          <input type="text" id="playlist-modal-new-name" placeholder="新規プレイリスト名">
-          <button id="playlist-modal-create-btn">作成して追加</button>
+      <div id="bookmark-modal-body" class="bookmark-modal-body">
+        <div id="bookmark-modal-list"></div>
+        <div class="bookmark-modal-actions">
+          <input type="text" id="bookmark-modal-new-name" placeholder="新規ブックマーク名">
+          <button id="bookmark-modal-create-btn">作成して追加</button>
         </div>
       </div>
     </div>
@@ -165,3 +165,4 @@
   <script type="module" src="script.js"></script>
 </body>
 </html>
+

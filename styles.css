@@ -295,14 +295,14 @@ input:checked + .slider { background: var(--primary-color); }
 input:checked + .slider:before { transform: translateX(16px); }
 hr { border: 0; border-top: 1px solid var(--border-color); margin: 15px 0; }
 
-/* Playlist */
-.playlist-list {
+/* Bookmark */
+.bookmark-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.playlist-item {
+.bookmark-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -315,30 +315,30 @@ hr { border: 0; border-top: 1px solid var(--border-color); margin: 15px 0; }
   transition: background-color 0.2s, border-color 0.2s;
 }
 
-.playlist-item:hover, .playlist-item.active {
+.bookmark-item:hover, .bookmark-item.active {
   background-color: var(--bg-color);
   border-color: var(--primary-color);
 }
 
-.playlist-item.active {
+.bookmark-item.active {
   color: var(--primary-color);
   font-weight: bold;
 }
 
-.playlist-item-name {
+.bookmark-item-name {
   flex-grow: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.playlist-item-count {
+.bookmark-item-count {
   font-size: 11px;
   color: var(--text-mute);
   margin-left: 8px;
 }
 
-.playlist-delete-btn {
+.bookmark-delete-btn {
   background: none;
   border: none;
   color: var(--text-mute);
@@ -358,25 +358,25 @@ hr { border: 0; border-top: 1px solid var(--border-color); margin: 15px 0; }
   transition: color 0.2s, opacity 0.2s;
 }
 
-.playlist-item:hover .playlist-delete-btn,
-.playlist-item:focus-within .playlist-delete-btn,
-.playlist-delete-btn:focus-visible {
+.bookmark-item:hover .bookmark-delete-btn,
+.bookmark-item:focus-within .bookmark-delete-btn,
+.bookmark-delete-btn:focus-visible {
   opacity: 1;
   pointer-events: auto;
 }
 
 @media (hover: none), (pointer: coarse) {
-  .playlist-delete-btn {
+  .bookmark-delete-btn {
     opacity: 1;
     pointer-events: auto;
   }
 }
 
-.playlist-delete-btn:hover {
+.bookmark-delete-btn:hover {
   color: var(--text-color);
 }
 
-.add-to-playlist-btn {
+.add-to-bookmark-btn {
   background: none;
   border: none;
   color: var(--text-mute);
@@ -392,13 +392,13 @@ hr { border: 0; border-top: 1px solid var(--border-color); margin: 15px 0; }
   justify-content: center;
 }
 
-.add-to-playlist-btn:hover {
+.add-to-bookmark-btn:hover {
   color: var(--primary-color);
   background-color: var(--bg-color);
 }
 
-/* Playlist Modal */
-.playlist-modal-overlay {
+/* Bookmark Modal */
+.bookmark-modal-overlay {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
@@ -411,12 +411,12 @@ hr { border: 0; border-top: 1px solid var(--border-color); margin: 15px 0; }
   transition: opacity 0.3s;
 }
 
-.playlist-modal-overlay:not([hidden]) {
+.bookmark-modal-overlay:not([hidden]) {
   opacity: 1;
   pointer-events: auto;
 }
 
-.playlist-modal-content {
+.bookmark-modal-content {
   background: var(--sidebar-bg);
   border-radius: 8px;
   width: 90%;
@@ -427,7 +427,7 @@ hr { border: 0; border-top: 1px solid var(--border-color); margin: 15px 0; }
   box-shadow: 0 5px 15px rgba(0,0,0,0.2);
 }
 
-.playlist-modal-header {
+.bookmark-modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -435,25 +435,25 @@ hr { border: 0; border-top: 1px solid var(--border-color); margin: 15px 0; }
   border-bottom: 1px solid var(--border-color);
 }
 
-.playlist-modal-header h3 {
+.bookmark-modal-header h3 {
   margin: 0;
   font-size: 16px;
 }
 
-.playlist-modal-body {
+.bookmark-modal-body {
   padding: 20px;
   overflow-y: auto;
   flex-grow: 1;
 }
 
-#playlist-modal-list {
+#bookmark-modal-list {
   display: flex;
   flex-direction: column;
   gap: 10px;
   margin-bottom: 20px;
 }
 
-.playlist-modal-item {
+.bookmark-modal-item {
   padding: 12px;
   border-radius: 6px;
   background: var(--card-bg);
@@ -461,22 +461,22 @@ hr { border: 0; border-top: 1px solid var(--border-color); margin: 15px 0; }
   cursor: pointer;
   font-size: 14px;
 }
-.playlist-modal-item:hover {
+.bookmark-modal-item:hover {
   border-color: var(--primary-color);
 }
 
 
-.playlist-modal-actions {
+.bookmark-modal-actions {
   display: flex;
   gap: 10px;
 }
 
-.playlist-modal-actions input {
+.bookmark-modal-actions input {
   flex-grow: 1;
   font-size: 14px;
 }
 
-.playlist-modal-actions button {
+.bookmark-modal-actions button {
   background-color: var(--primary-color);
   color: white;
   border: none;
@@ -487,8 +487,8 @@ hr { border: 0; border-top: 1px solid var(--border-color); margin: 15px 0; }
   white-space: nowrap;
 }
 
-/* Playlist Song Actions */
-.remove-from-playlist-btn {
+/* Bookmark Song Actions */
+.remove-from-bookmark-btn {
   background-color: #ffebee;
   border: none;
   color: #c62828;
@@ -501,15 +501,16 @@ hr { border: 0; border-top: 1px solid var(--border-color); margin: 15px 0; }
   width: 100%;
 }
 
-.remove-from-playlist-btn:hover {
+.remove-from-bookmark-btn:hover {
   background-color: #ffcdd2;
 }
 
-.dark-theme .remove-from-playlist-btn {
+.dark-theme .remove-from-bookmark-btn {
   background-color: #3e2723;
   color: #ef9a9a;
 }
 
-.dark-theme .remove-from-playlist-btn:hover {
+.dark-theme .remove-from-bookmark-btn:hover {
   background-color: #4e342e;
 }
+

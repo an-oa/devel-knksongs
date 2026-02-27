@@ -14,9 +14,9 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
     let isRecommendedMode = () => false;
     let updateThumbnail = () => {};
     let extractYoutubeInfo = () => ({ videoId: "", startSeconds: 0 });
-    let openPlaylistModal = () => {};
+    let openBookmarkModal = () => {};
     let setupScrollObserver = () => {};
-    let removeSongFromActivePlaylist = () => {};
+    let removeSongFromActiveBookmark = () => {};
 
     /**
      * setDependencies を実行する
@@ -28,9 +28,9 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
         if (typeof next.isRecommendedMode === "function") isRecommendedMode = next.isRecommendedMode;
         if (typeof next.updateThumbnail === "function") updateThumbnail = next.updateThumbnail;
         if (typeof next.extractYoutubeInfo === "function") extractYoutubeInfo = next.extractYoutubeInfo;
-        if (typeof next.openPlaylistModal === "function") openPlaylistModal = next.openPlaylistModal;
+        if (typeof next.openBookmarkModal === "function") openBookmarkModal = next.openBookmarkModal;
         if (typeof next.setupScrollObserver === "function") setupScrollObserver = next.setupScrollObserver;
-        if (typeof next.removeSongFromActivePlaylist === "function") removeSongFromActivePlaylist = next.removeSongFromActivePlaylist;
+        if (typeof next.removeSongFromActiveBookmark === "function") removeSongFromActiveBookmark = next.removeSongFromActiveBookmark;
     }
 
     /**
@@ -66,27 +66,27 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
         const tags = document.createElement("div");
         tags.className = "footer-tags";
 
-        const addToPlaylistBtn = document.createElement("button");
-        addToPlaylistBtn.type = "button";
-        addToPlaylistBtn.className = "add-to-playlist-btn";
-        addToPlaylistBtn.innerHTML = "+";
-        addToPlaylistBtn.setAttribute("aria-label", "プレイリストに追加");
-        addToPlaylistBtn.setAttribute("title", "プレイリストに追加");
+        const addToBookmarkBtn = document.createElement("button");
+        addToBookmarkBtn.type = "button";
+        addToBookmarkBtn.className = "add-to-bookmark-btn";
+        addToBookmarkBtn.innerHTML = "+";
+        addToBookmarkBtn.setAttribute("aria-label", "ブックマークに追加");
+        addToBookmarkBtn.setAttribute("title", "ブックマークに追加");
 
-        const removeFromPlaylistBtn = document.createElement("button");
-        removeFromPlaylistBtn.type = "button";
-        removeFromPlaylistBtn.className = "remove-from-playlist-btn";
-        removeFromPlaylistBtn.innerHTML = "&times;";
-        removeFromPlaylistBtn.setAttribute("aria-label", "プレイリストから削除");
-        removeFromPlaylistBtn.setAttribute("title", "プレイリストから削除");
-        removeFromPlaylistBtn.hidden = true;
+        const removeFromBookmarkBtn = document.createElement("button");
+        removeFromBookmarkBtn.type = "button";
+        removeFromBookmarkBtn.className = "remove-from-bookmark-btn";
+        removeFromBookmarkBtn.innerHTML = "&times;";
+        removeFromBookmarkBtn.setAttribute("aria-label", "ブックマークから削除");
+        removeFromBookmarkBtn.setAttribute("title", "ブックマークから削除");
+        removeFromBookmarkBtn.hidden = true;
 
         rightGroup.append(tags);
-        footer.append(leftGroup, rightGroup, addToPlaylistBtn);
+        footer.append(leftGroup, rightGroup, addToBookmarkBtn);
         content.append(title, artist, footer);
-        card.append(thumbDiv, content, removeFromPlaylistBtn);
+        card.append(thumbDiv, content, removeFromBookmarkBtn);
 
-        return { card, thumbDiv, titleEl: title, artistEl: artist, dateEl: date, tagsEl: tags, addToPlaylistBtn, removeFromPlaylistBtn };
+        return { card, thumbDiv, titleEl: title, artistEl: artist, dateEl: date, tagsEl: tags, addToBookmarkBtn, removeFromBookmarkBtn };
     }
 
     /**
@@ -102,15 +102,15 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
         entry.dateEl.textContent = row.date;
         updateFooterTags(entry.tagsEl, row);
 
-        const isPlaylistActive = !!data.activePlaylist;
-        entry.addToPlaylistBtn.hidden = isPlaylistActive;
-        entry.removeFromPlaylistBtn.hidden = !isPlaylistActive;
+        const isBookmarkActive = !!data.activeBookmark;
+        entry.addToBookmarkBtn.hidden = isBookmarkActive;
+        entry.removeFromBookmarkBtn.hidden = !isBookmarkActive;
 
-        entry.addToPlaylistBtn.onclick = () => {
-            openPlaylistModal(row.songKey);
+        entry.addToBookmarkBtn.onclick = () => {
+            openBookmarkModal(row.songKey);
         };
-        entry.removeFromPlaylistBtn.onclick = () => {
-            removeSongFromActivePlaylist(row.songKey);
+        entry.removeFromBookmarkBtn.onclick = () => {
+            removeSongFromActiveBookmark(row.songKey);
         };
     }
 
@@ -391,3 +391,4 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
         updateDisplay
     };
 }
+

@@ -6,7 +6,7 @@ import {
     DEFAULT_FORMATS,
     CSV_CACHE_KEY,
     SEARCH_STATE_KEY,
-    PLAYLIST_STORAGE_KEY,
+    BOOKMARK_STORAGE_KEY,
     UI_SYNC_PASSES,
     SEARCH_DEBOUNCE_MS,
     YT_IFRAME_API_SRC,
@@ -21,7 +21,7 @@ import { createSearchController } from "./search.mjs";
 import { createRenderController } from "./render.mjs";
 import { createYoutubeController, extractYoutubeInfo } from "./youtube.mjs";
 import { createStorageController } from "./storage.mjs";
-import { createPlaylistUiController } from "./playlist-ui.mjs";
+import { createBookmarkUiController } from "./bookmark-ui.mjs";
 import { parseCsvToSongs } from "./csv-parser.mjs";
 
 /**
@@ -75,7 +75,7 @@ const youtubeController = createYoutubeController({
     }
 });
 
-let playlistUiController = null;
+let bookmarkUiController = null;
 
 const storageController = createStorageController({
     data,
@@ -83,19 +83,19 @@ const storageController = createStorageController({
     constants: {
         DEFAULT_FORMATS,
         SEARCH_STATE_KEY,
-        PLAYLIST_STORAGE_KEY
+        BOOKMARK_STORAGE_KEY
     },
     callbacks: {
         getDateSelectValue: (kind) => searchController.getDateSelectValue(kind),
         applyPendingDateValues: () => searchController.applyPendingDateValues(),
-        renderPlaylists: () => {
-            if (playlistUiController) playlistUiController.renderPlaylists();
+        renderBookmarks: () => {
+            if (bookmarkUiController) bookmarkUiController.renderBookmarks();
         },
         scheduleSearch: (options) => scheduleSearch(options)
     }
 });
 
-playlistUiController = createPlaylistUiController({
+bookmarkUiController = createBookmarkUiController({
     data,
     ui,
     callbacks: {
@@ -103,10 +103,10 @@ playlistUiController = createPlaylistUiController({
         resetSearchQuery,
         resetSearchFilters,
         scheduleSearch,
-        onAddSongToPlaylist: (playlistId, songKey) => storageController.addSongToPlaylist(playlistId, songKey),
-        onCreatePlaylistAndAdd: (playlistName, songKey) => storageController.createPlaylistAndAdd(playlistName, songKey),
-        onDeletePlaylist: (playlistId) => storageController.deletePlaylist(playlistId),
-        onRemoveSongFromPlaylist: (playlistId, songKey) => storageController.removeSongFromPlaylist(playlistId, songKey)
+        onAddSongToBookmark: (bookmarkId, songKey) => storageController.addSongToBookmark(bookmarkId, songKey),
+        onCreateBookmarkAndAdd: (bookmarkName, songKey) => storageController.createBookmarkAndAdd(bookmarkName, songKey),
+        onDeleteBookmark: (bookmarkId) => storageController.deleteBookmark(bookmarkId),
+        onRemoveSongFromBookmark: (bookmarkId, songKey) => storageController.removeSongFromBookmark(bookmarkId, songKey)
     }
 });
 
@@ -115,9 +115,9 @@ renderController.setDependencies({
     isRecommendedMode: (state) => searchController.isRecommendedMode(state),
     updateThumbnail: (thumbDiv, yt) => youtubeController.updateThumbnail(thumbDiv, yt),
     extractYoutubeInfo,
-    openPlaylistModal: (songKey) => openPlaylistModal(songKey),
+    openBookmarkModal: (songKey) => openBookmarkModal(songKey),
     setupScrollObserver: () => youtubeController.setupScrollObserver(),
-    removeSongFromActivePlaylist: (songKey) => removeSongFromActivePlaylist(songKey)
+    removeSongFromActiveBookmark: (songKey) => removeSongFromActiveBookmark(songKey)
 });
 searchController.setRenderHooks({
     updateDisplay: () => renderController.updateDisplay(),
@@ -148,8 +148,8 @@ function updateDisplay() { renderController.updateDisplay(); }
 
 function setSelectedFormatsToDefault() { storageController.setSelectedFormatsToDefault(); }
 function syncFormatCheckboxesFromState() { storageController.syncFormatCheckboxesFromState(); }
-function loadPlaylists() { storageController.loadPlaylists(); }
-function migrateLegacyPlaylistSongRefs() { storageController.migrateLegacyPlaylistSongRefs(); }
+function loadBookmarks() { storageController.loadBookmarks(); }
+function migrateLegacyBookmarkSongRefs() { storageController.migrateLegacyBookmarkSongRefs(); }
 function saveSearchState() { storageController.saveSearchState(); }
 function restoreSearchState() { storageController.restoreSearchState(); }
 
@@ -177,18 +177,18 @@ async function initUI() {
         themeToggle: document.getElementById('theme-toggle'),
         thumbToggle: document.getElementById('thumbnail-toggle'),
         formatsList: document.getElementById('formatsList'),
-        playlistList: document.getElementById('playlist-list'),
-        playlistModal: document.getElementById('playlist-modal'),
-        playlistModalClose: document.getElementById('playlist-modal-close'),
-        playlistModalList: document.getElementById('playlist-modal-list'),
-        playlistModalNewName: document.getElementById('playlist-modal-new-name'),
-        playlistModalCreateBtn: document.getElementById('playlist-modal-create-btn')
+        bookmarkList: document.getElementById('bookmark-list'),
+        bookmarkModal: document.getElementById('bookmark-modal'),
+        bookmarkModalClose: document.getElementById('bookmark-modal-close'),
+        bookmarkModalList: document.getElementById('bookmark-modal-list'),
+        bookmarkModalNewName: document.getElementById('bookmark-modal-new-name'),
+        bookmarkModalCreateBtn: document.getElementById('bookmark-modal-create-btn')
     };
     if (isIOSWebKit()) document.documentElement.classList.add('ios');
 
     setupUIHandlers();
     initFilterMenu();
-    loadPlaylists();
+    loadBookmarks();
     setupTheme();
     setupThumbnailToggle();
     setupScrollObserver();
@@ -348,7 +348,7 @@ function setupUIHandlers() {
     });
 
     clearBtn.addEventListener('click', clearSearch);
-    setupPlaylistHandlers();
+    setupBookmarkHandlers();
 }
 
 /**
@@ -366,37 +366,37 @@ function resetDateSelectGroup(kind) {
     syncDateSelectOptions();
 }
 
-// ===== Playlist =====
+// ===== Bookmark =====
 
 /**
- * setupPlaylistHandlers を実行する
+ * setupBookmarkHandlers を実行する
  */
-function setupPlaylistHandlers() {
-    playlistUiController.setupPlaylistHandlers();
+function setupBookmarkHandlers() {
+    bookmarkUiController.setupBookmarkHandlers();
 }
 
 /**
- * openPlaylistModal を実行する
+ * openBookmarkModal を実行する
  * @param {*} songKey
  */
-function openPlaylistModal(songKey) {
-    playlistUiController.openPlaylistModal(songKey);
+function openBookmarkModal(songKey) {
+    bookmarkUiController.openBookmarkModal(songKey);
 }
 
 /**
- * removeSongFromActivePlaylist を実行する
+ * removeSongFromActiveBookmark を実行する
  * @param {*} songKey
  */
-function removeSongFromActivePlaylist(songKey) {
-    playlistUiController.removeSongFromActivePlaylist(songKey);
+function removeSongFromActiveBookmark(songKey) {
+    bookmarkUiController.removeSongFromActiveBookmark(songKey);
 }
 
 /**
- * clearActivePlaylist を実行する
+ * clearActiveBookmark を実行する
  * @param {*} options
  */
-function clearActivePlaylist(options) {
-    playlistUiController.clearActivePlaylist(options);
+function clearActiveBookmark(options) {
+    bookmarkUiController.clearActiveBookmark(options);
 }
 
 // ===== Sidebar Accessibility =====
@@ -503,7 +503,7 @@ function trapSidebarFocus(event, sidebar) {
  * clearSearch を実行する
  */
 function clearSearch() {
-    clearActivePlaylist({ skipSearch: true });
+    clearActiveBookmark({ skipSearch: true });
     resetSearchConditions(true);
     saveSearchState();
 }
@@ -794,7 +794,7 @@ function initFilterMenu() {
  */
 function applyLoadedCsv(csvText, statusLabel) {
     data.allSongsRaw = parseCsvToSongs(csvText);
-    migrateLegacyPlaylistSongRefs();
+    migrateLegacyBookmarkSongRefs();
     ui.recommendedCache = null;
     const dateBounds = applyDateInputRange(data.allSongsRaw);
     if (dateBounds) {
@@ -810,3 +810,4 @@ function applyLoadedCsv(csvText, statusLabel) {
     }
     scheduleSearch({ immediate: true });
 }
+

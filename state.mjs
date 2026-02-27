@@ -8,7 +8,7 @@ export const PUBLIC_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1v
 export const DEFAULT_FORMATS = ["配信", "歌みた", "ショート", "切り抜き"];
 export const CSV_CACHE_KEY = "cachedCsv";
 export const SEARCH_STATE_KEY = "searchStateV1";
-export const PLAYLIST_STORAGE_KEY = "playlistsV1";
+export const BOOKMARK_STORAGE_KEY = "bookmarksV1";
 // Paint preview/フォーム復元の後追い対策で複数回同期する。
 export const UI_SYNC_PASSES = 2;
 export const SEARCH_DEBOUNCE_MS = 200;
@@ -22,8 +22,8 @@ export const state = {
         allSongsRaw: [],
         currentResults: [],
         displayLimit: RANDOM_DISPLAY_COUNT,
-        playlists: {},
-        activePlaylist: null
+        bookmarks: {},
+        activeBookmark: null
     },
     ui: {
         selectedFormats: new Set(),
@@ -44,7 +44,7 @@ export const state = {
         dateBounds: null,
         dateIndex: null,
         pendingDateValues: null,
-        pendingPlaylistAction: null
+        pendingBookmarkAction: null
     },
     youtube: {
         apiPromise: null,
@@ -55,3 +55,4 @@ export const state = {
 export const data = state.data;
 export const ui = state.ui;
 export const youtube = state.youtube;
+

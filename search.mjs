@@ -198,7 +198,7 @@ export function createSearchController({ data, ui, constants }) {
      * @param {*} searchState
      */
     function isRecommendedMode(searchState) {
-        return !data.activePlaylist &&
+        return !data.activeBookmark &&
             searchState.queryRaw === "" &&
             !searchState.relayOnly &&
             !searchState.harmonyOnly &&
@@ -207,12 +207,12 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * resolvePlaylistRows を実行する
-     * @param {*} playlist
+     * resolveBookmarkRows を実行する
+     * @param {*} bookmark
      */
-    function resolvePlaylistRows(playlist) {
+    function resolveBookmarkRows(bookmark) {
         ensureSongLookupMaps();
-        const songs = Array.isArray(playlist.songs) ? playlist.songs : [];
+        const songs = Array.isArray(bookmark.songs) ? bookmark.songs : [];
         return songs
             .map((songRef) => {
                 if (typeof songRef === "string") return ui.songMapByKey.get(songRef);
@@ -241,14 +241,14 @@ export function createSearchController({ data, ui, constants }) {
      * @param {*} searchState
      */
     function resolveSearchResults(searchState) {
-        if (data.activePlaylist) {
-            const playlist = data.playlists[data.activePlaylist];
-            if (playlist) {
-                const results = resolvePlaylistRows(playlist);
+        if (data.activeBookmark) {
+            const bookmark = data.bookmarks[data.activeBookmark];
+            if (bookmark) {
+                const results = resolveBookmarkRows(bookmark);
                 return {
                     results,
                     displayLimit: results.length,
-                    label: `プレイリスト: ${playlist.name}`
+                    label: `ブックマーク: ${bookmark.name}`
                 };
             }
         }
@@ -815,3 +815,4 @@ export function createSearchController({ data, ui, constants }) {
         clampDateInputsIfNeeded
     };
 }
+

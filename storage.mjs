@@ -4,11 +4,11 @@
  * @param {*} constants
  */
 export function createStorageController({ data, ui, constants, callbacks }) {
-    const { DEFAULT_FORMATS, SEARCH_STATE_KEY, PLAYLIST_STORAGE_KEY } = constants;
+    const { DEFAULT_FORMATS, SEARCH_STATE_KEY, BOOKMARK_STORAGE_KEY } = constants;
     const {
         getDateSelectValue,
         applyPendingDateValues,
-        renderPlaylists,
+        renderBookmarks,
         scheduleSearch
     } = callbacks;
 
@@ -47,20 +47,20 @@ export function createStorageController({ data, ui, constants, callbacks }) {
     }
 
     /**
-     * sanitizePlaylists を実行する
+     * sanitizeBookmarks を実行する
      * @param {*} raw
      */
-    function sanitizePlaylists(raw) {
+    function sanitizeBookmarks(raw) {
         if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
         const sanitized = {};
-        for (const [id, playlist] of Object.entries(raw)) {
-            if (!playlist || typeof playlist !== "object" || Array.isArray(playlist)) continue;
-            const name = typeof playlist.name === "string" ? playlist.name.trim() : "";
+        for (const [id, bookmark] of Object.entries(raw)) {
+            if (!bookmark || typeof bookmark !== "object" || Array.isArray(bookmark)) continue;
+            const name = typeof bookmark.name === "string" ? bookmark.name.trim() : "";
             if (!name) continue;
-            const createdAt = Number.isFinite(playlist.createdAt) ? playlist.createdAt : 0;
+            const createdAt = Number.isFinite(bookmark.createdAt) ? bookmark.createdAt : 0;
             const songs = [];
             const seen = new Set();
-            const rawSongs = Array.isArray(playlist.songs) ? playlist.songs : [];
+            const rawSongs = Array.isArray(bookmark.songs) ? bookmark.songs : [];
             rawSongs.forEach((ref) => {
                 let normalized = null;
                 if (typeof ref === "string") {
@@ -81,42 +81,42 @@ export function createStorageController({ data, ui, constants, callbacks }) {
     }
 
     /**
-     * savePlaylists を実行する
+     * saveBookmarks を実行する
      */
-    function savePlaylists() {
+    function saveBookmarks() {
         try {
-            localStorage.setItem(PLAYLIST_STORAGE_KEY, JSON.stringify(data.playlists));
+            localStorage.setItem(BOOKMARK_STORAGE_KEY, JSON.stringify(data.bookmarks));
         } catch (e) {
-            console.error("Failed to save playlists", e);
+            console.error("Failed to save bookmarks", e);
         }
     }
 
     /**
-     * loadPlaylists を実行する
+     * loadBookmarks を実行する
      */
-    function loadPlaylists() {
+    function loadBookmarks() {
         try {
-            const stored = localStorage.getItem(PLAYLIST_STORAGE_KEY);
+            const stored = localStorage.getItem(BOOKMARK_STORAGE_KEY);
             if (stored) {
-                data.playlists = sanitizePlaylists(JSON.parse(stored));
+                data.bookmarks = sanitizeBookmarks(JSON.parse(stored));
             }
         } catch (e) {
-            console.error("Failed to load playlists", e);
-            data.playlists = {};
+            console.error("Failed to load bookmarks", e);
+            data.bookmarks = {};
         }
-        renderPlaylists();
+        renderBookmarks();
     }
 
     /**
-     * migrateLegacyPlaylistSongRefs を実行する
+     * migrateLegacyBookmarkSongRefs を実行する
      */
-    function migrateLegacyPlaylistSongRefs() {
+    function migrateLegacyBookmarkSongRefs() {
         const legacyMap = new Map(data.allSongsRaw.map((row) => [row.sourceIndex, row.songKey]));
         let updated = false;
-        Object.values(data.playlists).forEach((playlist) => {
+        Object.values(data.bookmarks).forEach((bookmark) => {
             const nextSongs = [];
             const seen = new Set();
-            const prevSongs = Array.isArray(playlist.songs) ? playlist.songs : [];
+            const prevSongs = Array.isArray(bookmark.songs) ? bookmark.songs : [];
             prevSongs.forEach((ref) => {
                 let normalized = null;
                 if (typeof ref === "string") {
@@ -130,80 +130,80 @@ export function createStorageController({ data, ui, constants, callbacks }) {
                 nextSongs.push(normalized);
             });
             if (prevSongs.length !== nextSongs.length || prevSongs.some((ref, idx) => ref !== nextSongs[idx])) {
-                playlist.songs = nextSongs;
+                bookmark.songs = nextSongs;
                 updated = true;
             }
         });
-        if (updated) savePlaylists();
+        if (updated) saveBookmarks();
     }
 
     /**
-     * removeSongFromPlaylist を実行する
-     * @param {*} playlistId
+     * removeSongFromBookmark を実行する
+     * @param {*} bookmarkId
      * @param {*} songKey
      */
-    function removeSongFromPlaylist(playlistId, songKey) {
-        const playlist = data.playlists[playlistId];
-        if (!playlist) return;
+    function removeSongFromBookmark(bookmarkId, songKey) {
+        const bookmark = data.bookmarks[bookmarkId];
+        if (!bookmark) return;
 
-        const songIndex = playlist.songs.indexOf(songKey);
+        const songIndex = bookmark.songs.indexOf(songKey);
         if (songIndex > -1) {
-            playlist.songs.splice(songIndex, 1);
-            savePlaylists();
-            renderPlaylists();
-            if (data.activePlaylist === playlistId) {
+            bookmark.songs.splice(songIndex, 1);
+            saveBookmarks();
+            renderBookmarks();
+            if (data.activeBookmark === bookmarkId) {
                 scheduleSearch({ immediate: true });
             }
         }
     }
 
     /**
-     * addSongToPlaylist を実行する
-     * @param {*} playlistId
+     * addSongToBookmark を実行する
+     * @param {*} bookmarkId
      * @param {*} songKey
      */
-    function addSongToPlaylist(playlistId, songKey) {
-        const playlist = data.playlists[playlistId];
-        if (!playlist || playlist.songs.includes(songKey)) return false;
-        playlist.songs.push(songKey);
-        savePlaylists();
-        renderPlaylists();
-        if (data.activePlaylist === playlistId) {
+    function addSongToBookmark(bookmarkId, songKey) {
+        const bookmark = data.bookmarks[bookmarkId];
+        if (!bookmark || bookmark.songs.includes(songKey)) return false;
+        bookmark.songs.push(songKey);
+        saveBookmarks();
+        renderBookmarks();
+        if (data.activeBookmark === bookmarkId) {
             scheduleSearch({ immediate: true });
         }
         return true;
     }
 
     /**
-     * createPlaylistAndAdd を実行する
-     * @param {*} playlistName
+     * createBookmarkAndAdd を実行する
+     * @param {*} bookmarkName
      * @param {*} songKey
      */
-    function createPlaylistAndAdd(playlistName, songKey) {
+    function createBookmarkAndAdd(bookmarkName, songKey) {
         const now = Date.now();
         const newId = `p_${now}`;
-        data.playlists[newId] = {
-            name: playlistName,
+        data.bookmarks[newId] = {
+            name: bookmarkName,
             songs: [songKey],
             createdAt: now
         };
-        savePlaylists();
-        renderPlaylists();
+        saveBookmarks();
+        renderBookmarks();
         return newId;
     }
 
     /**
-     * deletePlaylist を実行する
-     * @param {*} playlistId
+     * deleteBookmark を実行する
+     * @param {*} bookmarkId
      */
-    function deletePlaylist(playlistId) {
-        const playlist = data.playlists[playlistId];
-        if (!playlist) return false;
-        const wasActive = data.activePlaylist === playlistId;
-        delete data.playlists[playlistId];
-        if (wasActive) data.activePlaylist = null;
-        savePlaylists();
-        renderPlaylists();
+    function deleteBookmark(bookmarkId) {
+        const bookmark = data.bookmarks[bookmarkId];
+        if (!bookmark) return false;
+        const wasActive = data.activeBookmark === bookmarkId;
+        delete data.bookmarks[bookmarkId];
+        if (wasActive) data.activeBookmark = null;
+        saveBookmarks();
+        renderBookmarks();
         if (wasActive) scheduleSearch({ immediate: true });
         return true;
     }
@@ -270,14 +270,15 @@ export function createStorageController({ data, ui, constants, callbacks }) {
         setSelectedFormatsToDefault,
         syncFormatCheckboxesFromState,
         applySelectedFormatsFromRaw,
-        loadPlaylists,
-        savePlaylists,
-        migrateLegacyPlaylistSongRefs,
-        addSongToPlaylist,
-        createPlaylistAndAdd,
-        deletePlaylist,
+        loadBookmarks,
+        saveBookmarks,
+        migrateLegacyBookmarkSongRefs,
+        addSongToBookmark,
+        createBookmarkAndAdd,
+        deleteBookmark,
         saveSearchState,
         restoreSearchState,
-        removeSongFromPlaylist
+        removeSongFromBookmark
     };
 }
+
