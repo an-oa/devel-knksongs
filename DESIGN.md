@@ -14,9 +14,11 @@
 - 開発時テスト：Node.js 標準 `node:test` を利用
 
 ## テスト方針（現状）
-- 対象: 検索/日付フィルタの純粋ロジック
-- テストファイル: `tests/search-date.test.mjs`
-- 実行コマンド: `node tests/search-date.test.mjs`
+- 対象: 検索ロジック、日付フィルタ、ブックマーク検索、描画/再生まわりの回帰
+- テストファイル:
+  - `tests/search-date.test.mjs`
+  - `tests/playback-regression.test.mjs`
+- 実行コマンド: `node --test tests/*.mjs`
 
 ## 主要機能
 - 検索（曲名/アーティスト名/読み、複数キーワード）
@@ -144,6 +146,7 @@
 ## パフォーマンス
 - CSVのキャッシュ
 - 段階表示（追加読み込み）
+  - 通常検索・ブックマーク検索ともに `INCREMENT_COUNT` 単位で追加表示
 - サムネ遅延読み込み（IntersectionObserver）
 
 ## 制約・注意点

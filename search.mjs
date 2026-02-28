@@ -246,11 +246,10 @@ export function createSearchController({ data, ui, constants }) {
             if (bookmark) {
                 const bookmarkRows = resolveBookmarkRows(bookmark);
                 const results = filterSongsByCriteria(bookmarkRows, searchState, ui.selectedFormats);
-                return {
+                return buildIncrementalSearchOutcome(
                     results,
-                    displayLimit: results.length,
-                    label: `ブックマーク: ${bookmark.name} (${results.length} 件)`
-                };
+                    `ブックマーク: ${bookmark.name} (${results.length} 件)`
+                );
             }
         }
 
@@ -262,10 +261,19 @@ export function createSearchController({ data, ui, constants }) {
             };
         }
         const results = filterSongs(searchState);
+        return buildIncrementalSearchOutcome(results, `${results.length} 件がヒット`);
+    }
+
+    /**
+     * buildIncrementalSearchOutcome を実行する
+     * @param {*} results
+     * @param {*} label
+     */
+    function buildIncrementalSearchOutcome(results, label) {
         return {
             results,
-            displayLimit: INCREMENT_COUNT,
-            label: `${results.length} 件がヒット`
+            displayLimit: Math.min(results.length, INCREMENT_COUNT),
+            label
         };
     }
 

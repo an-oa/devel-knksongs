@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createRenderController } from "../render.mjs";
+import { createSearchController } from "../search.mjs";
 import { createYoutubeController } from "../youtube.mjs";
 
 class FakeClassList {
@@ -432,6 +433,121 @@ test("render: active card hidden from next nodes stops playback", () => {
         controller.updateDisplay();
 
         assert.equal(restoreCount, 1);
+    } finally {
+        cleanup();
+    }
+});
+
+test("bookmark: shows load-more and increases by INCREMENT_COUNT (48)", () => {
+    const cleanup = installFakeDom();
+    try {
+        const rows = Array.from({ length: 100 }, (_, index) => ({
+            sourceIndex: index + 1,
+            songKey: `song-${index + 1}`,
+            title: `曲${index + 1}`,
+            artist: "artist",
+            date: "2024-01-01",
+            dateKey: 20240101,
+            format: "配信",
+            isRelay: false,
+            isHarmony: false,
+            url: `https://youtu.be/video${index + 1}`,
+            titleNorm: "",
+            artistNorm: "",
+            titleYomiNorm: "",
+            artistYomiNorm: ""
+        }));
+        const data = {
+            allSongsRaw: rows,
+            bookmarks: {
+                bm1: {
+                    name: "100件",
+                    songs: rows.map((row) => row.songKey)
+                }
+            },
+            activeBookmark: "bm1",
+            currentResults: [],
+            displayLimit: 0
+        };
+        const loadMoreContainer = document.createElement("div");
+        loadMoreContainer.classList.add("hidden");
+        const ui = {
+            activeThumb: null,
+            showThumbnails: false,
+            scrollObserver: null,
+            cardEntriesBySourceKey: new Map(),
+            selectedFormats: new Set(["配信"]),
+            dataReady: true,
+            searchDebounceId: 0,
+            el: {
+                resultList: document.createElement("div"),
+                loadMoreContainer,
+                resultCount: { innerText: "" },
+                searchBox: { value: "" },
+                relayOnly: { checked: false },
+                harmonyOnly: { checked: false },
+                dateFromYear: null,
+                dateFromMonth: null,
+                dateFromDay: null,
+                dateToYear: null,
+                dateToMonth: null,
+                dateToDay: null
+            }
+        };
+
+        const renderController = createRenderController({
+            data,
+            ui,
+            isAllFormatsSelected: () => true
+        });
+        renderController.setDependencies({
+            getSearchState: () => ({
+                queryRaw: "",
+                relayOnly: false,
+                harmonyOnly: false,
+                dateFromKey: null,
+                dateToKey: null,
+                hasDateFilter: false
+            }),
+            isRecommendedMode: () => false,
+            updateThumbnail: () => {},
+            extractYoutubeInfo: (url) => ({ videoId: String(url || ""), startSeconds: 0 }),
+            restoreActivePlayback: () => {}
+        });
+
+        const searchController = createSearchController({
+            data,
+            ui,
+            constants: {
+                RANDOM_DISPLAY_COUNT: 48,
+                MIN_PERFORMANCE_FOR_RANDOM: 3,
+                INCREMENT_COUNT: 48,
+                SEARCH_DEBOUNCE_MS: 0,
+                DEFAULT_FORMATS: ["配信", "歌みた", "ショート", "切り抜き"]
+            }
+        });
+        searchController.setRenderHooks({
+            updateDisplay: () => renderController.updateDisplay(),
+            scrollResultsPaneToTop: () => {}
+        });
+
+        searchController.search();
+        assert.equal(data.currentResults.length, 100);
+        assert.equal(data.displayLimit, 48);
+        assert.equal(ui.el.resultList.children.length, 48);
+        assert.equal(loadMoreContainer.classList.contains("hidden"), false);
+
+        data.displayLimit += 48;
+        renderController.updateDisplay();
+        assert.equal(data.displayLimit, 96);
+        assert.equal(ui.el.resultList.children.length, 96);
+        assert.equal(loadMoreContainer.classList.contains("hidden"), false);
+
+        data.displayLimit += 48;
+        renderController.updateDisplay();
+        assert.equal(data.displayLimit, 144);
+        assert.equal(ui.el.resultList.children.length, 100);
+        assert.equal(loadMoreContainer.classList.contains("hidden"), true);
     } finally {
         cleanup();
     }

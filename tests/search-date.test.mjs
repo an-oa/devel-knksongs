@@ -131,3 +131,57 @@ test("createSearchController: active bookmark also applies search criteria", () 
     assert.equal(data.displayLimit, 0);
     assert.equal(ui.el.resultCount.innerText, "ブックマーク: 検証 (0 件)");
 });
+
+test("createSearchController: active bookmark uses incremental display limit", () => {
+    const rows = Array.from({ length: 5 }, (_, index) =>
+        makeRow({
+            songKey: `s${index + 1}`,
+            sourceIndex: index + 1,
+            title: `曲${index + 1}`,
+            artist: "A",
+            format: "配信"
+        })
+    );
+    const data = {
+        allSongsRaw: rows,
+        bookmarks: {
+            bm1: {
+                name: "検証",
+                songs: rows.map((row) => row.songKey)
+            }
+        },
+        activeBookmark: "bm1",
+        currentResults: [],
+        displayLimit: 0
+    };
+    const ui = {
+        el: {
+            searchBox: { value: "" },
+            relayOnly: { checked: false },
+            harmonyOnly: { checked: false },
+            dateFromYear: null,
+            dateFromMonth: null,
+            dateFromDay: null,
+            dateToYear: null,
+            dateToMonth: null,
+            dateToDay: null,
+            resultCount: { innerText: "" }
+        },
+        selectedFormats: new Set(["配信"]),
+        searchDebounceId: 0
+    };
+    const constants = {
+        RANDOM_DISPLAY_COUNT: 10,
+        MIN_PERFORMANCE_FOR_RANDOM: 1,
+        INCREMENT_COUNT: 2,
+        SEARCH_DEBOUNCE_MS: 0,
+        DEFAULT_FORMATS: ["配信", "歌みた", "ショート"]
+    };
+
+    const controller = createSearchController({ data, ui, constants });
+    controller.search();
+
+    assert.equal(data.currentResults.length, 5);
+    assert.equal(data.displayLimit, 2);
+    assert.equal(ui.el.resultCount.innerText, "ブックマーク: 検証 (5 件)");
+});

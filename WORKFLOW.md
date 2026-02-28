@@ -15,7 +15,7 @@
    - 影響予測メモに沿って実装
 4. **テスト実行**
    - 変更影響に応じたテストを実行
-   - 現在の基本コマンド: `node tests/search-date.test.mjs`
+   - 現在の基本コマンド: `node --test tests/*.mjs`
 5. **必要なら DESIGN.md / README.md へ反映**
    - 合意した設計が長期的に有用な場合のみ追記
 
