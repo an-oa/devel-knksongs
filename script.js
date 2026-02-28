@@ -32,6 +32,7 @@ import { parseCsvToSongs } from "./csv-parser.mjs?v=3";
  * @property {number | null} archiveOrder
  * @property {number} sourceIndex
  * @property {string} songKey
+ * @property {string} legacySongKey
  * @property {string} format
  * @property {boolean} isRelay
  * @property {boolean} isHarmony

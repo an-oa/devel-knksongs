@@ -235,7 +235,9 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
         const nodes = [];
         for (let i = 0; i < results.length; i++) {
             const row = results[i];
-            const rowKey = row && Number.isFinite(row.sourceIndex) ? String(row.sourceIndex) : `idx:${i}`;
+            const rowKey = row && typeof row.songKey === "string" && row.songKey
+                ? `song:${row.songKey}`
+                : (row && Number.isFinite(row.sourceIndex) ? `src:${row.sourceIndex}` : `idx:${i}`);
             let entry = ui.cardEntriesBySourceKey.get(rowKey);
             if (!entry) entry = createCardElements();
             updateCardFromRow(entry, results[i]);

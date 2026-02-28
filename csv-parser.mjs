@@ -5,6 +5,19 @@ import { normalizeForSearch, parseDateKey } from "./search.mjs?v=3";
  * @param {*} input
  */
 function buildSongKey(input) {
+    const { archiveId, archiveOrder } = input;
+    const orderPart = Number.isFinite(archiveOrder) ? String(archiveOrder) : "";
+    return [
+        String(archiveId || "").trim(),
+        orderPart
+    ].join("::");
+}
+
+/**
+ * buildLegacySongKey を実行する
+ * @param {*} input
+ */
+function buildLegacySongKey(input) {
     const { archiveId, archiveOrder, url } = input;
     const orderPart = Number.isFinite(archiveOrder) ? String(archiveOrder) : "";
     return [
@@ -98,13 +111,15 @@ export function parseCsvToSongs(csvText) {
         const titleYomi = r[idx("キョクメイ")];
         const artistYomi = r[idx("アーティストメイ")];
         const archiveOrder = parseArchiveOrder(r[idx("##")]);
+        const legacySongKey = buildLegacySongKey({ archiveId, archiveOrder, url });
         songs.push({
             date: r[idx("配信日")],
             dateKey: parseDateKey(r[idx("配信日")]),
             archiveId,
             archiveOrder,
             sourceIndex: i,
-            songKey: buildSongKey({ archiveId, archiveOrder, url }),
+            songKey: buildSongKey({ archiveId, archiveOrder }),
+            legacySongKey,
             format: r[idx("形態")],
             isRelay: r[idx("歌枠リレー？")] === "◯",
             isHarmony: r[idx("ハモリあり？")] === "◯",

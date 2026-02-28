@@ -81,6 +81,22 @@ export function createStorageController({ data, ui, constants, callbacks }) {
     }
 
     /**
+     * normalizeLegacySongRefToCurrent を実行する
+     * @param {*} ref
+     */
+    function normalizeLegacySongRefToCurrent(ref) {
+        if (typeof ref !== "string") return null;
+        const parts = ref.split("::");
+        if (parts.length < 2) return null;
+        const archiveId = (parts[0] || "").trim();
+        if (!archiveId) return null;
+        const rawOrder = (parts[1] || "").trim();
+        const parsedOrder = Number.parseInt(rawOrder, 10);
+        const orderPart = Number.isFinite(parsedOrder) ? String(parsedOrder) : "";
+        return [archiveId, orderPart].join("::");
+    }
+
+    /**
      * saveBookmarks を実行する
      */
     function saveBookmarks() {
@@ -111,7 +127,17 @@ export function createStorageController({ data, ui, constants, callbacks }) {
      * migrateLegacyBookmarkSongRefs を実行する
      */
     function migrateLegacyBookmarkSongRefs() {
-        const legacyMap = new Map(data.allSongsRaw.map((row) => [row.sourceIndex, row.songKey]));
+        const legacyIndexMap = new Map(data.allSongsRaw.map((row) => [row.sourceIndex, row.songKey]));
+        const legacySongKeyMap = new Map();
+        const songKeySet = new Set();
+        data.allSongsRaw.forEach((row) => {
+            if (typeof row.songKey === "string" && row.songKey) {
+                songKeySet.add(row.songKey);
+            }
+            if (typeof row.legacySongKey === "string" && row.legacySongKey) {
+                legacySongKeyMap.set(row.legacySongKey, row.songKey);
+            }
+        });
         let updated = false;
         Object.values(data.bookmarks).forEach((bookmark) => {
             const nextSongs = [];
@@ -120,9 +146,14 @@ export function createStorageController({ data, ui, constants, callbacks }) {
             prevSongs.forEach((ref) => {
                 let normalized = null;
                 if (typeof ref === "string") {
-                    normalized = ref;
+                    if (songKeySet.has(ref)) normalized = ref;
+                    else if (legacySongKeyMap.has(ref)) normalized = legacySongKeyMap.get(ref) || null;
+                    else {
+                        const converted = normalizeLegacySongRefToCurrent(ref);
+                        if (converted && songKeySet.has(converted)) normalized = converted;
+                    }
                 } else if (Number.isFinite(ref)) {
-                    normalized = legacyMap.get(ref) || null;
+                    normalized = legacyIndexMap.get(ref) || null;
                 }
                 if (!normalized) return;
                 if (seen.has(normalized)) return;
@@ -281,4 +312,3 @@ export function createStorageController({ data, ui, constants, callbacks }) {
         removeSongFromBookmark
     };
 }
-
