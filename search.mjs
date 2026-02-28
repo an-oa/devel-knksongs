@@ -1,5 +1,5 @@
 /**
- * normalizeForSearch を実行する
+ * 検索比較しやすい形に文字列を正規化する。
  * @param {*} s
  */
 export function normalizeForSearch(s) {
@@ -10,7 +10,7 @@ export function normalizeForSearch(s) {
 }
 
 /**
- * parseDateKey を実行する
+ * 日付文字列を `YYYYMMDD` 形式の数値キーへ解析する。
  * @param {*} raw
  */
 export function parseDateKey(raw) {
@@ -29,7 +29,7 @@ export function parseDateKey(raw) {
 }
 
 /**
- * dateKeyToParts を実行する
+ * 日付キーを年・月・日に分解する。
  * @param {*} key
  */
 export function dateKeyToParts(key) {
@@ -40,7 +40,7 @@ export function dateKeyToParts(key) {
 }
 
 /**
- * isWithinDateRange を実行する
+ * 曲データの日付が指定範囲内かどうかを判定する。
  * @param {*} row
  * @param {*} fromKey
  * @param {*} toKey
@@ -54,7 +54,7 @@ export function isWithinDateRange(row, fromKey, toKey) {
 }
 
 /**
- * filterSongsByCriteria を実行する
+ * クエリ・日付・形式・フラグ条件で曲一覧を絞り込む。
  * @param {*} rows
  * @param {*} searchState
  * @param {*} selectedFormats
@@ -79,7 +79,7 @@ export function filterSongsByCriteria(rows, searchState, selectedFormats) {
 }
 
 /**
- * createSearchController を実行する
+ * 検索条件の収集・結果解決・推薦選曲を管理するコントローラーを作成する。
  * @param {*} ui
  */
 export function createSearchController({ data, ui, constants }) {
@@ -94,7 +94,7 @@ export function createSearchController({ data, ui, constants }) {
     let scrollResultsPaneToTop = () => {};
 
     /**
-     * setRenderHooks を実行する
+     * 検索後に呼び出す描画フックを登録する。
      * @param {*} hooks
      */
     function setRenderHooks(hooks) {
@@ -107,7 +107,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * scheduleSearch を実行する
+     * デバウンス付きで検索実行を予約し、必要時は即時実行する。
      * @param {*} options
      */
     function scheduleSearch(options) {
@@ -123,7 +123,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * search を実行する
+     * 検索入力の収集から結果反映までの処理を行う。
      */
     function search() {
         const searchInput = collectSearchInput();
@@ -132,7 +132,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * collectSearchInput を実行する
+     * 検索実行に必要な入力情報を収集する。
      */
     function collectSearchInput() {
         return {
@@ -142,7 +142,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * resolveSearchOutcome を実行する
+     * 検索状態から表示用の結果セットを導出する。
      * @param {*} searchState
      */
     function resolveSearchOutcome(searchState) {
@@ -150,7 +150,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * applySearchOutcome を実行する
+     * 検索結果をstateとUIへ反映する。
      * @param {*} searchInput
      * @param {*} outcome
      */
@@ -163,7 +163,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * getSearchState を実行する
+     * 現在のUI入力から検索条件オブジェクトを生成する。
      */
     function getSearchState() {
         const fromRange = getPartialDateRange("from");
@@ -179,14 +179,14 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * areAllFormatsSelected を実行する
+     * 既定フォーマットがすべて選択されているか判定する。
      */
     function areAllFormatsSelected() {
         return DEFAULT_FORMATS.every((f) => ui.selectedFormats.has(f));
     }
 
     /**
-     * areFormatsDefault を実行する
+     * フォーマット選択が既定状態と一致するか判定する。
      */
     function areFormatsDefault() {
         if (ui.selectedFormats.size !== DEFAULT_FORMATS.length) return false;
@@ -194,7 +194,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * isRecommendedMode を実行する
+     * 条件未指定時のおすすめ表示モードかどうかを判定する。
      * @param {*} searchState
      */
     function isRecommendedMode(searchState) {
@@ -207,7 +207,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * resolveBookmarkRows を実行する
+     * ブックマーク内の参照IDを曲データ配列へ解決する。
      * @param {*} bookmark
      */
     function resolveBookmarkRows(bookmark) {
@@ -223,7 +223,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * ensureSongLookupMaps を実行する
+     * 曲参照用の検索マップを必要時に再構築する。
      */
     function ensureSongLookupMaps() {
         if (ui.songLookupSourceRef === data.allSongsRaw &&
@@ -237,7 +237,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * resolveSearchResults を実行する
+     * 通常検索・ブックマーク検索・おすすめ表示を切り替えて結果を作る。
      * @param {*} searchState
      */
     function resolveSearchResults(searchState) {
@@ -265,7 +265,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * buildIncrementalSearchOutcome を実行する
+     * 段階表示用の件数上限を含む検索結果オブジェクトを作る。
      * @param {*} results
      * @param {*} label
      */
@@ -278,7 +278,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * buildDateIndex を実行する
+     * 年/月ごとの利用可能日を引ける日付インデックスを作る。
      * @param {*} songs
      */
     function buildDateIndex(songs) {
@@ -298,7 +298,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * getAvailableDays を実行する
+     * 指定した年/月で選択可能な日一覧を返す。
      * @param {*} year
      * @param {*} month
      */
@@ -309,14 +309,14 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * hasDateSelection を実行する
+     * 開始/終了いずれかの日付選択があるか判定する。
      */
     function hasDateSelection() {
         return hasPartialDateSelection("from") || hasPartialDateSelection("to");
     }
 
     /**
-     * hasPartialDateSelection を実行する
+     * 指定側の日付セレクトに部分入力があるか判定する。
      * @param {*} kind
      */
     function hasPartialDateSelection(kind) {
@@ -325,7 +325,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * getDateSelectParts を実行する
+     * 開始または終了側の日付セレクト値を取得する。
      * @param {*} kind
      */
     function getDateSelectParts(kind) {
@@ -337,7 +337,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * getDateSelectValue を実行する
+     * 日付セレクトの値を `YYYY-MM-DD` 文字列で取得する。
      * @param {*} kind
      */
     function getDateSelectValue(kind) {
@@ -347,7 +347,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * applyDateSelectValue を実行する
+     * 日付文字列をセレクトUIへ反映する。
      * @param {*} kind
      * @param {*} value
      */
@@ -369,7 +369,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * resetDateSelects を実行する
+     * 日付セレクトを全クリアして選択肢を同期する。
      */
     function resetDateSelects() {
         ["from", "to"].forEach((kind) => {
@@ -385,7 +385,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * getPartialDateRange を実行する
+     * 部分指定を含む日付入力から最小/最大キー範囲を求める。
      * @param {*} kind
      */
     function getPartialDateRange(kind) {
@@ -405,7 +405,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * getConstrainedBounds を実行する
+     * 反対側入力を考慮した選択可能日付範囲を計算する。
      * @param {*} kind
      */
     function getConstrainedBounds(kind) {
@@ -429,7 +429,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * initDateSelects を実行する
+     * 日付境界に基づいて年/月/日セレクトを初期化する。
      * @param {*} bounds
      */
     function initDateSelects(bounds) {
@@ -451,7 +451,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * buildSelectOptions を実行する
+     * セレクト要素の選択肢を再構築する。
      * @param {*} select
      * @param {*} values
      * @param {*} placeholder
@@ -479,7 +479,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * syncDateSelectOptions を実行する
+     * 現在の境界と選択値に合わせて日付セレクト候補を同期する。
      * @param {*} kind
      */
     function syncDateSelectOptions(kind) {
@@ -524,7 +524,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * applyPendingDateValues を実行する
+     * 保留していた日付復元値をセレクトへ適用する。
      */
     function applyPendingDateValues() {
         if (!ui.pendingDateValues) return;
@@ -535,7 +535,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * buildNumberRange を実行する
+     * 開始値から終了値までの連番配列を生成する。
      * @param {*} start
      * @param {*} end
      */
@@ -546,7 +546,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * formatDateKeyForInput を実行する
+     * 日付キーを `YYYY-MM-DD` 形式へ整形する。
      * @param {*} key
      */
     function formatDateKeyForInput(key) {
@@ -559,7 +559,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * applyDateInputRange を実行する
+     * 曲一覧から日付境界を計算し、日付UIへ反映する。
      * @param {*} songs
      */
     function applyDateInputRange(songs) {
@@ -586,7 +586,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * clampDateInputsToBounds を実行する
+     * 日付入力を許容範囲内に収め、前後関係を補正する。
      * @param {*} minKey
      * @param {*} maxKey
      */
@@ -610,7 +610,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * clampDateInputsIfNeeded を実行する
+     * 日付境界がある場合に入力値の範囲補正を行う。
      */
     function clampDateInputsIfNeeded() {
         if (!ui.dateBounds) return;
@@ -618,7 +618,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * filterSongs を実行する
+     * 全曲データを現在の検索条件で絞り込む。
      * @param {*} searchState
      */
     function filterSongs(searchState) {
@@ -626,7 +626,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * shuffleInPlace を実行する
+     * 配列をFisher-Yates法でインプレースシャッフルする。
      * @param {*} list
      */
     function shuffleInPlace(list) {
@@ -638,7 +638,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * pickRecommended を実行する
+     * おすすめ曲をキャッシュ付きで選定して返す。
      */
     function pickRecommended() {
         if (ui.recommendedCache) return ui.recommendedCache;
@@ -650,7 +650,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * buildRecommendedGroups を実行する
+     * おすすめ抽選に使う曲グループを構築する。
      * @param {*} songs
      */
     function buildRecommendedGroups(songs) {
@@ -667,7 +667,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * collapseRecommendedRowsByArchive を実行する
+     * 同一アーカイブ内の候補を最新行へ集約する。
      * @param {*} songs
      */
     function collapseRecommendedRowsByArchive(songs) {
@@ -684,7 +684,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * groupRecommendedRowsBySong を実行する
+     * 曲同一性キーで候補をグループ化し形式別に分類する。
      * @param {*} rows
      */
     function groupRecommendedRowsBySong(rows) {
@@ -704,7 +704,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * pickRecommendedLatestRows を実行する
+     * 優先ルールに従ってグループから採用候補行を選ぶ。
      * @param {*} entry
      */
     function pickRecommendedLatestRows(entry) {
@@ -721,7 +721,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * selectRecommendedSongs を実行する
+     * 候補グループからランダム抽出して表示曲を決定する。
      * @param {*} groups
      * @param {*} count
      */
@@ -731,7 +731,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * pickRandomEntry を実行する
+     * 配列からランダムに1件選択する。
      * @param {*} list
      */
     function pickRandomEntry(list) {
@@ -740,7 +740,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * getRecommendedSongKey を実行する
+     * 同一曲判定用の正規化キーを生成する。
      * @param {*} row
      */
     function getRecommendedSongKey(row) {
@@ -753,7 +753,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * getRecommendedSongArchiveKey を実行する
+     * 曲キーとアーカイブIDを組み合わせた集約キーを生成する。
      * @param {*} row
      */
     function getRecommendedSongArchiveKey(row) {
@@ -761,7 +761,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * isHigherArchiveOrder を実行する
+     * 候補行が現在行より新しい順序かどうかを判定する。
      * @param {*} candidate
      * @param {*} current
      */
@@ -773,7 +773,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * isRecommendedCountFormat を実行する
+     * おすすめ集計対象の形式かどうかを判定する。
      * @param {*} format
      */
     function isRecommendedCountFormat(format) {
@@ -781,7 +781,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * isUtamitaFormat を実行する
+     * 形式が「歌みた」かどうかを判定する。
      * @param {*} format
      */
     function isUtamitaFormat(format) {
@@ -789,7 +789,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * isStreamFormat を実行する
+     * 形式が「配信」かどうかを判定する。
      * @param {*} format
      */
     function isStreamFormat(format) {
@@ -797,7 +797,7 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     /**
-     * isShortFormat を実行する
+     * 形式が「ショート」かどうかを判定する。
      * @param {*} format
      */
     function isShortFormat(format) {

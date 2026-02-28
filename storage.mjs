@@ -1,5 +1,5 @@
 /**
- * createStorageController を実行する
+ * ブックマークと検索状態の保存・復元を扱うストレージコントローラーを作成する。
  * @param {*} ui
  * @param {*} constants
  */
@@ -19,7 +19,7 @@ export function createStorageController({ data, ui, constants, callbacks }) {
     } = callbacks;
 
     /**
-     * setSelectedFormatsToDefault を実行する
+     * 選択中フォーマットを既定値に戻す。
      */
     function setSelectedFormatsToDefault() {
         ui.selectedFormats.clear();
@@ -27,7 +27,7 @@ export function createStorageController({ data, ui, constants, callbacks }) {
     }
 
     /**
-     * syncFormatCheckboxesFromState を実行する
+     * state上のフォーマット選択状態をチェックボックスへ同期する。
      */
     function syncFormatCheckboxesFromState() {
         const formatCheckboxes = document.querySelectorAll('#formatsList input[type="checkbox"]');
@@ -37,7 +37,7 @@ export function createStorageController({ data, ui, constants, callbacks }) {
     }
 
     /**
-     * applySelectedFormatsFromRaw を実行する
+     * 保存値からフォーマット選択を復元し、不正値を除外する。
      * @param {*} rawFormats
      */
     function applySelectedFormatsFromRaw(rawFormats) {
@@ -53,7 +53,7 @@ export function createStorageController({ data, ui, constants, callbacks }) {
     }
 
     /**
-     * sanitizeBookmarks を実行する
+     * 保存済みブックマーク構造を検証し、利用可能な形へ整形する。
      * @param {*} raw
      */
     function sanitizeBookmarks(raw) {
@@ -87,7 +87,7 @@ export function createStorageController({ data, ui, constants, callbacks }) {
     }
 
     /**
-     * normalizeLegacySongRefToCurrent を実行する
+     * 旧形式の曲参照キーを現行形式へ正規化する。
      * @param {*} ref
      */
     function normalizeLegacySongRefToCurrent(ref) {
@@ -103,7 +103,7 @@ export function createStorageController({ data, ui, constants, callbacks }) {
     }
 
     /**
-     * buildActionOk を実行する
+     * 成功時の共通レスポンスを組み立てる。
      * @param {*} extra
      */
     function buildActionOk(extra) {
@@ -111,7 +111,7 @@ export function createStorageController({ data, ui, constants, callbacks }) {
     }
 
     /**
-     * buildActionFail を実行する
+     * 失敗理由付きの共通レスポンスを組み立てる。
      * @param {*} reason
      * @param {*} extra
      */
@@ -120,7 +120,7 @@ export function createStorageController({ data, ui, constants, callbacks }) {
     }
 
     /**
-     * saveBookmarks を実行する
+     * ブックマーク情報をローカルストレージへ保存する。
      */
     function saveBookmarks() {
         try {
@@ -131,7 +131,7 @@ export function createStorageController({ data, ui, constants, callbacks }) {
     }
 
     /**
-     * loadBookmarks を実行する
+     * ブックマーク情報をローカルストレージから読み込み、描画を更新する。
      */
     function loadBookmarks() {
         try {
@@ -147,7 +147,7 @@ export function createStorageController({ data, ui, constants, callbacks }) {
     }
 
     /**
-     * migrateLegacyBookmarkSongRefs を実行する
+     * 旧参照形式のブックマーク曲IDを現行の `songKey` へ移行する。
      */
     function migrateLegacyBookmarkSongRefs() {
         const legacyIndexMap = new Map(data.allSongsRaw.map((row) => [row.sourceIndex, row.songKey]));
@@ -192,7 +192,7 @@ export function createStorageController({ data, ui, constants, callbacks }) {
     }
 
     /**
-     * removeSongFromBookmark を実行する
+     * 指定ブックマークから曲を削除し、必要なら検索結果を更新する。
      * @param {*} bookmarkId
      * @param {*} songKey
      */
@@ -212,7 +212,7 @@ export function createStorageController({ data, ui, constants, callbacks }) {
     }
 
     /**
-     * addSongToBookmark を実行する
+     * 指定ブックマークへ曲を追加し、上限や重複を検証して結果を返す。
      * @param {*} bookmarkId
      * @param {*} songKey
      */
@@ -233,7 +233,7 @@ export function createStorageController({ data, ui, constants, callbacks }) {
     }
 
     /**
-     * createBookmarkAndAdd を実行する
+     * 新規ブックマークを作成し、指定曲を初期登録する。
      * @param {*} bookmarkName
      * @param {*} songKey
      */
@@ -254,7 +254,7 @@ export function createStorageController({ data, ui, constants, callbacks }) {
     }
 
     /**
-     * deleteBookmark を実行する
+     * ブックマークを削除し、アクティブ状態と表示を更新する。
      * @param {*} bookmarkId
      */
     function deleteBookmark(bookmarkId) {
@@ -270,7 +270,7 @@ export function createStorageController({ data, ui, constants, callbacks }) {
     }
 
     /**
-     * saveSearchState を実行する
+     * 現在の検索条件をローカルストレージへ保存する。
      */
     function saveSearchState() {
         try {
@@ -294,7 +294,7 @@ export function createStorageController({ data, ui, constants, callbacks }) {
     }
 
     /**
-     * restoreSearchState を実行する
+     * 保存済み検索条件をUIとstateへ復元する。
      */
     function restoreSearchState() {
         try {

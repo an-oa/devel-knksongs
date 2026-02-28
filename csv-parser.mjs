@@ -1,7 +1,7 @@
 import { normalizeForSearch, parseDateKey } from "./search.mjs?v=3";
 
 /**
- * buildSongKey を実行する
+ * 現在仕様の曲キー（archiveId + archiveOrder）を生成する。
  * @param {*} input
  */
 function buildSongKey(input) {
@@ -14,7 +14,7 @@ function buildSongKey(input) {
 }
 
 /**
- * buildLegacySongKey を実行する
+ * 旧仕様互換の曲キー（archiveId + archiveOrder + url）を生成する。
  * @param {*} input
  */
 function buildLegacySongKey(input) {
@@ -28,7 +28,7 @@ function buildLegacySongKey(input) {
 }
 
 /**
- * parseArchiveOrder を実行する
+ * アーカイブ順序の値を整数として解析し、無効値は `null` を返す。
  * @param {*} raw
  */
 function parseArchiveOrder(raw) {
@@ -38,7 +38,7 @@ function parseArchiveOrder(raw) {
 }
 
 /**
- * parseCsvRFC4180 を実行する
+ * RFC4180ベースでCSV文字列を2次元配列へ解析する。
  * @param {*} t
  */
 function parseCsvRFC4180(t) {
@@ -83,7 +83,7 @@ function parseCsvRFC4180(t) {
 }
 
 /**
- * parseCsvToSongs を実行する
+ * CSVを検証・整形して、検索用正規化済みの曲データ配列へ変換する。
  * @param {*} csvText
  */
 export function parseCsvToSongs(csvText) {

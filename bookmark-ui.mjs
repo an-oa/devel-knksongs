@@ -1,5 +1,5 @@
 /**
- * createBookmarkUiController を実行する
+ * ブックマークUIのイベント処理・描画・選択状態管理をまとめたコントローラーを作成する。
  * @param {*} data
  * @param {*} ui
  * @param {*} callbacks
@@ -15,7 +15,7 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
     } = callbacks;
 
     /**
-     * normalizeActionResult を実行する
+     * 各アクションの戻り値を `{ ok, reason }` 形式に正規化する。
      * @param {*} result
      */
     function normalizeActionResult(result) {
@@ -29,7 +29,7 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
     }
 
     /**
-     * notifyIfLimitError を実行する
+     * 上限エラー時に理由別のメッセージを表示し、通知したかどうかを返す。
      * @param {*} result
      */
     function notifyIfLimitError(result) {
@@ -55,7 +55,7 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
     }
 
     /**
-     * getSortedBookmarkIds を実行する
+     * ブックマークIDを作成日時順で取得する。
      */
     function getSortedBookmarkIds() {
         return Object.keys(data.bookmarks).sort((a, b) => {
@@ -64,7 +64,7 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
     }
 
     /**
-     * setupBookmarkHandlers を実行する
+     * モーダルの開閉・作成・キーボード操作に関するイベントを登録する。
      */
     function setupBookmarkHandlers() {
         const modal = ui.el.bookmarkModal;
@@ -105,7 +105,7 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
     }
 
     /**
-     * renderBookmarks を実行する
+     * ブックマークリストを描画し、選択/削除の操作をバインドする。
      */
     function renderBookmarks() {
         const container = ui.el.bookmarkList;
@@ -151,7 +151,7 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
     }
 
     /**
-     * openBookmarkModal を実行する
+     * 指定した曲を追加するためのブックマーク選択モーダルを開く。
      * @param {*} songKey
      */
     function openBookmarkModal(songKey) {
@@ -185,7 +185,7 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
     }
 
     /**
-     * closeBookmarkModal を実行する
+     * ブックマークモーダルを閉じ、保留中の操作をクリアする。
      */
     function closeBookmarkModal() {
         ui.el.bookmarkModal.hidden = true;
@@ -193,7 +193,7 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
     }
 
     /**
-     * setActiveBookmark を実行する
+     * アクティブなブックマークを切り替えて検索を再実行する。
      * @param {*} bookmarkId
      */
     function setActiveBookmark(bookmarkId) {
@@ -204,7 +204,7 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
     }
 
     /**
-     * clearActiveBookmark を実行する
+     * アクティブなブックマークを解除し、必要に応じて検索を再実行する。
      * @param {*} options
      */
     function clearActiveBookmark(options) {
@@ -217,7 +217,7 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
     }
 
     /**
-     * removeSongFromActiveBookmark を実行する
+     * 現在アクティブなブックマークから指定曲を削除する。
      * @param {*} songKey
      */
     function removeSongFromActiveBookmark(songKey) {

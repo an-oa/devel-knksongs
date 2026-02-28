@@ -1,5 +1,5 @@
 /**
- * createRenderController を実行する
+ * 検索結果カードの生成・差分反映・表示更新を担うレンダーコントローラーを作成する。
  * @param {*} ui
  */
 export function createRenderController({ data, ui, isAllFormatsSelected }) {
@@ -20,7 +20,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
     let removeSongFromActiveBookmark = () => {};
 
     /**
-     * setDependencies を実行する
+     * 描画時に利用する外部依存関数を差し替える。
      * @param {*} next
      */
     function setDependencies(next) {
@@ -36,7 +36,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
     }
 
     /**
-     * createCardElements を実行する
+     * 結果カードを構成するDOM要素一式を生成する。
      */
     function createCardElements() {
         const card = document.createElement("div");
@@ -80,7 +80,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
     }
 
     /**
-     * updateCardFromRow を実行する
+     * 曲データをカード要素へ反映し、アクションボタンの挙動を設定する。
      * @param {*} entry
      * @param {*} row
      */
@@ -115,7 +115,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
     }
 
     /**
-     * updateTitleLink を実行する
+     * タイトル表示とリンク属性を更新する。
      * @param {*} titleEl
      * @param {*} row
      */
@@ -135,7 +135,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
     }
 
     /**
-     * updateFooterTags を実行する
+     * 形式・リレー・ハモリのタグ表示を更新する。
      * @param {*} tags
      * @param {*} row
      */
@@ -162,7 +162,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
     }
 
     /**
-     * createEmptyStateElement を実行する
+     * 空結果表示用のメッセージ要素を生成する。
      * @param {*} message
      */
     function createEmptyStateElement(message) {
@@ -176,7 +176,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
     }
 
     /**
-     * getEmptyStateDescriptor を実行する
+     * 現在状態に応じた空結果メッセージ種別を決定する。
      */
     function getEmptyStateDescriptor() {
         if (!ui.dataReady) {
@@ -189,14 +189,14 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
     }
 
     /**
-     * getVisibleResults を実行する
+     * 表示上限を考慮した可視結果一覧を返す。
      */
     function getVisibleResults() {
         return data.currentResults.slice(0, data.displayLimit);
     }
 
     /**
-     * renderEmptyResults を実行する
+     * 空結果UIを描画し、再生状態と「もっと見る」表示をリセットする。
      * @param {*} container
      * @param {*} loadMoreContainer
      */
@@ -208,7 +208,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
     }
 
     /**
-     * collectActiveCardRenderState を実行する
+     * 描画更新前のアクティブカード・再生状態を収集する。
      * @param {*} container
      * @param {*} nodes
      */
@@ -224,7 +224,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
     }
 
     /**
-     * stopActivePlaybackIfHidden を実行する
+     * アクティブ再生カードが次表示に含まれない場合は再生を停止する。
      * @param {*} activeState
      */
     function stopActivePlaybackIfHidden(activeState) {
@@ -234,7 +234,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
     }
 
     /**
-     * buildResultNodes を実行する
+     * 結果配列からカードノードを再利用しつつ構築する。
      * @param {*} results
      */
     function buildResultNodes(results) {
@@ -258,7 +258,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
     }
 
     /**
-     * getPinnedActiveCard を実行する
+     * 再生中カードを描画順維持対象として固定するか判定する。
      * @param {*} activeState
      */
     function getPinnedActiveCard(activeState) {
@@ -268,7 +268,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
     }
 
     /**
-     * reconcileNodesWithPinnedActive を実行する
+     * 再生中カードの位置を保ったまま、結果ノードとの差分を反映する。
      * @param {*} container
      * @param {*} nodes
      * @param {*} pinnedActiveCard
@@ -295,7 +295,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
     }
 
     /**
-     * reconcileNodesByOrder を実行する
+     * 結果ノード順にDOMを並べ替え、余分なノードを除去する。
      * @param {*} container
      * @param {*} nodes
      */
@@ -316,7 +316,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
     }
 
     /**
-     * reconcileResultNodes を実行する
+     * 再生状態を考慮した方法で結果ノードをDOMへ反映する。
      * @param {*} container
      * @param {*} nodes
      */
@@ -332,7 +332,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
     }
 
     /**
-     * observeVisibleThumbnails を実行する
+     * 表示中カードのサムネイルをIntersectionObserverへ登録する。
      * @param {*} entries
      */
     function observeVisibleThumbnails(entries) {
@@ -343,7 +343,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
     }
 
     /**
-     * updateLoadMoreVisibility を実行する
+     * 推薦モードと件数に応じて「もっと見る」表示を切り替える。
      * @param {*} recommendedMode
      */
     function updateLoadMoreVisibility(recommendedMode) {
@@ -356,7 +356,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
     }
 
     /**
-     * collectDisplayState を実行する
+     * 描画に必要なコンテナ・結果・モード情報をまとめる。
      */
     function collectDisplayState() {
         return {
@@ -367,7 +367,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
     }
 
     /**
-     * prepareDisplayObservation を実行する
+     * 描画前に監視状態を初期化し、必要なら監視を再設定する。
      */
     function prepareDisplayObservation() {
         if (ui.scrollObserver) ui.scrollObserver.disconnect();
@@ -375,7 +375,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
     }
 
     /**
-     * renderDisplayState を実行する
+     * 表示状態に応じて空結果または結果カードを描画する。
      * @param {*} displayState
      */
     function renderDisplayState(displayState) {
@@ -390,7 +390,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
     }
 
     /**
-     * monitorDisplayState を実行する
+     * 描画後のサムネイル監視と「もっと見る」状態を更新する。
      * @param {*} rendered
      * @param {*} displayState
      */
@@ -400,7 +400,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
     }
 
     /**
-     * updateDisplay を実行する
+     * 収集・描画・監視更新までの表示更新パイプラインを行う。
      */
     function updateDisplay() {
         const displayState = collectDisplayState();

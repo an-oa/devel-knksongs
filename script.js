@@ -160,7 +160,7 @@ function restoreSearchState() { storageController.restoreSearchState(); }
 // ===== Lifecycle (public) =====
 
 /**
- * initUI を実行する
+ * DOM参照の初期化とUI各機能のセットアップを行う。
  */
 async function initUI() {
     ui.el = {
@@ -203,7 +203,7 @@ async function initUI() {
 }
 
 /**
- * boot を実行する
+ * アプリ起動時に初期化処理を開始する。
  */
 function boot() {
     initUI().catch((err) => {
@@ -216,14 +216,14 @@ document.addEventListener('DOMContentLoaded', boot);
 // ===== Lifecycle (private) =====
 
 /**
- * handleFocusSync を実行する
+ * フォーカス復帰時のUI同期を行う。
  */
 function handleFocusSync() {
     scheduleSyncUiState();
 }
 
 /**
- * handleVisibilitySync を実行する
+ * ページ再表示時にUI同期を行う。
  */
 function handleVisibilitySync() {
     if (document.visibilityState !== "visible") return;
@@ -231,7 +231,7 @@ function handleVisibilitySync() {
 }
 
 /**
- * handlePageShowSync を実行する
+ * pageshow時に同期と遅延ビジュアル同期を行う。
  */
 function handlePageShowSync() {
     scheduleSyncUiState();
@@ -239,7 +239,7 @@ function handlePageShowSync() {
 }
 
 /**
- * setupSyncEvents を実行する
+ * フォーカス・表示状態・pageshowの同期イベントを登録する。
  */
 function setupSyncEvents() {
     window.addEventListener('focus', handleFocusSync);
@@ -250,7 +250,7 @@ function setupSyncEvents() {
 // ===== UI Controls (public) =====
 
 /**
- * setupUIHandlers を実行する
+ * 検索UI・サイドバー・日付入力・各種ボタンのイベントを設定する。
  */
 function setupUIHandlers() {
     const sidebar = document.getElementById('sidebar');
@@ -356,7 +356,7 @@ function setupUIHandlers() {
 }
 
 /**
- * resetDateSelectGroup を実行する
+ * 指定側の日付セレクトをクリアして候補を同期する。
  * @param {*} kind
  */
 function resetDateSelectGroup(kind) {
@@ -373,14 +373,14 @@ function resetDateSelectGroup(kind) {
 // ===== Bookmark =====
 
 /**
- * setupBookmarkHandlers を実行する
+ * ブックマークUIハンドラーの初期化を委譲する。
  */
 function setupBookmarkHandlers() {
     bookmarkUiController.setupBookmarkHandlers();
 }
 
 /**
- * openBookmarkModal を実行する
+ * 曲追加用のブックマークモーダル表示を委譲する。
  * @param {*} songKey
  */
 function openBookmarkModal(songKey) {
@@ -388,7 +388,7 @@ function openBookmarkModal(songKey) {
 }
 
 /**
- * removeSongFromActiveBookmark を実行する
+ * アクティブブックマークからの曲削除を委譲する。
  * @param {*} songKey
  */
 function removeSongFromActiveBookmark(songKey) {
@@ -396,7 +396,7 @@ function removeSongFromActiveBookmark(songKey) {
 }
 
 /**
- * clearActiveBookmark を実行する
+ * アクティブブックマーク解除処理を委譲する。
  * @param {*} options
  */
 function clearActiveBookmark(options) {
@@ -406,7 +406,7 @@ function clearActiveBookmark(options) {
 // ===== Sidebar Accessibility =====
 
 /**
- * moveDateFocusIfNeeded を実行する
+ * 日付入力時に次のセレクトへフォーカス移動する。
  * @param {*} target
  * @param {*} fromYear
  * @param {*} fromMonth
@@ -438,7 +438,7 @@ function moveDateFocusIfNeeded(target, fromYear, fromMonth, toYear, toMonth) {
 }
 
 /**
- * blurSidebarActiveElement を実行する
+ * サイドバー内の現在フォーカス要素を外す。
  * @param {*} sidebar
  */
 function blurSidebarActiveElement(sidebar) {
@@ -451,7 +451,7 @@ function blurSidebarActiveElement(sidebar) {
 }
 
 /**
- * getFocusableInSidebar を実行する
+ * サイドバー内でフォーカス可能な要素一覧を取得する。
  * @param {*} sidebar
  */
 function getFocusableInSidebar(sidebar) {
@@ -468,7 +468,7 @@ function getFocusableInSidebar(sidebar) {
 }
 
 /**
- * focusSidebarFirst を実行する
+ * サイドバー内の先頭フォーカス可能要素へフォーカスする。
  */
 function focusSidebarFirst() {
     const sidebar = document.getElementById('sidebar');
@@ -482,7 +482,7 @@ function focusSidebarFirst() {
 }
 
 /**
- * trapSidebarFocus を実行する
+ * 開いているサイドバー内でTabフォーカスを循環させる。
  * @param {*} event
  * @param {*} sidebar
  */
@@ -504,7 +504,7 @@ function trapSidebarFocus(event, sidebar) {
 }
 
 /**
- * clearSearch を実行する
+ * 検索条件とアクティブブックマークをリセットして保存する。
  */
 function clearSearch() {
     clearActiveBookmark({ skipSearch: true });
@@ -513,7 +513,7 @@ function clearSearch() {
 }
 
 /**
- * setupTheme を実行する
+ * テーマ状態を初期化し、トグル変更を保存する。
  */
 function setupTheme() {
     const themeToggle = ui.el.themeToggle;
@@ -527,7 +527,7 @@ function setupTheme() {
 }
 
 /**
- * scrollResultsPaneToTop を実行する
+ * 結果リストのスクロール位置を先頭へ戻す。
  */
 function scrollResultsPaneToTop() {
     const resultList = ui.el.resultList;
@@ -544,7 +544,7 @@ function scrollResultsPaneToTop() {
 }
 
 /**
- * findScrollableAncestor を実行する
+ * 指定要素を含む最も近いスクロール可能祖先を探す。
  * @param {*} element
  */
 function findScrollableAncestor(element) {
@@ -562,7 +562,7 @@ function findScrollableAncestor(element) {
 // ===== UI Controls (private) =====
 
 /**
- * markFilterTouched を実行する
+ * フィルタ操作済みフラグを立てて検索・保存を行う。
  * @param {*} options
  */
 function markFilterTouched(options) {
@@ -572,7 +572,7 @@ function markFilterTouched(options) {
 }
 
 /**
- * markQueryTouched を実行する
+ * 検索語操作済みフラグを立てて検索・保存を行う。
  */
 function markQueryTouched() {
     ui.userTouchedQuery = true;
@@ -581,7 +581,7 @@ function markQueryTouched() {
 }
 
 /**
- * clearSearchDebounce を実行する
+ * 保留中の検索デバウンスタイマーを解除する。
  */
 function clearSearchDebounce() {
     if (ui.searchDebounceId) {
@@ -591,7 +591,7 @@ function clearSearchDebounce() {
 }
 
 /**
- * resetSearchQuery を実行する
+ * 検索語入力を初期化する。
  */
 function resetSearchQuery() {
     if (ui.el.searchBox) ui.el.searchBox.value = "";
@@ -599,7 +599,7 @@ function resetSearchQuery() {
 }
 
 /**
- * resetSearchFilters を実行する
+ * フィルタ条件を既定状態へ戻す。
  */
 function resetSearchFilters() {
     const relayOnly = ui.el.relayOnly;
@@ -616,7 +616,7 @@ function resetSearchFilters() {
 }
 
 /**
- * resetSearchConditions を実行する
+ * 検索語とフィルタをまとめて初期化し必要なら再検索する。
  * @param {*} shouldSearch
  */
 function resetSearchConditions(shouldSearch) {
@@ -629,7 +629,7 @@ function resetSearchConditions(shouldSearch) {
 // ===== UI Sync (public) =====
 
 /**
- * syncUiState を実行する
+ * オプションに応じてUIの見た目と検索状態を同期する。
  * @param {*} options
  */
 function syncUiState(options) {
@@ -641,7 +641,7 @@ function syncUiState(options) {
 }
 
 /**
- * scheduleSyncUiState を実行する
+ * UI同期を実行し、必要に応じて次フレームでも再同期する。
  * @param {*} options
  */
 function scheduleSyncUiState(options) {
@@ -651,7 +651,7 @@ function scheduleSyncUiState(options) {
 }
 
 /**
- * scheduleDelayedVisualSync を実行する
+ * 遅延付きで見た目のみのUI同期を予約する。
  * @param {*} delayMs
  */
 function scheduleDelayedVisualSync(delayMs) {
@@ -662,7 +662,7 @@ function scheduleDelayedVisualSync(delayMs) {
 // ===== UI Sync (private) =====
 
 /**
- * syncVisualUI を実行する
+ * テーマとサムネイル表示のUI状態を同期する。
  */
 function syncVisualUI() {
     syncThemeUI();
@@ -670,21 +670,21 @@ function syncVisualUI() {
 }
 
 /**
- * syncThemeUI を実行する
+ * テーマ表示を保存状態に同期する。
  */
 function syncThemeUI() {
     applyThemeFromStorage();
 }
 
 /**
- * syncThumbnailUI を実行する
+ * サムネイル表示設定を保存状態に同期する。
  */
 function syncThumbnailUI() {
     applyThumbnailFromStorage();
 }
 
 /**
- * applyThemeFromStorage を実行する
+ * 保存値またはシステム設定からテーマを適用する。
  */
 function applyThemeFromStorage() {
     const themeToggle = ui.el.themeToggle;
@@ -698,7 +698,7 @@ function applyThemeFromStorage() {
 // ===== Search Sync / Filters (private) =====
 
 /**
- * needsFilterReset を実行する
+ * フィルタが既定状態から外れているか判定する。
  */
 function needsFilterReset() {
     const relayOnly = ui.el.relayOnly;
@@ -710,7 +710,7 @@ function needsFilterReset() {
 }
 
 /**
- * syncSearchQueryIfNeeded を実行する
+ * 未操作時に検索語の不整合があればリセットする。
  */
 function syncSearchQueryIfNeeded() {
     if (ui.userTouchedQuery) return false;
@@ -721,7 +721,7 @@ function syncSearchQueryIfNeeded() {
 }
 
 /**
- * syncSearchFiltersIfNeeded を実行する
+ * 未操作時にフィルタの不整合があればリセットする。
  */
 function syncSearchFiltersIfNeeded() {
     syncFormatCheckboxesFromState();
@@ -732,7 +732,7 @@ function syncSearchFiltersIfNeeded() {
 }
 
 /**
- * syncSearchUI を実行する
+ * 検索語/フィルタ同期の結果に応じて再検索する。
  */
 function syncSearchUI() {
     const shouldSearch = syncSearchQueryIfNeeded() || syncSearchFiltersIfNeeded();
@@ -742,7 +742,7 @@ function syncSearchUI() {
 // ===== Data Loading / Parsing (public) =====
 
 /**
- * loadInitialData を実行する
+ * CSVを取得（失敗時はキャッシュ利用）して初期データを適用する。
  */
 async function loadInitialData() {
     const resCount = ui.el.resultCount;
@@ -766,7 +766,7 @@ async function loadInitialData() {
 // ===== Data Loading / Parsing (private) =====
 
 /**
- * initFilterMenu を実行する
+ * フォーマットフィルタのチェックボックスUIを構築する。
  */
 function initFilterMenu() {
     const container = ui.el.formatsList;
@@ -792,7 +792,7 @@ function initFilterMenu() {
 }
 
 /**
- * applyLoadedCsv を実行する
+ * 読み込んだCSVを解析して状態更新と初回検索を行う。
  * @param {*} csvText
  * @param {*} statusLabel
  */

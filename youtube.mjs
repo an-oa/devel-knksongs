@@ -1,5 +1,5 @@
 /**
- * extractYoutubeInfo を実行する
+ * YouTube URLから `videoId` と開始秒数を抽出する。
  * @param {*} url
  */
 export function extractYoutubeInfo(url) {
@@ -16,7 +16,7 @@ export function extractYoutubeInfo(url) {
 }
 
 /**
- * createYoutubeController を実行する
+ * サムネイル表示と埋め込み再生の制御を行うコントローラーを作成する。
  * @param {*} youtube
  */
 export function createYoutubeController({ ui, youtube, constants }) {
@@ -29,7 +29,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
     let updateDisplay = () => {};
 
     /**
-     * setDisplayHook を実行する
+     * サムネイル設定変更時に呼ぶ表示更新フックを登録する。
      * @param {*} fn
      */
     function setDisplayHook(fn) {
@@ -39,7 +39,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
     }
 
     /**
-     * isIOSWebKit を実行する
+     * 実行環境がiOS系WebKitかどうかを判定する。
      */
     function isIOSWebKit() {
         const hasTouch = navigator.maxTouchPoints > 0 || "ontouchstart" in window;
@@ -51,13 +51,13 @@ export function createYoutubeController({ ui, youtube, constants }) {
 
     const youtubeApi = {
         /**
-         * isReady を実行する
+         * YouTube Iframe APIが利用可能かを判定する。
          */
         isReady() {
             return Boolean(window.YT && window.YT.Player);
         },
         /**
-         * waitForReady を実行する
+         * Iframe APIが利用可能になるまでポーリングで待機する。
          * @param {*} resolve
          */
         waitForReady(resolve) {
@@ -68,7 +68,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
             setTimeout(() => this.waitForReady(resolve), YT_IFRAME_READY_POLL_MS);
         },
         /**
-         * ensureReady を実行する
+         * Iframe APIスクリプトの読み込みと初期化完了を保証する。
          */
         ensureReady() {
             if (this.isReady()) return Promise.resolve();
@@ -94,7 +94,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
             return youtube.apiPromise;
         },
         /**
-         * buildEmbedUrl を実行する
+         * 埋め込み再生用の `youtube-nocookie` URLを生成する。
          * @param {*} yt
          */
         buildEmbedUrl(yt) {
@@ -104,7 +104,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
             return `https://www.youtube-nocookie.com/embed/${yt.videoId}?autoplay=1&playsinline=1&start=${yt.startSeconds}&enablejsapi=1&rel=0&cc_load_policy=0&iv_load_policy=3${origin}`;
         },
         /**
-         * handleStateChange を実行する
+         * プレイヤー状態変化に応じて再生状態表示を更新する。
          * @param {*} thumbDiv
          * @param {*} event
          */
@@ -119,7 +119,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
             }
         },
         /**
-         * attachPlayer を実行する
+         * 生成済みiframeへYouTubeプレイヤーを紐付ける。
          * @param {*} thumbDiv
          * @param {*} iframe
          * @param {*} yt
@@ -140,7 +140,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
             });
         },
         /**
-         * destroyPlayer を実行する
+         * 指定サムネイルに紐づくプレイヤーを破棄する。
          * @param {*} thumbDiv
          */
         destroyPlayer(thumbDiv) {
@@ -154,7 +154,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
     };
 
     /**
-     * ensureYoutubeApiForThumbnails を実行する
+     * サムネイル表示時にYouTube APIの事前読み込みを行う。
      */
     function ensureYoutubeApiForThumbnails() {
         if (!ui.showThumbnails) return;
@@ -162,7 +162,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
     }
 
     /**
-     * setupThumbnailToggle を実行する
+     * サムネイル表示トグルを初期化し、変更イベントを設定する。
      */
     function setupThumbnailToggle() {
         const thumbToggle = ui.el.thumbToggle;
@@ -187,7 +187,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
     }
 
     /**
-     * applyThumbnailFromStorage を実行する
+     * 保存済みサムネイル表示設定をUIへ反映する。
      */
     function applyThumbnailFromStorage() {
         const thumbToggle = ui.el.thumbToggle;
@@ -205,7 +205,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
     }
 
     /**
-     * resetThumbnailContainer を実行する
+     * サムネイルコンテナを再生状態から初期表示へリセットする。
      * @param {*} thumbDiv
      * @param {*} videoId
      * @param {*} playbackKey
@@ -225,7 +225,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
     }
 
     /**
-     * createThumbnailImage を実行する
+     * 遅延読み込み用のサムネイル画像要素を生成する。
      * @param {*} videoId
      */
     function createThumbnailImage(videoId) {
@@ -235,7 +235,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
     }
 
     /**
-     * applyThumbnailImage を実行する
+     * サムネイル画像をコンテナへ適用する。
      * @param {*} thumbDiv
      * @param {*} videoId
      * @param {*} options
@@ -247,7 +247,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
     }
 
     /**
-     * shouldLoadThumbnailNow を実行する
+     * サムネイルを即時読み込みすべき可視領域内か判定する。
      * @param {*} thumbDiv
      */
     function shouldLoadThumbnailNow(thumbDiv) {
@@ -257,7 +257,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
     }
 
     /**
-     * setPlaybackState を実行する
+     * サムネイル要素の再生状態クラスを更新する。
      * @param {*} thumbDiv
      * @param {*} state
      */
@@ -269,7 +269,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
     }
 
     /**
-     * buildPlaybackKey を実行する
+     * 再生対象の同一性判定に使うキーを生成する。
      * @param {*} yt
      */
     function buildPlaybackKey(yt) {
@@ -278,7 +278,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
     }
 
     /**
-     * isSamePlaybackTarget を実行する
+     * 現在表示中の再生対象と次の対象が同一か判定する。
      * @param {*} thumbDiv
      * @param {*} nextPlaybackKey
      */
@@ -289,7 +289,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
     }
 
     /**
-     * setActiveThumb を実行する
+     * アクティブなサムネイルを切り替える。
      * @param {*} thumbDiv
      */
     function setActiveThumb(thumbDiv) {
@@ -300,7 +300,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
     }
 
     /**
-     * clearActiveThumb を実行する
+     * 指定サムネイルがアクティブなら参照を解除する。
      * @param {*} thumbDiv
      */
     function clearActiveThumb(thumbDiv) {
@@ -308,7 +308,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
     }
 
     /**
-     * handleScrollObserver を実行する
+     * スクロール監視結果に応じて画像読み込みや再生停止を処理する。
      * @param {*} entries
      */
     function handleScrollObserver(entries) {
@@ -340,7 +340,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
     }
 
     /**
-     * setupScrollObserver を実行する
+     * サムネイル可視判定用のIntersectionObserverを再設定する。
      */
     function setupScrollObserver() {
         const header = document.querySelector(".header");
@@ -357,7 +357,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
     }
 
     /**
-     * restoreThumbnail を実行する
+     * 埋め込み再生を解除して通常サムネイル表示へ戻す。
      * @param {*} thumbDiv
      * @param {*} videoId
      */
@@ -377,7 +377,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
     }
 
     /**
-     * restoreActivePlayback を実行する
+     * 現在アクティブな再生サムネイルを通常表示へ復元する。
      */
     function restoreActivePlayback() {
         const activeThumb = ui.activeThumb;
@@ -390,7 +390,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
     }
 
     /**
-     * startEmbeddedPlayback を実行する
+     * サムネイルを埋め込みプレイヤーへ切り替えて再生開始する。
      * @param {*} thumbDiv
      * @param {*} yt
      */
@@ -418,7 +418,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
     }
 
     /**
-     * updateThumbnail を実行する
+     * 曲情報に合わせてサムネイル表示内容を更新する。
      * @param {*} thumbDiv
      * @param {*} yt
      */
