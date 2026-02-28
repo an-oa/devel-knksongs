@@ -7,6 +7,8 @@ import {
     CSV_CACHE_KEY,
     SEARCH_STATE_KEY,
     BOOKMARK_STORAGE_KEY,
+    MAX_BOOKMARK_COUNT,
+    MAX_SONGS_PER_BOOKMARK,
     UI_SYNC_PASSES,
     SEARCH_DEBOUNCE_MS,
     YT_IFRAME_API_SRC,
@@ -84,7 +86,9 @@ const storageController = createStorageController({
     constants: {
         DEFAULT_FORMATS,
         SEARCH_STATE_KEY,
-        BOOKMARK_STORAGE_KEY
+        BOOKMARK_STORAGE_KEY,
+        MAX_BOOKMARK_COUNT,
+        MAX_SONGS_PER_BOOKMARK
     },
     callbacks: {
         getDateSelectValue: (kind) => searchController.getDateSelectValue(kind),

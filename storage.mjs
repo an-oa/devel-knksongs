@@ -4,7 +4,13 @@
  * @param {*} constants
  */
 export function createStorageController({ data, ui, constants, callbacks }) {
-    const { DEFAULT_FORMATS, SEARCH_STATE_KEY, BOOKMARK_STORAGE_KEY } = constants;
+    const {
+        DEFAULT_FORMATS,
+        SEARCH_STATE_KEY,
+        BOOKMARK_STORAGE_KEY,
+        MAX_BOOKMARK_COUNT = Number.POSITIVE_INFINITY,
+        MAX_SONGS_PER_BOOKMARK = Number.POSITIVE_INFINITY
+    } = constants;
     const {
         getDateSelectValue,
         applyPendingDateValues,
@@ -94,6 +100,23 @@ export function createStorageController({ data, ui, constants, callbacks }) {
         const parsedOrder = Number.parseInt(rawOrder, 10);
         const orderPart = Number.isFinite(parsedOrder) ? String(parsedOrder) : "";
         return [archiveId, orderPart].join("::");
+    }
+
+    /**
+     * buildActionOk を実行する
+     * @param {*} extra
+     */
+    function buildActionOk(extra) {
+        return { ok: true, ...(extra || {}) };
+    }
+
+    /**
+     * buildActionFail を実行する
+     * @param {*} reason
+     * @param {*} extra
+     */
+    function buildActionFail(reason, extra) {
+        return { ok: false, reason, ...(extra || {}) };
     }
 
     /**
@@ -195,14 +218,18 @@ export function createStorageController({ data, ui, constants, callbacks }) {
      */
     function addSongToBookmark(bookmarkId, songKey) {
         const bookmark = data.bookmarks[bookmarkId];
-        if (!bookmark || bookmark.songs.includes(songKey)) return false;
+        if (!bookmark) return buildActionFail("bookmark_not_found");
+        if (bookmark.songs.includes(songKey)) return buildActionFail("duplicate_song");
+        if (bookmark.songs.length >= MAX_SONGS_PER_BOOKMARK) {
+            return buildActionFail("max_songs_per_bookmark", { limit: MAX_SONGS_PER_BOOKMARK });
+        }
         bookmark.songs.push(songKey);
         saveBookmarks();
         renderBookmarks();
         if (data.activeBookmark === bookmarkId) {
             scheduleSearch({ immediate: true });
         }
-        return true;
+        return buildActionOk();
     }
 
     /**
@@ -211,6 +238,9 @@ export function createStorageController({ data, ui, constants, callbacks }) {
      * @param {*} songKey
      */
     function createBookmarkAndAdd(bookmarkName, songKey) {
+        if (Object.keys(data.bookmarks).length >= MAX_BOOKMARK_COUNT) {
+            return buildActionFail("max_bookmark_count", { limit: MAX_BOOKMARK_COUNT });
+        }
         const now = Date.now();
         const newId = `p_${now}`;
         data.bookmarks[newId] = {
@@ -220,7 +250,7 @@ export function createStorageController({ data, ui, constants, callbacks }) {
         };
         saveBookmarks();
         renderBookmarks();
-        return newId;
+        return buildActionOk({ id: newId });
     }
 
     /**

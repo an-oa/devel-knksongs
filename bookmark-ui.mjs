@@ -15,6 +15,46 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
     } = callbacks;
 
     /**
+     * normalizeActionResult を実行する
+     * @param {*} result
+     */
+    function normalizeActionResult(result) {
+        if (result && typeof result === "object" && typeof result.ok === "boolean") {
+            return result;
+        }
+        if (typeof result === "boolean") {
+            return { ok: result, reason: result ? "" : "unknown" };
+        }
+        return { ok: false, reason: "unknown" };
+    }
+
+    /**
+     * notifyIfLimitError を実行する
+     * @param {*} result
+     */
+    function notifyIfLimitError(result) {
+        if (!result || result.ok) return false;
+        const limit = Number.isFinite(result.limit) ? result.limit : null;
+        if (result.reason === "max_bookmark_count") {
+            if (limit === null) {
+                alert("ブックマークの登録上限に達しています。不要なブックマークを削除してください。");
+            } else {
+                alert(`ブックマークは最大${limit}件までです。不要なブックマークを削除してください。`);
+            }
+            return true;
+        }
+        if (result.reason === "max_songs_per_bookmark") {
+            if (limit === null) {
+                alert("1つのブックマークに登録できる曲数の上限に達しています。");
+            } else {
+                alert(`1つのブックマークに登録できる曲は最大${limit}曲です。`);
+            }
+            return true;
+        }
+        return false;
+    }
+
+    /**
      * getSortedBookmarkIds を実行する
      */
     function getSortedBookmarkIds() {
@@ -36,8 +76,16 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
         ui.el.bookmarkModalCreateBtn.addEventListener("click", () => {
             const newName = ui.el.bookmarkModalNewName.value.trim();
             if (newName && ui.pendingBookmarkAction) {
-                onCreateBookmarkAndAdd(newName, ui.pendingBookmarkAction.songKey);
-                closeBookmarkModal();
+                const result = normalizeActionResult(
+                    onCreateBookmarkAndAdd(newName, ui.pendingBookmarkAction.songKey)
+                );
+                if (result.ok) {
+                    closeBookmarkModal();
+                    return;
+                }
+                if (!notifyIfLimitError(result)) {
+                    closeBookmarkModal();
+                }
             }
         });
 
@@ -120,8 +168,14 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
             item.className = "bookmark-modal-item";
             item.textContent = p.name;
             item.addEventListener("click", () => {
-                onAddSongToBookmark(id, songKey);
-                closeBookmarkModal();
+                const result = normalizeActionResult(onAddSongToBookmark(id, songKey));
+                if (result.ok) {
+                    closeBookmarkModal();
+                    return;
+                }
+                if (!notifyIfLimitError(result)) {
+                    closeBookmarkModal();
+                }
             });
             modalList.appendChild(item);
         });
