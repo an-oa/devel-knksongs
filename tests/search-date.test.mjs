@@ -4,8 +4,11 @@ import {
     normalizeForSearch,
     parseDateKey,
     isWithinDateRange,
-    filterSongsByCriteria
+    filterSongsByCriteria,
+    createSearchController
 } from "../search.mjs";
+
+let autoSongId = 0;
 
 function makeRow(input) {
     const title = input.title ?? "";
@@ -13,6 +16,8 @@ function makeRow(input) {
     const titleYomi = input.titleYomi ?? "";
     const artistYomi = input.artistYomi ?? "";
     return {
+        songKey: input.songKey ?? `song-${++autoSongId}`,
+        sourceIndex: input.sourceIndex ?? 0,
         dateKey: input.dateKey ?? null,
         format: input.format ?? "配信",
         isRelay: !!input.isRelay,
@@ -75,4 +80,54 @@ test("filterSongsByCriteria: AND keywords and harmony flag", () => {
 
     const hit = filterSongsByCriteria(rows, searchState, selectedFormats);
     assert.equal(hit.length, 1);
+});
+
+test("createSearchController: active bookmark also applies search criteria", () => {
+    const rows = [
+        makeRow({ songKey: "s1", sourceIndex: 1, title: "青い月", artist: "A", format: "配信" }),
+        makeRow({ songKey: "s2", sourceIndex: 2, title: "赤い星", artist: "B", format: "歌みた" }),
+        makeRow({ songKey: "s3", sourceIndex: 3, title: "赤い空", artist: "C", format: "配信" })
+    ];
+    const data = {
+        allSongsRaw: rows,
+        bookmarks: {
+            bm1: {
+                name: "検証",
+                songs: ["s1", "s2"]
+            }
+        },
+        activeBookmark: "bm1",
+        currentResults: [],
+        displayLimit: 0
+    };
+    const ui = {
+        el: {
+            searchBox: { value: "赤い" },
+            relayOnly: { checked: false },
+            harmonyOnly: { checked: false },
+            dateFromYear: null,
+            dateFromMonth: null,
+            dateFromDay: null,
+            dateToYear: null,
+            dateToMonth: null,
+            dateToDay: null,
+            resultCount: { innerText: "" }
+        },
+        selectedFormats: new Set(["配信"]),
+        searchDebounceId: 0
+    };
+    const constants = {
+        RANDOM_DISPLAY_COUNT: 10,
+        MIN_PERFORMANCE_FOR_RANDOM: 1,
+        INCREMENT_COUNT: 30,
+        SEARCH_DEBOUNCE_MS: 0,
+        DEFAULT_FORMATS: ["配信", "歌みた", "ショート"]
+    };
+
+    const controller = createSearchController({ data, ui, constants });
+    controller.search();
+
+    assert.equal(data.currentResults.length, 0);
+    assert.equal(data.displayLimit, 0);
+    assert.equal(ui.el.resultCount.innerText, "ブックマーク: 検証 (0 件)");
 });

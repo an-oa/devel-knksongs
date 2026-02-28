@@ -1,4 +1,4 @@
-import { normalizeForSearch, parseDateKey } from "./search.mjs";
+import { normalizeForSearch, parseDateKey } from "./search.mjs?v=3";
 
 /**
  * buildSongKey を実行する

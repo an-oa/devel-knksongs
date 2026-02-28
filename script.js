@@ -16,13 +16,13 @@ import {
     data,
     ui,
     youtube
-} from "./state.mjs";
-import { createSearchController } from "./search.mjs";
-import { createRenderController } from "./render.mjs";
-import { createYoutubeController, extractYoutubeInfo } from "./youtube.mjs";
-import { createStorageController } from "./storage.mjs";
-import { createBookmarkUiController } from "./bookmark-ui.mjs";
-import { parseCsvToSongs } from "./csv-parser.mjs";
+} from "./state.mjs?v=3";
+import { createSearchController } from "./search.mjs?v=3";
+import { createRenderController } from "./render.mjs?v=3";
+import { createYoutubeController, extractYoutubeInfo } from "./youtube.mjs?v=3";
+import { createStorageController } from "./storage.mjs?v=3";
+import { createBookmarkUiController } from "./bookmark-ui.mjs?v=3";
+import { parseCsvToSongs } from "./csv-parser.mjs?v=3";
 
 /**
  * @typedef {Object} SongRow
@@ -100,8 +100,6 @@ bookmarkUiController = createBookmarkUiController({
     ui,
     callbacks: {
         clearSearchDebounce,
-        resetSearchQuery,
-        resetSearchFilters,
         scheduleSearch,
         onAddSongToBookmark: (bookmarkId, songKey) => storageController.addSongToBookmark(bookmarkId, songKey),
         onCreateBookmarkAndAdd: (bookmarkName, songKey) => storageController.createBookmarkAndAdd(bookmarkName, songKey),
@@ -810,4 +808,3 @@ function applyLoadedCsv(csvText, statusLabel) {
     }
     scheduleSearch({ immediate: true });
 }
-

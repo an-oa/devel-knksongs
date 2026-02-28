@@ -244,11 +244,12 @@ export function createSearchController({ data, ui, constants }) {
         if (data.activeBookmark) {
             const bookmark = data.bookmarks[data.activeBookmark];
             if (bookmark) {
-                const results = resolveBookmarkRows(bookmark);
+                const bookmarkRows = resolveBookmarkRows(bookmark);
+                const results = filterSongsByCriteria(bookmarkRows, searchState, ui.selectedFormats);
                 return {
                     results,
                     displayLimit: results.length,
-                    label: `ブックマーク: ${bookmark.name}`
+                    label: `ブックマーク: ${bookmark.name} (${results.length} 件)`
                 };
             }
         }
@@ -815,4 +816,3 @@ export function createSearchController({ data, ui, constants }) {
         clampDateInputsIfNeeded
     };
 }
-

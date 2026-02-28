@@ -7,8 +7,6 @@
 export function createBookmarkUiController({ data, ui, callbacks }) {
     const {
         clearSearchDebounce,
-        resetSearchQuery,
-        resetSearchFilters,
         scheduleSearch,
         onAddSongToBookmark,
         onCreateBookmarkAndAdd,
@@ -146,8 +144,6 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
      */
     function setActiveBookmark(bookmarkId) {
         clearSearchDebounce();
-        resetSearchQuery();
-        resetSearchFilters();
         data.activeBookmark = bookmarkId;
         renderBookmarks();
         scheduleSearch({ immediate: true });
@@ -185,4 +181,3 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
         removeSongFromActiveBookmark
     };
 }
-
