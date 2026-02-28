@@ -113,6 +113,7 @@ renderController.setDependencies({
     isRecommendedMode: (state) => searchController.isRecommendedMode(state),
     updateThumbnail: (thumbDiv, yt) => youtubeController.updateThumbnail(thumbDiv, yt),
     extractYoutubeInfo,
+    restoreActivePlayback: () => youtubeController.restoreActivePlayback(),
     openBookmarkModal: (songKey) => openBookmarkModal(songKey),
     setupScrollObserver: () => youtubeController.setupScrollObserver(),
     removeSongFromActiveBookmark: (songKey) => removeSongFromActiveBookmark(songKey)

@@ -377,6 +377,15 @@ export function createYoutubeController({ ui, youtube, constants }) {
     }
 
     /**
+     * restoreActivePlayback を実行する
+     */
+    function restoreActivePlayback() {
+        const activeThumb = ui.activeThumb;
+        if (!activeThumb) return;
+        restoreThumbnail(activeThumb, activeThumb.dataset.videoId || "");
+    }
+
+    /**
      * startEmbeddedPlayback を実行する
      * @param {*} thumbDiv
      * @param {*} yt
@@ -437,6 +446,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
         setupThumbnailToggle,
         applyThumbnailFromStorage,
         setupScrollObserver,
-        updateThumbnail
+        updateThumbnail,
+        restoreActivePlayback
     };
 }

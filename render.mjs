@@ -14,6 +14,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
     let isRecommendedMode = () => false;
     let updateThumbnail = () => {};
     let extractYoutubeInfo = () => ({ videoId: "", startSeconds: 0 });
+    let restoreActivePlayback = () => {};
     let openBookmarkModal = () => {};
     let setupScrollObserver = () => {};
     let removeSongFromActiveBookmark = () => {};
@@ -28,6 +29,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
         if (typeof next.isRecommendedMode === "function") isRecommendedMode = next.isRecommendedMode;
         if (typeof next.updateThumbnail === "function") updateThumbnail = next.updateThumbnail;
         if (typeof next.extractYoutubeInfo === "function") extractYoutubeInfo = next.extractYoutubeInfo;
+        if (typeof next.restoreActivePlayback === "function") restoreActivePlayback = next.restoreActivePlayback;
         if (typeof next.openBookmarkModal === "function") openBookmarkModal = next.openBookmarkModal;
         if (typeof next.setupScrollObserver === "function") setupScrollObserver = next.setupScrollObserver;
         if (typeof next.removeSongFromActiveBookmark === "function") removeSongFromActiveBookmark = next.removeSongFromActiveBookmark;
@@ -199,9 +201,28 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
      * @param {*} loadMoreContainer
      */
     function renderEmptyResults(container, loadMoreContainer) {
+        restoreActivePlayback();
         const emptyState = getEmptyStateDescriptor(getSearchState());
         container.replaceChildren(createEmptyStateElement(emptyState.message));
         loadMoreContainer.classList.add("hidden");
+    }
+
+    /**
+     * stopActivePlaybackIfHidden を実行する
+     * @param {*} container
+     * @param {*} nodes
+     */
+    function stopActivePlaybackIfHidden(container, nodes) {
+        const activeThumb = ui.activeThumb;
+        if (!activeThumb) return;
+        const activeCard = activeThumb.closest(".song-card");
+        const shouldKeepPlaying =
+            activeCard instanceof HTMLElement &&
+            container.contains(activeCard) &&
+            nodes.includes(activeCard);
+        if (!shouldKeepPlaying) {
+            restoreActivePlayback();
+        }
     }
 
     /**
@@ -297,6 +318,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
      * @param {*} nodes
      */
     function reconcileResultNodes(container, nodes) {
+        stopActivePlaybackIfHidden(container, nodes);
         const pinnedActiveCard = getPinnedActiveCard(container, nodes);
         if (pinnedActiveCard) {
             reconcileNodesWithPinnedActive(container, nodes, pinnedActiveCard);
