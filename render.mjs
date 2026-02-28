@@ -208,21 +208,29 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
     }
 
     /**
-     * stopActivePlaybackIfHidden を実行する
+     * collectActiveCardRenderState を実行する
      * @param {*} container
      * @param {*} nodes
      */
-    function stopActivePlaybackIfHidden(container, nodes) {
+    function collectActiveCardRenderState(container, nodes) {
         const activeThumb = ui.activeThumb;
-        if (!activeThumb) return;
-        const activeCard = activeThumb.closest(".song-card");
-        const shouldKeepPlaying =
+        const activeCard = activeThumb ? activeThumb.closest(".song-card") : null;
+        const isActiveCardInNextNodes =
             activeCard instanceof HTMLElement &&
             container.contains(activeCard) &&
             nodes.includes(activeCard);
-        if (!shouldKeepPlaying) {
-            restoreActivePlayback();
-        }
+        const hasEmbeddedPlayer = Boolean(activeThumb && activeThumb.querySelector("iframe"));
+        return { activeThumb, activeCard, isActiveCardInNextNodes, hasEmbeddedPlayer };
+    }
+
+    /**
+     * stopActivePlaybackIfHidden を実行する
+     * @param {*} activeState
+     */
+    function stopActivePlaybackIfHidden(activeState) {
+        if (!activeState.activeThumb) return;
+        if (activeState.isActiveCardInNextNodes) return;
+        restoreActivePlayback();
     }
 
     /**
@@ -251,19 +259,12 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
 
     /**
      * getPinnedActiveCard を実行する
-     * @param {*} container
-     * @param {*} nodes
+     * @param {*} activeState
      */
-    function getPinnedActiveCard(container, nodes) {
-        const activeThumb = ui.activeThumb;
-        const activeCard = activeThumb ? activeThumb.closest(".song-card") : null;
-        const shouldPin =
-            Boolean(activeCard) &&
-            activeCard instanceof HTMLElement &&
-            container.contains(activeCard) &&
-            nodes.includes(activeCard) &&
-            Boolean(activeThumb && activeThumb.querySelector("iframe"));
-        return shouldPin ? activeCard : null;
+    function getPinnedActiveCard(activeState) {
+        if (!activeState.isActiveCardInNextNodes) return null;
+        if (!activeState.hasEmbeddedPlayer) return null;
+        return activeState.activeCard;
     }
 
     /**
@@ -320,8 +321,9 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
      * @param {*} nodes
      */
     function reconcileResultNodes(container, nodes) {
-        stopActivePlaybackIfHidden(container, nodes);
-        const pinnedActiveCard = getPinnedActiveCard(container, nodes);
+        const activeState = collectActiveCardRenderState(container, nodes);
+        stopActivePlaybackIfHidden(activeState);
+        const pinnedActiveCard = getPinnedActiveCard(activeState);
         if (pinnedActiveCard) {
             reconcileNodesWithPinnedActive(container, nodes, pinnedActiveCard);
             return;

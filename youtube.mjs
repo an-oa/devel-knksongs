@@ -382,6 +382,10 @@ export function createYoutubeController({ ui, youtube, constants }) {
     function restoreActivePlayback() {
         const activeThumb = ui.activeThumb;
         if (!activeThumb) return;
+        if (!activeThumb.isConnected) {
+            ui.activeThumb = null;
+            return;
+        }
         restoreThumbnail(activeThumb, activeThumb.dataset.videoId || "");
     }
 
