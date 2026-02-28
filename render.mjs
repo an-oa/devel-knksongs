@@ -66,27 +66,15 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
         const tags = document.createElement("div");
         tags.className = "footer-tags";
 
-        const addToBookmarkBtn = document.createElement("button");
-        addToBookmarkBtn.type = "button";
-        addToBookmarkBtn.className = "add-to-bookmark-btn";
-        addToBookmarkBtn.innerHTML = "+";
-        addToBookmarkBtn.setAttribute("aria-label", "ブックマークに追加");
-        addToBookmarkBtn.setAttribute("title", "ブックマークに追加");
+        const actionBtn = document.createElement("button");
+        actionBtn.type = "button";
 
-        const removeFromBookmarkBtn = document.createElement("button");
-        removeFromBookmarkBtn.type = "button";
-        removeFromBookmarkBtn.className = "remove-from-bookmark-btn";
-        removeFromBookmarkBtn.innerHTML = "&times;";
-        removeFromBookmarkBtn.setAttribute("aria-label", "ブックマークから削除");
-        removeFromBookmarkBtn.setAttribute("title", "ブックマークから削除");
-        removeFromBookmarkBtn.hidden = true;
-
-        rightGroup.append(tags);
-        footer.append(leftGroup, rightGroup, addToBookmarkBtn);
+        rightGroup.append(tags, actionBtn);
+        footer.append(leftGroup, rightGroup);
         content.append(title, artist, footer);
-        card.append(thumbDiv, content, removeFromBookmarkBtn);
+        card.append(thumbDiv, content);
 
-        return { card, thumbDiv, titleEl: title, artistEl: artist, dateEl: date, tagsEl: tags, addToBookmarkBtn, removeFromBookmarkBtn };
+        return { card, thumbDiv, titleEl: title, artistEl: artist, dateEl: date, tagsEl: tags, actionBtn };
     }
 
     /**
@@ -103,15 +91,25 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
         updateFooterTags(entry.tagsEl, row);
 
         const isBookmarkActive = !!data.activeBookmark;
-        entry.addToBookmarkBtn.hidden = isBookmarkActive;
-        entry.removeFromBookmarkBtn.hidden = !isBookmarkActive;
+        const btn = entry.actionBtn;
 
-        entry.addToBookmarkBtn.onclick = () => {
-            openBookmarkModal(row.songKey);
-        };
-        entry.removeFromBookmarkBtn.onclick = () => {
-            removeSongFromActiveBookmark(row.songKey);
-        };
+        if (isBookmarkActive) {
+            btn.textContent = "×";
+            btn.className = "remove-from-bookmark-btn";
+            btn.setAttribute("aria-label", "ブックマークから削除");
+            btn.setAttribute("title", "ブックマークから削除");
+            btn.onclick = () => {
+                removeSongFromActiveBookmark(row.songKey);
+            };
+        } else {
+            btn.textContent = "+";
+            btn.className = "add-to-bookmark-btn";
+            btn.setAttribute("aria-label", "ブックマークに追加");
+            btn.setAttribute("title", "ブックマークに追加");
+            btn.onclick = () => {
+                openBookmarkModal(row.songKey);
+            };
+        }
     }
 
     /**
@@ -391,4 +389,3 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
         updateDisplay
     };
 }
-
