@@ -543,3 +543,7 @@ hr { border: 0; border-top: 1px solid var(--border-color); margin: 15px 0; }
 .dark-theme .remove-from-bookmark-btn:hover {
   background-color: #3e2723;
 }
+
+.dark-theme .drag-handle {
+  background-color: rgba(0, 0, 0, 0.2);
+}
