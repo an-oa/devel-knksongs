@@ -122,7 +122,8 @@ renderController.setDependencies({
     restoreActivePlayback: () => youtubeController.restoreActivePlayback(),
     openBookmarkModal: (songKey) => openBookmarkModal(songKey),
     setupScrollObserver: () => youtubeController.setupScrollObserver(),
-    removeSongFromActiveBookmark: (songKey) => removeSongFromActiveBookmark(songKey)
+    removeSongFromActiveBookmark: (songKey) => removeSongFromActiveBookmark(songKey),
+    saveBookmarks: () => storageController.saveBookmarks()
 });
 searchController.setRenderHooks({
     updateDisplay: () => renderController.updateDisplay(),

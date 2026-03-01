@@ -18,6 +18,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
     let openBookmarkModal = () => {};
     let setupScrollObserver = () => {};
     let removeSongFromActiveBookmark = () => {};
+    let saveBookmarks = () => {};
 
     /**
      * 描画時に利用する外部依存関数を差し替える。
@@ -33,6 +34,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
         if (typeof next.openBookmarkModal === "function") openBookmarkModal = next.openBookmarkModal;
         if (typeof next.setupScrollObserver === "function") setupScrollObserver = next.setupScrollObserver;
         if (typeof next.removeSongFromActiveBookmark === "function") removeSongFromActiveBookmark = next.removeSongFromActiveBookmark;
+        if (typeof next.saveBookmarks === "function") saveBookmarks = next.saveBookmarks;
     }
 
     /**
@@ -41,6 +43,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
     function createCardElements() {
         const card = document.createElement("div");
         card.className = "song-card";
+        card.draggable = false;
 
         const thumbDiv = document.createElement("div");
         thumbDiv.className = "thumb";
@@ -71,12 +74,24 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
         const actionBtn = document.createElement("button");
         actionBtn.type = "button";
 
+        const dragHandle = document.createElement("div");
+        dragHandle.className = "drag-handle";
+        dragHandle.innerHTML = "⠿";
+        dragHandle.hidden = true;
+        dragHandle.draggable = false;
+
+        dragHandle.addEventListener("dragstart", onDragStart);
+        dragHandle.addEventListener("dragend", onDragEnd);
+        card.addEventListener("dragover", onDragOver);
+        card.addEventListener("dragleave", onDragLeave);
+        card.addEventListener("drop", onDrop);
+
         rightGroup.append(tags, actionBtn);
         footer.append(leftGroup, rightGroup);
-        content.append(title, artist, footer);
+        content.append(dragHandle, title, artist, footer);
         card.append(thumbDiv, content);
 
-        return { card, thumbDiv, titleEl: title, artistEl: artist, dateEl: date, tagsEl: tags, actionBtn };
+        return { card, thumbDiv, titleEl: title, artistEl: artist, dateEl: date, tagsEl: tags, actionBtn, dragHandle };
     }
 
     /**
@@ -233,6 +248,95 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
         restoreActivePlayback();
     }
 
+    function onDragStart(event) {
+        if (!data.activeBookmark) {
+            event.preventDefault();
+            return;
+        }
+        const handle = event.currentTarget;
+        if (!(handle instanceof HTMLElement)) return;
+        const card = handle.closest(".song-card");
+        if (!(card instanceof HTMLElement)) return;
+        const songKey = card.dataset.songKey || "";
+        if (!songKey) {
+            event.preventDefault();
+            return;
+        }
+        event.dataTransfer.setData("text/plain", songKey);
+        event.dataTransfer.effectAllowed = "move";
+        card.classList.add("dragging");
+    }
+
+    function onDragEnd(event) {
+        const handle = event.currentTarget;
+        if (!(handle instanceof HTMLElement)) return;
+        const card = handle.closest(".song-card");
+        if (!(card instanceof HTMLElement)) return;
+        card.classList.remove("dragging");
+        card.classList.remove("drag-over");
+    }
+
+    function onDragOver(event) {
+        if (!data.activeBookmark) return;
+        event.preventDefault();
+        const targetCard = event.target.closest(".song-card");
+        if (!(targetCard instanceof HTMLElement)) return;
+        targetCard.classList.add("drag-over");
+    }
+
+    function onDragLeave(event) {
+        const targetCard = event.target.closest(".song-card");
+        if (!(targetCard instanceof HTMLElement)) return;
+        targetCard.classList.remove("drag-over");
+    }
+
+    function onDrop(event) {
+        if (!data.activeBookmark) return;
+        event.preventDefault();
+        const draggedKey = event.dataTransfer.getData("text/plain");
+        const targetCard = event.target.closest(".song-card");
+        if (!targetCard) return;
+        targetCard.classList.remove("drag-over");
+
+        const targetKey = targetCard.dataset.songKey;
+        if (draggedKey === targetKey) return;
+
+        const fromIndex = data.currentResults.findIndex(song => song.songKey === draggedKey);
+        const toIndex = data.currentResults.findIndex(song => song.songKey === targetKey);
+
+        if (fromIndex === -1 || toIndex === -1) return;
+
+        const [movedItem] = data.currentResults.splice(fromIndex, 1);
+        data.currentResults.splice(toIndex, 0, movedItem);
+
+        persistActiveBookmarkOrder();
+        saveBookmarks();
+
+        updateDisplay();
+    }
+
+    function persistActiveBookmarkOrder() {
+        if (!data.activeBookmark) return;
+        const bookmark = data.bookmarks[data.activeBookmark];
+        if (!bookmark || !Array.isArray(bookmark.songs) || bookmark.songs.length === 0) return;
+
+        const orderedKeys = data.currentResults
+            .map((row) => (row && typeof row.songKey === "string" ? row.songKey : ""))
+            .filter(Boolean);
+        if (orderedKeys.length === 0) return;
+
+        const reorderSet = new Set(orderedKeys);
+        const queue = orderedKeys.slice();
+        const nextSongs = bookmark.songs.map((songKey) => {
+            if (!reorderSet.has(songKey)) return songKey;
+            return queue.length > 0 ? queue.shift() : songKey;
+        });
+
+        const changed = nextSongs.some((songKey, idx) => songKey !== bookmark.songs[idx]);
+        if (!changed) return;
+        bookmark.songs = nextSongs;
+    }
+
     /**
      * 結果配列からカードノードを再利用しつつ構築する。
      * @param {*} results
@@ -248,6 +352,14 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
                 : (row && Number.isFinite(row.sourceIndex) ? `src:${row.sourceIndex}` : `idx:${i}`);
             let entry = ui.cardEntriesBySourceKey.get(rowKey);
             if (!entry) entry = createCardElements();
+
+            entry.card.dataset.songKey = row.songKey;
+            const isBookmarkActive = Boolean(data.activeBookmark);
+            entry.card.draggable = false;
+            entry.card.classList.remove("dragging", "drag-over");
+            entry.dragHandle.hidden = !isBookmarkActive;
+            entry.dragHandle.draggable = isBookmarkActive;
+
             updateCardFromRow(entry, results[i]);
             nextEntriesBySourceKey.set(rowKey, entry);
             entries.push(entry);
