@@ -270,6 +270,34 @@ export function createStorageController({ data, ui, constants, callbacks }) {
     }
 
     /**
+     * ブックマーク名を変更して保存し、一覧を再描画する。
+     * 変更対象がアクティブな場合は検索結果表示も即時更新する。
+     * @param {string} bookmarkId
+     * @param {string} newName
+     * @returns {{ ok: boolean, reason?: string, changed?: boolean }}
+     */
+    function renameBookmark(bookmarkId, newName) {
+        const bookmark = data.bookmarks[bookmarkId];
+        if (!bookmark) return buildActionFail("bookmark_not_found");
+        if (typeof newName !== "string") return buildActionFail("invalid_name_type");
+
+        const trimmedName = newName.trim();
+        if (!trimmedName) return buildActionFail("empty_name");
+
+        if (bookmark.name === trimmedName) {
+            return buildActionOk({ changed: false });
+        }
+
+        bookmark.name = trimmedName;
+        saveBookmarks();
+        renderBookmarks();
+        if (data.activeBookmark === bookmarkId) {
+            scheduleSearch({ immediate: true });
+        }
+        return buildActionOk({ changed: true });
+    }
+
+    /**
      * 現在の検索条件をローカルストレージへ保存する。
      */
     function saveSearchState() {
@@ -337,6 +365,7 @@ export function createStorageController({ data, ui, constants, callbacks }) {
         addSongToBookmark,
         createBookmarkAndAdd,
         deleteBookmark,
+        renameBookmark,
         saveSearchState,
         restoreSearchState,
         removeSongFromBookmark

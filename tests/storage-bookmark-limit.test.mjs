@@ -127,3 +127,104 @@ test("addSongToBookmark: succeeds under limit and triggers render/search for act
         globalThis.localStorage = prevLocalStorage;
     }
 });
+
+test("renameBookmark: rejects invalid input and keeps state unchanged", () => {
+    const prevLocalStorage = globalThis.localStorage;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        const { controller, data, getRenderCount, getScheduleCount } = setupStorageController({
+            bookmarks: {
+                b1: { name: "A", songs: ["s1"], createdAt: 1 }
+            },
+            activeBookmark: "b1",
+            maxBookmarkCount: 20,
+            maxSongsPerBookmark: 120
+        });
+
+        const invalidTypeResult = controller.renameBookmark("b1", null);
+        assert.equal(invalidTypeResult.ok, false);
+        assert.equal(invalidTypeResult.reason, "invalid_name_type");
+
+        const emptyNameResult = controller.renameBookmark("b1", "   ");
+        assert.equal(emptyNameResult.ok, false);
+        assert.equal(emptyNameResult.reason, "empty_name");
+
+        assert.equal(data.bookmarks.b1.name, "A");
+        assert.equal(getRenderCount(), 0);
+        assert.equal(getScheduleCount(), 0);
+    } finally {
+        globalThis.localStorage = prevLocalStorage;
+    }
+});
+
+test("renameBookmark: same name is no-op", () => {
+    const prevLocalStorage = globalThis.localStorage;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        const { controller, data, getRenderCount, getScheduleCount } = setupStorageController({
+            bookmarks: {
+                b1: { name: "A", songs: ["s1"], createdAt: 1 }
+            },
+            activeBookmark: "b1",
+            maxBookmarkCount: 20,
+            maxSongsPerBookmark: 120
+        });
+
+        const result = controller.renameBookmark("b1", "A");
+        assert.equal(result.ok, true);
+        assert.equal(result.changed, false);
+        assert.equal(data.bookmarks.b1.name, "A");
+        assert.equal(getRenderCount(), 0);
+        assert.equal(getScheduleCount(), 0);
+    } finally {
+        globalThis.localStorage = prevLocalStorage;
+    }
+});
+
+test("renameBookmark: active bookmark rename triggers render and search", () => {
+    const prevLocalStorage = globalThis.localStorage;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        const { controller, data, getRenderCount, getScheduleCount } = setupStorageController({
+            bookmarks: {
+                b1: { name: "A", songs: ["s1"], createdAt: 1 }
+            },
+            activeBookmark: "b1",
+            maxBookmarkCount: 20,
+            maxSongsPerBookmark: 120
+        });
+
+        const result = controller.renameBookmark("b1", "B");
+        assert.equal(result.ok, true);
+        assert.equal(result.changed, true);
+        assert.equal(data.bookmarks.b1.name, "B");
+        assert.equal(getRenderCount(), 1);
+        assert.equal(getScheduleCount(), 1);
+    } finally {
+        globalThis.localStorage = prevLocalStorage;
+    }
+});
+
+test("renameBookmark: inactive bookmark rename triggers render only", () => {
+    const prevLocalStorage = globalThis.localStorage;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        const { controller, data, getRenderCount, getScheduleCount } = setupStorageController({
+            bookmarks: {
+                b1: { name: "A", songs: ["s1"], createdAt: 1 }
+            },
+            activeBookmark: null,
+            maxBookmarkCount: 20,
+            maxSongsPerBookmark: 120
+        });
+
+        const result = controller.renameBookmark("b1", "B");
+        assert.equal(result.ok, true);
+        assert.equal(result.changed, true);
+        assert.equal(data.bookmarks.b1.name, "B");
+        assert.equal(getRenderCount(), 1);
+        assert.equal(getScheduleCount(), 0);
+    } finally {
+        globalThis.localStorage = prevLocalStorage;
+    }
+});

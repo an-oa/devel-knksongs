@@ -109,6 +109,7 @@ bookmarkUiController = createBookmarkUiController({
         onAddSongToBookmark: (bookmarkId, songKey) => storageController.addSongToBookmark(bookmarkId, songKey),
         onCreateBookmarkAndAdd: (bookmarkName, songKey) => storageController.createBookmarkAndAdd(bookmarkName, songKey),
         onDeleteBookmark: (bookmarkId) => storageController.deleteBookmark(bookmarkId),
+        onRenameBookmark: (bookmarkId, newName) => storageController.renameBookmark(bookmarkId, newName),
         onRemoveSongFromBookmark: (bookmarkId, songKey) => storageController.removeSongFromBookmark(bookmarkId, songKey)
     }
 });

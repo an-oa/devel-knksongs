@@ -338,13 +338,13 @@ hr { border: 0; border-top: 1px solid var(--border-color); margin: 15px 0; }
   margin-left: 8px;
 }
 
+.bookmark-rename-btn,
 .bookmark-delete-btn {
   background: none;
   border: none;
   color: var(--text-mute);
   cursor: pointer;
   padding: 0;
-  font-size: 20px;
   line-height: 1;
   width: 28px;
   height: 28px;
@@ -357,21 +357,30 @@ hr { border: 0; border-top: 1px solid var(--border-color); margin: 15px 0; }
   pointer-events: none;
   transition: color 0.2s, opacity 0.2s;
 }
+.bookmark-rename-btn { font-size: 13px; }
+.bookmark-delete-btn { font-size: 20px; }
+.bookmark-delete-btn span { position: relative; top: -1px; }
 
+
+.bookmark-item:hover .bookmark-rename-btn,
 .bookmark-item:hover .bookmark-delete-btn,
+.bookmark-item:focus-within .bookmark-rename-btn,
 .bookmark-item:focus-within .bookmark-delete-btn,
+.bookmark-rename-btn:focus-visible,
 .bookmark-delete-btn:focus-visible {
   opacity: 1;
   pointer-events: auto;
 }
 
 @media (hover: none), (pointer: coarse) {
+  .bookmark-rename-btn,
   .bookmark-delete-btn {
     opacity: 1;
     pointer-events: auto;
   }
 }
 
+.bookmark-rename-btn:hover,
 .bookmark-delete-btn:hover {
   color: var(--text-color);
 }

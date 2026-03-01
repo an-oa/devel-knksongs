@@ -11,6 +11,7 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
         onAddSongToBookmark,
         onCreateBookmarkAndAdd,
         onDeleteBookmark,
+        onRenameBookmark,
         onRemoveSongFromBookmark
     } = callbacks;
 
@@ -49,6 +50,24 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
             } else {
                 alert(`1つのブックマークに登録できる曲は最大${limit}曲です。`);
             }
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * リネーム失敗時に理由別メッセージを表示し、通知したかどうかを返す。
+     * @param {*} result
+     * @returns {boolean}
+     */
+    function notifyIfRenameError(result) {
+        if (!result || result.ok) return false;
+        if (result.reason === "empty_name") {
+            alert("ブックマーク名を入力してください。");
+            return true;
+        }
+        if (result.reason === "bookmark_not_found") {
+            alert("ブックマークが見つかりません。画面を更新して再度お試しください。");
             return true;
         }
         return false;
@@ -105,7 +124,7 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
     }
 
     /**
-     * ブックマークリストを描画し、選択/削除の操作をバインドする。
+     * ブックマークリストを描画し、選択/リネーム/削除の操作をバインドする。
      */
     function renderBookmarks() {
         const container = ui.el.bookmarkList;
@@ -120,7 +139,8 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
             item.innerHTML = `
                 <span class="bookmark-item-name"></span>
                 <span class="bookmark-item-count">${p.songs.length}</span>
-                <button class="bookmark-delete-btn" aria-label="ブックマークを削除">&times;</button>
+                <button class="bookmark-rename-btn" aria-label="ブックマーク名を変更">変更</button>
+                <button class="bookmark-delete-btn" aria-label="ブックマークを削除"><span>&times;</span></button>
             `;
             item.querySelector(".bookmark-item-name").textContent = p.name;
 
@@ -130,7 +150,19 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
 
             item.addEventListener("click", (e) => {
                 const target = e.target instanceof Element ? e.target : null;
-                const deleteBtn = target ? target.closest(".bookmark-delete-btn") : null;
+                if (!target) return;
+
+                const renameBtn = target.closest(".bookmark-rename-btn");
+                if (renameBtn) {
+                    e.stopPropagation();
+                    const newName = prompt("新しいブックマーク名を入力してください:", p.name);
+                    if (newName === null) return;
+                    const result = normalizeActionResult(onRenameBookmark(id, newName));
+                    notifyIfRenameError(result);
+                    return;
+                }
+
+                const deleteBtn = target.closest(".bookmark-delete-btn");
                 if (deleteBtn) {
                     e.stopPropagation();
                     if (confirm(`ブックマーク「${p.name}」を削除しますか？`)) {
