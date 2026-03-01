@@ -291,6 +291,25 @@ function makeRenderRow(input) {
     };
 }
 
+function createDataTransferMock() {
+    const store = new Map();
+    return {
+        effectAllowed: "none",
+        setData(type, value) {
+            store.set(String(type), String(value));
+        },
+        getData(type) {
+            return store.get(String(type)) || "";
+        }
+    };
+}
+
+function invokeListener(element, type, event) {
+    const listener = element && element._events ? element._events.get(type) : null;
+    assert.equal(typeof listener, "function", `${type} listener is missing`);
+    listener(event);
+}
+
 test("render: empty results stop active playback", () => {
     const cleanup = installFakeDom();
     try {
@@ -548,6 +567,104 @@ test("bookmark: shows load-more and increases by INCREMENT_COUNT (48)", () => {
         assert.equal(data.displayLimit, 144);
         assert.equal(ui.el.resultList.children.length, 100);
         assert.equal(loadMoreContainer.classList.contains("hidden"), true);
+    } finally {
+        cleanup();
+    }
+});
+
+test("render: drag handle is bookmark-only and reorder works in both directions with persistence", () => {
+    const cleanup = installFakeDom();
+    try {
+        const rowA = makeRenderRow({ songKey: "a::1", sourceIndex: 1, title: "A" });
+        const rowB = makeRenderRow({ songKey: "b::2", sourceIndex: 2, title: "B", url: "https://youtu.be/video2" });
+        const data = {
+            currentResults: [rowA, rowB],
+            displayLimit: 10,
+            activeBookmark: null,
+            bookmarks: {
+                bm1: {
+                    name: "test",
+                    songs: [rowA.songKey, rowB.songKey]
+                }
+            }
+        };
+        const ui = {
+            activeThumb: null,
+            showThumbnails: false,
+            scrollObserver: null,
+            cardEntriesBySourceKey: new Map(),
+            selectedFormats: new Set(["配信"]),
+            dataReady: true,
+            el: {
+                resultList: document.createElement("div"),
+                loadMoreContainer: document.createElement("div")
+            }
+        };
+        let saveCount = 0;
+        const controller = createRenderController({
+            data,
+            ui,
+            isAllFormatsSelected: () => true
+        });
+        controller.setDependencies({
+            getSearchState: () => ({ queryRaw: "" }),
+            isRecommendedMode: () => false,
+            updateThumbnail: () => {},
+            extractYoutubeInfo: () => ({ videoId: "video1", startSeconds: 0 }),
+            restoreActivePlayback: () => {},
+            saveBookmarks: () => {
+                saveCount += 1;
+            }
+        });
+
+        controller.updateDisplay();
+        const normalEntryA = ui.cardEntriesBySourceKey.get(`song:${rowA.songKey}`);
+        assert.ok(normalEntryA);
+        assert.equal(normalEntryA.dragHandle.hidden, true);
+        assert.equal(normalEntryA.dragHandle.draggable, false);
+        assert.equal(normalEntryA.card.draggable, false);
+        assert.equal(normalEntryA.card._events.has("dragstart"), false);
+
+        data.activeBookmark = "bm1";
+        controller.updateDisplay();
+        const entryA = ui.cardEntriesBySourceKey.get(`song:${rowA.songKey}`);
+        const entryB = ui.cardEntriesBySourceKey.get(`song:${rowB.songKey}`);
+        assert.ok(entryA);
+        assert.ok(entryB);
+        assert.equal(entryA.dragHandle.hidden, false);
+        assert.equal(entryA.dragHandle.draggable, true);
+
+        const transfer1 = createDataTransferMock();
+        invokeListener(entryA.dragHandle, "dragstart", {
+            currentTarget: entryA.dragHandle,
+            target: entryA.dragHandle,
+            dataTransfer: transfer1,
+            preventDefault() {}
+        });
+        invokeListener(entryB.card, "drop", {
+            target: entryB.card,
+            dataTransfer: transfer1,
+            preventDefault() {}
+        });
+        assert.deepEqual(data.currentResults.map((row) => row.songKey), [rowB.songKey, rowA.songKey]);
+        assert.deepEqual(data.bookmarks.bm1.songs, [rowB.songKey, rowA.songKey]);
+        assert.equal(saveCount, 1);
+
+        const transfer2 = createDataTransferMock();
+        invokeListener(entryA.dragHandle, "dragstart", {
+            currentTarget: entryA.dragHandle,
+            target: entryA.dragHandle,
+            dataTransfer: transfer2,
+            preventDefault() {}
+        });
+        invokeListener(entryB.card, "drop", {
+            target: entryB.card,
+            dataTransfer: transfer2,
+            preventDefault() {}
+        });
+        assert.deepEqual(data.currentResults.map((row) => row.songKey), [rowA.songKey, rowB.songKey]);
+        assert.deepEqual(data.bookmarks.bm1.songs, [rowA.songKey, rowB.songKey]);
+        assert.equal(saveCount, 2);
     } finally {
         cleanup();
     }
