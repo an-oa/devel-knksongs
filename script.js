@@ -79,6 +79,7 @@ const youtubeController = createYoutubeController({
 });
 
 let bookmarkUiController = null;
+let closeSidebarMenu = null;
 
 const storageController = createStorageController({
     data,
@@ -111,7 +112,12 @@ bookmarkUiController = createBookmarkUiController({
         onCreateBookmarkAndAdd: (bookmarkName, songKey) => storageController.createBookmarkAndAdd(bookmarkName, songKey),
         onDeleteBookmark: (bookmarkId) => storageController.deleteBookmark(bookmarkId),
         onRenameBookmark: (bookmarkId, newName) => storageController.renameBookmark(bookmarkId, newName),
-        onRemoveSongFromBookmark: (bookmarkId, songKey) => storageController.removeSongFromBookmark(bookmarkId, songKey)
+        onRemoveSongFromBookmark: (bookmarkId, songKey) => storageController.removeSongFromBookmark(bookmarkId, songKey),
+        onRequestCloseSidebar: () => {
+            if (typeof closeSidebarMenu === 'function') {
+                closeSidebarMenu();
+            }
+        }
     }
 });
 
@@ -166,7 +172,11 @@ function restoreSearchState() { storageController.restoreSearchState(); }
  * DOM参照の初期化とUI各機能のセットアップを行う。
  */
 async function initUI() {
+    const sidebar = document.getElementById('sidebar');
     ui.el = {
+        sidebar,
+        sidebarHeader: sidebar ? sidebar.querySelector('.sidebar-header') : null,
+        sidebarScrollArea: sidebar ? sidebar.querySelector('.sidebar-scroll-area') : null,
         resultList: document.getElementById('resultList'),
         resultCount: document.getElementById('resultCount'),
         loadMoreContainer: document.getElementById('loadMoreContainer'),
@@ -259,7 +269,7 @@ function setupSyncEvents() {
  * 検索UI・サイドバー・日付入力・各種ボタンのイベントを設定する。
  */
 function setupUIHandlers() {
-    const sidebar = document.getElementById('sidebar');
+    const sidebar = ui.el.sidebar;
     const openBtn = document.getElementById('open-sidebar');
     const closeBtn = document.getElementById('close-sidebar');
     const overlay = document.getElementById('sidebar-overlay');
@@ -274,7 +284,7 @@ function setupUIHandlers() {
     let lastFocusedElement = null;
 
     openBtn.addEventListener('click', () => {
-        bookmarkUiController.closeBookmarkModal();
+        bookmarkUiController.closeBookmarkModal({ restoreFocus: false });
         sidebar.classList.add('active');
         overlay.classList.add('show');
         sidebar.setAttribute('aria-hidden', 'false');
@@ -283,7 +293,7 @@ function setupUIHandlers() {
     });
 
     const closeMenu = () => {
-        bookmarkUiController.closeBookmarkModal();
+        bookmarkUiController.closeBookmarkModal({ restoreFocus: false });
         blurSidebarActiveElement(sidebar);
         sidebar.classList.remove('active');
         overlay.classList.remove('show');
@@ -294,23 +304,24 @@ function setupUIHandlers() {
             openBtn.focus();
         }
     };
+    closeSidebarMenu = closeMenu;
 
     closeBtn.addEventListener('click', closeMenu);
     overlay.addEventListener('click', closeMenu);
     ui.el.openBookmarkPanelBtn.addEventListener('click', () => {
-        bookmarkUiController.openBookmarkBrowser();
+        bookmarkUiController.openBookmarkBrowser({
+            returnFocusEl: ui.el.openBookmarkPanelBtn
+        });
     });
     ui.el.closeBookmarkPanelBtn.addEventListener('click', () => {
-        bookmarkUiController.closeBookmarkModal();
-        ui.el.openBookmarkPanelBtn.focus();
+        bookmarkUiController.closeBookmarkModal({ restoreFocus: true });
     });
     ui.el.closeBookmarkSidebarBtn.addEventListener('click', closeMenu);
     document.addEventListener('keydown', (e) => {
         if (e.key === "Escape") {
             if (ui.el.bookmarkSidebarPanel && !ui.el.bookmarkSidebarPanel.hidden) {
                 e.preventDefault();
-                bookmarkUiController.closeBookmarkModal();
-                ui.el.openBookmarkPanelBtn.focus();
+                bookmarkUiController.closeBookmarkModal({ restoreFocus: true });
                 return;
             }
             closeMenu();
@@ -408,12 +419,17 @@ function setupBookmarkHandlers() {
  * @param {*} songKey
  */
 function openBookmarkModal(songKey) {
-    const sidebar = document.getElementById('sidebar');
+    const sidebar = ui.el.sidebar;
     const openBtn = document.getElementById('open-sidebar');
-    if (!sidebar.classList.contains('active')) {
+    const returnFocusEl = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const sidebarWasActive = sidebar.classList.contains('active');
+    if (!sidebarWasActive) {
         openBtn.click();
     }
-    bookmarkUiController.openBookmarkModal(songKey);
+    bookmarkUiController.openBookmarkModal(songKey, {
+        returnFocusEl,
+        closeSidebarOnExit: !sidebarWasActive
+    });
 }
 
 /**

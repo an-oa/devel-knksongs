@@ -46,7 +46,9 @@ export const state = {
         dateBounds: null,
         dateIndex: null,
         pendingDateValues: null,
-        pendingBookmarkAction: null
+        pendingBookmarkAction: null,
+        bookmarkPanelReturnFocusEl: null,
+        bookmarkPanelExitClosesSidebar: false
     },
     youtube: {
         apiPromise: null,
