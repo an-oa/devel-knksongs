@@ -35,7 +35,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="styles.css?v=2">
+  <link rel="stylesheet" href="styles.css?v=5">
 </head>
 <body>
 
@@ -51,72 +51,96 @@
     </div>
 
     <div class="sidebar-scroll-area">
-      <div class="sidebar-section">
-        <div class="section-header">
-          <label class="section-label">キーワード検索</label>
-          <button id="clearBtn" class="text-clear-btn">条件をクリア</button>
+      <section class="sidebar-group">
+        <div class="sidebar-group-header">
+          <div class="sidebar-group-title">検索条件</div>
         </div>
-        <input type="text" id="searchBox" placeholder="曲名・歌手・読み..." aria-label="曲名・歌手・読みで検索" disabled>
-      </div>
-
-      <div class="sidebar-section">
-        <div class="date-row">
-          <span class="section-label date-row-label">From</span>
-          <div class="date-select-group">
-            <select id="dateFromYear" class="date-select year" aria-label="開始年"></select>
-            <select id="dateFromMonth" class="date-select month" aria-label="開始月"></select>
-            <select id="dateFromDay" class="date-select day" aria-label="開始日"></select>
+        <div class="sidebar-group-body">
+          <div class="sidebar-section">
+            <div class="section-header">
+              <label class="section-label">キーワード検索</label>
+              <button id="clearBtn" class="text-clear-btn">条件をクリア</button>
+            </div>
+            <input type="text" id="searchBox" placeholder="曲名・歌手・読み..." aria-label="曲名・歌手・読みで検索" disabled>
           </div>
-          <button id="clearDateFromBtn" class="date-clear-btn" aria-label="開始日をクリア">&times;</button>
-        </div>
-        <div class="date-row">
-          <span class="section-label date-row-label">To</span>
-          <div class="date-select-group">
-            <select id="dateToYear" class="date-select year" aria-label="終了年"></select>
-            <select id="dateToMonth" class="date-select month" aria-label="終了月"></select>
-            <select id="dateToDay" class="date-select day" aria-label="終了日"></select>
+
+          <div class="sidebar-section">
+            <div class="section-header">
+              <label class="section-label">日付範囲</label>
+            </div>
+            <div class="date-row">
+              <span class="section-label date-row-label">From</span>
+              <div class="date-select-group">
+                <select id="dateFromYear" class="date-select year" aria-label="開始年"></select>
+                <select id="dateFromMonth" class="date-select month" aria-label="開始月"></select>
+                <select id="dateFromDay" class="date-select day" aria-label="開始日"></select>
+              </div>
+              <button id="clearDateFromBtn" class="date-clear-btn" aria-label="開始日をクリア">&times;</button>
+            </div>
+            <div class="date-row">
+              <span class="section-label date-row-label">To</span>
+              <div class="date-select-group">
+                <select id="dateToYear" class="date-select year" aria-label="終了年"></select>
+                <select id="dateToMonth" class="date-select month" aria-label="終了月"></select>
+                <select id="dateToDay" class="date-select day" aria-label="終了日"></select>
+              </div>
+              <button id="clearDateToBtn" class="date-clear-btn" aria-label="終了日をクリア">&times;</button>
+            </div>
           </div>
-          <button id="clearDateToBtn" class="date-clear-btn" aria-label="終了日をクリア">&times;</button>
+
+          <div class="sidebar-section">
+            <div class="section-header">
+              <label class="section-label">動画の種類</label>
+            </div>
+            <div id="formatsList" class="filter-group-stack"></div>
+          </div>
+
+          <div class="sidebar-section sidebar-flags">
+            <label class="checkbox-item"><input type="checkbox" id="relayOnly"> 🚩 歌枠リレー</label>
+            <label class="checkbox-item"><input type="checkbox" id="harmonyOnly"> ✨ ハモリあり</label>
+          </div>
         </div>
-      </div>
+      </section>
 
-      <div class="sidebar-section">
-        <div id="formatsList" class="filter-group-stack"></div>
-      </div>
-
-      <div class="sidebar-section">
-        <label class="checkbox-item"><input type="checkbox" id="relayOnly"> 🚩 歌枠リレー</label>
-        <label class="checkbox-item"><input type="checkbox" id="harmonyOnly"> ✨ ハモリあり</label>
-      </div>
-
-      <hr>
-
-      <div class="sidebar-section">
-        <div class="menu-item-toggle">
-          <span>サムネイル表示</span>
-          <label class="switch">
-            <input type="checkbox" id="thumbnail-toggle" aria-label="サムネイル表示を切り替える">
-            <span class="slider"></span>
-          </label>
+      <section class="sidebar-group">
+        <div class="sidebar-group-header">
+          <div class="sidebar-group-title">表示設定</div>
         </div>
-      </div>
+        <div class="sidebar-group-body">
+          <div class="sidebar-section sidebar-setting-item">
+            <div class="menu-item-toggle">
+              <span>サムネイル表示</span>
+              <label class="switch">
+                <input type="checkbox" id="thumbnail-toggle" aria-label="サムネイル表示を切り替える">
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
 
-      <div class="sidebar-section">
-        <div class="menu-item-toggle">
-          <span>ダークモード</span>
-          <label class="switch">
-            <input type="checkbox" id="theme-toggle" aria-label="ダークモードを切り替える">
-            <span class="slider"></span>
-          </label>
+          <div class="sidebar-section sidebar-setting-item">
+            <div class="menu-item-toggle">
+              <span>ダークモード</span>
+              <label class="switch">
+                <input type="checkbox" id="theme-toggle" aria-label="ダークモードを切り替える">
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
         </div>
+      </section>
+
+      <button id="open-bookmark-panel" class="sidebar-link-row" type="button" aria-haspopup="dialog" aria-controls="bookmark-sidebar-panel">
+        <span>ブックマークを開く</span>
+        <span class="sidebar-link-row-arrow" aria-hidden="true">›</span>
+      </button>
+    </div>
+
+    <div id="bookmark-sidebar-panel" class="bookmark-sidebar-panel" hidden>
+      <div class="bookmark-sidebar-header">
+        <button id="close-bookmark-panel" class="bookmark-sidebar-back" type="button" aria-label="検索・設定に戻る">← ブックマーク</button>
+        <button id="close-bookmark-sidebar" class="close-btn" aria-label="閉じる">&times;</button>
       </div>
-
-      <hr>
-
-      <div class="sidebar-section">
-        <div class="section-header">
-          <label class="section-label">ブックマーク</label>
-        </div>
+      <div class="bookmark-sidebar-body">
         <div id="bookmark-list" class="bookmark-list"></div>
       </div>
     </div>
@@ -162,6 +186,6 @@
     </div>
   </div>
 
-  <script type="module" src="script.js?v=3"></script>
+  <script type="module" src="script.js?v=5"></script>
 </body>
 </html>

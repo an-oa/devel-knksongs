@@ -183,6 +183,10 @@ async function initUI() {
         themeToggle: document.getElementById('theme-toggle'),
         thumbToggle: document.getElementById('thumbnail-toggle'),
         formatsList: document.getElementById('formatsList'),
+        openBookmarkPanelBtn: document.getElementById('open-bookmark-panel'),
+        bookmarkSidebarPanel: document.getElementById('bookmark-sidebar-panel'),
+        closeBookmarkPanelBtn: document.getElementById('close-bookmark-panel'),
+        closeBookmarkSidebarBtn: document.getElementById('close-bookmark-sidebar'),
         bookmarkList: document.getElementById('bookmark-list'),
         bookmarkModal: document.getElementById('bookmark-modal'),
         bookmarkModalClose: document.getElementById('bookmark-modal-close'),
@@ -267,9 +271,11 @@ function setupUIHandlers() {
     const dateToYear = ui.el.dateToYear;
     const dateToMonth = ui.el.dateToMonth;
     const dateToDay = ui.el.dateToDay;
+    const bookmarkPanel = ui.el.bookmarkSidebarPanel;
     let lastFocusedElement = null;
 
     openBtn.addEventListener('click', () => {
+        if (bookmarkPanel) bookmarkPanel.hidden = true;
         sidebar.classList.add('active');
         overlay.classList.add('show');
         sidebar.setAttribute('aria-hidden', 'false');
@@ -278,6 +284,7 @@ function setupUIHandlers() {
     });
 
     const closeMenu = () => {
+        closeBookmarkPanel({ restoreFocus: false });
         blurSidebarActiveElement(sidebar);
         sidebar.classList.remove('active');
         overlay.classList.remove('show');
@@ -291,8 +298,18 @@ function setupUIHandlers() {
 
     closeBtn.addEventListener('click', closeMenu);
     overlay.addEventListener('click', closeMenu);
+    ui.el.openBookmarkPanelBtn.addEventListener('click', openBookmarkPanel);
+    ui.el.closeBookmarkPanelBtn.addEventListener('click', () => closeBookmarkPanel({ restoreFocus: true }));
+    ui.el.closeBookmarkSidebarBtn.addEventListener('click', closeMenu);
     document.addEventListener('keydown', (e) => {
-        if (e.key === "Escape") closeMenu();
+        if (e.key === "Escape") {
+            if (bookmarkPanel && !bookmarkPanel.hidden) {
+                e.preventDefault();
+                closeBookmarkPanel({ restoreFocus: true });
+                return;
+            }
+            closeMenu();
+        }
         if (e.key === "Tab") trapSidebarFocus(e, sidebar);
     });
 
@@ -355,6 +372,20 @@ function setupUIHandlers() {
 
     clearBtn.addEventListener('click', clearSearch);
     setupBookmarkHandlers();
+
+    function openBookmarkPanel() {
+        if (!bookmarkPanel) return;
+        bookmarkPanel.hidden = false;
+        ui.el.closeBookmarkPanelBtn.focus();
+    }
+
+    function closeBookmarkPanel(options) {
+        if (!bookmarkPanel || bookmarkPanel.hidden) return;
+        bookmarkPanel.hidden = true;
+        if (options && options.restoreFocus) {
+            ui.el.openBookmarkPanelBtn.focus();
+        }
+    }
 }
 
 /**
@@ -466,7 +497,11 @@ function getFocusableInSidebar(sidebar) {
         'textarea:not([disabled])',
         '[tabindex]:not([tabindex="-1"])'
     ].join(','));
-    return Array.from(focusable).filter((el) => !el.hasAttribute('inert'));
+    return Array.from(focusable).filter((el) => {
+        if (el.hasAttribute('inert') || el.hidden) return false;
+        const style = window.getComputedStyle(el);
+        return style.display !== 'none' && style.visibility !== 'hidden';
+    });
 }
 
 /**
