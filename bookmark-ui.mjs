@@ -9,6 +9,7 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
         clearSearchDebounce,
         scheduleSearch,
         onAddSongToBookmark,
+        onCreateBookmark,
         onCreateBookmarkAndAdd,
         onDeleteBookmark,
         onRenameBookmark,
@@ -74,6 +75,25 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
     }
 
     /**
+     * 曲追加失敗時に理由別メッセージを表示し、通知したかどうかを返す。
+     * @param {*} result
+     * @returns {boolean}
+     */
+    function notifyIfAddSongError(result) {
+        if (!result || result.ok) return false;
+        if (notifyIfLimitError(result)) return true;
+        if (result.reason === "duplicate_song") {
+            alert("この曲はすでに選択したブックマークに追加されています。");
+            return true;
+        }
+        if (result.reason === "bookmark_not_found") {
+            alert("ブックマークが見つかりません。画面を更新して再度お試しください。");
+            return true;
+        }
+        return false;
+    }
+
+    /**
      * ブックマークIDを作成日時順で取得する。
      */
     function getSortedBookmarkIds() {
@@ -83,68 +103,113 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
     }
 
     /**
-     * モーダルの開閉・作成・キーボード操作に関するイベントを登録する。
+     * 現在が「曲を追加するための選択モード」かどうかを返す。
      */
-    function setupBookmarkHandlers() {
-        const modal = ui.el.bookmarkModal;
-        ui.el.bookmarkModalClose.addEventListener("click", closeBookmarkModal);
-        modal.addEventListener("click", (e) => {
-            if (e.target === modal) closeBookmarkModal();
-        });
-
-        ui.el.bookmarkModalCreateBtn.addEventListener("click", () => {
-            const newName = ui.el.bookmarkModalNewName.value.trim();
-            if (newName && ui.pendingBookmarkAction) {
-                const result = normalizeActionResult(
-                    onCreateBookmarkAndAdd(newName, ui.pendingBookmarkAction.songKey)
-                );
-                if (result.ok) {
-                    closeBookmarkModal();
-                    return;
-                }
-                if (!notifyIfLimitError(result)) {
-                    closeBookmarkModal();
-                }
-            }
-        });
-
-        ui.el.bookmarkModalNewName.addEventListener("keydown", (e) => {
-            if (e.key === "Enter") {
-                ui.el.bookmarkModalCreateBtn.click();
-            }
-        });
-
-        document.addEventListener("keydown", (e) => {
-            if (e.key !== "Escape") return;
-            if (ui.el.bookmarkModal.hidden) return;
-            e.preventDefault();
-            e.stopPropagation();
-            closeBookmarkModal();
-        }, true);
+    function isAddingSongMode() {
+        return Boolean(ui.pendingBookmarkAction && ui.pendingBookmarkAction.songKey);
     }
 
     /**
-     * ブックマークリストを描画し、選択/リネーム/削除の操作をバインドする。
+     * ブックマーク専用パネルを表示する。
+     */
+    function showBookmarkPanel() {
+        if (ui.el.bookmarkSidebarPanel) {
+            ui.el.bookmarkSidebarPanel.hidden = false;
+        }
+    }
+
+    /**
+     * ブックマーク専用パネルを閉じる。
+     */
+    function hideBookmarkPanel() {
+        if (ui.el.bookmarkSidebarPanel) {
+            ui.el.bookmarkSidebarPanel.hidden = true;
+        }
+    }
+
+    /**
+     * 現在モードに応じて作成フォームの表示を更新する。
+     */
+    function syncBookmarkPanelMode() {
+        const createWrap = ui.el.bookmarkPanelCreate;
+        const nameInput = ui.el.bookmarkPanelNewName;
+        const createBtn = ui.el.bookmarkPanelCreateBtn;
+        if (!createWrap || !nameInput || !createBtn) return;
+
+        createWrap.hidden = false;
+        nameInput.placeholder = "新規ブックマーク名";
+        createBtn.textContent = "作成";
+    }
+
+    /**
+     * 空状態表示を生成する。
+     * @param {string} message
+     */
+    function createEmptyBookmarkElement(message) {
+        const empty = document.createElement("div");
+        empty.className = "bookmark-empty-state";
+        empty.textContent = message;
+        return empty;
+    }
+
+    /**
+     * 作成欄のインラインエラーを表示する。
+     * @param {string} message
+     */
+    function showBookmarkPanelError(message) {
+        const errorEl = ui.el.bookmarkPanelError;
+        if (!errorEl) return;
+        errorEl.textContent = message;
+        errorEl.hidden = !message;
+    }
+
+    /**
+     * 作成欄のインラインエラーをクリアする。
+     */
+    function clearBookmarkPanelError() {
+        showBookmarkPanelError("");
+    }
+
+    /**
+     * ブックマークを追加モード/閲覧モードに応じて描画する。
      */
     function renderBookmarks() {
         const container = ui.el.bookmarkList;
         if (!container) return;
 
+        syncBookmarkPanelMode();
+
         const sortedIds = getSortedBookmarkIds();
+        if (sortedIds.length === 0) {
+            container.replaceChildren(createEmptyBookmarkElement("ブックマークはまだありません。"));
+            return;
+        }
+
+        const addingMode = isAddingSongMode();
         container.replaceChildren(...sortedIds.map((id) => {
-            const p = data.bookmarks[id];
+            const bookmark = data.bookmarks[id];
             const item = document.createElement("div");
             item.className = "bookmark-item";
             item.dataset.bookmarkId = id;
-            item.innerHTML = `
-                <span class="bookmark-item-name"></span>
-                <span class="bookmark-item-count">${p.songs.length}</span>
-                <button class="bookmark-rename-btn" aria-label="ブックマーク名を変更">変更</button>
-                <button class="bookmark-delete-btn" aria-label="ブックマークを削除"><span>&times;</span></button>
-            `;
-            item.querySelector(".bookmark-item-name").textContent = p.name;
 
-            if (data.activeBookmark === id) {
+            if (addingMode) {
+                item.classList.add("bookmark-item-selecting");
+                item.innerHTML = `
+                    <span class="bookmark-item-name"></span>
+                    <span class="bookmark-item-count">${bookmark.songs.length}</span>
+                `;
+            } else {
+                item.innerHTML = `
+                    <span class="bookmark-item-name"></span>
+                    <span class="bookmark-item-count">${bookmark.songs.length}</span>
+                    <button class="bookmark-rename-btn" aria-label="ブックマーク名を変更">変更</button>
+                    <button class="bookmark-delete-btn" aria-label="ブックマークを削除"><span>&times;</span></button>
+                `;
+            }
+
+            item.querySelector(".bookmark-item-name").textContent = bookmark.name;
+
+            if (!addingMode && data.activeBookmark === id) {
                 item.classList.add("active");
             }
 
@@ -152,10 +217,22 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
                 const target = e.target instanceof Element ? e.target : null;
                 if (!target) return;
 
+                if (addingMode) {
+                    const result = normalizeActionResult(
+                        onAddSongToBookmark(id, ui.pendingBookmarkAction.songKey)
+                    );
+                    if (result.ok) {
+                        closeBookmarkModal();
+                        return;
+                    }
+                    notifyIfAddSongError(result);
+                    return;
+                }
+
                 const renameBtn = target.closest(".bookmark-rename-btn");
                 if (renameBtn) {
                     e.stopPropagation();
-                    const newName = prompt("新しいブックマーク名を入力してください:", p.name);
+                    const newName = prompt("新しいブックマーク名を入力してください:", bookmark.name);
                     if (newName === null) return;
                     const result = normalizeActionResult(onRenameBookmark(id, newName));
                     notifyIfRenameError(result);
@@ -165,7 +242,7 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
                 const deleteBtn = target.closest(".bookmark-delete-btn");
                 if (deleteBtn) {
                     e.stopPropagation();
-                    if (confirm(`ブックマーク「${p.name}」を削除しますか？`)) {
+                    if (confirm(`ブックマーク「${bookmark.name}」を削除しますか？`)) {
                         onDeleteBookmark(id);
                     }
                     return;
@@ -183,45 +260,100 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
     }
 
     /**
-     * 指定した曲を追加するためのブックマーク選択モーダルを開く。
+     * 新規ブックマークを作成し、保留中の曲を追加する。
+     */
+    function createBookmarkFromPanel() {
+        const nameInput = ui.el.bookmarkPanelNewName;
+        if (!nameInput) return;
+
+        const newName = nameInput.value.trim();
+        if (!newName) {
+            showBookmarkPanelError("ブックマーク名を入力してください。");
+            nameInput.focus();
+            return;
+        }
+
+        clearBookmarkPanelError();
+
+        const result = isAddingSongMode()
+            ? normalizeActionResult(onCreateBookmarkAndAdd(newName, ui.pendingBookmarkAction.songKey))
+            : normalizeActionResult(onCreateBookmark(newName));
+        if (result.ok) {
+            nameInput.value = "";
+            clearBookmarkPanelError();
+            if (isAddingSongMode()) {
+                closeBookmarkModal();
+            } else {
+                renderBookmarks();
+                nameInput.focus();
+            }
+            return;
+        }
+        if (result.reason === "empty_name") {
+            showBookmarkPanelError("ブックマーク名を入力してください。");
+            nameInput.focus();
+            return;
+        }
+        notifyIfLimitError(result);
+    }
+
+    /**
+     * ブックマークパネルのイベントを登録する。
+     */
+    function setupBookmarkHandlers() {
+        const createBtn = ui.el.bookmarkPanelCreateBtn;
+        const nameInput = ui.el.bookmarkPanelNewName;
+        if (createBtn) {
+            createBtn.addEventListener("click", createBookmarkFromPanel);
+        }
+        if (nameInput) {
+            nameInput.addEventListener("input", clearBookmarkPanelError);
+            nameInput.addEventListener("keydown", (e) => {
+                if (e.key === "Enter") {
+                    e.preventDefault();
+                    createBookmarkFromPanel();
+                }
+            });
+        }
+    }
+
+    /**
+     * 閲覧モードでブックマークパネルを開く。
+     */
+    function openBookmarkBrowser() {
+        ui.pendingBookmarkAction = null;
+        clearBookmarkPanelError();
+        renderBookmarks();
+        showBookmarkPanel();
+        if (ui.el.closeBookmarkPanelBtn) {
+            ui.el.closeBookmarkPanelBtn.focus();
+        }
+    }
+
+    /**
+     * 指定した曲を追加するためのブックマーク選択パネルを開く。
      * @param {*} songKey
      */
     function openBookmarkModal(songKey) {
         ui.pendingBookmarkAction = { songKey };
-        ui.el.bookmarkModal.hidden = false;
-
-        const modalList = ui.el.bookmarkModalList;
-        modalList.replaceChildren();
-
-        const sortedIds = getSortedBookmarkIds();
-        sortedIds.forEach((id) => {
-            const p = data.bookmarks[id];
-            const item = document.createElement("div");
-            item.className = "bookmark-modal-item";
-            item.textContent = p.name;
-            item.addEventListener("click", () => {
-                const result = normalizeActionResult(onAddSongToBookmark(id, songKey));
-                if (result.ok) {
-                    closeBookmarkModal();
-                    return;
-                }
-                if (!notifyIfLimitError(result)) {
-                    closeBookmarkModal();
-                }
-            });
-            modalList.appendChild(item);
-        });
-
-        ui.el.bookmarkModalNewName.value = "";
-        ui.el.bookmarkModalNewName.focus();
+        clearBookmarkPanelError();
+        renderBookmarks();
+        showBookmarkPanel();
+        if (ui.el.bookmarkPanelNewName) {
+            ui.el.bookmarkPanelNewName.focus();
+        } else if (ui.el.closeBookmarkPanelBtn) {
+            ui.el.closeBookmarkPanelBtn.focus();
+        }
     }
 
     /**
-     * ブックマークモーダルを閉じ、保留中の操作をクリアする。
+     * ブックマーク追加モードを終了し、専用パネルを閉じる。
      */
     function closeBookmarkModal() {
-        ui.el.bookmarkModal.hidden = true;
         ui.pendingBookmarkAction = null;
+        clearBookmarkPanelError();
+        hideBookmarkPanel();
+        renderBookmarks();
     }
 
     /**
@@ -260,6 +392,7 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
     return {
         setupBookmarkHandlers,
         renderBookmarks,
+        openBookmarkBrowser,
         openBookmarkModal,
         closeBookmarkModal,
         setActiveBookmark,

@@ -35,7 +35,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="styles.css?v=5">
+  <link rel="stylesheet" href="styles.css?v=7">
 </head>
 <body>
 
@@ -141,6 +141,11 @@
         <button id="close-bookmark-sidebar" class="close-btn" aria-label="閉じる">&times;</button>
       </div>
       <div class="bookmark-sidebar-body">
+        <div id="bookmark-panel-create" class="bookmark-panel-create">
+          <input type="text" id="bookmark-panel-new-name" placeholder="新規ブックマーク名" aria-label="新規ブックマーク名">
+          <button id="bookmark-panel-create-btn" type="button">作成</button>
+          <div id="bookmark-panel-error" class="bookmark-panel-error" hidden></div>
+        </div>
         <div id="bookmark-list" class="bookmark-list"></div>
       </div>
     </div>
@@ -169,23 +174,6 @@
       </p>
     </footer>
   </main>
-
-  <div id="bookmark-modal" class="bookmark-modal-overlay" aria-modal="true" role="dialog" aria-labelledby="bookmark-modal-title" hidden>
-    <div class="bookmark-modal-content">
-      <div class="bookmark-modal-header">
-        <h3 id="bookmark-modal-title">ブックマークに追加</h3>
-        <button id="bookmark-modal-close" class="close-btn" aria-label="閉じる">&times;</button>
-      </div>
-      <div id="bookmark-modal-body" class="bookmark-modal-body">
-        <div id="bookmark-modal-list"></div>
-        <div class="bookmark-modal-actions">
-          <input type="text" id="bookmark-modal-new-name" placeholder="新規ブックマーク名">
-          <button id="bookmark-modal-create-btn">作成して追加</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <script type="module" src="script.js?v=5"></script>
+  <script type="module" src="script.js?v=7"></script>
 </body>
 </html>

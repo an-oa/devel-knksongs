@@ -80,6 +80,31 @@ test("createBookmarkAndAdd: rejects when bookmark count limit is reached", () =>
     }
 });
 
+test("createBookmark: succeeds under limit and creates empty bookmark", () => {
+    const prevLocalStorage = globalThis.localStorage;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        const { controller, data, getRenderCount, getScheduleCount } = setupStorageController({
+            bookmarks: {
+                b1: { name: "A", songs: ["s1"], createdAt: 1 }
+            },
+            activeBookmark: null,
+            maxBookmarkCount: 20,
+            maxSongsPerBookmark: 120
+        });
+
+        const result = controller.createBookmark("B");
+        assert.equal(result.ok, true);
+        assert.equal(typeof result.id, "string");
+        assert.equal(data.bookmarks[result.id].name, "B");
+        assert.deepEqual(data.bookmarks[result.id].songs, []);
+        assert.equal(getRenderCount(), 1);
+        assert.equal(getScheduleCount(), 0);
+    } finally {
+        globalThis.localStorage = prevLocalStorage;
+    }
+});
+
 test("addSongToBookmark: rejects when per-bookmark song limit is reached", () => {
     const prevLocalStorage = globalThis.localStorage;
     globalThis.localStorage = createFakeLocalStorage();

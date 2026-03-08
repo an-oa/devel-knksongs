@@ -233,24 +233,44 @@ export function createStorageController({ data, ui, constants, callbacks }) {
     }
 
     /**
-     * 新規ブックマークを作成し、指定曲を初期登録する。
+     * 新規ブックマークを作成する共通処理。
      * @param {*} bookmarkName
-     * @param {*} songKey
+     * @param {Array<string>} initialSongs
      */
-    function createBookmarkAndAdd(bookmarkName, songKey) {
+    function createBookmarkRecord(bookmarkName, initialSongs) {
         if (Object.keys(data.bookmarks).length >= MAX_BOOKMARK_COUNT) {
             return buildActionFail("max_bookmark_count", { limit: MAX_BOOKMARK_COUNT });
         }
+        if (typeof bookmarkName !== "string") return buildActionFail("invalid_name_type");
+        const trimmedName = bookmarkName.trim();
+        if (!trimmedName) return buildActionFail("empty_name");
         const now = Date.now();
         const newId = `p_${now}`;
         data.bookmarks[newId] = {
-            name: bookmarkName,
-            songs: [songKey],
+            name: trimmedName,
+            songs: Array.isArray(initialSongs) ? initialSongs.slice() : [],
             createdAt: now
         };
         saveBookmarks();
         renderBookmarks();
         return buildActionOk({ id: newId });
+    }
+
+    /**
+     * 新規ブックマークを空の状態で作成する。
+     * @param {*} bookmarkName
+     */
+    function createBookmark(bookmarkName) {
+        return createBookmarkRecord(bookmarkName, []);
+    }
+
+    /**
+     * 新規ブックマークを作成し、指定曲を初期登録する。
+     * @param {*} bookmarkName
+     * @param {*} songKey
+     */
+    function createBookmarkAndAdd(bookmarkName, songKey) {
+        return createBookmarkRecord(bookmarkName, [songKey]);
     }
 
     /**
@@ -363,6 +383,7 @@ export function createStorageController({ data, ui, constants, callbacks }) {
         saveBookmarks,
         migrateLegacyBookmarkSongRefs,
         addSongToBookmark,
+        createBookmark,
         createBookmarkAndAdd,
         deleteBookmark,
         renameBookmark,

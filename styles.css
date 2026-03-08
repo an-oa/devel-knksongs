@@ -183,6 +183,46 @@ body.hide-thumbs .thumb {
   flex: 1 1 auto;
 }
 
+.bookmark-panel-create {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 8px;
+  row-gap: 6px;
+  align-items: start;
+  margin-bottom: 12px;
+}
+
+.bookmark-panel-create input {
+  width: 100%;
+  min-width: 0;
+  font-size: 14px;
+}
+
+.bookmark-panel-error {
+  grid-column: 1 / -1;
+  color: #c62828;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.bookmark-panel-create button {
+  flex: 0 0 auto;
+  border: none;
+  border-radius: 8px;
+  background: var(--primary-color);
+  color: #fff;
+  min-height: 40px;
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
 .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .section-label { display: block; font-size: 11px; font-weight: bold; color: var(--text-mute); }
 .text-clear-btn { background: none; border: none; color: var(--primary-color); font-size: 11px; cursor: pointer; padding: 0; text-decoration: underline; }
@@ -447,6 +487,10 @@ input:checked + .slider:before { transform: translateX(16px); }
   border-color: var(--primary-color);
 }
 
+.bookmark-item.bookmark-item-selecting:hover {
+  color: var(--primary-color);
+}
+
 .bookmark-item.active {
   color: var(--primary-color);
   font-weight: bold;
@@ -463,6 +507,15 @@ input:checked + .slider:before { transform: translateX(16px); }
   font-size: 11px;
   color: var(--text-mute);
   margin-left: 8px;
+}
+
+.bookmark-empty-state {
+  padding: 14px 12px;
+  border: 1px dashed var(--border-color);
+  border-radius: 8px;
+  color: var(--text-mute);
+  font-size: 13px;
+  text-align: center;
 }
 
 .bookmark-rename-btn,
@@ -510,96 +563,6 @@ input:checked + .slider:before { transform: translateX(16px); }
 .bookmark-rename-btn:hover,
 .bookmark-delete-btn:hover {
   color: var(--text-color);
-}
-
-/* Bookmark Modal */
-.bookmark-modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2000;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.3s;
-}
-
-.bookmark-modal-overlay:not([hidden]) {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.bookmark-modal-content {
-  background: var(--sidebar-bg);
-  border-radius: 8px;
-  width: 90%;
-  max-width: 320px;
-  max-height: 80vh;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-}
-
-.bookmark-modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.bookmark-modal-header h3 {
-  margin: 0;
-  font-size: 16px;
-}
-
-.bookmark-modal-body {
-  padding: 20px;
-  overflow-y: auto;
-  flex-grow: 1;
-}
-
-#bookmark-modal-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 20px;
-}
-
-.bookmark-modal-item {
-  padding: 12px;
-  border-radius: 6px;
-  background: var(--card-bg);
-  border: 1px solid var(--border-color);
-  cursor: pointer;
-  font-size: 14px;
-}
-.bookmark-modal-item:hover {
-  border-color: var(--primary-color);
-}
-
-
-.bookmark-modal-actions {
-  display: flex;
-  gap: 10px;
-}
-
-.bookmark-modal-actions input {
-  flex-grow: 1;
-  font-size: 14px;
-}
-
-.bookmark-modal-actions button {
-  background-color: var(--primary-color);
-  color: white;
-  border: none;
-  padding: 0 15px;
-  font-size: 13px;
-  border-radius: 6px;
-  cursor: pointer;
-  white-space: nowrap;
 }
 
 /* Bookmark Song Actions */

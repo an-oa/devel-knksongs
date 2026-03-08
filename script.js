@@ -18,13 +18,13 @@ import {
     data,
     ui,
     youtube
-} from "./state.mjs?v=3";
-import { createSearchController } from "./search.mjs?v=3";
-import { createRenderController } from "./render.mjs?v=3";
-import { createYoutubeController, extractYoutubeInfo } from "./youtube.mjs?v=3";
-import { createStorageController } from "./storage.mjs?v=3";
-import { createBookmarkUiController } from "./bookmark-ui.mjs?v=3";
-import { parseCsvToSongs } from "./csv-parser.mjs?v=3";
+} from "./state.mjs?v=5";
+import { createSearchController } from "./search.mjs?v=5";
+import { createRenderController } from "./render.mjs?v=5";
+import { createYoutubeController, extractYoutubeInfo } from "./youtube.mjs?v=5";
+import { createStorageController } from "./storage.mjs?v=5";
+import { createBookmarkUiController } from "./bookmark-ui.mjs?v=5";
+import { parseCsvToSongs } from "./csv-parser.mjs?v=5";
 
 /**
  * @typedef {Object} SongRow
@@ -107,6 +107,7 @@ bookmarkUiController = createBookmarkUiController({
         clearSearchDebounce,
         scheduleSearch,
         onAddSongToBookmark: (bookmarkId, songKey) => storageController.addSongToBookmark(bookmarkId, songKey),
+        onCreateBookmark: (bookmarkName) => storageController.createBookmark(bookmarkName),
         onCreateBookmarkAndAdd: (bookmarkName, songKey) => storageController.createBookmarkAndAdd(bookmarkName, songKey),
         onDeleteBookmark: (bookmarkId) => storageController.deleteBookmark(bookmarkId),
         onRenameBookmark: (bookmarkId, newName) => storageController.renameBookmark(bookmarkId, newName),
@@ -187,12 +188,11 @@ async function initUI() {
         bookmarkSidebarPanel: document.getElementById('bookmark-sidebar-panel'),
         closeBookmarkPanelBtn: document.getElementById('close-bookmark-panel'),
         closeBookmarkSidebarBtn: document.getElementById('close-bookmark-sidebar'),
+        bookmarkPanelCreate: document.getElementById('bookmark-panel-create'),
+        bookmarkPanelNewName: document.getElementById('bookmark-panel-new-name'),
+        bookmarkPanelError: document.getElementById('bookmark-panel-error'),
+        bookmarkPanelCreateBtn: document.getElementById('bookmark-panel-create-btn'),
         bookmarkList: document.getElementById('bookmark-list'),
-        bookmarkModal: document.getElementById('bookmark-modal'),
-        bookmarkModalClose: document.getElementById('bookmark-modal-close'),
-        bookmarkModalList: document.getElementById('bookmark-modal-list'),
-        bookmarkModalNewName: document.getElementById('bookmark-modal-new-name'),
-        bookmarkModalCreateBtn: document.getElementById('bookmark-modal-create-btn')
     };
     if (isIOSWebKit()) document.documentElement.classList.add('ios');
 
@@ -271,11 +271,10 @@ function setupUIHandlers() {
     const dateToYear = ui.el.dateToYear;
     const dateToMonth = ui.el.dateToMonth;
     const dateToDay = ui.el.dateToDay;
-    const bookmarkPanel = ui.el.bookmarkSidebarPanel;
     let lastFocusedElement = null;
 
     openBtn.addEventListener('click', () => {
-        if (bookmarkPanel) bookmarkPanel.hidden = true;
+        bookmarkUiController.closeBookmarkModal();
         sidebar.classList.add('active');
         overlay.classList.add('show');
         sidebar.setAttribute('aria-hidden', 'false');
@@ -284,7 +283,7 @@ function setupUIHandlers() {
     });
 
     const closeMenu = () => {
-        closeBookmarkPanel({ restoreFocus: false });
+        bookmarkUiController.closeBookmarkModal();
         blurSidebarActiveElement(sidebar);
         sidebar.classList.remove('active');
         overlay.classList.remove('show');
@@ -298,14 +297,20 @@ function setupUIHandlers() {
 
     closeBtn.addEventListener('click', closeMenu);
     overlay.addEventListener('click', closeMenu);
-    ui.el.openBookmarkPanelBtn.addEventListener('click', openBookmarkPanel);
-    ui.el.closeBookmarkPanelBtn.addEventListener('click', () => closeBookmarkPanel({ restoreFocus: true }));
+    ui.el.openBookmarkPanelBtn.addEventListener('click', () => {
+        bookmarkUiController.openBookmarkBrowser();
+    });
+    ui.el.closeBookmarkPanelBtn.addEventListener('click', () => {
+        bookmarkUiController.closeBookmarkModal();
+        ui.el.openBookmarkPanelBtn.focus();
+    });
     ui.el.closeBookmarkSidebarBtn.addEventListener('click', closeMenu);
     document.addEventListener('keydown', (e) => {
         if (e.key === "Escape") {
-            if (bookmarkPanel && !bookmarkPanel.hidden) {
+            if (ui.el.bookmarkSidebarPanel && !ui.el.bookmarkSidebarPanel.hidden) {
                 e.preventDefault();
-                closeBookmarkPanel({ restoreFocus: true });
+                bookmarkUiController.closeBookmarkModal();
+                ui.el.openBookmarkPanelBtn.focus();
                 return;
             }
             closeMenu();
@@ -372,20 +377,6 @@ function setupUIHandlers() {
 
     clearBtn.addEventListener('click', clearSearch);
     setupBookmarkHandlers();
-
-    function openBookmarkPanel() {
-        if (!bookmarkPanel) return;
-        bookmarkPanel.hidden = false;
-        ui.el.closeBookmarkPanelBtn.focus();
-    }
-
-    function closeBookmarkPanel(options) {
-        if (!bookmarkPanel || bookmarkPanel.hidden) return;
-        bookmarkPanel.hidden = true;
-        if (options && options.restoreFocus) {
-            ui.el.openBookmarkPanelBtn.focus();
-        }
-    }
 }
 
 /**
@@ -417,6 +408,11 @@ function setupBookmarkHandlers() {
  * @param {*} songKey
  */
 function openBookmarkModal(songKey) {
+    const sidebar = document.getElementById('sidebar');
+    const openBtn = document.getElementById('open-sidebar');
+    if (!sidebar.classList.contains('active')) {
+        openBtn.click();
+    }
     bookmarkUiController.openBookmarkModal(songKey);
 }
 
