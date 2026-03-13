@@ -856,6 +856,123 @@ test("render: drag handle is bookmark-only and reorder works in both directions 
     }
 });
 
+test("render: active playback card can move back left without jumping to the end", () => {
+    const cleanup = installFakeDom();
+    try {
+        const rowA = makeRenderRow({ songKey: "a::1", sourceIndex: 1, title: "A" });
+        const rowB = makeRenderRow({ songKey: "b::2", sourceIndex: 2, title: "B" });
+        const rowC = makeRenderRow({ songKey: "c::3", sourceIndex: 3, title: "C" });
+        const rowD = makeRenderRow({ songKey: "d::4", sourceIndex: 4, title: "D" });
+        const data = {
+            currentResults: [rowA, rowB, rowC, rowD],
+            displayLimit: 10,
+            activeBookmark: "bm1",
+            bookmarks: {
+                bm1: {
+                    name: "test",
+                    songs: [rowA.songKey, rowB.songKey, rowC.songKey, rowD.songKey]
+                }
+            }
+        };
+        const ui = {
+            activeThumb: null,
+            showThumbnails: false,
+            scrollObserver: null,
+            cardEntriesBySourceKey: new Map(),
+            selectedFormats: new Set(["配信"]),
+            dataReady: true,
+            el: {
+                resultList: document.createElement("div"),
+                loadMoreContainer: document.createElement("div")
+            }
+        };
+        const controller = createRenderController({
+            data,
+            ui,
+            isAllFormatsSelected: () => true
+        });
+        controller.setDependencies({
+            getSearchState: () => ({ queryRaw: "" }),
+            isRecommendedMode: () => false,
+            updateThumbnail: () => {},
+            extractYoutubeInfo: () => ({ videoId: "video1", startSeconds: 0 }),
+            restoreActivePlayback: () => {},
+            saveBookmarks: () => {}
+        });
+
+        controller.updateDisplay();
+        const entryA = ui.cardEntriesBySourceKey.get(`song:${rowA.songKey}`);
+        const entryB = ui.cardEntriesBySourceKey.get(`song:${rowB.songKey}`);
+        assert.ok(entryA);
+        assert.ok(entryB);
+
+        ui.activeThumb = entryA.thumbDiv;
+        ui.activeThumb.appendChild(document.createElement("iframe"));
+        const movedNodes = [];
+        const originalInsertBefore = ui.el.resultList.insertBefore.bind(ui.el.resultList);
+        ui.el.resultList.insertBefore = (node, referenceNode) => {
+            movedNodes.push(node);
+            return originalInsertBefore(node, referenceNode);
+        };
+
+        const transferRight = createDataTransferMock();
+        invokeListener(entryA.dragHandle, "dragstart", {
+            currentTarget: entryA.dragHandle,
+            target: entryA.dragHandle,
+            dataTransfer: transferRight,
+            preventDefault() {}
+        });
+        invokeListener(entryB.card, "drop", {
+            target: entryB.card,
+            dataTransfer: transferRight,
+            preventDefault() {}
+        });
+        assert.deepEqual(data.currentResults.map((row) => row.songKey), [
+            rowB.songKey,
+            rowA.songKey,
+            rowC.songKey,
+            rowD.songKey
+        ]);
+
+        const transferLeft = createDataTransferMock();
+        invokeListener(entryA.dragHandle, "dragstart", {
+            currentTarget: entryA.dragHandle,
+            target: entryA.dragHandle,
+            dataTransfer: transferLeft,
+            preventDefault() {}
+        });
+        invokeListener(entryB.card, "drop", {
+            target: entryB.card,
+            dataTransfer: transferLeft,
+            preventDefault() {}
+        });
+
+        assert.deepEqual(data.currentResults.map((row) => row.songKey), [
+            rowA.songKey,
+            rowB.songKey,
+            rowC.songKey,
+            rowD.songKey
+        ]);
+        assert.deepEqual(data.bookmarks.bm1.songs, [
+            rowA.songKey,
+            rowB.songKey,
+            rowC.songKey,
+            rowD.songKey
+        ]);
+        assert.deepEqual(
+            ui.el.resultList.children.map((card) => card.dataset.songKey),
+            [rowA.songKey, rowB.songKey, rowC.songKey, rowD.songKey]
+        );
+        assert.equal(
+            movedNodes.includes(entryA.card),
+            false,
+            "active playback card should stay mounted to preserve current position"
+        );
+    } finally {
+        cleanup();
+    }
+});
+
 test("youtube: disconnected active thumb is cleared without restore work", () => {
     const cleanup = installFakeDom();
     try {

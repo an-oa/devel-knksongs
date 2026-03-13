@@ -405,17 +405,22 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
             if (!keepSet.has(child)) container.removeChild(child);
         });
 
-        let cursor = container.firstChild;
-        for (const node of nodes) {
-            if (node === pinnedActiveCard) {
-                if (cursor === pinnedActiveCard) cursor = cursor.nextSibling;
-                continue;
+        const pinnedIndex = nodes.indexOf(pinnedActiveCard);
+        if (pinnedIndex === -1) return;
+
+        for (let i = 0; i < pinnedIndex; i++) {
+            const node = nodes[i];
+            if (node !== pinnedActiveCard) {
+                container.insertBefore(node, pinnedActiveCard);
             }
-            if (node === cursor) {
-                cursor = cursor.nextSibling;
-                continue;
-            }
-            container.insertBefore(node, cursor);
+        }
+
+        let anchor = null;
+        for (let i = nodes.length - 1; i > pinnedIndex; i--) {
+            const node = nodes[i];
+            if (node === pinnedActiveCard) continue;
+            container.insertBefore(node, anchor);
+            anchor = node;
         }
     }
 
