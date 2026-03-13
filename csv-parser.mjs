@@ -40,11 +40,15 @@ function parseArchiveOrder(raw) {
 /**
  * 画面の向き列を正規化し、既知の値のみ返す。
  * @param {*} raw
+ * @param {number} rowNumber
  */
-function parseVideoOrientation(raw) {
+function parseVideoOrientation(raw, rowNumber) {
     const value = String(raw || "").trim();
     if (value === "縦") return "vertical";
     if (value === "横") return "landscape";
+    if (value !== "") {
+        console.warn(`CSV画面の向きが不正です: ${rowNumber}行目 "${value}"`);
+    }
     return "";
 }
 
@@ -132,7 +136,7 @@ export function parseCsvToSongs(csvText) {
             songKey: buildSongKey({ archiveId, archiveOrder }),
             legacySongKey,
             format: r[idx("形態")],
-            videoOrientation: parseVideoOrientation(r[idx("画面の向き")]),
+            videoOrientation: parseVideoOrientation(r[idx("画面の向き")], i + 2),
             isRelay: r[idx("歌枠リレー？")] === "◯",
             isHarmony: r[idx("ハモリあり？")] === "◯",
             title,

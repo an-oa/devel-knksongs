@@ -594,6 +594,26 @@ test("csv: explicit video orientation is parsed from 画面の向き", () => {
     assert.equal(songs[0].videoOrientation, "vertical");
 });
 
+test("csv: invalid 画面の向き value warns and falls back to auto detection", () => {
+    const csv = [
+        "#,配信日,画面の向き,公開範囲,形態,歌枠リレー？,ハモリあり？,##,曲名,アーティスト名,キョクメイ,アーティストメイ,URL,終了時刻,メモ",
+        "1,2026/03/11,縦型,全体,配信,,,1,KING,Kanaria feat. GUMI,キング,カナリアフィーチャリンググミ,https://www.youtube.com/watch?v=abc123&t=10s,0:09:41,"
+    ].join("\n");
+    const warnings = [];
+    const originalWarn = console.warn;
+    console.warn = (message) => {
+        warnings.push(String(message));
+    };
+    try {
+        const songs = parseCsvToSongs(csv);
+        assert.equal(songs.length, 1);
+        assert.equal(songs[0].videoOrientation, "");
+    } finally {
+        console.warn = originalWarn;
+    }
+    assert.deepEqual(warnings, ['CSV画面の向きが不正です: 2行目 "縦型"']);
+});
+
 test("render: explicit video orientation overrides URL heuristic", () => {
     const cleanup = installFakeDom();
     try {
