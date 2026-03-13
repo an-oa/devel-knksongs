@@ -5,13 +5,14 @@
 export function extractYoutubeInfo(url) {
     try {
         const u = new URL(url);
+        const isShorts = /\/shorts\/[^/?#]+/.test(u.pathname);
         const id = u.hostname === "youtu.be"
             ? u.pathname.slice(1)
             : (u.searchParams.get("v") || u.pathname.match(/\/shorts\/([^/?#]+)/)?.[1] || u.pathname.match(/\/live\/([^/?#]+)/)?.[1]);
         const t = u.searchParams.get("t") || u.searchParams.get("start") || "0";
-        return { videoId: id, startSeconds: parseInt(t, 10) || 0 };
+        return { videoId: id, startSeconds: parseInt(t, 10) || 0, isVertical: isShorts };
     } catch {
-        return { videoId: "", startSeconds: 0 };
+        return { videoId: "", startSeconds: 0, isVertical: false };
     }
 }
 
@@ -269,6 +270,15 @@ export function createYoutubeController({ ui, youtube, constants }) {
     }
 
     /**
+     * サムネイル/プレイヤー枠の向きをデータ属性へ反映する。
+     * @param {*} thumbDiv
+     * @param {*} yt
+     */
+    function setThumbnailOrientation(thumbDiv, yt) {
+        thumbDiv.dataset.videoOrientation = yt && yt.isVertical ? "vertical" : "landscape";
+    }
+
+    /**
      * 再生対象の同一性判定に使うキーを生成する。
      * @param {*} yt
      */
@@ -423,6 +433,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
      * @param {*} yt
      */
     function updateThumbnail(thumbDiv, yt) {
+        setThumbnailOrientation(thumbDiv, yt);
         const nextPlaybackKey = buildPlaybackKey(yt);
         if (isSamePlaybackTarget(thumbDiv, nextPlaybackKey)) {
             thumbDiv.dataset.videoId = yt.videoId;

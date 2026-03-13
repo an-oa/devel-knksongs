@@ -213,7 +213,10 @@ async function initUI() {
     setupThumbnailToggle();
     setupScrollObserver();
     setupSyncEvents();
-    window.addEventListener('resize', setupScrollObserver);
+    window.addEventListener('resize', () => {
+        setupScrollObserver();
+        renderController.refreshLayout();
+    });
     restoreSearchState();
     await loadInitialData();
 }

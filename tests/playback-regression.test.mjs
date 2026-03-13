@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createRenderController } from "../render.mjs";
 import { createSearchController } from "../search.mjs";
-import { createYoutubeController } from "../youtube.mjs";
+import { createYoutubeController, extractYoutubeInfo } from "../youtube.mjs";
 
 class FakeClassList {
     constructor() {
@@ -99,6 +99,14 @@ class FakeElement {
             node = node.parentElement;
         }
         return false;
+    }
+
+    get scrollHeight() {
+        return 100;
+    }
+
+    get clientHeight() {
+        return 100;
     }
 
     appendChild(child) {
@@ -457,6 +465,53 @@ test("render: active card hidden from next nodes stops playback", () => {
     }
 });
 
+test("render: cards get masonry row spans while preserving DOM order", () => {
+    const cleanup = installFakeDom();
+    try {
+        const rowA = makeRenderRow({ songKey: "a::1", sourceIndex: 1 });
+        const rowB = makeRenderRow({ songKey: "b::2", sourceIndex: 2, url: "https://www.youtube.com/shorts/video2" });
+        const data = {
+            currentResults: [rowA, rowB],
+            displayLimit: 10,
+            activeBookmark: null
+        };
+        const ui = {
+            activeThumb: null,
+            showThumbnails: false,
+            scrollObserver: null,
+            cardEntriesBySourceKey: new Map(),
+            selectedFormats: new Set(["配信"]),
+            dataReady: true,
+            el: {
+                resultList: document.createElement("div"),
+                loadMoreContainer: document.createElement("div")
+            }
+        };
+        const controller = createRenderController({
+            data,
+            ui,
+            isAllFormatsSelected: () => true
+        });
+        controller.setDependencies({
+            getSearchState: () => ({ queryRaw: "" }),
+            isRecommendedMode: () => false,
+            updateThumbnail: () => {},
+            extractYoutubeInfo: () => ({ videoId: "video1", startSeconds: 0 }),
+            restoreActivePlayback: () => {}
+        });
+
+        controller.updateDisplay();
+        const entryA = ui.cardEntriesBySourceKey.get(`song:${rowA.songKey}`);
+        const entryB = ui.cardEntriesBySourceKey.get(`song:${rowB.songKey}`);
+        assert.equal(ui.el.resultList.children[0], entryA.card);
+        assert.equal(ui.el.resultList.children[1], entryB.card);
+        assert.equal(entryA.card.style.gridRowEnd, "span 7");
+        assert.equal(entryB.card.style.gridRowEnd, "span 7");
+    } finally {
+        cleanup();
+    }
+});
+
 test("bookmark: shows load-more and increases by INCREMENT_COUNT (48)", () => {
     const cleanup = installFakeDom();
     try {
@@ -694,6 +749,44 @@ test("youtube: disconnected active thumb is cleared without restore work", () =>
 
         controller.restoreActivePlayback();
         assert.equal(ui.activeThumb, null);
+    } finally {
+        cleanup();
+    }
+});
+
+test("youtube: shorts url is treated as vertical playback target", () => {
+    const yt = extractYoutubeInfo("https://www.youtube.com/shorts/abc123?t=45");
+    assert.deepEqual(yt, { videoId: "abc123", startSeconds: 45, isVertical: true });
+});
+
+test("youtube: updateThumbnail reflects vertical orientation on thumb dataset", () => {
+    const cleanup = installFakeDom();
+    try {
+        const ui = {
+            showThumbnails: true,
+            activeThumb: null
+        };
+        const youtube = {
+            apiPromise: null,
+            players: new WeakMap()
+        };
+        const controller = createYoutubeController({
+            ui,
+            youtube,
+            constants: {
+                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
+                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
+                YT_IFRAME_READY_POLL_MS: 50,
+                STOP_PLAYBACK_ON_SCROLL_OUT: false
+            }
+        });
+
+        const thumb = document.createElement("div");
+        controller.updateThumbnail(thumb, { videoId: "short1", startSeconds: 0, isVertical: true });
+        assert.equal(thumb.dataset.videoOrientation, "vertical");
+
+        controller.updateThumbnail(thumb, { videoId: "video1", startSeconds: 0, isVertical: false });
+        assert.equal(thumb.dataset.videoOrientation, "landscape");
     } finally {
         cleanup();
     }

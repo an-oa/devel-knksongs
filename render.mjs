@@ -3,6 +3,8 @@
  * @param {*} ui
  */
 export function createRenderController({ data, ui, isAllFormatsSelected }) {
+    const MASONRY_AUTO_ROW_PX = 4;
+    const MASONRY_GAP_PX = 12;
     let getSearchState = () => ({
         queryRaw: "",
         relayOnly: false,
@@ -219,6 +221,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
         restoreActivePlayback();
         const emptyState = getEmptyStateDescriptor(getSearchState());
         container.replaceChildren(createEmptyStateElement(emptyState.message));
+        refreshLayout();
         loadMoreContainer.classList.add("hidden");
     }
 
@@ -444,6 +447,23 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
     }
 
     /**
+     * カード高さから疑似masonryレイアウト用の行スパンを再計算する。
+     */
+    function refreshLayout() {
+        const container = ui.el.resultList;
+        if (!container) return;
+        for (const node of Array.from(container.children)) {
+            if (!(node instanceof HTMLElement)) continue;
+            if (!node.classList.contains("song-card")) continue;
+            const contentHeight = Number.isFinite(node.scrollHeight) && node.scrollHeight > 0
+                ? node.scrollHeight
+                : node.getBoundingClientRect().height;
+            const span = Math.max(1, Math.ceil((contentHeight + MASONRY_GAP_PX) / (MASONRY_AUTO_ROW_PX + MASONRY_GAP_PX)));
+            node.style.gridRowEnd = `span ${span}`;
+        }
+    }
+
+    /**
      * 表示中カードのサムネイルをIntersectionObserverへ登録する。
      * @param {*} entries
      */
@@ -498,6 +518,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
         }
         const { nodes, entries } = buildResultNodes(results);
         reconcileResultNodes(container, nodes);
+        refreshLayout();
         return { entries };
     }
 
@@ -524,6 +545,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
 
     return {
         setDependencies,
-        updateDisplay
+        updateDisplay,
+        refreshLayout
     };
 }
