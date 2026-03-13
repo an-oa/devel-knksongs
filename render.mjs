@@ -3,8 +3,12 @@
  * @param {*} ui
  */
 export function createRenderController({ data, ui, isAllFormatsSelected }) {
-    const MASONRY_AUTO_ROW_PX = 4;
     const MASONRY_GAP_PX = 12;
+    const MASONRY_BREAKPOINTS = [
+        { minWidth: 1400, columns: 4 },
+        { minWidth: 1000, columns: 3 },
+        { minWidth: 600, columns: 2 }
+    ];
     let getSearchState = () => ({
         queryRaw: "",
         relayOnly: false,
@@ -227,7 +231,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
         restoreActivePlayback();
         const emptyState = getEmptyStateDescriptor(getSearchState());
         container.replaceChildren(createEmptyStateElement(emptyState.message));
-        refreshLayout();
+        container.style.height = "";
         loadMoreContainer.classList.add("hidden");
     }
 
@@ -452,8 +456,27 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
         reconcileNodesByOrder(container, nodes);
     }
 
+    function getMasonryColumnCount(containerWidth) {
+        for (const rule of MASONRY_BREAKPOINTS) {
+            if (containerWidth >= rule.minWidth) return rule.columns;
+        }
+        return 1;
+    }
+
+    function getShortestColumnIndex(columnHeights) {
+        let shortestIndex = 0;
+        let shortestHeight = columnHeights[0] || 0;
+        for (let i = 1; i < columnHeights.length; i++) {
+            if (columnHeights[i] < shortestHeight) {
+                shortestHeight = columnHeights[i];
+                shortestIndex = i;
+            }
+        }
+        return shortestIndex;
+    }
+
     /**
-     * カード高さから疑似masonryレイアウト用の行スパンを再計算する。
+     * DOM順を維持しながらカードを絶対配置のmasonryレイアウトへ再配置する。
      */
     function refreshLayout() {
         const container = ui.el.resultList;
@@ -462,17 +485,37 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
             node instanceof HTMLElement &&
             node.classList.contains("song-card")
         ));
+        if (cards.length === 0) {
+            container.style.height = "";
+            return;
+        }
+        const containerRect = container.getBoundingClientRect();
+        const containerWidth = container.clientWidth || containerRect.width || 0;
+        if (containerWidth <= 0) return;
+        const columnCount = getMasonryColumnCount(containerWidth);
+        const totalGap = MASONRY_GAP_PX * (columnCount - 1);
+        const columnWidth = Math.max(0, (containerWidth - totalGap) / columnCount);
+        const columnHeights = Array.from({ length: columnCount }, () => 0);
         for (const node of cards) {
-            node.style.gridRowEnd = "span 1";
+            node.style.width = `${columnWidth}px`;
+            node.style.left = "0px";
+            node.style.top = "0px";
+            node.style.transform = "translate(0px, 0px)";
         }
         for (const node of cards) {
-            if (!(node instanceof HTMLElement)) continue;
             const contentHeight = Number.isFinite(node.scrollHeight) && node.scrollHeight > 0
                 ? node.scrollHeight
                 : node.getBoundingClientRect().height;
-            const span = Math.max(1, Math.ceil((contentHeight + MASONRY_GAP_PX) / (MASONRY_AUTO_ROW_PX + MASONRY_GAP_PX)));
-            node.style.gridRowEnd = `span ${span}`;
+            const columnIndex = getShortestColumnIndex(columnHeights);
+            const top = columnHeights[columnIndex];
+            const left = (columnWidth + MASONRY_GAP_PX) * columnIndex;
+            node.style.left = `${left}px`;
+            node.style.top = `${top}px`;
+            node.style.transform = "none";
+            columnHeights[columnIndex] = top + contentHeight + MASONRY_GAP_PX;
         }
+        const tallest = Math.max(...columnHeights);
+        container.style.height = `${Math.max(0, tallest - MASONRY_GAP_PX)}px`;
     }
 
     /**

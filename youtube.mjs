@@ -232,6 +232,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
         thumbDiv.dataset.videoId = videoId;
         thumbDiv.dataset.playbackKey = playbackKey;
         thumbDiv.classList.remove("playing");
+        setExpandedCardState(thumbDiv, false);
         thumbDiv.onclick = null;
         thumbDiv.replaceChildren();
     }
@@ -287,6 +288,17 @@ export function createYoutubeController({ ui, youtube, constants }) {
      */
     function setThumbnailOrientation(thumbDiv, orientation) {
         thumbDiv.dataset.videoOrientation = orientation === "vertical" ? "vertical" : "landscape";
+    }
+
+    /**
+     * 縦再生で前面表示が必要なカード状態を切り替える。
+     * @param {*} thumbDiv
+     * @param {*} isExpanded
+     */
+    function setExpandedCardState(thumbDiv, isExpanded) {
+        const card = thumbDiv instanceof HTMLElement ? thumbDiv.closest(".song-card") : null;
+        if (!(card instanceof HTMLElement)) return;
+        card.classList.toggle("song-card-expanded", Boolean(isExpanded));
     }
 
     /**
@@ -413,6 +425,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
                 const videoId = thumb.dataset.videoId;
                 thumb.classList.remove("playing");
                 setThumbnailOrientation(thumb, "landscape");
+                setExpandedCardState(thumb, false);
                 if (videoId) {
                     applyThumbnailImage(thumb, videoId);
                 } else {
@@ -454,6 +467,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
         thumbDiv.dataset.playbackKey = "";
         setThumbnailOrientation(thumbDiv, "landscape");
         setPlaybackState(thumbDiv, "stopped");
+        setExpandedCardState(thumbDiv, false);
         if (videoId) {
             applyThumbnailImage(thumbDiv, videoId, { eager: true });
         } else {
@@ -486,6 +500,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
         thumbDiv.dataset.playbackKey = buildPlaybackKey(yt);
         setThumbnailOrientation(thumbDiv, yt && yt.isVertical ? "vertical" : "landscape");
         setPlaybackState(thumbDiv, "playing");
+        setExpandedCardState(thumbDiv, Boolean(yt && yt.isVertical));
         const ifr = document.createElement("iframe");
         ifr.src = youtubeApi.buildEmbedUrl(yt);
         ifr.allow = "autoplay; encrypted-media";
@@ -502,7 +517,6 @@ export function createYoutubeController({ ui, youtube, constants }) {
         });
         thumbDiv.replaceChildren(ifr, close);
         youtubeApi.attachPlayer(thumbDiv, ifr, yt);
-        refreshCardLayoutSoon(thumbDiv);
     }
 
     /**

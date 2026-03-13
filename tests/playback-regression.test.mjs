@@ -108,6 +108,12 @@ class FakeElement {
     }
 
     get clientHeight() {
+        if (typeof this._clientHeight === "number") return this._clientHeight;
+        return 100;
+    }
+
+    get clientWidth() {
+        if (typeof this._clientWidth === "number") return this._clientWidth;
         return 100;
     }
 
@@ -211,6 +217,7 @@ class FakeElement {
     }
 
     getBoundingClientRect() {
+        if (this._rect) return this._rect;
         return { top: 0, bottom: 100, left: 0, right: 100, width: 100, height: 100 };
     }
 }
@@ -502,6 +509,8 @@ test("render: cards get masonry row spans while preserving DOM order", () => {
             ui,
             isAllFormatsSelected: () => true
         });
+        ui.el.resultList._clientWidth = 700;
+        ui.el.resultList._rect = { top: 0, bottom: 200, left: 0, right: 700, width: 700, height: 200 };
         controller.setDependencies({
             getSearchState: () => ({ queryRaw: "" }),
             isRecommendedMode: () => false,
@@ -515,14 +524,19 @@ test("render: cards get masonry row spans while preserving DOM order", () => {
         const entryB = ui.cardEntriesBySourceKey.get(`song:${rowB.songKey}`);
         assert.equal(ui.el.resultList.children[0], entryA.card);
         assert.equal(ui.el.resultList.children[1], entryB.card);
-        assert.equal(entryA.card.style.gridRowEnd, "span 7");
-        assert.equal(entryB.card.style.gridRowEnd, "span 7");
+        assert.equal(entryA.card.style.width, "344px");
+        assert.equal(entryA.card.style.left, "0px");
+        assert.equal(entryA.card.style.top, "0px");
+        assert.equal(entryB.card.style.width, "344px");
+        assert.equal(entryB.card.style.left, "356px");
+        assert.equal(entryB.card.style.top, "0px");
+        assert.equal(ui.el.resultList.style.height, "100px");
     } finally {
         cleanup();
     }
 });
 
-test("render: refreshLayout shrinks row span after card height decreases", () => {
+test("render: refreshLayout shrinks container height after card height decreases", () => {
     const cleanup = installFakeDom();
     try {
         const row = makeRenderRow({ songKey: "a::1", sourceIndex: 1 });
@@ -560,11 +574,11 @@ test("render: refreshLayout shrinks row span after card height decreases", () =>
         const entry = ui.cardEntriesBySourceKey.get(`song:${row.songKey}`);
         entry.card._scrollHeight = 400;
         controller.refreshLayout();
-        assert.equal(entry.card.style.gridRowEnd, "span 26");
+        assert.equal(ui.el.resultList.style.height, "400px");
 
         entry.card._scrollHeight = 100;
         controller.refreshLayout();
-        assert.equal(entry.card.style.gridRowEnd, "span 7");
+        assert.equal(ui.el.resultList.style.height, "100px");
     } finally {
         cleanup();
     }
@@ -897,20 +911,32 @@ test("youtube: vertical videos stay landscape in thumbnail mode and switch on pl
                 STOP_PLAYBACK_ON_SCROLL_OUT: false
             }
         });
+        let layoutRefreshCount = 0;
+        controller.setLayoutHook(() => {
+            layoutRefreshCount += 1;
+        });
 
+        const card = document.createElement("div");
+        card.className = "song-card";
         const thumb = document.createElement("div");
+        card.appendChild(thumb);
         controller.updateThumbnail(thumb, { videoId: "short1", startSeconds: 0, isVertical: true });
         assert.equal(thumb.dataset.videoOrientation, "landscape");
+        assert.equal(card.classList.contains("song-card-expanded"), false);
 
         assert.equal(typeof thumb.onclick, "function");
         thumb.onclick();
         assert.equal(thumb.dataset.videoOrientation, "vertical");
+        assert.equal(card.classList.contains("song-card-expanded"), true);
+        assert.equal(layoutRefreshCount, 0);
 
         const close = thumb.querySelector("button");
         invokeListener(close, "click", {
             stopPropagation() {}
         });
         assert.equal(thumb.dataset.videoOrientation, "landscape");
+        assert.equal(card.classList.contains("song-card-expanded"), false);
+        assert.equal(layoutRefreshCount, 1);
     } finally {
         cleanup();
     }
