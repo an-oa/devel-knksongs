@@ -38,6 +38,17 @@ function parseArchiveOrder(raw) {
 }
 
 /**
+ * 画面の向き列を正規化し、既知の値のみ返す。
+ * @param {*} raw
+ */
+function parseVideoOrientation(raw) {
+    const value = String(raw || "").trim();
+    if (value === "縦") return "vertical";
+    if (value === "横") return "landscape";
+    return "";
+}
+
+/**
  * RFC4180ベースでCSV文字列を2次元配列へ解析する。
  * @param {*} t
  */
@@ -121,6 +132,7 @@ export function parseCsvToSongs(csvText) {
             songKey: buildSongKey({ archiveId, archiveOrder }),
             legacySongKey,
             format: r[idx("形態")],
+            videoOrientation: parseVideoOrientation(r[idx("画面の向き")]),
             isRelay: r[idx("歌枠リレー？")] === "◯",
             isHarmony: r[idx("ハモリあり？")] === "◯",
             title,

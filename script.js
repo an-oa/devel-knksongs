@@ -36,6 +36,7 @@ import { parseCsvToSongs } from "./csv-parser.mjs?v=4";
  * @property {string} songKey
  * @property {string} legacySongKey
  * @property {string} format
+ * @property {string} videoOrientation
  * @property {boolean} isRelay
  * @property {boolean} isHarmony
  * @property {string} title
@@ -137,6 +138,7 @@ searchController.setRenderHooks({
     scrollResultsPaneToTop
 });
 youtubeController.setDisplayHook(() => renderController.updateDisplay());
+youtubeController.setLayoutHook(() => renderController.refreshLayout());
 
 function scheduleSearch(options) { searchController.scheduleSearch(options); }
 function getSearchState() { return searchController.getSearchState(); }

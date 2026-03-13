@@ -102,7 +102,13 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
      * @param {*} row
      */
     function updateCardFromRow(entry, row) {
-        const yt = extractYoutubeInfo(row.url);
+        const extracted = extractYoutubeInfo(row.url);
+        const yt = {
+            ...extracted,
+            isVertical: row.videoOrientation
+                ? row.videoOrientation === "vertical"
+                : extracted.isVertical
+        };
         updateThumbnail(entry.thumbDiv, yt);
         updateTitleLink(entry.titleEl, row);
         entry.artistEl.textContent = row.artist || "不明";
@@ -452,9 +458,15 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
     function refreshLayout() {
         const container = ui.el.resultList;
         if (!container) return;
-        for (const node of Array.from(container.children)) {
+        const cards = Array.from(container.children).filter((node) => (
+            node instanceof HTMLElement &&
+            node.classList.contains("song-card")
+        ));
+        for (const node of cards) {
+            node.style.gridRowEnd = "span 1";
+        }
+        for (const node of cards) {
             if (!(node instanceof HTMLElement)) continue;
-            if (!node.classList.contains("song-card")) continue;
             const contentHeight = Number.isFinite(node.scrollHeight) && node.scrollHeight > 0
                 ? node.scrollHeight
                 : node.getBoundingClientRect().height;

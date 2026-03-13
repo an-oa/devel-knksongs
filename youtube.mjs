@@ -28,6 +28,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
         STOP_PLAYBACK_ON_SCROLL_OUT
     } = constants;
     let updateDisplay = () => {};
+    let refreshLayout = () => {};
 
     /**
      * サムネイル設定変更時に呼ぶ表示更新フックを登録する。
@@ -36,6 +37,16 @@ export function createYoutubeController({ ui, youtube, constants }) {
     function setDisplayHook(fn) {
         if (typeof fn === "function") {
             updateDisplay = fn;
+        }
+    }
+
+    /**
+     * レイアウト再計算フックを登録する。
+     * @param {*} fn
+     */
+    function setLayoutHook(fn) {
+        if (typeof fn === "function") {
+            refreshLayout = fn;
         }
     }
 
@@ -274,8 +285,69 @@ export function createYoutubeController({ ui, youtube, constants }) {
      * @param {*} thumbDiv
      * @param {*} yt
      */
-    function setThumbnailOrientation(thumbDiv, yt) {
-        thumbDiv.dataset.videoOrientation = yt && yt.isVertical ? "vertical" : "landscape";
+    function setThumbnailOrientation(thumbDiv, orientation) {
+        thumbDiv.dataset.videoOrientation = orientation === "vertical" ? "vertical" : "landscape";
+    }
+
+    /**
+     * 指定要素を含む最も近いスクロール可能祖先を返す。
+     * @param {*} element
+     */
+    function findScrollableAncestor(element) {
+        let current = element ? element.parentElement : null;
+        while (current) {
+            const style = window.getComputedStyle(current);
+            const overflowY = style ? style.overflowY : "";
+            const isScrollable = (overflowY === "auto" || overflowY === "scroll") && current.scrollHeight > current.clientHeight;
+            if (isScrollable) return current;
+            current = current.parentElement;
+        }
+        return document.scrollingElement instanceof HTMLElement ? document.scrollingElement : document.documentElement;
+    }
+
+    /**
+     * レイアウト更新後に元の見えていた位置へ戻すためのアンカー情報を作る。
+     * @param {*} element
+     */
+    function createViewportAnchor(element) {
+        if (!(element instanceof HTMLElement) || !element.isConnected) return null;
+        return {
+            element,
+            container: findScrollableAncestor(element),
+            top: element.getBoundingClientRect().top
+        };
+    }
+
+    /**
+     * アンカー要素の見えていた位置を維持するようスクロール位置を補正する。
+     * @param {*} anchor
+     */
+    function restoreViewportAnchor(anchor) {
+        if (!anchor || !(anchor.element instanceof HTMLElement) || !anchor.element.isConnected) return;
+        const nextTop = anchor.element.getBoundingClientRect().top;
+        const delta = nextTop - anchor.top;
+        if (Math.abs(delta) < 1) return;
+        const container = anchor.container;
+        if (container === document.body || container === document.documentElement || container === document.scrollingElement) {
+            window.scrollBy({ top: delta, behavior: "auto" });
+            return;
+        }
+        container.scrollTop += delta;
+    }
+
+    /**
+     * 高さ変化が反映された後にカードレイアウトを再計算する。
+     * @param {*} anchorElement
+     */
+    function refreshCardLayoutSoon(anchorElement) {
+        const anchor = createViewportAnchor(anchorElement);
+        requestAnimationFrame(() => {
+            refreshLayout();
+            restoreViewportAnchor(anchor);
+            requestAnimationFrame(() => {
+                restoreViewportAnchor(anchor);
+            });
+        });
     }
 
     /**
@@ -340,11 +412,13 @@ export function createYoutubeController({ ui, youtube, constants }) {
                 iframe.src = "about:blank";
                 const videoId = thumb.dataset.videoId;
                 thumb.classList.remove("playing");
+                setThumbnailOrientation(thumb, "landscape");
                 if (videoId) {
                     applyThumbnailImage(thumb, videoId);
                 } else {
                     thumb.replaceChildren();
                 }
+                refreshCardLayoutSoon(thumb);
             }
         });
     }
@@ -378,12 +452,14 @@ export function createYoutubeController({ ui, youtube, constants }) {
         if (iframe) iframe.src = "about:blank";
         thumbDiv.dataset.videoId = videoId;
         thumbDiv.dataset.playbackKey = "";
+        setThumbnailOrientation(thumbDiv, "landscape");
         setPlaybackState(thumbDiv, "stopped");
         if (videoId) {
             applyThumbnailImage(thumbDiv, videoId, { eager: true });
         } else {
             thumbDiv.replaceChildren();
         }
+        refreshCardLayoutSoon(thumbDiv);
     }
 
     /**
@@ -408,6 +484,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
         setActiveThumb(thumbDiv);
         thumbDiv.dataset.videoId = yt.videoId;
         thumbDiv.dataset.playbackKey = buildPlaybackKey(yt);
+        setThumbnailOrientation(thumbDiv, yt && yt.isVertical ? "vertical" : "landscape");
         setPlaybackState(thumbDiv, "playing");
         const ifr = document.createElement("iframe");
         ifr.src = youtubeApi.buildEmbedUrl(yt);
@@ -425,6 +502,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
         });
         thumbDiv.replaceChildren(ifr, close);
         youtubeApi.attachPlayer(thumbDiv, ifr, yt);
+        refreshCardLayoutSoon(thumbDiv);
     }
 
     /**
@@ -433,13 +511,14 @@ export function createYoutubeController({ ui, youtube, constants }) {
      * @param {*} yt
      */
     function updateThumbnail(thumbDiv, yt) {
-        setThumbnailOrientation(thumbDiv, yt);
         const nextPlaybackKey = buildPlaybackKey(yt);
         if (isSamePlaybackTarget(thumbDiv, nextPlaybackKey)) {
             thumbDiv.dataset.videoId = yt.videoId;
+            setThumbnailOrientation(thumbDiv, yt && yt.isVertical ? "vertical" : "landscape");
             return;
         }
         resetThumbnailContainer(thumbDiv, yt.videoId, nextPlaybackKey);
+        setThumbnailOrientation(thumbDiv, "landscape");
 
         if (!ui.showThumbnails) return;
         if (!yt.videoId) return;
@@ -457,6 +536,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
 
     return {
         setDisplayHook,
+        setLayoutHook,
         isIOSWebKit,
         setupThumbnailToggle,
         applyThumbnailFromStorage,

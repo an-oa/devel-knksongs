@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { parseCsvToSongs } from "../csv-parser.mjs";
 import { createRenderController } from "../render.mjs";
 import { createSearchController } from "../search.mjs";
 import { createYoutubeController, extractYoutubeInfo } from "../youtube.mjs";
@@ -102,6 +103,7 @@ class FakeElement {
     }
 
     get scrollHeight() {
+        if (typeof this._scrollHeight === "number") return this._scrollHeight;
         return 100;
     }
 
@@ -239,6 +241,7 @@ function installFakeDom() {
     const document = {
         body,
         head,
+        scrollingElement: body,
         documentElement: { clientHeight: 720 },
         createElement(tagName) {
             return new FakeElement(tagName);
@@ -251,7 +254,13 @@ function installFakeDom() {
     };
 
     setGlobalValue("document", document);
-    setGlobalValue("window", { innerHeight: 720 });
+    setGlobalValue("window", {
+        innerHeight: 720,
+        scrollBy() {},
+        getComputedStyle() {
+            return { overflowY: "visible" };
+        }
+    });
     setGlobalValue("HTMLElement", FakeElement);
     setGlobalValue("navigator", { maxTouchPoints: 0 });
     setGlobalValue("location", { origin: "https://example.test" });
@@ -293,6 +302,7 @@ function makeRenderRow(input) {
         artist: input.artist || "artist",
         date: input.date || "2024-01-01",
         format: input.format || "配信",
+        videoOrientation: input.videoOrientation || "",
         isRelay: false,
         isHarmony: false,
         url: input.url || "https://youtu.be/video1"
@@ -507,6 +517,113 @@ test("render: cards get masonry row spans while preserving DOM order", () => {
         assert.equal(ui.el.resultList.children[1], entryB.card);
         assert.equal(entryA.card.style.gridRowEnd, "span 7");
         assert.equal(entryB.card.style.gridRowEnd, "span 7");
+    } finally {
+        cleanup();
+    }
+});
+
+test("render: refreshLayout shrinks row span after card height decreases", () => {
+    const cleanup = installFakeDom();
+    try {
+        const row = makeRenderRow({ songKey: "a::1", sourceIndex: 1 });
+        const data = {
+            currentResults: [row],
+            displayLimit: 10,
+            activeBookmark: null
+        };
+        const ui = {
+            activeThumb: null,
+            showThumbnails: false,
+            scrollObserver: null,
+            cardEntriesBySourceKey: new Map(),
+            selectedFormats: new Set(["配信"]),
+            dataReady: true,
+            el: {
+                resultList: document.createElement("div"),
+                loadMoreContainer: document.createElement("div")
+            }
+        };
+        const controller = createRenderController({
+            data,
+            ui,
+            isAllFormatsSelected: () => true
+        });
+        controller.setDependencies({
+            getSearchState: () => ({ queryRaw: "" }),
+            isRecommendedMode: () => false,
+            updateThumbnail: () => {},
+            extractYoutubeInfo: () => ({ videoId: "video1", startSeconds: 0 }),
+            restoreActivePlayback: () => {}
+        });
+
+        controller.updateDisplay();
+        const entry = ui.cardEntriesBySourceKey.get(`song:${row.songKey}`);
+        entry.card._scrollHeight = 400;
+        controller.refreshLayout();
+        assert.equal(entry.card.style.gridRowEnd, "span 26");
+
+        entry.card._scrollHeight = 100;
+        controller.refreshLayout();
+        assert.equal(entry.card.style.gridRowEnd, "span 7");
+    } finally {
+        cleanup();
+    }
+});
+
+test("csv: explicit video orientation is parsed from 画面の向き", () => {
+    const csv = [
+        "#,配信日,画面の向き,公開範囲,形態,歌枠リレー？,ハモリあり？,##,曲名,アーティスト名,キョクメイ,アーティストメイ,URL,終了時刻,メモ",
+        "1,2026/03/11,縦,全体,配信,,,1,KING,Kanaria feat. GUMI,キング,カナリアフィーチャリンググミ,https://www.youtube.com/watch?v=abc123&t=10s,0:09:41,"
+    ].join("\n");
+    const songs = parseCsvToSongs(csv);
+    assert.equal(songs.length, 1);
+    assert.equal(songs[0].videoOrientation, "vertical");
+});
+
+test("render: explicit video orientation overrides URL heuristic", () => {
+    const cleanup = installFakeDom();
+    try {
+        const row = makeRenderRow({
+            songKey: "a::1",
+            sourceIndex: 1,
+            url: "https://youtu.be/video1",
+            videoOrientation: "vertical"
+        });
+        const data = {
+            currentResults: [row],
+            displayLimit: 10,
+            activeBookmark: null
+        };
+        const ui = {
+            activeThumb: null,
+            showThumbnails: false,
+            scrollObserver: null,
+            cardEntriesBySourceKey: new Map(),
+            selectedFormats: new Set(["配信"]),
+            dataReady: true,
+            el: {
+                resultList: document.createElement("div"),
+                loadMoreContainer: document.createElement("div")
+            }
+        };
+        let received = null;
+        const controller = createRenderController({
+            data,
+            ui,
+            isAllFormatsSelected: () => true
+        });
+        controller.setDependencies({
+            getSearchState: () => ({ queryRaw: "" }),
+            isRecommendedMode: () => false,
+            updateThumbnail: (_, yt) => {
+                received = yt;
+            },
+            extractYoutubeInfo,
+            restoreActivePlayback: () => {}
+        });
+
+        controller.updateDisplay();
+        assert.equal(received && received.isVertical, true);
     } finally {
         cleanup();
     }
@@ -759,7 +876,7 @@ test("youtube: shorts url is treated as vertical playback target", () => {
     assert.deepEqual(yt, { videoId: "abc123", startSeconds: 45, isVertical: true });
 });
 
-test("youtube: updateThumbnail reflects vertical orientation on thumb dataset", () => {
+test("youtube: vertical videos stay landscape in thumbnail mode and switch on playback", () => {
     const cleanup = installFakeDom();
     try {
         const ui = {
@@ -783,9 +900,16 @@ test("youtube: updateThumbnail reflects vertical orientation on thumb dataset", 
 
         const thumb = document.createElement("div");
         controller.updateThumbnail(thumb, { videoId: "short1", startSeconds: 0, isVertical: true });
+        assert.equal(thumb.dataset.videoOrientation, "landscape");
+
+        assert.equal(typeof thumb.onclick, "function");
+        thumb.onclick();
         assert.equal(thumb.dataset.videoOrientation, "vertical");
 
-        controller.updateThumbnail(thumb, { videoId: "video1", startSeconds: 0, isVertical: false });
+        const close = thumb.querySelector("button");
+        invokeListener(close, "click", {
+            stopPropagation() {}
+        });
         assert.equal(thumb.dataset.videoOrientation, "landscape");
     } finally {
         cleanup();
