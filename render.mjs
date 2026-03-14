@@ -468,20 +468,9 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
         return 1;
     }
 
-    function getShortestColumnIndex(columnHeights) {
-        let shortestIndex = 0;
-        let shortestHeight = columnHeights[0] || 0;
-        for (let i = 1; i < columnHeights.length; i++) {
-            if (columnHeights[i] < shortestHeight) {
-                shortestHeight = columnHeights[i];
-                shortestIndex = i;
-            }
-        }
-        return shortestIndex;
-    }
-
     /**
-     * DOM順を維持しながらカードを絶対配置のmasonryレイアウトへ再配置する。
+     * DOM順を列固定で保ちつつカードを絶対配置する。
+     * 同じ列のカードだけが上下に影響し、他列の位置は維持される。
      */
     function refreshLayout() {
         const container = ui.el.resultList;
@@ -507,16 +496,18 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
             node.style.top = "0px";
             node.style.transform = "translate(0px, 0px)";
         }
-        for (const node of cards) {
+        for (let index = 0; index < cards.length; index++) {
+            const node = cards[index];
             const contentHeight = Number.isFinite(node.scrollHeight) && node.scrollHeight > 0
                 ? node.scrollHeight
                 : node.getBoundingClientRect().height;
-            const columnIndex = getShortestColumnIndex(columnHeights);
+            const columnIndex = index % columnCount;
             const top = columnHeights[columnIndex];
             const left = (columnWidth + MASONRY_GAP_PX) * columnIndex;
             node.style.left = `${left}px`;
             node.style.top = `${top}px`;
             node.style.transform = "none";
+            node.dataset.layoutColumn = String(columnIndex);
             columnHeights[columnIndex] = top + contentHeight + MASONRY_GAP_PX;
         }
         const tallest = Math.max(...columnHeights);

@@ -482,7 +482,7 @@ test("render: active card hidden from next nodes stops playback", () => {
     }
 });
 
-test("render: cards get masonry row spans while preserving DOM order", () => {
+test("render: cards keep fixed columns while preserving DOM order", () => {
     const cleanup = installFakeDom();
     try {
         const rowA = makeRenderRow({ songKey: "a::1", sourceIndex: 1 });
@@ -527,10 +527,88 @@ test("render: cards get masonry row spans while preserving DOM order", () => {
         assert.equal(entryA.card.style.width, "344px");
         assert.equal(entryA.card.style.left, "0px");
         assert.equal(entryA.card.style.top, "0px");
+        assert.equal(entryA.card.dataset.layoutColumn, "0");
         assert.equal(entryB.card.style.width, "344px");
         assert.equal(entryB.card.style.left, "356px");
         assert.equal(entryB.card.style.top, "0px");
+        assert.equal(entryB.card.dataset.layoutColumn, "1");
         assert.equal(ui.el.resultList.style.height, "100px");
+    } finally {
+        cleanup();
+    }
+});
+
+test("render: card height changes only shift cards in the same column", () => {
+    const cleanup = installFakeDom();
+    try {
+        const rows = [
+            makeRenderRow({ songKey: "a::1", sourceIndex: 1 }),
+            makeRenderRow({ songKey: "b::2", sourceIndex: 2 }),
+            makeRenderRow({ songKey: "c::3", sourceIndex: 3 }),
+            makeRenderRow({ songKey: "d::4", sourceIndex: 4 })
+        ];
+        const data = {
+            currentResults: rows,
+            displayLimit: 10,
+            activeBookmark: null
+        };
+        const ui = {
+            activeThumb: null,
+            showThumbnails: false,
+            scrollObserver: null,
+            cardEntriesBySourceKey: new Map(),
+            selectedFormats: new Set(["配信"]),
+            dataReady: true,
+            el: {
+                resultList: document.createElement("div"),
+                loadMoreContainer: document.createElement("div")
+            }
+        };
+        const controller = createRenderController({
+            data,
+            ui,
+            isAllFormatsSelected: () => true
+        });
+        ui.el.resultList._clientWidth = 700;
+        ui.el.resultList._rect = { top: 0, bottom: 200, left: 0, right: 700, width: 700, height: 200 };
+        controller.setDependencies({
+            getSearchState: () => ({ queryRaw: "" }),
+            isRecommendedMode: () => false,
+            updateThumbnail: () => {},
+            extractYoutubeInfo: () => ({ videoId: "video1", startSeconds: 0 }),
+            restoreActivePlayback: () => {}
+        });
+
+        controller.updateDisplay();
+        const entryA = ui.cardEntriesBySourceKey.get("song:a::1");
+        const entryB = ui.cardEntriesBySourceKey.get("song:b::2");
+        const entryC = ui.cardEntriesBySourceKey.get("song:c::3");
+        const entryD = ui.cardEntriesBySourceKey.get("song:d::4");
+        assert.ok(entryA);
+        assert.ok(entryB);
+        assert.ok(entryC);
+        assert.ok(entryD);
+
+        assert.equal(entryA.card.style.top, "0px");
+        assert.equal(entryB.card.style.top, "0px");
+        assert.equal(entryC.card.style.top, "112px");
+        assert.equal(entryD.card.style.top, "112px");
+
+        entryA.card._scrollHeight = 400;
+        controller.refreshLayout();
+
+        assert.equal(entryA.card.style.top, "0px");
+        assert.equal(entryB.card.style.top, "0px");
+        assert.equal(entryC.card.style.top, "412px");
+        assert.equal(entryD.card.style.top, "112px");
+        assert.equal(ui.el.resultList.style.height, "512px");
+
+        entryA.card._scrollHeight = 100;
+        controller.refreshLayout();
+
+        assert.equal(entryC.card.style.top, "112px");
+        assert.equal(entryD.card.style.top, "112px");
+        assert.equal(ui.el.resultList.style.height, "212px");
     } finally {
         cleanup();
     }
@@ -1065,7 +1143,7 @@ test("youtube: vertical videos stay landscape in thumbnail mode and switch on pl
         thumb.onclick();
         assert.equal(thumb.dataset.videoOrientation, "vertical");
         assert.equal(card.classList.contains("song-card-expanded"), true);
-        assert.equal(layoutRefreshCount, 0);
+        assert.equal(layoutRefreshCount, 1);
 
         const close = thumb.querySelector("button");
         invokeListener(close, "click", {
@@ -1073,7 +1151,7 @@ test("youtube: vertical videos stay landscape in thumbnail mode and switch on pl
         });
         assert.equal(thumb.dataset.videoOrientation, "landscape");
         assert.equal(card.classList.contains("song-card-expanded"), false);
-        assert.equal(layoutRefreshCount, 1);
+        assert.equal(layoutRefreshCount, 2);
     } finally {
         cleanup();
     }

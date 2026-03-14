@@ -517,6 +517,9 @@ export function createYoutubeController({ ui, youtube, constants }) {
         });
         thumbDiv.replaceChildren(ifr, close);
         youtubeApi.attachPlayer(thumbDiv, ifr, yt);
+        if (yt && yt.isVertical) {
+            refreshCardLayoutSoon(thumbDiv);
+        }
     }
 
     /**
