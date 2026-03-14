@@ -1,20 +1,6 @@
-/**
- * YouTube URLから `videoId` と開始秒数を抽出する。
- * @param {*} url
- */
-export function extractYoutubeInfo(url) {
-    try {
-        const u = new URL(url);
-        const isShorts = /\/shorts\/[^/?#]+/.test(u.pathname);
-        const id = u.hostname === "youtu.be"
-            ? u.pathname.slice(1)
-            : (u.searchParams.get("v") || u.pathname.match(/\/shorts\/([^/?#]+)/)?.[1] || u.pathname.match(/\/live\/([^/?#]+)/)?.[1]);
-        const t = u.searchParams.get("t") || u.searchParams.get("start") || "0";
-        return { videoId: id, startSeconds: parseInt(t, 10) || 0, isVertical: isShorts };
-    } catch {
-        return { videoId: "", startSeconds: 0, isVertical: false };
-    }
-}
+import { createLayoutRefreshScheduler } from "./layout-anchor.mjs?v=1";
+
+export { extractYoutubeInfo } from "./youtube-url.mjs?v=1";
 
 /**
  * サムネイル表示と埋め込み再生の制御を行うコントローラーを作成する。
@@ -29,6 +15,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
     } = constants;
     let updateDisplay = () => {};
     let refreshLayout = () => {};
+    const refreshCardLayoutSoon = createLayoutRefreshScheduler(() => refreshLayout);
 
     /**
      * サムネイル設定変更時に呼ぶ表示更新フックを登録する。
@@ -299,67 +286,6 @@ export function createYoutubeController({ ui, youtube, constants }) {
         const card = thumbDiv instanceof HTMLElement ? thumbDiv.closest(".song-card") : null;
         if (!(card instanceof HTMLElement)) return;
         card.classList.toggle("song-card-expanded", Boolean(isExpanded));
-    }
-
-    /**
-     * 指定要素を含む最も近いスクロール可能祖先を返す。
-     * @param {*} element
-     */
-    function findScrollableAncestor(element) {
-        let current = element ? element.parentElement : null;
-        while (current) {
-            const style = window.getComputedStyle(current);
-            const overflowY = style ? style.overflowY : "";
-            const isScrollable = (overflowY === "auto" || overflowY === "scroll") && current.scrollHeight > current.clientHeight;
-            if (isScrollable) return current;
-            current = current.parentElement;
-        }
-        return document.scrollingElement instanceof HTMLElement ? document.scrollingElement : document.documentElement;
-    }
-
-    /**
-     * レイアウト更新後に元の見えていた位置へ戻すためのアンカー情報を作る。
-     * @param {*} element
-     */
-    function createViewportAnchor(element) {
-        if (!(element instanceof HTMLElement) || !element.isConnected) return null;
-        return {
-            element,
-            container: findScrollableAncestor(element),
-            top: element.getBoundingClientRect().top
-        };
-    }
-
-    /**
-     * アンカー要素の見えていた位置を維持するようスクロール位置を補正する。
-     * @param {*} anchor
-     */
-    function restoreViewportAnchor(anchor) {
-        if (!anchor || !(anchor.element instanceof HTMLElement) || !anchor.element.isConnected) return;
-        const nextTop = anchor.element.getBoundingClientRect().top;
-        const delta = nextTop - anchor.top;
-        if (Math.abs(delta) < 1) return;
-        const container = anchor.container;
-        if (container === document.body || container === document.documentElement || container === document.scrollingElement) {
-            window.scrollBy({ top: delta, behavior: "auto" });
-            return;
-        }
-        container.scrollTop += delta;
-    }
-
-    /**
-     * 高さ変化が反映された後にカードレイアウトを再計算する。
-     * @param {*} anchorElement
-     */
-    function refreshCardLayoutSoon(anchorElement) {
-        const anchor = createViewportAnchor(anchorElement);
-        requestAnimationFrame(() => {
-            refreshLayout();
-            restoreViewportAnchor(anchor);
-            requestAnimationFrame(() => {
-                restoreViewportAnchor(anchor);
-            });
-        });
     }
 
     /**
