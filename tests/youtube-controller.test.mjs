@@ -1,0 +1,194 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { createYoutubeController, extractYoutubeInfo } from "../youtube.mjs";
+import {
+    installFakeDom,
+    invokeListener,
+    setGlobalValue
+} from "./test-helpers.mjs";
+
+test("youtube: disconnected active thumb is cleared without restore work", () => {
+    const cleanup = installFakeDom();
+    try {
+        const ui = {
+            showThumbnails: true,
+            activeThumb: document.createElement("div")
+        };
+        const youtube = {
+            apiPromise: null,
+            players: new WeakMap()
+        };
+        const controller = createYoutubeController({
+            ui,
+            youtube,
+            constants: {
+                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
+                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
+                YT_IFRAME_READY_POLL_MS: 50,
+                STOP_PLAYBACK_ON_SCROLL_OUT: false
+            }
+        });
+
+        controller.restoreActivePlayback();
+        assert.equal(ui.activeThumb, null);
+    } finally {
+        cleanup();
+    }
+});
+
+test("youtube: shorts url is treated as vertical playback target", () => {
+    const yt = extractYoutubeInfo("https://www.youtube.com/shorts/abc123?t=45");
+    assert.deepEqual(yt, { videoId: "abc123", startSeconds: 45, isVertical: true });
+});
+
+test("youtube: vertical videos stay landscape in thumbnail mode and switch on playback", () => {
+    const cleanup = installFakeDom();
+    try {
+        const ui = {
+            showThumbnails: true,
+            activeThumb: null
+        };
+        const youtube = {
+            apiPromise: null,
+            players: new WeakMap()
+        };
+        const controller = createYoutubeController({
+            ui,
+            youtube,
+            constants: {
+                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
+                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
+                YT_IFRAME_READY_POLL_MS: 50,
+                STOP_PLAYBACK_ON_SCROLL_OUT: false
+            }
+        });
+        let layoutRefreshCount = 0;
+        controller.setLayoutHook(() => {
+            layoutRefreshCount += 1;
+        });
+
+        const card = document.createElement("div");
+        card.className = "song-card";
+        const thumb = document.createElement("div");
+        card.appendChild(thumb);
+        controller.updateThumbnail(thumb, { videoId: "short1", startSeconds: 0, isVertical: true });
+        assert.equal(thumb.dataset.videoOrientation, "landscape");
+        assert.equal(card.classList.contains("song-card-expanded"), false);
+
+        assert.equal(typeof thumb.onclick, "function");
+        thumb.onclick();
+        assert.equal(thumb.dataset.videoOrientation, "vertical");
+        assert.equal(card.classList.contains("song-card-expanded"), true);
+        assert.equal(layoutRefreshCount, 1);
+
+        const close = thumb.querySelector("button");
+        invokeListener(close, "click", {
+            stopPropagation() {}
+        });
+        assert.equal(thumb.dataset.videoOrientation, "landscape");
+        assert.equal(card.classList.contains("song-card-expanded"), false);
+        assert.equal(layoutRefreshCount, 2);
+    } finally {
+        cleanup();
+    }
+});
+
+test("youtube: stale queued layout refresh requests are ignored", () => {
+    const cleanup = installFakeDom();
+    const previousRaf = globalThis.requestAnimationFrame;
+    const rafQueue = [];
+    setGlobalValue("requestAnimationFrame", (cb) => {
+        rafQueue.push(cb);
+        return rafQueue.length;
+    });
+    try {
+        const ui = {
+            showThumbnails: true,
+            activeThumb: null
+        };
+        const youtube = {
+            apiPromise: null,
+            players: new WeakMap()
+        };
+        const controller = createYoutubeController({
+            ui,
+            youtube,
+            constants: {
+                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
+                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
+                YT_IFRAME_READY_POLL_MS: 50,
+                STOP_PLAYBACK_ON_SCROLL_OUT: false
+            }
+        });
+        let layoutRefreshCount = 0;
+        controller.setLayoutHook(() => {
+            layoutRefreshCount += 1;
+        });
+
+        const card = document.createElement("div");
+        card.className = "song-card";
+        document.body.appendChild(card);
+        const thumb = document.createElement("div");
+        card.appendChild(thumb);
+        controller.updateThumbnail(thumb, { videoId: "short1", startSeconds: 0, isVertical: true });
+
+        thumb.onclick();
+        const close = thumb.querySelector("button");
+        invokeListener(close, "click", {
+            stopPropagation() {}
+        });
+
+        while (rafQueue.length > 0) {
+            const callback = rafQueue.shift();
+            if (typeof callback === "function") callback();
+        }
+
+        assert.equal(layoutRefreshCount, 1);
+    } finally {
+        setGlobalValue("requestAnimationFrame", previousRaf);
+        cleanup();
+    }
+});
+
+test("youtube: after explicit restore, same target does not auto-resume on redraw", () => {
+    const cleanup = installFakeDom();
+    try {
+        const ui = {
+            showThumbnails: true,
+            activeThumb: null
+        };
+        const youtube = {
+            apiPromise: null,
+            players: new WeakMap()
+        };
+        const controller = createYoutubeController({
+            ui,
+            youtube,
+            constants: {
+                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
+                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
+                YT_IFRAME_READY_POLL_MS: 50,
+                STOP_PLAYBACK_ON_SCROLL_OUT: false
+            }
+        });
+
+        const thumb = document.createElement("div");
+        document.body.appendChild(thumb);
+        thumb.dataset.videoId = "video1";
+        thumb.dataset.playbackKey = "video1:0";
+        thumb.classList.add("playing");
+        thumb.appendChild(document.createElement("iframe"));
+        ui.activeThumb = thumb;
+
+        controller.restoreActivePlayback();
+        assert.equal(ui.activeThumb, null);
+        assert.equal(thumb.querySelector("iframe"), null);
+
+        controller.updateThumbnail(thumb, { videoId: "video1", startSeconds: 0 });
+        assert.equal(thumb.querySelector("iframe"), null);
+        assert.ok(thumb.querySelector("img"));
+        assert.equal(typeof thumb.onclick, "function");
+    } finally {
+        cleanup();
+    }
+});
