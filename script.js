@@ -25,6 +25,7 @@ import { createYoutubeController, extractYoutubeInfo } from "./youtube.mjs?v=5";
 import { createStorageController } from "./storage.mjs?v=5";
 import { createBookmarkUiController } from "./bookmark-ui.mjs?v=5";
 import { parseCsvToSongs } from "./csv-parser.mjs?v=5";
+import { scrollResultListToTop } from "./results-scroll.mjs?v=1";
 
 /**
  * @typedef {Object} SongRow
@@ -584,33 +585,7 @@ function setupTheme() {
  * 結果リストのスクロール位置を先頭へ戻す。
  */
 function scrollResultsPaneToTop() {
-    const resultList = ui.el.resultList;
-    if (!resultList) return;
-
-    const scrollContainer = findScrollableAncestor(resultList);
-    if (!scrollContainer) return;
-
-    if (scrollContainer === document.body || scrollContainer === document.documentElement) {
-        window.scrollTo({ top: 0, behavior: 'auto' });
-        return;
-    }
-    scrollContainer.scrollTo({ top: 0, behavior: 'auto' });
-}
-
-/**
- * 指定要素を含む最も近いスクロール可能祖先を探す。
- * @param {*} element
- */
-function findScrollableAncestor(element) {
-    let current = element.parentElement;
-    while (current) {
-        const style = window.getComputedStyle(current);
-        const overflowY = style.overflowY;
-        const isScrollable = (overflowY === 'auto' || overflowY === 'scroll') && current.scrollHeight > current.clientHeight;
-        if (isScrollable) return current;
-        current = current.parentElement;
-    }
-    return document.scrollingElement instanceof HTMLElement ? document.scrollingElement : document.documentElement;
+    scrollResultListToTop(ui.el.resultList);
 }
 
 // ===== UI Controls (private) =====
