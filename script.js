@@ -25,7 +25,7 @@ import { createYoutubeController, extractYoutubeInfo } from "./youtube.mjs?v=5";
 import { createStorageController } from "./storage.mjs?v=5";
 import { createBookmarkUiController } from "./bookmark-ui.mjs?v=5";
 import { parseCsvToSongs } from "./csv-parser.mjs?v=5";
-import { scrollResultListToTop } from "./results-scroll.mjs?v=1";
+import { scrollResultListToTop } from "./results-scroll.mjs?v=5";
 
 /**
  * @typedef {Object} SongRow
