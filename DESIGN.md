@@ -60,6 +60,22 @@
 4. 条件未指定ならおすすめ結果を解決し、通常時は検索条件を取得してフィルタ
 5. 結果一覧を描画し、通常検索/ブックマーク検索時のみ段階表示を有効化
 
+```mermaid
+flowchart TD
+    A[公開CSVを取得] --> B[CSVをパース]
+    B --> C[SongRowへ正規化]
+    C --> D{ブックマーク選択中?}
+    D -- Yes --> E[ブックマーク内の曲集合を解決]
+    D -- No --> F[全曲を対象にする]
+    E --> G{条件未指定?}
+    F --> G
+    G -- Yes --> H[おすすめ結果を解決]
+    G -- No --> I[検索条件でフィルタ]
+    H --> J[結果一覧を描画]
+    I --> J
+    J --> K[段階表示を有効化]
+```
+
 ## データモデル（概要）
 `SongRow`
 - date / dateKey / archiveId / archiveOrder / sourceIndex
@@ -111,6 +127,18 @@
 - ブックマーク選択中は「ブックマーク名 + 件数」を状態テキストに表示
 - どちらの状態でも検索条件の変更は即時に反映される
 
+```mermaid
+stateDiagram-v2
+    [*] --> Recommended: 初期表示
+    Recommended --> Filtered: 条件変更
+    Filtered --> Recommended: 条件解除
+    Recommended --> Recommended: 未指定で再表示
+```
+
+- 図中の「条件変更」は、キーワード入力・日付指定・形態の絞り込み・リレー/ハモリONをまとめた表記。
+- 図中の「条件解除」は、上記の条件をすべて外して未指定に戻すことを指す。
+- CSV再読み込み時はおすすめキャッシュを破棄し、おすすめ一覧を再抽出する。
+
 ## おすすめ抽出の具体ロジック
 
 ### 対象母集団
@@ -142,6 +170,24 @@
 - `data`：全曲/結果/表示件数/ブックマーク情報/選択中ブックマーク
 - `ui`：フィルタ状態、サムネ表示、キャッシュ、ブックマーク追加の一時状態
 - `youtube`：API準備/プレイヤー管理
+
+```mermaid
+flowchart LR
+    state[state]
+    state --> data[data]
+    state --> ui[ui]
+    state --> youtube[youtube]
+    data --> d1[全曲]
+    data --> d2[結果]
+    data --> d3[表示件数]
+    data --> d4[ブックマーク情報]
+    ui --> u1[フィルタ状態]
+    ui --> u2[サムネ表示]
+    ui --> u3[recommendedCache]
+    ui --> u4[ブックマーク追加の一時状態]
+    youtube --> y1[API準備]
+    youtube --> y2[プレイヤー管理]
+```
 
 ## 永続化
 ローカルストレージ保存：
