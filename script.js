@@ -18,14 +18,15 @@ import {
     data,
     ui,
     youtube
-} from "./state.mjs?v=5";
-import { createSearchController } from "./search.mjs?v=5";
-import { createRenderController } from "./render.mjs?v=5";
-import { createYoutubeController, extractYoutubeInfo } from "./youtube.mjs?v=5";
-import { createStorageController } from "./storage.mjs?v=5";
-import { createBookmarkUiController } from "./bookmark-ui.mjs?v=5";
-import { parseCsvToSongs } from "./csv-parser.mjs?v=5";
-import { scrollResultListToTop } from "./results-scroll.mjs?v=5";
+} from "./state.mjs?v=6";
+import { createSearchController } from "./search.mjs?v=6";
+import { createRenderController } from "./render.mjs?v=6";
+import { createYoutubeController, extractYoutubeInfo } from "./youtube.mjs?v=6";
+import { createStorageController } from "./storage.mjs?v=6";
+import { createBookmarkUiController } from "./bookmark-ui.mjs?v=6";
+import { parseCsvToSongs } from "./csv-parser.mjs?v=6";
+import { scrollResultListToTop } from "./results-scroll.mjs?v=6";
+import { getFormatFilterLabel } from "./format-filter.mjs?v=6";
 
 /**
  * @typedef {Object} SongRow
@@ -814,7 +815,7 @@ function initFilterMenu() {
             scheduleSearch();
             saveSearchState();
         });
-        label.append(cb, ` ${fmt}`);
+        label.append(cb, ` ${getFormatFilterLabel(fmt)}`);
         container.appendChild(label);
     });
     syncFormatCheckboxesFromState();
