@@ -72,10 +72,47 @@ export function filterSongsByCriteria(rows, searchState, selectedFormats) {
         const matchDate = isWithinDateRange(row, searchState.dateFromKey, searchState.dateToKey);
         return matchText &&
             matchDate &&
-            selectedFormats.has(row.format) &&
+            matchesSelectedFormat(row.format, selectedFormats) &&
             (!searchState.relayOnly || row.isRelay) &&
             (!searchState.harmonyOnly || row.isHarmony);
     });
+}
+
+/**
+ * 形式が「歌みた」かどうかを判定する。
+ * @param {*} format
+ */
+function isUtamitaFormat(format) {
+    return format === "歌みた";
+}
+
+/**
+ * 形式が「オリソン」かどうかを判定する。
+ * @param {*} format
+ */
+function isOrisongFormat(format) {
+    return format === "オリソン";
+}
+
+/**
+ * 形式が「歌みた」系かどうかを判定する。
+ * 「オリソン」は「歌みた」と同等に扱う。
+ * @param {*} format
+ */
+function isUtamitaEquivalentFormat(format) {
+    return isUtamitaFormat(format) || isOrisongFormat(format);
+}
+
+/**
+ * 指定フォーマットが現在の選択状態に含まれるかを判定する。
+ * 「オリソン」は「歌みた」と同じ選択肢で通す。
+ * @param {*} format
+ * @param {*} selectedFormats
+ */
+function matchesSelectedFormat(format, selectedFormats) {
+    if (selectedFormats.has(format)) return true;
+    if (!isUtamitaEquivalentFormat(format)) return false;
+    return selectedFormats.has("歌みた") || selectedFormats.has("オリソン");
 }
 
 /**
@@ -696,7 +733,7 @@ export function createSearchController({ data, ui, constants }) {
             }
             const entry = groups.get(key);
             entry.rows.push(row);
-            if (isUtamitaFormat(row.format)) entry.utamitaRows.push(row);
+            if (isUtamitaEquivalentFormat(row.format)) entry.utamitaRows.push(row);
             if (isStreamFormat(row.format)) entry.streamRows.push(row);
             if (isShortFormat(row.format)) entry.shortRows.push(row);
         }
@@ -777,15 +814,7 @@ export function createSearchController({ data, ui, constants }) {
      * @param {*} format
      */
     function isRecommendedCountFormat(format) {
-        return isStreamFormat(format) || isUtamitaFormat(format) || isShortFormat(format);
-    }
-
-    /**
-     * 形式が「歌みた」かどうかを判定する。
-     * @param {*} format
-     */
-    function isUtamitaFormat(format) {
-        return format === "歌みた";
+        return isStreamFormat(format) || isUtamitaEquivalentFormat(format) || isShortFormat(format);
     }
 
     /**

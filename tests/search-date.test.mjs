@@ -16,6 +16,8 @@ function makeRow(input) {
     const titleYomi = input.titleYomi ?? "";
     const artistYomi = input.artistYomi ?? "";
     return {
+        archiveId: input.archiveId ?? "",
+        archiveOrder: input.archiveOrder ?? null,
         songKey: input.songKey ?? `song-${++autoSongId}`,
         sourceIndex: input.sourceIndex ?? 0,
         dateKey: input.dateKey ?? null,
@@ -62,6 +64,23 @@ test("filterSongsByCriteria: query/date/format/flags", () => {
     const hit = filterSongsByCriteria(rows, searchState, selectedFormats);
     assert.equal(hit.length, 1);
     assert.equal(hit[0].artistNorm, normalizeForSearch("B"));
+});
+
+test("filterSongsByCriteria: オリソン is included when 歌みた is selected", () => {
+    const rows = [
+        makeRow({ title: "覚声", artist: "PSYBELL", dateKey: 20260315, format: "オリソン" })
+    ];
+    const searchState = {
+        queryRaw: "覚声",
+        relayOnly: false,
+        harmonyOnly: false,
+        dateFromKey: null,
+        dateToKey: null
+    };
+
+    const hit = filterSongsByCriteria(rows, searchState, new Set(["歌みた"]));
+    assert.equal(hit.length, 1);
+    assert.equal(hit[0].format, "オリソン");
 });
 
 test("filterSongsByCriteria: AND keywords and harmony flag", () => {
@@ -184,4 +203,50 @@ test("createSearchController: active bookmark uses incremental display limit", (
     assert.equal(data.currentResults.length, 5);
     assert.equal(data.displayLimit, 2);
     assert.equal(ui.el.resultCount.innerText, "ブックマーク: 検証 (5 件)");
+});
+
+test("createSearchController: recommendation mode counts オリソン as 歌みた", () => {
+    const rows = [
+        makeRow({ archiveId: "a1", sourceIndex: 1, title: "覚声", artist: "PSYBELL", format: "オリソン" }),
+        makeRow({ archiveId: "a2", sourceIndex: 2, title: "覚声", artist: "PSYBELL", format: "オリソン" }),
+        makeRow({ archiveId: "a3", sourceIndex: 3, title: "覚声", artist: "PSYBELL", format: "オリソン" })
+    ];
+    const data = {
+        allSongsRaw: rows,
+        bookmarks: {},
+        activeBookmark: null,
+        currentResults: [],
+        displayLimit: 0
+    };
+    const ui = {
+        el: {
+            searchBox: { value: "" },
+            relayOnly: { checked: false },
+            harmonyOnly: { checked: false },
+            dateFromYear: null,
+            dateFromMonth: null,
+            dateFromDay: null,
+            dateToYear: null,
+            dateToMonth: null,
+            dateToDay: null,
+            resultCount: { innerText: "" }
+        },
+        selectedFormats: new Set(["配信", "歌みた", "ショート", "切り抜き"]),
+        searchDebounceId: 0,
+        recommendedCache: null
+    };
+    const constants = {
+        RANDOM_DISPLAY_COUNT: 10,
+        MIN_PERFORMANCE_FOR_RANDOM: 3,
+        INCREMENT_COUNT: 30,
+        SEARCH_DEBOUNCE_MS: 0,
+        DEFAULT_FORMATS: ["配信", "歌みた", "ショート", "切り抜き"]
+    };
+
+    const controller = createSearchController({ data, ui, constants });
+    controller.search();
+
+    assert.equal(data.currentResults.length, 1);
+    assert.equal(data.currentResults[0].format, "オリソン");
+    assert.equal(ui.el.resultCount.innerText, "おすすめを表示中");
 });
