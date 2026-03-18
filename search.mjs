@@ -695,7 +695,7 @@ export function createSearchController({ data, ui, constants }) {
         const groups = groupRecommendedRowsBySong(dedupedRows);
         const result = [];
         for (const [key, entry] of groups.entries()) {
-            if (entry.rows.length < MIN_PERFORMANCE_FOR_RANDOM) continue;
+            if (!isRecommendedGroupEligible(entry)) continue;
             const latestRows = pickRecommendedLatestRows(entry);
             if (latestRows.length === 0) continue;
             result.push({ key, latestRows });
@@ -729,15 +729,26 @@ export function createSearchController({ data, ui, constants }) {
         for (const row of rows) {
             const key = getRecommendedSongKey(row);
             if (!groups.has(key)) {
-                groups.set(key, { rows: [], utamitaRows: [], streamRows: [], shortRows: [] });
+                groups.set(key, { rows: [], utamitaRows: [], orisongRows: [], streamRows: [], shortRows: [] });
             }
             const entry = groups.get(key);
             entry.rows.push(row);
             if (isUtamitaEquivalentFormat(row.format)) entry.utamitaRows.push(row);
+            if (isOrisongFormat(row.format)) entry.orisongRows.push(row);
             if (isStreamFormat(row.format)) entry.streamRows.push(row);
             if (isShortFormat(row.format)) entry.shortRows.push(row);
         }
         return groups;
+    }
+
+    /**
+     * おすすめ候補グループが抽選対象かどうかを判定する。
+     * オリソンが含まれる曲は1回でも候補に含める。
+     * @param {*} entry
+     */
+    function isRecommendedGroupEligible(entry) {
+        if (entry.rows.length >= MIN_PERFORMANCE_FOR_RANDOM) return true;
+        return entry.orisongRows.length > 0;
     }
 
     /**
