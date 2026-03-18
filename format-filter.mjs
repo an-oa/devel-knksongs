@@ -3,7 +3,6 @@
  * @param {*} format
  */
 export function getFormatFilterLabel(format) {
-    if (format === "歌みた") return "オリソン/歌みた";
+    if (format === "歌みた") return "オリ曲/歌みた";
     return format;
 }
-

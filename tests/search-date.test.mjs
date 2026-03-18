@@ -66,9 +66,9 @@ test("filterSongsByCriteria: query/date/format/flags", () => {
     assert.equal(hit[0].artistNorm, normalizeForSearch("B"));
 });
 
-test("filterSongsByCriteria: オリソン is included when 歌みた is selected", () => {
+test("filterSongsByCriteria: オリ曲 is included when 歌みた is selected", () => {
     const rows = [
-        makeRow({ title: "覚声", artist: "PSYBELL", dateKey: 20260315, format: "オリソン" })
+        makeRow({ title: "覚声", artist: "PSYBELL", dateKey: 20260315, format: "オリ曲" })
     ];
     const searchState = {
         queryRaw: "覚声",
@@ -80,7 +80,7 @@ test("filterSongsByCriteria: オリソン is included when 歌みた is selected
 
     const hit = filterSongsByCriteria(rows, searchState, new Set(["歌みた"]));
     assert.equal(hit.length, 1);
-    assert.equal(hit[0].format, "オリソン");
+    assert.equal(hit[0].format, "オリ曲");
 });
 
 test("filterSongsByCriteria: AND keywords and harmony flag", () => {
@@ -205,11 +205,11 @@ test("createSearchController: active bookmark uses incremental display limit", (
     assert.equal(ui.el.resultCount.innerText, "ブックマーク: 検証 (5 件)");
 });
 
-test("createSearchController: recommendation mode counts オリソン as 歌みた", () => {
+test("createSearchController: recommendation mode counts オリ曲 as 歌みた", () => {
     const rows = [
-        makeRow({ archiveId: "a1", sourceIndex: 1, title: "覚声", artist: "PSYBELL", format: "オリソン" }),
-        makeRow({ archiveId: "a2", sourceIndex: 2, title: "覚声", artist: "PSYBELL", format: "オリソン" }),
-        makeRow({ archiveId: "a3", sourceIndex: 3, title: "覚声", artist: "PSYBELL", format: "オリソン" })
+        makeRow({ archiveId: "a1", sourceIndex: 1, title: "覚声", artist: "PSYBELL", format: "オリ曲" }),
+        makeRow({ archiveId: "a2", sourceIndex: 2, title: "覚声", artist: "PSYBELL", format: "オリ曲" }),
+        makeRow({ archiveId: "a3", sourceIndex: 3, title: "覚声", artist: "PSYBELL", format: "オリ曲" })
     ];
     const data = {
         allSongsRaw: rows,
@@ -247,13 +247,13 @@ test("createSearchController: recommendation mode counts オリソン as 歌み�
     controller.search();
 
     assert.equal(data.currentResults.length, 1);
-    assert.equal(data.currentResults[0].format, "オリソン");
+    assert.equal(data.currentResults[0].format, "オリ曲");
     assert.equal(ui.el.resultCount.innerText, "おすすめを表示中");
 });
 
-test("createSearchController: single オリソン performance is eligible for recommendation", () => {
+test("createSearchController: single オリ曲 performance is eligible for recommendation", () => {
     const rows = [
-        makeRow({ archiveId: "a1", sourceIndex: 1, title: "覚声", artist: "PSYBELL", format: "オリソン" })
+        makeRow({ archiveId: "a1", sourceIndex: 1, title: "覚声", artist: "PSYBELL", format: "オリ曲" })
     ];
     const data = {
         allSongsRaw: rows,
@@ -291,6 +291,6 @@ test("createSearchController: single オリソン performance is eligible for re
     controller.search();
 
     assert.equal(data.currentResults.length, 1);
-    assert.equal(data.currentResults[0].format, "オリソン");
+    assert.equal(data.currentResults[0].format, "オリ曲");
     assert.equal(ui.el.resultCount.innerText, "おすすめを表示中");
 });

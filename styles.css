@@ -245,7 +245,7 @@ input[type="text"] {
   width: 100%;
   box-sizing: border-box;
   gap: 6px;
-  font-size: 12px;
+  font-size: 13px;
   white-space: nowrap;
 }
 .checkbox-item { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; margin-bottom: 8px; }

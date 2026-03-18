@@ -87,32 +87,32 @@ function isUtamitaFormat(format) {
 }
 
 /**
- * 形式が「オリソン」かどうかを判定する。
+ * 形式が「オリ曲」かどうかを判定する。
  * @param {*} format
  */
-function isOrisongFormat(format) {
-    return format === "オリソン";
+function isOriginalSongFormat(format) {
+    return format === "オリ曲";
 }
 
 /**
  * 形式が「歌みた」系かどうかを判定する。
- * 「オリソン」は「歌みた」と同等に扱う。
+ * 「オリ曲」は「歌みた」と同等に扱う。
  * @param {*} format
  */
 function isUtamitaEquivalentFormat(format) {
-    return isUtamitaFormat(format) || isOrisongFormat(format);
+    return isUtamitaFormat(format) || isOriginalSongFormat(format);
 }
 
 /**
  * 指定フォーマットが現在の選択状態に含まれるかを判定する。
- * 「オリソン」は「歌みた」と同じ選択肢で通す。
+ * 「オリ曲」は「歌みた」と同じ選択肢で通す。
  * @param {*} format
  * @param {*} selectedFormats
  */
 function matchesSelectedFormat(format, selectedFormats) {
     if (selectedFormats.has(format)) return true;
     if (!isUtamitaEquivalentFormat(format)) return false;
-    return selectedFormats.has("歌みた") || selectedFormats.has("オリソン");
+    return selectedFormats.has("歌みた") || selectedFormats.has("オリ曲");
 }
 
 /**
@@ -734,7 +734,7 @@ export function createSearchController({ data, ui, constants }) {
             const entry = groups.get(key);
             entry.rows.push(row);
             if (isUtamitaEquivalentFormat(row.format)) entry.utamitaRows.push(row);
-            if (isOrisongFormat(row.format)) entry.orisongRows.push(row);
+            if (isOriginalSongFormat(row.format)) entry.orisongRows.push(row);
             if (isStreamFormat(row.format)) entry.streamRows.push(row);
             if (isShortFormat(row.format)) entry.shortRows.push(row);
         }
@@ -743,7 +743,7 @@ export function createSearchController({ data, ui, constants }) {
 
     /**
      * おすすめ候補グループが抽選対象かどうかを判定する。
-     * オリソンが含まれる曲は1回でも候補に含める。
+     * オリ曲が含まれる曲は1回でも候補に含める。
      * @param {*} entry
      */
     function isRecommendedGroupEligible(entry) {
