@@ -18,15 +18,15 @@ import {
     data,
     ui,
     youtube
-} from "./state.mjs?v=7";
-import { createSearchController } from "./search.mjs?v=7";
-import { createRenderController } from "./render.mjs?v=7";
-import { createYoutubeController, extractYoutubeInfo } from "./youtube.mjs?v=7";
-import { createStorageController } from "./storage.mjs?v=7";
-import { createBookmarkUiController } from "./bookmark-ui.mjs?v=7";
-import { parseCsvToSongs } from "./csv-parser.mjs?v=7";
-import { scrollResultListToTop } from "./results-scroll.mjs?v=7";
-import { getFormatFilterLabel } from "./format-filter.mjs?v=7";
+} from "./state.mjs?v=8";
+import { createSearchController } from "./search.mjs?v=8";
+import { createRenderController } from "./render.mjs?v=8";
+import { createYoutubeController, extractYoutubeInfo } from "./youtube.mjs?v=8";
+import { createStorageController } from "./storage.mjs?v=8";
+import { createBookmarkUiController } from "./bookmark-ui.mjs?v=8";
+import { parseCsvToSongs } from "./csv-parser.mjs?v=8";
+import { scrollResultListToTop } from "./results-scroll.mjs?v=8";
+import { getFormatFilterLabel } from "./format-filter.mjs?v=8";
 
 /**
  * @typedef {Object} SongRow
