@@ -38,6 +38,14 @@ feat: move settings into dedicated sidebar panel
 - 構文だけを素早く確認したいときは `node --check <file>` を使い、その結果だけでテスト完了とは扱わない。
 - コミット前後に確認結果を共有するときは、実行コマンドと pass/fail の件数を簡潔に残す。
 
+## Cache Busters
+
+- UI / JavaScript を更新して公開反映が必要なときは、キャッシュバスターの `v=...` を更新する。
+- `index.html` の `styles.css?v=...` と `script.js?v=...` は必ず同じ値に揃える。
+- `script.js` から読む ES Modules や、module 間の import / export に `?v=...` が付いている箇所も同じ値へ揃える。
+- 関連有無を自己判断せず、更新時点で残っている古い `v=...` を `rg -n "v=<old>|\\?v=<old>" -S .` で全検索して統一する。
+- 更新後は `node --test tests/*.mjs` を実行し、pass/fail 件数を共有する。
+
 ## Encoding And Line Endings
 
 - 2026-04-08 時点で確認した `.js` `.mjs` `.html` `.css` `.md` は、すべて `UTF-8 BOMなし` かつ `LF`。
