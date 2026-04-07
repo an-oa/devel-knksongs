@@ -197,6 +197,10 @@ async function initUI() {
         clearDateToBtn: document.getElementById('clearDateToBtn'),
         themeToggle: document.getElementById('theme-toggle'),
         thumbToggle: document.getElementById('thumbnail-toggle'),
+        openSettingsPanelBtn: document.getElementById('open-settings-panel'),
+        settingsSidebarPanel: document.getElementById('settings-sidebar-panel'),
+        closeSettingsPanelBtn: document.getElementById('close-settings-panel'),
+        closeSettingsSidebarBtn: document.getElementById('close-settings-sidebar'),
         formatsList: document.getElementById('formatsList'),
         openBookmarkPanelBtn: document.getElementById('open-bookmark-panel'),
         bookmarkSidebarPanel: document.getElementById('bookmark-sidebar-panel'),
@@ -291,6 +295,7 @@ function setupUIHandlers() {
     let lastFocusedElement = null;
 
     openBtn.addEventListener('click', () => {
+        closeSettingsPanel({ restoreFocus: false });
         bookmarkUiController.closeBookmarkModal({ restoreFocus: false });
         sidebar.classList.add('active');
         overlay.classList.add('show');
@@ -300,6 +305,7 @@ function setupUIHandlers() {
     });
 
     const closeMenu = () => {
+        closeSettingsPanel({ restoreFocus: false });
         bookmarkUiController.closeBookmarkModal({ restoreFocus: false });
         blurSidebarActiveElement(sidebar);
         sidebar.classList.remove('active');
@@ -315,7 +321,18 @@ function setupUIHandlers() {
 
     closeBtn.addEventListener('click', closeMenu);
     overlay.addEventListener('click', closeMenu);
+    ui.el.openSettingsPanelBtn.addEventListener('click', () => {
+        bookmarkUiController.closeBookmarkModal({ restoreFocus: false });
+        openSettingsPanel({
+            returnFocusEl: ui.el.openSettingsPanelBtn
+        });
+    });
+    ui.el.closeSettingsPanelBtn.addEventListener('click', () => {
+        closeSettingsPanel({ restoreFocus: true });
+    });
+    ui.el.closeSettingsSidebarBtn.addEventListener('click', closeMenu);
     ui.el.openBookmarkPanelBtn.addEventListener('click', () => {
+        closeSettingsPanel({ restoreFocus: false });
         bookmarkUiController.openBookmarkBrowser({
             returnFocusEl: ui.el.openBookmarkPanelBtn
         });
@@ -326,6 +343,11 @@ function setupUIHandlers() {
     ui.el.closeBookmarkSidebarBtn.addEventListener('click', closeMenu);
     document.addEventListener('keydown', (e) => {
         if (e.key === "Escape") {
+            if (ui.el.settingsSidebarPanel && !ui.el.settingsSidebarPanel.hidden) {
+                e.preventDefault();
+                closeSettingsPanel({ restoreFocus: true });
+                return;
+            }
             if (ui.el.bookmarkSidebarPanel && !ui.el.bookmarkSidebarPanel.hidden) {
                 e.preventDefault();
                 bookmarkUiController.closeBookmarkModal({ restoreFocus: true });
@@ -410,6 +432,69 @@ function resetDateSelectGroup(kind) {
     if (month) month.value = "";
     if (day) day.value = "";
     syncDateSelectOptions();
+}
+
+/**
+ * サブパネル表示中のみ、背面のサイドバー要素をフォーカス対象外にする。
+ * @param {boolean} isInert
+ */
+function setSidebarBackgroundInert(isInert) {
+    [ui.el.sidebarHeader, ui.el.sidebarScrollArea].forEach((el) => {
+        if (!el) return;
+        if (isInert) {
+            el.setAttribute("inert", "");
+            el.setAttribute("aria-hidden", "true");
+            return;
+        }
+        el.removeAttribute("inert");
+        el.removeAttribute("aria-hidden");
+    });
+}
+
+/**
+ * 表示設定パネルを開く。
+ * @param {*} options
+ */
+function openSettingsPanel(options) {
+    ui.settingsPanelReturnFocusEl =
+        options && options.returnFocusEl instanceof HTMLElement ? options.returnFocusEl : null;
+    setSidebarBackgroundInert(true);
+    if (ui.el.settingsSidebarPanel) {
+        ui.el.settingsSidebarPanel.hidden = false;
+        ui.el.settingsSidebarPanel.setAttribute("aria-hidden", "false");
+    }
+    if (ui.el.closeSettingsPanelBtn) {
+        ui.el.closeSettingsPanelBtn.focus();
+    }
+}
+
+/**
+ * 表示設定パネルを閉じる。
+ * @param {*} options
+ */
+function closeSettingsPanel(options) {
+    const shouldRestoreFocus = Boolean(options && options.restoreFocus);
+    const returnFocusEl = ui.settingsPanelReturnFocusEl;
+    ui.settingsPanelReturnFocusEl = null;
+    if (ui.el.settingsSidebarPanel) {
+        ui.el.settingsSidebarPanel.hidden = true;
+        ui.el.settingsSidebarPanel.setAttribute("aria-hidden", "true");
+    }
+    setSidebarBackgroundInert(false);
+    if (!shouldRestoreFocus) return;
+    if (
+        returnFocusEl &&
+        returnFocusEl.isConnected &&
+        typeof returnFocusEl.focus === "function" &&
+        ui.el.sidebar &&
+        ui.el.sidebar.contains(returnFocusEl)
+    ) {
+        returnFocusEl.focus();
+        return;
+    }
+    if (ui.el.openSettingsPanelBtn && typeof ui.el.openSettingsPanelBtn.focus === "function") {
+        ui.el.openSettingsPanelBtn.focus();
+    }
 }
 
 // ===== Bookmark =====

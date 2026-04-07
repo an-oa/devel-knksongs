@@ -102,45 +102,51 @@
         </div>
       </section>
 
-      <section class="sidebar-group">
-        <div class="sidebar-group-header">
-          <div class="sidebar-group-title">表示設定</div>
-        </div>
-        <div class="sidebar-group-body">
-          <div class="sidebar-section sidebar-setting-item">
-            <div class="menu-item-toggle">
-              <span>サムネイル表示</span>
-              <label class="switch">
-                <input type="checkbox" id="thumbnail-toggle" aria-label="サムネイル表示を切り替える">
-                <span class="slider"></span>
-              </label>
-            </div>
-          </div>
-
-          <div class="sidebar-section sidebar-setting-item">
-            <div class="menu-item-toggle">
-              <span>ダークモード</span>
-              <label class="switch">
-                <input type="checkbox" id="theme-toggle" aria-label="ダークモードを切り替える">
-                <span class="slider"></span>
-              </label>
-            </div>
-          </div>
-        </div>
-      </section>
-
       <button id="open-bookmark-panel" class="sidebar-link-row" type="button" aria-haspopup="dialog" aria-controls="bookmark-sidebar-panel">
         <span>ブックマークを開く</span>
         <span class="sidebar-link-row-arrow" aria-hidden="true">›</span>
       </button>
+
+      <button id="open-settings-panel" class="sidebar-link-row" type="button" aria-haspopup="dialog" aria-controls="settings-sidebar-panel">
+        <span>設定</span>
+        <span class="sidebar-link-row-arrow" aria-hidden="true">›</span>
+      </button>
     </div>
 
-    <div id="bookmark-sidebar-panel" class="bookmark-sidebar-panel" hidden>
-      <div class="bookmark-sidebar-header">
-        <button id="close-bookmark-panel" class="bookmark-sidebar-back" type="button" aria-label="検索・設定に戻る">← ブックマーク</button>
+    <div id="settings-sidebar-panel" class="sidebar-subpanel" aria-hidden="true" hidden>
+      <div class="sidebar-subpanel-header">
+        <button id="close-settings-panel" class="sidebar-subpanel-back" type="button" aria-label="検索・設定に戻る">← 設定</button>
+        <button id="close-settings-sidebar" class="close-btn" aria-label="閉じる">&times;</button>
+      </div>
+      <div class="sidebar-subpanel-body">
+        <div class="sidebar-section sidebar-setting-item">
+          <div class="menu-item-toggle">
+            <span>サムネイル表示</span>
+            <label class="switch">
+              <input type="checkbox" id="thumbnail-toggle" aria-label="サムネイル表示を切り替える">
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="sidebar-section sidebar-setting-item">
+          <div class="menu-item-toggle">
+            <span>ダークモード</span>
+            <label class="switch">
+              <input type="checkbox" id="theme-toggle" aria-label="ダークモードを切り替える">
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="bookmark-sidebar-panel" class="sidebar-subpanel" aria-hidden="true" hidden>
+      <div class="sidebar-subpanel-header">
+        <button id="close-bookmark-panel" class="sidebar-subpanel-back" type="button" aria-label="検索・設定に戻る">← ブックマーク</button>
         <button id="close-bookmark-sidebar" class="close-btn" aria-label="閉じる">&times;</button>
       </div>
-      <div class="bookmark-sidebar-body">
+      <div class="sidebar-subpanel-body">
         <div id="bookmark-panel-create" class="bookmark-panel-create">
           <input type="text" id="bookmark-panel-new-name" placeholder="新規ブックマーク名" aria-label="新規ブックマーク名">
           <button id="bookmark-panel-create-btn" type="button">作成</button>

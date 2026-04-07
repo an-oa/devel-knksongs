@@ -145,7 +145,7 @@ body.hide-thumbs .thumb {
   line-height: 1;
 }
 
-.bookmark-sidebar-panel {
+.sidebar-subpanel {
   position: absolute;
   inset: 0;
   z-index: 1100;
@@ -154,11 +154,11 @@ body.hide-thumbs .thumb {
   background: var(--sidebar-bg);
 }
 
-.bookmark-sidebar-panel[hidden] {
+.sidebar-subpanel[hidden] {
   display: none !important;
 }
 
-.bookmark-sidebar-header {
+.sidebar-subpanel-header {
   padding: 12px 16px;
   display: flex;
   align-items: center;
@@ -166,7 +166,7 @@ body.hide-thumbs .thumb {
   border-bottom: 1px solid var(--border-color);
 }
 
-.bookmark-sidebar-back {
+.sidebar-subpanel-back {
   background: none;
   border: none;
   color: var(--text-color);
@@ -176,7 +176,7 @@ body.hide-thumbs .thumb {
   padding: 0;
 }
 
-.bookmark-sidebar-body {
+.sidebar-subpanel-body {
   padding: 16px;
   padding-bottom: 20px;
   overflow-y: auto;

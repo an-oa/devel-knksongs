@@ -47,6 +47,7 @@ export const state = {
         dateIndex: null,
         pendingDateValues: null,
         pendingBookmarkAction: null,
+        settingsPanelReturnFocusEl: null,
         bookmarkPanelReturnFocusEl: null,
         bookmarkPanelExitClosesSidebar: false
     },
