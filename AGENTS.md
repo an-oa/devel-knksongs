@@ -32,6 +32,12 @@ feat: move settings into dedicated sidebar panel
 - 短い委譲関数や一部テスト補助関数では省略されている箇所もあるが、新しく JavaScript の関数を追加するときは、関数の先頭に JSDoc を付けて機能を説明する。
 - 必要に応じて `@param` `@returns` を付け、既存コードの粒度に合わせて簡潔に書く。
 
+## Verification
+
+- `tests/` 配下に Node のテストがあるため、JavaScript を変更したときは `node --test tests/*.mjs` を基本の確認手順として実行する。
+- 構文だけを素早く確認したいときは `node --check <file>` を使い、その結果だけでテスト完了とは扱わない。
+- コミット前後に確認結果を共有するときは、実行コマンドと pass/fail の件数を簡潔に残す。
+
 ## Encoding And Line Endings
 
 - 2026-04-08 時点で確認した `.js` `.mjs` `.html` `.css` `.md` は、すべて `UTF-8 BOMなし` かつ `LF`。
