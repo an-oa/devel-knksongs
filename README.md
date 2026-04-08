@@ -1,4 +1,4 @@
-# かねきかう 歌サーチ(鐘輝かう 歌リスト検索ツール)
+# 鐘輝かう 歌サーチ
 
 公開URL: [https://an-oa.github.io/knksongs/](https://an-oa.github.io/knksongs/)
 

@@ -1,5 +1,5 @@
 /**
- * かねきかう 歌サーチ
+ * 鐘輝かう 歌サーチ
  */
 export const RANDOM_DISPLAY_COUNT = 48;
 export const MIN_PERFORMANCE_FOR_RANDOM = 3;
