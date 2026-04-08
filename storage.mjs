@@ -1,9 +1,13 @@
+import { getDateUiState, getSearchUiState } from "./ui-slices.mjs?v=8";
+
 /**
  * ブックマークと検索状態の保存・復元を扱うストレージコントローラーを作成する。
  * @param {*} ui
  * @param {*} constants
  */
 export function createStorageController({ data, ui, constants, callbacks }) {
+    const searchUi = getSearchUiState(ui);
+    const dateUi = getDateUiState(ui);
     const {
         DEFAULT_FORMATS,
         SEARCH_STATE_KEY,
@@ -22,8 +26,8 @@ export function createStorageController({ data, ui, constants, callbacks }) {
      * 選択中フォーマットを既定値に戻す。
      */
     function setSelectedFormatsToDefault() {
-        ui.selectedFormats.clear();
-        DEFAULT_FORMATS.forEach((f) => ui.selectedFormats.add(f));
+        searchUi.selectedFormats.clear();
+        DEFAULT_FORMATS.forEach((f) => searchUi.selectedFormats.add(f));
     }
 
     /**
@@ -32,7 +36,7 @@ export function createStorageController({ data, ui, constants, callbacks }) {
     function syncFormatCheckboxesFromState() {
         const formatCheckboxes = document.querySelectorAll('#formatsList input[type="checkbox"]');
         formatCheckboxes.forEach((cb) => {
-            cb.checked = ui.selectedFormats.has(cb.value);
+            cb.checked = searchUi.selectedFormats.has(cb.value);
         });
     }
 
@@ -43,11 +47,11 @@ export function createStorageController({ data, ui, constants, callbacks }) {
     function applySelectedFormatsFromRaw(rawFormats) {
         const formats = Array.isArray(rawFormats) ? rawFormats : [];
         const allowed = new Set(DEFAULT_FORMATS);
-        ui.selectedFormats.clear();
+        searchUi.selectedFormats.clear();
         formats.forEach((f) => {
-            if (allowed.has(f)) ui.selectedFormats.add(f);
+            if (allowed.has(f)) searchUi.selectedFormats.add(f);
         });
-        if (ui.selectedFormats.size === 0) {
+        if (searchUi.selectedFormats.size === 0) {
             setSelectedFormatsToDefault();
         }
     }
@@ -333,7 +337,7 @@ export function createStorageController({ data, ui, constants, callbacks }) {
                 harmonyOnly: harmonyOnly ? !!harmonyOnly.checked : false,
                 dateFrom,
                 dateTo,
-                formats: Array.from(ui.selectedFormats)
+                formats: Array.from(searchUi.selectedFormats)
             };
             localStorage.setItem(SEARCH_STATE_KEY, JSON.stringify(payload));
         } catch (e) {
@@ -363,13 +367,13 @@ export function createStorageController({ data, ui, constants, callbacks }) {
                 from: typeof parsed.dateFrom === "string" ? parsed.dateFrom : "",
                 to: typeof parsed.dateTo === "string" ? parsed.dateTo : ""
             };
-            ui.pendingDateValues = pending;
-            if (ui.dateBounds) {
+            dateUi.pendingValues = pending;
+            if (dateUi.bounds) {
                 applyPendingDateValues();
             }
-            ui.userTouchedQuery = true;
-            ui.userTouchedFilters = true;
-            ui.hasRestoredSearchState = true;
+            searchUi.userTouchedQuery = true;
+            searchUi.userTouchedFilters = true;
+            searchUi.hasRestoredSearchState = true;
         } catch (e) {
             console.warn("Failed to restore search state", e);
         }

@@ -1,4 +1,5 @@
 import { parseCsvToSongs } from "./csv-parser.mjs?v=8";
+import { getDateUiState, getSearchUiState } from "./ui-slices.mjs?v=8";
 
 /**
  * CSV 読込と初期データ反映を扱うコントローラーを作成する。
@@ -24,6 +25,8 @@ export function createDataLoader(input) {
         csvCacheKey,
         callbacks
     } = input;
+    const searchUi = getSearchUiState(ui);
+    const dateUi = getDateUiState(ui);
     const {
         migrateLegacyBookmarkSongRefs,
         applyDateInputRange,
@@ -62,17 +65,17 @@ export function createDataLoader(input) {
     function applyLoadedCsv(csvText, statusLabel) {
         data.allSongsRaw = parseCsvToSongs(csvText);
         migrateLegacyBookmarkSongRefs();
-        ui.recommendedCache = null;
+        searchUi.recommendedCache = null;
         const dateBounds = applyDateInputRange(data.allSongsRaw);
         if (dateBounds) {
             clampDateInputsToBounds(dateBounds.minKey, dateBounds.maxKey);
         }
         if (ui.el.searchBox) ui.el.searchBox.disabled = false;
-        ui.dataReady = true;
+        searchUi.dataReady = true;
         if (statusLabel && ui.el.resultCount) {
             ui.el.resultCount.innerText = statusLabel;
         }
-        if (!ui.hasRestoredSearchState) {
+        if (!searchUi.hasRestoredSearchState && !dateUi.pendingValues) {
             resetSearchConditions(false);
         }
         scheduleSearch({ immediate: true });

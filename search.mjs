@@ -7,6 +7,7 @@ import {
     parseDateKey
 } from "./search-filters.mjs?v=8";
 import { pickRecommendedSongs } from "./search-recommendation.mjs?v=8";
+import { getLookupUiState, getSearchUiState } from "./ui-slices.mjs?v=8";
 
 export {
     dateKeyToParts,
@@ -28,6 +29,8 @@ export function createSearchController({ data, ui, constants }) {
         SEARCH_DEBOUNCE_MS,
         DEFAULT_FORMATS
     } = constants;
+    const searchUi = getSearchUiState(ui);
+    const lookupUi = getLookupUiState(ui);
     const dateFilterController = createDateFilterController({ ui });
     let updateDisplay = () => {};
     let scrollResultsPaneToTop = () => {};
@@ -50,13 +53,13 @@ export function createSearchController({ data, ui, constants }) {
      * @param {*} options
      */
     function scheduleSearch(options) {
-        if (ui.searchDebounceId) clearTimeout(ui.searchDebounceId);
+        if (searchUi.debounceId) clearTimeout(searchUi.debounceId);
         if (options && options.immediate) {
             search();
             return;
         }
-        ui.searchDebounceId = setTimeout(() => {
-            ui.searchDebounceId = 0;
+        searchUi.debounceId = setTimeout(() => {
+            searchUi.debounceId = 0;
             search();
         }, SEARCH_DEBOUNCE_MS);
     }
@@ -121,14 +124,14 @@ export function createSearchController({ data, ui, constants }) {
      * 既定フォーマットがすべて選択されているか判定する。
      */
     function areAllFormatsSelected() {
-        return DEFAULT_FORMATS.every((f) => ui.selectedFormats.has(f));
+        return DEFAULT_FORMATS.every((f) => searchUi.selectedFormats.has(f));
     }
 
     /**
      * フォーマット選択が既定状態と一致するか判定する。
      */
     function areFormatsDefault() {
-        if (ui.selectedFormats.size !== DEFAULT_FORMATS.length) return false;
+        if (searchUi.selectedFormats.size !== DEFAULT_FORMATS.length) return false;
         return areAllFormatsSelected();
     }
 
@@ -154,8 +157,8 @@ export function createSearchController({ data, ui, constants }) {
         const songs = Array.isArray(bookmark.songs) ? bookmark.songs : [];
         return songs
             .map((songRef) => {
-                if (typeof songRef === "string") return ui.songMapByKey.get(songRef);
-                if (Number.isFinite(songRef)) return ui.songMapByLegacyIndex.get(songRef);
+                if (typeof songRef === "string") return lookupUi.songMapByKey.get(songRef);
+                if (Number.isFinite(songRef)) return lookupUi.songMapByLegacyIndex.get(songRef);
                 return null;
             })
             .filter(Boolean);
@@ -165,14 +168,14 @@ export function createSearchController({ data, ui, constants }) {
      * 曲参照用の検索マップを必要時に再構築する。
      */
     function ensureSongLookupMaps() {
-        if (ui.songLookupSourceRef === data.allSongsRaw &&
-            ui.songMapByKey instanceof Map &&
-            ui.songMapByLegacyIndex instanceof Map) {
+        if (lookupUi.songLookupSourceRef === data.allSongsRaw &&
+            lookupUi.songMapByKey instanceof Map &&
+            lookupUi.songMapByLegacyIndex instanceof Map) {
             return;
         }
-        ui.songMapByKey = new Map(data.allSongsRaw.map((row) => [row.songKey, row]));
-        ui.songMapByLegacyIndex = new Map(data.allSongsRaw.map((row) => [row.sourceIndex, row]));
-        ui.songLookupSourceRef = data.allSongsRaw;
+        lookupUi.songMapByKey = new Map(data.allSongsRaw.map((row) => [row.songKey, row]));
+        lookupUi.songMapByLegacyIndex = new Map(data.allSongsRaw.map((row) => [row.sourceIndex, row]));
+        lookupUi.songLookupSourceRef = data.allSongsRaw;
     }
 
     /**
@@ -184,7 +187,7 @@ export function createSearchController({ data, ui, constants }) {
             const bookmark = data.bookmarks[data.activeBookmark];
             if (bookmark) {
                 const bookmarkRows = resolveBookmarkRows(bookmark);
-                const results = filterSongsByCriteria(bookmarkRows, searchState, ui.selectedFormats);
+                const results = filterSongsByCriteria(bookmarkRows, searchState, searchUi.selectedFormats);
                 return buildIncrementalSearchOutcome(
                     results,
                     `ブックマーク: ${bookmark.name} (${results.length} 件)`
@@ -222,19 +225,19 @@ export function createSearchController({ data, ui, constants }) {
      * @param {*} searchState
      */
     function filterSongs(searchState) {
-        return filterSongsByCriteria(data.allSongsRaw, searchState, ui.selectedFormats);
+        return filterSongsByCriteria(data.allSongsRaw, searchState, searchUi.selectedFormats);
     }
 
     /**
      * おすすめ曲をキャッシュ付きで選定して返す。
      */
     function pickRecommended() {
-        if (ui.recommendedCache) return ui.recommendedCache;
-        ui.recommendedCache = pickRecommendedSongs(data.allSongsRaw, {
+        if (searchUi.recommendedCache) return searchUi.recommendedCache;
+        searchUi.recommendedCache = pickRecommendedSongs(data.allSongsRaw, {
             count: RANDOM_DISPLAY_COUNT,
             minPerformanceCount: MIN_PERFORMANCE_FOR_RANDOM
         });
-        return ui.recommendedCache;
+        return searchUi.recommendedCache;
     }
 
     return {

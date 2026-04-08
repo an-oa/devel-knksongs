@@ -1,3 +1,5 @@
+import { getBookmarkPanelUiState } from "./ui-slices.mjs?v=8";
+
 /**
  * ブックマークUIのイベント処理・描画・選択状態管理をまとめたコントローラーを作成する。
  * @param {*} data
@@ -5,6 +7,7 @@
  * @param {*} callbacks
  */
 export function createBookmarkUiController({ data, ui, callbacks }) {
+    const bookmarkPanelUi = getBookmarkPanelUiState(ui);
     const {
         clearSearchDebounce,
         scheduleSearch,
@@ -107,7 +110,7 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
      * 現在が「曲を追加するための選択モード」かどうかを返す。
      */
     function isAddingSongMode() {
-        return Boolean(ui.pendingBookmarkAction && ui.pendingBookmarkAction.songKey);
+        return Boolean(bookmarkPanelUi.pendingAction && bookmarkPanelUi.pendingAction.songKey);
     }
 
     /**
@@ -154,15 +157,15 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
      * @param {*} returnFocusEl
      */
     function rememberBookmarkPanelReturnFocus(returnFocusEl) {
-        ui.bookmarkPanelReturnFocusEl = returnFocusEl instanceof HTMLElement ? returnFocusEl : null;
+        bookmarkPanelUi.returnFocusEl = returnFocusEl instanceof HTMLElement ? returnFocusEl : null;
     }
 
     /**
      * パネルを閉じたあとにフォーカスを元の要素へ戻す。
      */
     function restoreBookmarkPanelFocus() {
-        const returnFocusEl = ui.bookmarkPanelReturnFocusEl;
-        ui.bookmarkPanelReturnFocusEl = null;
+        const returnFocusEl = bookmarkPanelUi.returnFocusEl;
+        bookmarkPanelUi.returnFocusEl = null;
         if (
             returnFocusEl &&
             returnFocusEl.isConnected &&
@@ -270,7 +273,7 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
 
                 if (addingMode) {
                     const result = normalizeActionResult(
-                        onAddSongToBookmark(id, ui.pendingBookmarkAction.songKey)
+                        onAddSongToBookmark(id, bookmarkPanelUi.pendingAction.songKey)
                     );
                     if (result.ok) {
                         closeBookmarkModal();
@@ -327,7 +330,7 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
         clearBookmarkPanelError();
 
         const result = isAddingSongMode()
-            ? normalizeActionResult(onCreateBookmarkAndAdd(newName, ui.pendingBookmarkAction.songKey))
+            ? normalizeActionResult(onCreateBookmarkAndAdd(newName, bookmarkPanelUi.pendingAction.songKey))
             : normalizeActionResult(onCreateBookmark(newName));
         if (result.ok) {
             nameInput.value = "";
@@ -372,8 +375,8 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
      * 閲覧モードでブックマークパネルを開く。
      */
     function openBookmarkBrowser(options) {
-        ui.pendingBookmarkAction = null;
-        ui.bookmarkPanelExitClosesSidebar = false;
+        bookmarkPanelUi.pendingAction = null;
+        bookmarkPanelUi.exitClosesSidebar = false;
         rememberBookmarkPanelReturnFocus(options && options.returnFocusEl);
         clearBookmarkPanelError();
         renderBookmarks();
@@ -388,8 +391,8 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
      * @param {*} songKey
      */
     function openBookmarkModal(songKey, options) {
-        ui.pendingBookmarkAction = { songKey };
-        ui.bookmarkPanelExitClosesSidebar = Boolean(options && options.closeSidebarOnExit);
+        bookmarkPanelUi.pendingAction = { songKey };
+        bookmarkPanelUi.exitClosesSidebar = Boolean(options && options.closeSidebarOnExit);
         rememberBookmarkPanelReturnFocus(options && options.returnFocusEl);
         clearBookmarkPanelError();
         renderBookmarks();
@@ -407,14 +410,14 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
     function closeBookmarkModal(options) {
         const shouldCloseSidebar =
             Boolean(options && options.restoreFocus) &&
-            Boolean(ui.bookmarkPanelExitClosesSidebar);
-        ui.pendingBookmarkAction = null;
-        ui.bookmarkPanelExitClosesSidebar = false;
+            Boolean(bookmarkPanelUi.exitClosesSidebar);
+        bookmarkPanelUi.pendingAction = null;
+        bookmarkPanelUi.exitClosesSidebar = false;
         clearBookmarkPanelError();
         hideBookmarkPanel();
         renderBookmarks();
         if (shouldCloseSidebar) {
-            ui.bookmarkPanelReturnFocusEl = null;
+            bookmarkPanelUi.returnFocusEl = null;
             onRequestCloseSidebar();
             return;
         }
@@ -422,7 +425,7 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
             restoreBookmarkPanelFocus();
             return;
         }
-        ui.bookmarkPanelReturnFocusEl = null;
+        bookmarkPanelUi.returnFocusEl = null;
     }
 
     /**

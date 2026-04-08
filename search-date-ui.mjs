@@ -1,10 +1,12 @@
 import { dateKeyToParts, parseDateKey } from "./search-filters.mjs?v=8";
+import { getDateUiState } from "./ui-slices.mjs?v=8";
 
 /**
  * 日付フィルタ UI の初期化・同期・補正を扱うコントローラーを作成する。
  * @param {{ ui: any }} options
  */
 export function createDateFilterController({ ui }) {
+    const dateUi = getDateUiState(ui);
     /**
      * 開始/終了いずれかの日付選択があるか判定する。
      */
@@ -106,9 +108,9 @@ export function createDateFilterController({ ui }) {
      * @param {*} kind
      */
     function getConstrainedBounds(kind) {
-        if (!ui.dateBounds) return null;
-        let minKey = ui.dateBounds.minKey;
-        let maxKey = ui.dateBounds.maxKey;
+        if (!dateUi.bounds) return null;
+        let minKey = dateUi.bounds.minKey;
+        let maxKey = dateUi.bounds.maxKey;
         const otherKind = kind === "from" ? "to" : "from";
         const otherRange = getPartialDateRange(otherKind);
         if (otherRange) {
@@ -173,9 +175,9 @@ export function createDateFilterController({ ui }) {
      * @param {*} month
      */
     function getAvailableDays(year, month) {
-        if (!ui.dateIndex) return [];
+        if (!dateUi.index) return [];
         const key = `${year}-${month}`;
-        return ui.dateIndex.get(key) || [];
+        return dateUi.index.get(key) || [];
     }
 
     /**
@@ -211,10 +213,10 @@ export function createDateFilterController({ ui }) {
      * @param {*} kind
      */
     function syncDateSelectOptions(kind) {
-        if (!ui.dateBounds) return;
+        if (!dateUi.bounds) return;
         const targets = kind ? [kind] : ["from", "to"];
         targets.forEach((k) => {
-            const bounds = getConstrainedBounds(k) || ui.dateBounds;
+            const bounds = getConstrainedBounds(k) || dateUi.bounds;
             const isFrom = k === "from";
             const yearSelect = isFrom ? ui.el.dateFromYear : ui.el.dateToYear;
             const monthSelect = isFrom ? ui.el.dateFromMonth : ui.el.dateToMonth;
@@ -255,11 +257,11 @@ export function createDateFilterController({ ui }) {
      * 保留していた日付復元値をセレクトへ適用する。
      */
     function applyPendingDateValues() {
-        if (!ui.pendingDateValues) return;
-        const { from, to } = ui.pendingDateValues;
+        if (!dateUi.pendingValues) return;
+        const { from, to } = dateUi.pendingValues;
         if (from) applyDateSelectValue("from", from);
         if (to) applyDateSelectValue("to", to);
-        ui.pendingDateValues = null;
+        dateUi.pendingValues = null;
     }
 
     /**
@@ -307,8 +309,8 @@ export function createDateFilterController({ ui }) {
         }
         if (minKey === null || maxKey === null) return null;
         const bounds = { minKey, maxKey };
-        ui.dateBounds = bounds;
-        ui.dateIndex = buildDateIndex(songs);
+        dateUi.bounds = bounds;
+        dateUi.index = buildDateIndex(songs);
         initDateSelects(bounds);
         return bounds;
     }
@@ -353,8 +355,8 @@ export function createDateFilterController({ ui }) {
      * 日付境界がある場合に入力値の範囲補正を行う。
      */
     function clampDateInputsIfNeeded() {
-        if (!ui.dateBounds) return;
-        clampDateInputsToBounds(ui.dateBounds.minKey, ui.dateBounds.maxKey);
+        if (!dateUi.bounds) return;
+        clampDateInputsToBounds(dateUi.bounds.minKey, dateUi.bounds.maxKey);
     }
 
     return {

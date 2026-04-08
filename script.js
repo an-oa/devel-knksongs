@@ -35,6 +35,7 @@ import {
 import { createUiSyncController } from "./app-sync.mjs?v=8";
 import { createDataLoader } from "./app-data.mjs?v=8";
 import { createSidebarController } from "./sidebar-ui.mjs?v=8";
+import { getDateUiState, getSearchUiState } from "./ui-slices.mjs?v=8";
 
 /**
  * @typedef {Object} SongRow
@@ -91,6 +92,8 @@ const youtubeController = createYoutubeController({
 
 let bookmarkUiController = null;
 let sidebarController = null;
+const searchUi = getSearchUiState(ui);
+const dateUi = getDateUiState(ui);
 
 const storageController = createStorageController({
     data,
@@ -262,7 +265,7 @@ function clearSearch() {
  * @param {{ immediate?: boolean } | undefined} options
  */
 function markFilterTouched(options) {
-    ui.userTouchedFilters = true;
+    searchUi.userTouchedFilters = true;
     searchController.scheduleSearch(options);
     storageController.saveSearchState();
 }
@@ -271,7 +274,7 @@ function markFilterTouched(options) {
  * 検索語操作済みフラグを立てて検索・保存を行う。
  */
 function markQueryTouched() {
-    ui.userTouchedQuery = true;
+    searchUi.userTouchedQuery = true;
     searchController.scheduleSearch();
     storageController.saveSearchState();
 }
@@ -280,9 +283,9 @@ function markQueryTouched() {
  * 保留中の検索デバウンスタイマーを解除する。
  */
 function clearSearchDebounce() {
-    if (ui.searchDebounceId) {
-        clearTimeout(ui.searchDebounceId);
-        ui.searchDebounceId = 0;
+    if (searchUi.debounceId) {
+        clearTimeout(searchUi.debounceId);
+        searchUi.debounceId = 0;
     }
 }
 
@@ -291,7 +294,7 @@ function clearSearchDebounce() {
  */
 function resetSearchQuery() {
     if (ui.el.searchBox) ui.el.searchBox.value = "";
-    ui.userTouchedQuery = false;
+    searchUi.userTouchedQuery = false;
 }
 
 /**
@@ -304,11 +307,11 @@ function resetSearchFilters() {
     if (relayOnly) relayOnly.checked = false;
     if (harmonyOnly) harmonyOnly.checked = false;
     searchController.resetDateSelects();
-    ui.pendingDateValues = null;
+    dateUi.pendingValues = null;
 
     storageController.setSelectedFormatsToDefault();
     storageController.syncFormatCheckboxesFromState();
-    ui.userTouchedFilters = false;
+    searchUi.userTouchedFilters = false;
 }
 
 /**
@@ -319,7 +322,7 @@ function resetSearchConditions(shouldSearch) {
     clearSearchDebounce();
     resetSearchQuery();
     resetSearchFilters();
-    if (shouldSearch && ui.dataReady) {
+    if (shouldSearch && searchUi.dataReady) {
         searchController.scheduleSearch({ immediate: true });
     }
 }
@@ -342,7 +345,7 @@ function needsFilterReset() {
  * @returns {boolean}
  */
 function syncSearchQueryIfNeeded() {
-    if (ui.userTouchedQuery) return false;
+    if (searchUi.userTouchedQuery) return false;
     const searchBox = ui.el.searchBox;
     if (!searchBox || searchBox.value === "") return false;
     resetSearchQuery();
@@ -355,7 +358,7 @@ function syncSearchQueryIfNeeded() {
  */
 function syncSearchFiltersIfNeeded() {
     storageController.syncFormatCheckboxesFromState();
-    if (ui.userTouchedFilters) return false;
+    if (searchUi.userTouchedFilters) return false;
     if (!needsFilterReset()) return false;
     resetSearchFilters();
     return true;
@@ -366,7 +369,7 @@ function syncSearchFiltersIfNeeded() {
  */
 function syncSearchUI() {
     const shouldSearch = syncSearchQueryIfNeeded() || syncSearchFiltersIfNeeded();
-    if (shouldSearch && ui.dataReady) {
+    if (shouldSearch && searchUi.dataReady) {
         searchController.scheduleSearch({ immediate: true });
     }
 }

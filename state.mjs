@@ -28,28 +28,42 @@ export const state = {
         activeBookmark: null
     },
     ui: {
-        selectedFormats: new Set(),
-        scrollObserver: null,
-        showThumbnails: false,
-        dataReady: false,
-        userTouchedQuery: false,
-        userTouchedFilters: false,
-        hasRestoredSearchState: false,
-        searchDebounceId: 0,
-        cardEntriesBySourceKey: new Map(),
-        recommendedCache: null,
-        activeThumb: null,
-        songMapByKey: new Map(),
-        songMapByLegacyIndex: new Map(),
-        songLookupSourceRef: null,
         el: {}, // DOM要素のキャッシュ用
-        dateBounds: null,
-        dateIndex: null,
-        pendingDateValues: null,
-        pendingBookmarkAction: null,
-        settingsPanelReturnFocusEl: null,
-        bookmarkPanelReturnFocusEl: null,
-        bookmarkPanelExitClosesSidebar: false
+        search: {
+            selectedFormats: new Set(),
+            dataReady: false,
+            userTouchedQuery: false,
+            userTouchedFilters: false,
+            hasRestoredSearchState: false,
+            debounceId: 0,
+            recommendedCache: null
+        },
+        date: {
+            bounds: null,
+            index: null,
+            pendingValues: null
+        },
+        playback: {
+            scrollObserver: null,
+            showThumbnails: false,
+            activeThumb: null
+        },
+        lookup: {
+            songMapByKey: new Map(),
+            songMapByLegacyIndex: new Map(),
+            songLookupSourceRef: null
+        },
+        render: {
+            cardEntriesBySourceKey: new Map()
+        },
+        settingsPanel: {
+            returnFocusEl: null
+        },
+        bookmarkPanel: {
+            pendingAction: null,
+            returnFocusEl: null,
+            exitClosesSidebar: false
+        }
     },
     youtube: {
         apiPromise: null,

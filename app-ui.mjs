@@ -1,3 +1,5 @@
+import { getSearchUiState } from "./ui-slices.mjs?v=8";
+
 /**
  * 初期化時に利用する DOM 要素参照をまとめて取得する。
  * @returns {Record<string, HTMLElement | null>}
@@ -91,9 +93,10 @@ export function initFilterMenu(input) {
         scheduleSearch,
         saveSearchState
     } = input;
+    const searchUi = getSearchUiState(ui);
     const container = ui.el.formatsList;
     if (!container || container.childElementCount > 0) return;
-    if (ui.selectedFormats.size === 0) setSelectedFormatsToDefault();
+    if (searchUi.selectedFormats.size === 0) setSelectedFormatsToDefault();
     defaultFormats.forEach((format) => {
         const label = document.createElement("label");
         label.className = "checkbox-item";
@@ -101,9 +104,9 @@ export function initFilterMenu(input) {
         checkbox.type = "checkbox";
         checkbox.value = format;
         checkbox.addEventListener("change", (event) => {
-            ui.userTouchedFilters = true;
-            if (event.target.checked) ui.selectedFormats.add(event.target.value);
-            else ui.selectedFormats.delete(event.target.value);
+            searchUi.userTouchedFilters = true;
+            if (event.target.checked) searchUi.selectedFormats.add(event.target.value);
+            else searchUi.selectedFormats.delete(event.target.value);
             scheduleSearch();
             saveSearchState();
         });

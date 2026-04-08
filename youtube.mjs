@@ -1,4 +1,5 @@
 import { createLayoutRefreshScheduler } from "./layout-anchor.mjs?v=8";
+import { getPlaybackUiState, getSearchUiState } from "./ui-slices.mjs?v=8";
 
 export { extractYoutubeInfo } from "./youtube-url.mjs?v=8";
 
@@ -13,6 +14,8 @@ export function createYoutubeController({ ui, youtube, constants }) {
         YT_IFRAME_READY_POLL_MS,
         STOP_PLAYBACK_ON_SCROLL_OUT
     } = constants;
+    const playbackUi = getPlaybackUiState(ui);
+    const searchUi = getSearchUiState(ui);
     let updateDisplay = () => {};
     let refreshLayout = () => {};
     const refreshCardLayoutSoon = createLayoutRefreshScheduler(() => refreshLayout);
@@ -156,7 +159,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
      * サムネイル表示時にYouTube APIの事前読み込みを行う。
      */
     function ensureYoutubeApiForThumbnails() {
-        if (!ui.showThumbnails) return;
+        if (!playbackUi.showThumbnails) return;
         requestAnimationFrame(() => youtubeApi.ensureReady().catch(() => {}));
     }
 
@@ -167,7 +170,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
         const thumbToggle = ui.el.thumbToggle;
         const savedSetting = localStorage.getItem("showThumbnails");
         const isShow = savedSetting !== null ? (savedSetting === "true") : false;
-        ui.showThumbnails = isShow;
+        playbackUi.showThumbnails = isShow;
 
         if (thumbToggle) thumbToggle.checked = isShow;
         if (!isShow) document.body.classList.add("hide-thumbs");
@@ -176,7 +179,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
         if (!thumbToggle) return;
         thumbToggle.addEventListener("change", () => {
             const checked = thumbToggle.checked;
-            ui.showThumbnails = checked;
+            playbackUi.showThumbnails = checked;
             document.body.classList.toggle("hide-thumbs", !checked);
             localStorage.setItem("showThumbnails", checked);
             ensureYoutubeApiForThumbnails();
@@ -192,12 +195,12 @@ export function createYoutubeController({ ui, youtube, constants }) {
         const thumbToggle = ui.el.thumbToggle;
         const savedSetting = localStorage.getItem("showThumbnails");
         const isShow = savedSetting !== null ? (savedSetting === "true") : false;
-        const prev = ui.showThumbnails;
-        ui.showThumbnails = isShow;
+        const prev = playbackUi.showThumbnails;
+        playbackUi.showThumbnails = isShow;
         if (thumbToggle) thumbToggle.checked = isShow;
         document.body.classList.toggle("hide-thumbs", !isShow);
         ensureYoutubeApiForThumbnails();
-        if (prev !== isShow && ui.dataReady) {
+        if (prev !== isShow && searchUi.dataReady) {
             updateDisplay();
             setupScrollObserver();
         }
@@ -303,7 +306,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
      * @param {*} nextPlaybackKey
      */
     function isSamePlaybackTarget(thumbDiv, nextPlaybackKey) {
-        if (!ui.showThumbnails) return false;
+        if (!playbackUi.showThumbnails) return false;
         if (!thumbDiv.querySelector("iframe")) return false;
         return (thumbDiv.dataset.playbackKey || "") === nextPlaybackKey;
     }
@@ -313,10 +316,10 @@ export function createYoutubeController({ ui, youtube, constants }) {
      * @param {*} thumbDiv
      */
     function setActiveThumb(thumbDiv) {
-        if (ui.activeThumb && ui.activeThumb !== thumbDiv) {
-            restoreThumbnail(ui.activeThumb, ui.activeThumb.dataset.videoId || "");
+        if (playbackUi.activeThumb && playbackUi.activeThumb !== thumbDiv) {
+            restoreThumbnail(playbackUi.activeThumb, playbackUi.activeThumb.dataset.videoId || "");
         }
-        ui.activeThumb = thumbDiv;
+        playbackUi.activeThumb = thumbDiv;
     }
 
     /**
@@ -324,7 +327,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
      * @param {*} thumbDiv
      */
     function clearActiveThumb(thumbDiv) {
-        if (ui.activeThumb === thumbDiv) ui.activeThumb = null;
+        if (playbackUi.activeThumb === thumbDiv) playbackUi.activeThumb = null;
     }
 
     /**
@@ -368,14 +371,14 @@ export function createYoutubeController({ ui, youtube, constants }) {
     function setupScrollObserver() {
         const header = document.querySelector(".header");
         const headerHeight = header ? header.getBoundingClientRect().height : 0;
-        if (ui.scrollObserver) ui.scrollObserver.disconnect();
-        ui.scrollObserver = new IntersectionObserver(handleScrollObserver, {
+        if (playbackUi.scrollObserver) playbackUi.scrollObserver.disconnect();
+        playbackUi.scrollObserver = new IntersectionObserver(handleScrollObserver, {
             threshold: 0,
             rootMargin: `-${headerHeight}px 0px 0px 0px`
         });
-        if (!ui.showThumbnails) return;
+        if (!playbackUi.showThumbnails) return;
         document.querySelectorAll(".thumb").forEach((thumb) => {
-            ui.scrollObserver.observe(thumb);
+            playbackUi.scrollObserver.observe(thumb);
         });
     }
 
@@ -406,10 +409,10 @@ export function createYoutubeController({ ui, youtube, constants }) {
      * 現在アクティブな再生サムネイルを通常表示へ復元する。
      */
     function restoreActivePlayback() {
-        const activeThumb = ui.activeThumb;
+        const activeThumb = playbackUi.activeThumb;
         if (!activeThumb) return;
         if (!activeThumb.isConnected) {
-            ui.activeThumb = null;
+            playbackUi.activeThumb = null;
             return;
         }
         restoreThumbnail(activeThumb, activeThumb.dataset.videoId || "");
@@ -463,7 +466,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
         resetThumbnailContainer(thumbDiv, yt.videoId, nextPlaybackKey);
         setThumbnailOrientation(thumbDiv, "landscape");
 
-        if (!ui.showThumbnails) return;
+        if (!playbackUi.showThumbnails) return;
         if (!yt.videoId) return;
 
         const img = createThumbnailImage(yt.videoId);

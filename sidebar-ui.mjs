@@ -1,3 +1,5 @@
+import { getSettingsPanelUiState } from "./ui-slices.mjs?v=8";
+
 /**
  * サイドバー関連の UI 操作をまとめるコントローラーを作成する。
  * @param {{
@@ -26,6 +28,7 @@
  */
 export function createSidebarController(input) {
     const { data, ui, constants, callbacks } = input;
+    const settingsPanelUi = getSettingsPanelUiState(ui);
     const { incrementCount } = constants;
     const {
         getBookmarkUiController,
@@ -45,7 +48,7 @@ export function createSidebarController(input) {
      * @param {{ returnFocusEl?: HTMLElement | null } | undefined} options
      */
     function openSettingsPanel(options) {
-        ui.settingsPanelReturnFocusEl =
+        settingsPanelUi.returnFocusEl =
             options && options.returnFocusEl instanceof HTMLElement ? options.returnFocusEl : null;
         setSidebarBackgroundInert(true);
         if (ui.el.settingsSidebarPanel) {
@@ -63,8 +66,8 @@ export function createSidebarController(input) {
      */
     function closeSettingsPanel(options) {
         const shouldRestoreFocus = Boolean(options && options.restoreFocus);
-        const returnFocusEl = ui.settingsPanelReturnFocusEl;
-        ui.settingsPanelReturnFocusEl = null;
+        const returnFocusEl = settingsPanelUi.returnFocusEl;
+        settingsPanelUi.returnFocusEl = null;
         if (ui.el.settingsSidebarPanel) {
             ui.el.settingsSidebarPanel.hidden = true;
             ui.el.settingsSidebarPanel.setAttribute("aria-hidden", "true");

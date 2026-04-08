@@ -1,8 +1,13 @@
+import { getPlaybackUiState, getRenderUiState, getSearchUiState } from "./ui-slices.mjs?v=8";
+
 /**
  * 検索結果カードの生成・差分反映・表示更新を担うレンダーコントローラーを作成する。
  * @param {*} ui
  */
 export function createRenderController({ data, ui, isAllFormatsSelected }) {
+    const searchUi = getSearchUiState(ui);
+    const playbackUi = getPlaybackUiState(ui);
+    const renderUi = getRenderUiState(ui);
     const MASONRY_GAP_PX = 12;
     const MASONRY_BREAKPOINTS = [
         { minWidth: 1400, columns: 4 },
@@ -206,10 +211,10 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
      * 現在状態に応じた空結果メッセージ種別を決定する。
      */
     function getEmptyStateDescriptor() {
-        if (!ui.dataReady) {
+        if (!searchUi.dataReady) {
             return { kind: "loading", message: "読み込み中..." };
         }
-        if (!isAllFormatsSelected() && ui.selectedFormats.size === 0) {
+        if (!isAllFormatsSelected() && searchUi.selectedFormats.size === 0) {
             return { kind: "error", message: "動画の種類を選択してください" };
         }
         return { kind: "empty", message: "見つかりませんでした" };
@@ -241,7 +246,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
      * @param {*} nodes
      */
     function collectActiveCardRenderState(container, nodes) {
-        const activeThumb = ui.activeThumb;
+        const activeThumb = playbackUi.activeThumb;
         const activeCard = activeThumb ? activeThumb.closest(".song-card") : null;
         const isActiveCardInNextNodes =
             activeCard instanceof HTMLElement &&
@@ -363,7 +368,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
             const rowKey = row && typeof row.songKey === "string" && row.songKey
                 ? `song:${row.songKey}`
                 : (row && Number.isFinite(row.sourceIndex) ? `src:${row.sourceIndex}` : `idx:${i}`);
-            let entry = ui.cardEntriesBySourceKey.get(rowKey);
+            let entry = renderUi.cardEntriesBySourceKey.get(rowKey);
             if (!entry) entry = createCardElements();
 
             entry.card.dataset.songKey = row.songKey;
@@ -378,7 +383,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
             entries.push(entry);
             nodes.push(entry.card);
         }
-        ui.cardEntriesBySourceKey = nextEntriesBySourceKey;
+        renderUi.cardEntriesBySourceKey = nextEntriesBySourceKey;
         return { nodes, entries };
     }
 
@@ -519,9 +524,9 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
      * @param {*} entries
      */
     function observeVisibleThumbnails(entries) {
-        if (!ui.showThumbnails || !ui.scrollObserver) return;
+        if (!playbackUi.showThumbnails || !playbackUi.scrollObserver) return;
         for (const entry of entries) {
-            ui.scrollObserver.observe(entry.thumbDiv);
+            playbackUi.scrollObserver.observe(entry.thumbDiv);
         }
     }
 
@@ -553,8 +558,8 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
      * 描画前に監視状態を初期化し、必要なら監視を再設定する。
      */
     function prepareDisplayObservation() {
-        if (ui.scrollObserver) ui.scrollObserver.disconnect();
-        if (ui.showThumbnails && !ui.scrollObserver) setupScrollObserver();
+        if (playbackUi.scrollObserver) playbackUi.scrollObserver.disconnect();
+        if (playbackUi.showThumbnails && !playbackUi.scrollObserver) setupScrollObserver();
     }
 
     /**
