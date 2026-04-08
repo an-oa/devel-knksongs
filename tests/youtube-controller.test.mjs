@@ -7,13 +7,31 @@ import {
     setGlobalValue
 } from "./test-helpers.mjs";
 
+/**
+ * youtube 系テスト用の UI 状態を作る。
+ * @param {*} input
+ * @returns {*}
+ */
+function createYoutubeUiState(input) {
+    return {
+        el: {},
+        search: {
+            dataReady: input.dataReady ?? false
+        },
+        playback: {
+            showThumbnails: input.showThumbnails ?? true,
+            activeThumb: input.activeThumb ?? null,
+            scrollObserver: null
+        }
+    };
+}
+
 test("youtube: disconnected active thumb is cleared without restore work", () => {
     const cleanup = installFakeDom();
     try {
-        const ui = {
-            showThumbnails: true,
+        const ui = createYoutubeUiState({
             activeThumb: document.createElement("div")
-        };
+        });
         const youtube = {
             apiPromise: null,
             players: new WeakMap()
@@ -30,7 +48,7 @@ test("youtube: disconnected active thumb is cleared without restore work", () =>
         });
 
         controller.restoreActivePlayback();
-        assert.equal(ui.activeThumb, null);
+        assert.equal(ui.playback.activeThumb, null);
     } finally {
         cleanup();
     }
@@ -44,10 +62,7 @@ test("youtube: shorts url is treated as vertical playback target", () => {
 test("youtube: vertical videos stay landscape in thumbnail mode and switch on playback", () => {
     const cleanup = installFakeDom();
     try {
-        const ui = {
-            showThumbnails: true,
-            activeThumb: null
-        };
+        const ui = createYoutubeUiState({});
         const youtube = {
             apiPromise: null,
             players: new WeakMap()
@@ -102,10 +117,7 @@ test("youtube: stale queued layout refresh requests are ignored", () => {
         return rafQueue.length;
     });
     try {
-        const ui = {
-            showThumbnails: true,
-            activeThumb: null
-        };
+        const ui = createYoutubeUiState({});
         const youtube = {
             apiPromise: null,
             players: new WeakMap()
@@ -153,10 +165,7 @@ test("youtube: stale queued layout refresh requests are ignored", () => {
 test("youtube: after explicit restore, same target does not auto-resume on redraw", () => {
     const cleanup = installFakeDom();
     try {
-        const ui = {
-            showThumbnails: true,
-            activeThumb: null
-        };
+        const ui = createYoutubeUiState({});
         const youtube = {
             apiPromise: null,
             players: new WeakMap()
@@ -178,10 +187,10 @@ test("youtube: after explicit restore, same target does not auto-resume on redra
         thumb.dataset.playbackKey = "video1:0";
         thumb.classList.add("playing");
         thumb.appendChild(document.createElement("iframe"));
-        ui.activeThumb = thumb;
+        ui.playback.activeThumb = thumb;
 
         controller.restoreActivePlayback();
-        assert.equal(ui.activeThumb, null);
+        assert.equal(ui.playback.activeThumb, null);
         assert.equal(thumb.querySelector("iframe"), null);
 
         controller.updateThumbnail(thumb, { videoId: "video1", startSeconds: 0 });

@@ -10,6 +10,44 @@ import {
     invokeListener
 } from "./test-helpers.mjs";
 
+/**
+ * render 系テスト用の UI 状態を作る。
+ * @param {*} input
+ * @returns {*}
+ */
+function createRenderUiState(input) {
+    return {
+        el: input.el,
+        search: {
+            selectedFormats: input.selectedFormats ?? new Set(["配信"]),
+            dataReady: input.dataReady ?? true,
+            debounceId: input.debounceId ?? 0,
+            recommendedCache: null,
+            userTouchedQuery: false,
+            userTouchedFilters: false,
+            hasRestoredSearchState: false
+        },
+        date: {
+            bounds: null,
+            index: null,
+            pendingValues: null
+        },
+        playback: {
+            activeThumb: input.activeThumb ?? null,
+            showThumbnails: input.showThumbnails ?? false,
+            scrollObserver: input.scrollObserver ?? null
+        },
+        render: {
+            cardEntriesBySourceKey: input.cardEntriesBySourceKey ?? new Map()
+        },
+        lookup: {
+            songMapByKey: new Map(),
+            songMapByLegacyIndex: new Map(),
+            songLookupSourceRef: null
+        }
+    };
+}
+
 test("render: empty results stop active playback", () => {
     const cleanup = installFakeDom();
     try {
@@ -18,18 +56,13 @@ test("render: empty results stop active playback", () => {
             displayLimit: 48,
             activeBookmark: null
         };
-        const ui = {
+        const ui = createRenderUiState({
             activeThumb: document.createElement("div"),
-            showThumbnails: false,
-            scrollObserver: null,
-            cardEntriesBySourceKey: new Map(),
-            selectedFormats: new Set(["配信"]),
-            dataReady: true,
             el: {
                 resultList: document.createElement("div"),
                 loadMoreContainer: document.createElement("div")
             }
-        };
+        });
         let restoreCount = 0;
         const controller = createRenderController({
             data,
@@ -62,18 +95,12 @@ test("render: active card kept in next nodes does not stop playback", () => {
             displayLimit: 10,
             activeBookmark: null
         };
-        const ui = {
-            activeThumb: null,
-            showThumbnails: false,
-            scrollObserver: null,
-            cardEntriesBySourceKey: new Map(),
-            selectedFormats: new Set(["配信"]),
-            dataReady: true,
+        const ui = createRenderUiState({
             el: {
                 resultList: document.createElement("div"),
                 loadMoreContainer: document.createElement("div")
             }
-        };
+        });
         let restoreCount = 0;
         const controller = createRenderController({
             data,
@@ -91,11 +118,11 @@ test("render: active card kept in next nodes does not stop playback", () => {
         });
 
         controller.updateDisplay();
-        const entry = ui.cardEntriesBySourceKey.get(`song:${row.songKey}`);
+        const entry = ui.render.cardEntriesBySourceKey.get(`song:${row.songKey}`);
         assert.ok(entry);
 
-        ui.activeThumb = entry.thumbDiv;
-        ui.activeThumb.appendChild(document.createElement("iframe"));
+        ui.playback.activeThumb = entry.thumbDiv;
+        ui.playback.activeThumb.appendChild(document.createElement("iframe"));
         controller.updateDisplay();
 
         assert.equal(restoreCount, 0);
@@ -114,18 +141,12 @@ test("render: active card hidden from next nodes stops playback", () => {
             displayLimit: 10,
             activeBookmark: null
         };
-        const ui = {
-            activeThumb: null,
-            showThumbnails: false,
-            scrollObserver: null,
-            cardEntriesBySourceKey: new Map(),
-            selectedFormats: new Set(["配信"]),
-            dataReady: true,
+        const ui = createRenderUiState({
             el: {
                 resultList: document.createElement("div"),
                 loadMoreContainer: document.createElement("div")
             }
-        };
+        });
         let restoreCount = 0;
         const controller = createRenderController({
             data,
@@ -143,10 +164,10 @@ test("render: active card hidden from next nodes stops playback", () => {
         });
 
         controller.updateDisplay();
-        const entryA = ui.cardEntriesBySourceKey.get(`song:${rowA.songKey}`);
+        const entryA = ui.render.cardEntriesBySourceKey.get(`song:${rowA.songKey}`);
         assert.ok(entryA);
-        ui.activeThumb = entryA.thumbDiv;
-        ui.activeThumb.appendChild(document.createElement("iframe"));
+        ui.playback.activeThumb = entryA.thumbDiv;
+        ui.playback.activeThumb.appendChild(document.createElement("iframe"));
 
         data.currentResults = [rowB];
         controller.updateDisplay();
@@ -167,18 +188,12 @@ test("render: cards keep fixed columns while preserving DOM order", () => {
             displayLimit: 10,
             activeBookmark: null
         };
-        const ui = {
-            activeThumb: null,
-            showThumbnails: false,
-            scrollObserver: null,
-            cardEntriesBySourceKey: new Map(),
-            selectedFormats: new Set(["配信"]),
-            dataReady: true,
+        const ui = createRenderUiState({
             el: {
                 resultList: document.createElement("div"),
                 loadMoreContainer: document.createElement("div")
             }
-        };
+        });
         const controller = createRenderController({
             data,
             ui,
@@ -195,8 +210,8 @@ test("render: cards keep fixed columns while preserving DOM order", () => {
         });
 
         controller.updateDisplay();
-        const entryA = ui.cardEntriesBySourceKey.get(`song:${rowA.songKey}`);
-        const entryB = ui.cardEntriesBySourceKey.get(`song:${rowB.songKey}`);
+        const entryA = ui.render.cardEntriesBySourceKey.get(`song:${rowA.songKey}`);
+        const entryB = ui.render.cardEntriesBySourceKey.get(`song:${rowB.songKey}`);
         assert.equal(ui.el.resultList.children[0], entryA.card);
         assert.equal(ui.el.resultList.children[1], entryB.card);
         assert.equal(entryA.card.style.width, "344px");
@@ -227,18 +242,12 @@ test("render: card height changes only shift cards in the same column", () => {
             displayLimit: 10,
             activeBookmark: null
         };
-        const ui = {
-            activeThumb: null,
-            showThumbnails: false,
-            scrollObserver: null,
-            cardEntriesBySourceKey: new Map(),
-            selectedFormats: new Set(["配信"]),
-            dataReady: true,
+        const ui = createRenderUiState({
             el: {
                 resultList: document.createElement("div"),
                 loadMoreContainer: document.createElement("div")
             }
-        };
+        });
         const controller = createRenderController({
             data,
             ui,
@@ -255,10 +264,10 @@ test("render: card height changes only shift cards in the same column", () => {
         });
 
         controller.updateDisplay();
-        const entryA = ui.cardEntriesBySourceKey.get("song:a::1");
-        const entryB = ui.cardEntriesBySourceKey.get("song:b::2");
-        const entryC = ui.cardEntriesBySourceKey.get("song:c::3");
-        const entryD = ui.cardEntriesBySourceKey.get("song:d::4");
+        const entryA = ui.render.cardEntriesBySourceKey.get("song:a::1");
+        const entryB = ui.render.cardEntriesBySourceKey.get("song:b::2");
+        const entryC = ui.render.cardEntriesBySourceKey.get("song:c::3");
+        const entryD = ui.render.cardEntriesBySourceKey.get("song:d::4");
         assert.ok(entryA);
         assert.ok(entryB);
         assert.ok(entryC);
@@ -298,18 +307,12 @@ test("render: refreshLayout shrinks container height after card height decreases
             displayLimit: 10,
             activeBookmark: null
         };
-        const ui = {
-            activeThumb: null,
-            showThumbnails: false,
-            scrollObserver: null,
-            cardEntriesBySourceKey: new Map(),
-            selectedFormats: new Set(["配信"]),
-            dataReady: true,
+        const ui = createRenderUiState({
             el: {
                 resultList: document.createElement("div"),
                 loadMoreContainer: document.createElement("div")
             }
-        };
+        });
         const controller = createRenderController({
             data,
             ui,
@@ -324,7 +327,7 @@ test("render: refreshLayout shrinks container height after card height decreases
         });
 
         controller.updateDisplay();
-        const entry = ui.cardEntriesBySourceKey.get(`song:${row.songKey}`);
+        const entry = ui.render.cardEntriesBySourceKey.get(`song:${row.songKey}`);
         entry.card._scrollHeight = 400;
         controller.refreshLayout();
         assert.equal(ui.el.resultList.style.height, "400px");
@@ -351,18 +354,12 @@ test("render: explicit video orientation overrides URL heuristic", () => {
             displayLimit: 10,
             activeBookmark: null
         };
-        const ui = {
-            activeThumb: null,
-            showThumbnails: false,
-            scrollObserver: null,
-            cardEntriesBySourceKey: new Map(),
-            selectedFormats: new Set(["配信"]),
-            dataReady: true,
+        const ui = createRenderUiState({
             el: {
                 resultList: document.createElement("div"),
                 loadMoreContainer: document.createElement("div")
             }
-        };
+        });
         let received = null;
         const controller = createRenderController({
             data,
@@ -419,14 +416,8 @@ test("bookmark: shows load-more and increases by INCREMENT_COUNT (48)", () => {
         };
         const loadMoreContainer = document.createElement("div");
         loadMoreContainer.classList.add("hidden");
-        const ui = {
-            activeThumb: null,
-            showThumbnails: false,
-            scrollObserver: null,
-            cardEntriesBySourceKey: new Map(),
-            selectedFormats: new Set(["配信"]),
-            dataReady: true,
-            searchDebounceId: 0,
+        const ui = createRenderUiState({
+            debounceId: 0,
             el: {
                 resultList: document.createElement("div"),
                 loadMoreContainer,
@@ -441,7 +432,7 @@ test("bookmark: shows load-more and increases by INCREMENT_COUNT (48)", () => {
                 dateToMonth: null,
                 dateToDay: null
             }
-        };
+        });
 
         const renderController = createRenderController({
             data,
@@ -517,18 +508,12 @@ test("render: drag handle is bookmark-only and reorder works in both directions 
                 }
             }
         };
-        const ui = {
-            activeThumb: null,
-            showThumbnails: false,
-            scrollObserver: null,
-            cardEntriesBySourceKey: new Map(),
-            selectedFormats: new Set(["配信"]),
-            dataReady: true,
+        const ui = createRenderUiState({
             el: {
                 resultList: document.createElement("div"),
                 loadMoreContainer: document.createElement("div")
             }
-        };
+        });
         let saveCount = 0;
         const controller = createRenderController({
             data,
@@ -547,7 +532,7 @@ test("render: drag handle is bookmark-only and reorder works in both directions 
         });
 
         controller.updateDisplay();
-        const normalEntryA = ui.cardEntriesBySourceKey.get(`song:${rowA.songKey}`);
+        const normalEntryA = ui.render.cardEntriesBySourceKey.get(`song:${rowA.songKey}`);
         assert.ok(normalEntryA);
         assert.equal(normalEntryA.dragHandle.hidden, true);
         assert.equal(normalEntryA.dragHandle.draggable, false);
@@ -556,8 +541,8 @@ test("render: drag handle is bookmark-only and reorder works in both directions 
 
         data.activeBookmark = "bm1";
         controller.updateDisplay();
-        const entryA = ui.cardEntriesBySourceKey.get(`song:${rowA.songKey}`);
-        const entryB = ui.cardEntriesBySourceKey.get(`song:${rowB.songKey}`);
+        const entryA = ui.render.cardEntriesBySourceKey.get(`song:${rowA.songKey}`);
+        const entryB = ui.render.cardEntriesBySourceKey.get(`song:${rowB.songKey}`);
         assert.ok(entryA);
         assert.ok(entryB);
         assert.equal(entryA.dragHandle.hidden, false);
@@ -617,18 +602,12 @@ test("render: active playback card can move back left without jumping to the end
                 }
             }
         };
-        const ui = {
-            activeThumb: null,
-            showThumbnails: false,
-            scrollObserver: null,
-            cardEntriesBySourceKey: new Map(),
-            selectedFormats: new Set(["配信"]),
-            dataReady: true,
+        const ui = createRenderUiState({
             el: {
                 resultList: document.createElement("div"),
                 loadMoreContainer: document.createElement("div")
             }
-        };
+        });
         const controller = createRenderController({
             data,
             ui,
@@ -644,13 +623,13 @@ test("render: active playback card can move back left without jumping to the end
         });
 
         controller.updateDisplay();
-        const entryA = ui.cardEntriesBySourceKey.get(`song:${rowA.songKey}`);
-        const entryB = ui.cardEntriesBySourceKey.get(`song:${rowB.songKey}`);
+        const entryA = ui.render.cardEntriesBySourceKey.get(`song:${rowA.songKey}`);
+        const entryB = ui.render.cardEntriesBySourceKey.get(`song:${rowB.songKey}`);
         assert.ok(entryA);
         assert.ok(entryB);
 
-        ui.activeThumb = entryA.thumbDiv;
-        ui.activeThumb.appendChild(document.createElement("iframe"));
+        ui.playback.activeThumb = entryA.thumbDiv;
+        ui.playback.activeThumb.appendChild(document.createElement("iframe"));
         const movedNodes = [];
         const originalInsertBefore = ui.el.resultList.insertBefore.bind(ui.el.resultList);
         ui.el.resultList.insertBefore = (node, referenceNode) => {

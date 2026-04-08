@@ -13,6 +13,54 @@ import { installFakeDom } from "./test-helpers.mjs";
 
 let autoSongId = 0;
 
+/**
+ * 日付コントローラー検証用の UI 状態を作る。
+ * @returns {*}
+ */
+function createDateUiState() {
+    return {
+        el: {
+            dateFromYear: document.createElement("select"),
+            dateFromMonth: document.createElement("select"),
+            dateFromDay: document.createElement("select"),
+            dateToYear: document.createElement("select"),
+            dateToMonth: document.createElement("select"),
+            dateToDay: document.createElement("select")
+        },
+        date: {
+            bounds: null,
+            index: null,
+            pendingValues: null
+        }
+    };
+}
+
+/**
+ * 検索コントローラー検証用の UI 状態を作る。
+ * @param {*} input
+ * @returns {*}
+ */
+function createSearchUiState(input) {
+    return {
+        el: input.el,
+        search: {
+            selectedFormats: input.selectedFormats,
+            debounceId: input.debounceId ?? 0,
+            recommendedCache: input.recommendedCache ?? null
+        },
+        date: {
+            bounds: null,
+            index: null,
+            pendingValues: null
+        },
+        lookup: {
+            songMapByKey: new Map(),
+            songMapByLegacyIndex: new Map(),
+            songLookupSourceRef: null
+        }
+    };
+}
+
 function makeRow(input) {
     const title = input.title ?? "";
     const artist = input.artist ?? "";
@@ -107,17 +155,7 @@ test("filterSongsByCriteria: AND keywords and harmony flag", () => {
 test("createDateFilterController: syncDateSelectOptions constrains end-side options by start-side selection", () => {
     const restoreDom = installFakeDom();
     try {
-        const ui = {
-            el: {
-                dateFromYear: document.createElement("select"),
-                dateFromMonth: document.createElement("select"),
-                dateFromDay: document.createElement("select"),
-                dateToYear: document.createElement("select"),
-                dateToMonth: document.createElement("select"),
-                dateToDay: document.createElement("select")
-            },
-            pendingDateValues: null
-        };
+        const ui = createDateUiState();
         const controller = createDateFilterController({ ui });
         const rows = [
             makeRow({ dateKey: 20240210 }),
@@ -147,17 +185,7 @@ test("createDateFilterController: syncDateSelectOptions constrains end-side opti
 test("createDateFilterController: clampDateInputsToBounds clamps and preserves chronological order", () => {
     const restoreDom = installFakeDom();
     try {
-        const ui = {
-            el: {
-                dateFromYear: document.createElement("select"),
-                dateFromMonth: document.createElement("select"),
-                dateFromDay: document.createElement("select"),
-                dateToYear: document.createElement("select"),
-                dateToMonth: document.createElement("select"),
-                dateToDay: document.createElement("select")
-            },
-            pendingDateValues: null
-        };
+        const ui = createDateUiState();
         const controller = createDateFilterController({ ui });
         const rows = [
             makeRow({ dateKey: 20240210 }),
@@ -185,17 +213,7 @@ test("createDateFilterController: clampDateInputsToBounds clamps and preserves c
 test("createDateFilterController: clampDateInputsIfNeeded keeps partial year selection", () => {
     const restoreDom = installFakeDom();
     try {
-        const ui = {
-            el: {
-                dateFromYear: document.createElement("select"),
-                dateFromMonth: document.createElement("select"),
-                dateFromDay: document.createElement("select"),
-                dateToYear: document.createElement("select"),
-                dateToMonth: document.createElement("select"),
-                dateToDay: document.createElement("select")
-            },
-            pendingDateValues: null
-        };
+        const ui = createDateUiState();
         const controller = createDateFilterController({ ui });
         const rows = [
             makeRow({ dateKey: 20240210 }),
@@ -219,17 +237,7 @@ test("createDateFilterController: clampDateInputsIfNeeded keeps partial year sel
 test("createDateFilterController: applyPendingDateValues restores selections and clears pending state", () => {
     const restoreDom = installFakeDom();
     try {
-        const ui = {
-            el: {
-                dateFromYear: document.createElement("select"),
-                dateFromMonth: document.createElement("select"),
-                dateFromDay: document.createElement("select"),
-                dateToYear: document.createElement("select"),
-                dateToMonth: document.createElement("select"),
-                dateToDay: document.createElement("select")
-            },
-            pendingDateValues: null
-        };
+        const ui = createDateUiState();
         const controller = createDateFilterController({ ui });
         const rows = [
             makeRow({ dateKey: 20240210 }),
@@ -238,7 +246,7 @@ test("createDateFilterController: applyPendingDateValues restores selections and
         ];
 
         controller.applyDateInputRange(rows);
-        ui.pendingDateValues = {
+        ui.date.pendingValues = {
             from: "2024-02-10",
             to: "2024-03-05"
         };
@@ -247,7 +255,7 @@ test("createDateFilterController: applyPendingDateValues restores selections and
 
         assert.equal(controller.getDateSelectValue("from"), "2024-02-10");
         assert.equal(controller.getDateSelectValue("to"), "2024-03-05");
-        assert.equal(ui.pendingDateValues, null);
+        assert.equal(ui.date.pendingValues, null);
     } finally {
         restoreDom();
     }
@@ -304,7 +312,7 @@ test("createSearchController: active bookmark also applies search criteria", () 
         currentResults: [],
         displayLimit: 0
     };
-    const ui = {
+    const ui = createSearchUiState({
         el: {
             searchBox: { value: "赤い" },
             relayOnly: { checked: false },
@@ -317,9 +325,8 @@ test("createSearchController: active bookmark also applies search criteria", () 
             dateToDay: null,
             resultCount: { innerText: "" }
         },
-        selectedFormats: new Set(["配信"]),
-        searchDebounceId: 0
-    };
+        selectedFormats: new Set(["配信"])
+    });
     const constants = {
         RANDOM_DISPLAY_COUNT: 10,
         MIN_PERFORMANCE_FOR_RANDOM: 1,
@@ -358,7 +365,7 @@ test("createSearchController: active bookmark uses incremental display limit", (
         currentResults: [],
         displayLimit: 0
     };
-    const ui = {
+    const ui = createSearchUiState({
         el: {
             searchBox: { value: "" },
             relayOnly: { checked: false },
@@ -371,9 +378,8 @@ test("createSearchController: active bookmark uses incremental display limit", (
             dateToDay: null,
             resultCount: { innerText: "" }
         },
-        selectedFormats: new Set(["配信"]),
-        searchDebounceId: 0
-    };
+        selectedFormats: new Set(["配信"])
+    });
     const constants = {
         RANDOM_DISPLAY_COUNT: 10,
         MIN_PERFORMANCE_FOR_RANDOM: 1,
@@ -403,7 +409,7 @@ test("createSearchController: recommendation mode counts オリ曲 as 歌みた"
         currentResults: [],
         displayLimit: 0
     };
-    const ui = {
+    const ui = createSearchUiState({
         el: {
             searchBox: { value: "" },
             relayOnly: { checked: false },
@@ -417,9 +423,8 @@ test("createSearchController: recommendation mode counts オリ曲 as 歌みた"
             resultCount: { innerText: "" }
         },
         selectedFormats: new Set(["配信", "歌みた", "ショート", "切り抜き"]),
-        searchDebounceId: 0,
         recommendedCache: null
-    };
+    });
     const constants = {
         RANDOM_DISPLAY_COUNT: 10,
         MIN_PERFORMANCE_FOR_RANDOM: 3,
@@ -455,7 +460,7 @@ test("createSearchController: single オリ曲 performance is eligible for recom
         currentResults: [],
         displayLimit: 0
     };
-    const ui = {
+    const ui = createSearchUiState({
         el: {
             searchBox: { value: "" },
             relayOnly: { checked: false },
@@ -469,9 +474,8 @@ test("createSearchController: single オリ曲 performance is eligible for recom
             resultCount: { innerText: "" }
         },
         selectedFormats: new Set(["配信", "歌みた", "ショート", "切り抜き"]),
-        searchDebounceId: 0,
         recommendedCache: null
-    };
+    });
     const constants = {
         RANDOM_DISPLAY_COUNT: 10,
         MIN_PERFORMANCE_FOR_RANDOM: 3,
