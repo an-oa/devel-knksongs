@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { getFormatFilterLabel } from "../format-filter.mjs";
+import { getFormatFilterLabel } from "../app/lib/format-filter.mjs";
 
 test("format filter label: 歌みた is shown as オリ曲/歌みた", () => {
     assert.equal(getFormatFilterLabel("歌みた"), "オリ曲/歌みた");

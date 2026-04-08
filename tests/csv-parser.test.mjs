@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseCsvToSongs } from "../csv-parser.mjs";
+import { parseCsvToSongs } from "../app/lib/csv-parser.mjs";
 
 test("csv: explicit video orientation is parsed from 画面の向き", () => {
     const csv = [

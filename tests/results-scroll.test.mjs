@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { scrollResultListToTop } from "../results-scroll.mjs";
+import { scrollResultListToTop } from "../app/lib/results-scroll.mjs";
 import { installFakeDom } from "./test-helpers.mjs";
 
 test("scroll: falls back to window scroll when result list has no scrollable ancestor", () => {

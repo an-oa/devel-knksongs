@@ -1,4 +1,4 @@
-import { getDateUiState, getSearchUiState } from "./ui-slices.mjs?v=8";
+import { getDateUiState, getSearchUiState } from "../lib/ui-slices.mjs?v=9";
 
 /**
  * ブックマークと検索状態の保存・復元を扱うストレージコントローラーを作成する。

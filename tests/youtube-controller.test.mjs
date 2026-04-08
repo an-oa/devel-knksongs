@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createYoutubeController, extractYoutubeInfo } from "../youtube.mjs";
+import { createYoutubeController, extractYoutubeInfo } from "../app/controllers/youtube.mjs";
 import {
     installFakeDom,
     invokeListener,

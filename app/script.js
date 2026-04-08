@@ -18,24 +18,24 @@ import {
     data,
     ui,
     youtube
-} from "./state.mjs?v=8";
-import { createSearchController } from "./search.mjs?v=8";
-import { createRenderController } from "./render.mjs?v=8";
-import { createYoutubeController, extractYoutubeInfo } from "./youtube.mjs?v=8";
-import { createStorageController } from "./storage.mjs?v=8";
-import { createBookmarkUiController } from "./bookmark-ui.mjs?v=8";
-import { scrollResultListToTop } from "./results-scroll.mjs?v=8";
-import { getFormatFilterLabel } from "./format-filter.mjs?v=8";
+} from "./state.mjs?v=9";
+import { createSearchController } from "./controllers/search.mjs?v=9";
+import { createRenderController } from "./controllers/render.mjs?v=9";
+import { createYoutubeController, extractYoutubeInfo } from "./controllers/youtube.mjs?v=9";
+import { createStorageController } from "./controllers/storage.mjs?v=9";
+import { createBookmarkUiController } from "./ui/bookmark/ui.mjs?v=9";
+import { scrollResultListToTop } from "./lib/results-scroll.mjs?v=9";
+import { getFormatFilterLabel } from "./lib/format-filter.mjs?v=9";
 import {
     collectUiElements,
     applyThemeFromStorage,
     setupTheme,
     initFilterMenu
-} from "./app-ui.mjs?v=8";
-import { createUiSyncController } from "./app-sync.mjs?v=8";
-import { createDataLoader } from "./app-data.mjs?v=8";
-import { createSidebarController } from "./sidebar-ui.mjs?v=8";
-import { getDateUiState, getSearchUiState } from "./ui-slices.mjs?v=8";
+} from "./ui/core/elements.mjs?v=9";
+import { createUiSyncController } from "./ui/core/sync.mjs?v=9";
+import { createDataLoader } from "./ui/core/data.mjs?v=9";
+import { createSidebarController } from "./ui/sidebar/ui.mjs?v=9";
+import { getDateUiState, getSearchUiState } from "./lib/ui-slices.mjs?v=9";
 
 /**
  * @typedef {Object} SongRow

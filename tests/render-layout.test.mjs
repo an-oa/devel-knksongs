@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createRenderController } from "../render.mjs";
-import { createSearchController } from "../search.mjs";
-import { extractYoutubeInfo } from "../youtube.mjs";
+import { createRenderController } from "../app/controllers/render.mjs";
+import { createSearchController } from "../app/controllers/search.mjs";
+import { extractYoutubeInfo } from "../app/controllers/youtube.mjs";
 import {
     installFakeDom,
     makeRenderRow,

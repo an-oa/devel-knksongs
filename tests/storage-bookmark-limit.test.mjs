@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createStorageController } from "../storage.mjs";
+import { createStorageController } from "../app/controllers/storage.mjs";
 
 function createFakeLocalStorage() {
     const store = new Map();
