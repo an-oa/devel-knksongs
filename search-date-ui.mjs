@@ -319,9 +319,13 @@ export function createDateFilterController({ ui }) {
      * @param {*} maxKey
      */
     function clampDateInputsToBounds(minKey, maxKey) {
-        const dateFrom = ui.el.dateFromYear;
-        const dateTo = ui.el.dateToYear;
-        if (!dateFrom || !dateTo) return;
+        const dateFromYear = ui.el.dateFromYear;
+        const dateFromMonth = ui.el.dateFromMonth;
+        const dateFromDay = ui.el.dateFromDay;
+        const dateToYear = ui.el.dateToYear;
+        const dateToMonth = ui.el.dateToMonth;
+        const dateToDay = ui.el.dateToDay;
+        if (!dateFromYear || !dateFromMonth || !dateFromDay || !dateToYear || !dateToMonth || !dateToDay) return;
         const clampKey = (key) => {
             if (key === null) return null;
             if (key < minKey) return minKey;
@@ -333,6 +337,14 @@ export function createDateFilterController({ ui }) {
         if (fromKey !== null && toKey !== null && fromKey > toKey) {
             toKey = fromKey;
         }
+        if (fromKey === null && toKey === null) return;
+        dateFromYear.value = "";
+        dateFromMonth.value = "";
+        dateFromDay.value = "";
+        dateToYear.value = "";
+        dateToMonth.value = "";
+        dateToDay.value = "";
+        syncDateSelectOptions();
         if (fromKey !== null) applyDateSelectValue("from", formatDateKeyForInput(fromKey));
         if (toKey !== null) applyDateSelectValue("to", formatDateKeyForInput(toKey));
     }

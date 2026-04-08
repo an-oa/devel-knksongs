@@ -1,5 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createDateFilterController } from "../search-date-ui.mjs";
+import { pickRecommendedSongs } from "../search-recommendation.mjs";
 import {
     normalizeForSearch,
     parseDateKey,
@@ -7,6 +9,7 @@ import {
     filterSongsByCriteria,
     createSearchController
 } from "../search.mjs";
+import { installFakeDom } from "./test-helpers.mjs";
 
 let autoSongId = 0;
 
@@ -99,6 +102,188 @@ test("filterSongsByCriteria: AND keywords and harmony flag", () => {
 
     const hit = filterSongsByCriteria(rows, searchState, selectedFormats);
     assert.equal(hit.length, 1);
+});
+
+test("createDateFilterController: syncDateSelectOptions constrains end-side options by start-side selection", () => {
+    const restoreDom = installFakeDom();
+    try {
+        const ui = {
+            el: {
+                dateFromYear: document.createElement("select"),
+                dateFromMonth: document.createElement("select"),
+                dateFromDay: document.createElement("select"),
+                dateToYear: document.createElement("select"),
+                dateToMonth: document.createElement("select"),
+                dateToDay: document.createElement("select")
+            },
+            pendingDateValues: null
+        };
+        const controller = createDateFilterController({ ui });
+        const rows = [
+            makeRow({ dateKey: 20240210 }),
+            makeRow({ dateKey: 20240215 }),
+            makeRow({ dateKey: 20240305 })
+        ];
+
+        controller.applyDateInputRange(rows);
+        ui.el.dateFromYear.value = "2024";
+        controller.syncDateSelectOptions("from");
+        ui.el.dateFromMonth.value = "03";
+        controller.syncDateSelectOptions("from");
+        ui.el.dateToYear.value = "2024";
+        controller.syncDateSelectOptions("to");
+
+        assert.deepEqual(getSelectValues(ui.el.dateToMonth), ["", "03"]);
+
+        ui.el.dateToMonth.value = "03";
+        controller.syncDateSelectOptions("to");
+
+        assert.deepEqual(getSelectValues(ui.el.dateToDay), ["", "05"]);
+    } finally {
+        restoreDom();
+    }
+});
+
+test("createDateFilterController: clampDateInputsToBounds clamps and preserves chronological order", () => {
+    const restoreDom = installFakeDom();
+    try {
+        const ui = {
+            el: {
+                dateFromYear: document.createElement("select"),
+                dateFromMonth: document.createElement("select"),
+                dateFromDay: document.createElement("select"),
+                dateToYear: document.createElement("select"),
+                dateToMonth: document.createElement("select"),
+                dateToDay: document.createElement("select")
+            },
+            pendingDateValues: null
+        };
+        const controller = createDateFilterController({ ui });
+        const rows = [
+            makeRow({ dateKey: 20240210 }),
+            makeRow({ dateKey: 20240215 }),
+            makeRow({ dateKey: 20240305 })
+        ];
+
+        controller.applyDateInputRange(rows);
+        ui.el.dateFromYear.value = "2024";
+        ui.el.dateFromMonth.value = "03";
+        ui.el.dateFromDay.value = "05";
+        ui.el.dateToYear.value = "2024";
+        ui.el.dateToMonth.value = "02";
+        ui.el.dateToDay.value = "15";
+
+        controller.clampDateInputsToBounds(20240210, 20240305);
+
+        assert.equal(controller.getDateSelectValue("from"), "2024-03-05");
+        assert.equal(controller.getDateSelectValue("to"), "2024-03-05");
+    } finally {
+        restoreDom();
+    }
+});
+
+test("createDateFilterController: clampDateInputsIfNeeded keeps partial year selection", () => {
+    const restoreDom = installFakeDom();
+    try {
+        const ui = {
+            el: {
+                dateFromYear: document.createElement("select"),
+                dateFromMonth: document.createElement("select"),
+                dateFromDay: document.createElement("select"),
+                dateToYear: document.createElement("select"),
+                dateToMonth: document.createElement("select"),
+                dateToDay: document.createElement("select")
+            },
+            pendingDateValues: null
+        };
+        const controller = createDateFilterController({ ui });
+        const rows = [
+            makeRow({ dateKey: 20240210 }),
+            makeRow({ dateKey: 20240215 }),
+            makeRow({ dateKey: 20240305 })
+        ];
+
+        controller.applyDateInputRange(rows);
+        ui.el.dateFromYear.value = "2024";
+
+        controller.clampDateInputsIfNeeded();
+
+        assert.equal(ui.el.dateFromYear.value, "2024");
+        assert.equal(ui.el.dateFromMonth.value, "");
+        assert.equal(ui.el.dateFromDay.value, "");
+    } finally {
+        restoreDom();
+    }
+});
+
+test("createDateFilterController: applyPendingDateValues restores selections and clears pending state", () => {
+    const restoreDom = installFakeDom();
+    try {
+        const ui = {
+            el: {
+                dateFromYear: document.createElement("select"),
+                dateFromMonth: document.createElement("select"),
+                dateFromDay: document.createElement("select"),
+                dateToYear: document.createElement("select"),
+                dateToMonth: document.createElement("select"),
+                dateToDay: document.createElement("select")
+            },
+            pendingDateValues: null
+        };
+        const controller = createDateFilterController({ ui });
+        const rows = [
+            makeRow({ dateKey: 20240210 }),
+            makeRow({ dateKey: 20240215 }),
+            makeRow({ dateKey: 20240305 })
+        ];
+
+        controller.applyDateInputRange(rows);
+        ui.pendingDateValues = {
+            from: "2024-02-10",
+            to: "2024-03-05"
+        };
+
+        controller.applyPendingDateValues();
+
+        assert.equal(controller.getDateSelectValue("from"), "2024-02-10");
+        assert.equal(controller.getDateSelectValue("to"), "2024-03-05");
+        assert.equal(ui.pendingDateValues, null);
+    } finally {
+        restoreDom();
+    }
+});
+
+test("pickRecommendedSongs: prefers 歌みた rows over 配信 and ショート for the same song", () => {
+    const rows = [
+        makeRow({ archiveId: "a1", sourceIndex: 1, title: "群青", artist: "A", format: "配信" }),
+        makeRow({ archiveId: "a2", sourceIndex: 2, title: "群青", artist: "A", format: "ショート" }),
+        makeRow({ archiveId: "a3", sourceIndex: 3, title: "群青", artist: "A", format: "歌みた" })
+    ];
+
+    const picked = pickRecommendedSongs(rows, { count: 10, minPerformanceCount: 2 });
+
+    assert.equal(picked.length, 1);
+    assert.equal(picked[0].format, "歌みた");
+});
+
+test("pickRecommendedSongs: keeps the latest row within the same archive", () => {
+    const rows = [
+        makeRow({ archiveId: "a1", archiveOrder: 1, sourceIndex: 1, title: "群青", artist: "A", format: "配信" }),
+        makeRow({ archiveId: "a1", archiveOrder: 2, sourceIndex: 2, title: "群青", artist: "A", format: "配信" }),
+        makeRow({ archiveId: "a2", archiveOrder: 1, sourceIndex: 3, title: "群青", artist: "A", format: "配信" })
+    ];
+    const originalRandom = Math.random;
+    Math.random = () => 0;
+    try {
+        const picked = pickRecommendedSongs(rows, { count: 10, minPerformanceCount: 2 });
+
+        assert.equal(picked.length, 1);
+        assert.equal(picked[0].archiveId, "a1");
+        assert.equal(picked[0].archiveOrder, 2);
+        assert.equal(picked[0].sourceIndex, 2);
+    } finally {
+        Math.random = originalRandom;
+    }
 });
 
 test("createSearchController: active bookmark also applies search criteria", () => {
@@ -250,6 +435,14 @@ test("createSearchController: recommendation mode counts オリ曲 as 歌みた"
     assert.equal(data.currentResults[0].format, "オリ曲");
     assert.equal(ui.el.resultCount.innerText, "おすすめを表示中");
 });
+
+/**
+ * セレクト要素の option 値一覧を返す。
+ * @param {*} select
+ */
+function getSelectValues(select) {
+    return select.children.map((option) => option.value);
+}
 
 test("createSearchController: single オリ曲 performance is eligible for recommendation", () => {
     const rows = [

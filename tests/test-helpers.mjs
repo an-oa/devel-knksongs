@@ -113,6 +113,12 @@ class FakeElement {
     }
 
     appendChild(child) {
+        if (child instanceof FakeDocumentFragment) {
+            child.children.slice().forEach((fragmentChild) => {
+                this.appendChild(fragmentChild);
+            });
+            return child;
+        }
         if (child.parentElement) {
             child.parentElement.removeChild(child);
         }
@@ -217,6 +223,12 @@ class FakeElement {
     }
 }
 
+class FakeDocumentFragment extends FakeElement {
+    constructor() {
+        super("#fragment");
+    }
+}
+
 function createMatcher(selector) {
     if (selector.startsWith(".")) {
         const targetClass = selector.slice(1);
@@ -247,6 +259,9 @@ export function installFakeDom() {
         documentElement: { clientHeight: 720 },
         createElement(tagName) {
             return new FakeElement(tagName);
+        },
+        createDocumentFragment() {
+            return new FakeDocumentFragment();
         },
         querySelector(selector) {
             const fromHead = head.querySelector(selector);
