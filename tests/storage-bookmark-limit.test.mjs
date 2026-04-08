@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createStorageController } from "../app/controllers/storage.mjs";
+import { installFakeDom } from "./test-helpers.mjs";
 
 function createFakeLocalStorage() {
     const store = new Map();
@@ -56,6 +57,109 @@ function setupStorageController({ bookmarks, activeBookmark, maxBookmarkCount, m
         getScheduleCount: () => scheduleCount
     };
 }
+
+test("loadBookmarks: main branch bookmarks payload is restored from bookmarksV1", () => {
+    const restoreDom = installFakeDom();
+    const prevLocalStorage = globalThis.localStorage;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        const storedBookmarks = {
+            p_1: {
+                name: "main branch payload",
+                songs: ["arch1::1", "arch2::2"],
+                createdAt: 1710000000000
+            }
+        };
+        const { controller, data, getRenderCount } = setupStorageController({
+            bookmarks: {},
+            maxBookmarkCount: 20,
+            maxSongsPerBookmark: 120
+        });
+        globalThis.localStorage.setItem("bookmarksTest", JSON.stringify(storedBookmarks));
+
+        controller.loadBookmarks();
+
+        assert.deepEqual(data.bookmarks, storedBookmarks);
+        assert.equal(getRenderCount(), 1);
+    } finally {
+        globalThis.localStorage = prevLocalStorage;
+        restoreDom();
+    }
+});
+
+test("restoreSearchState: main branch payload restores into sliced ui state", () => {
+    const restoreDom = installFakeDom();
+    const prevLocalStorage = globalThis.localStorage;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        let applyPendingCallCount = 0;
+        const data = {
+            allSongsRaw: [],
+            bookmarks: {},
+            activeBookmark: null
+        };
+        const ui = {
+            el: {
+                searchBox: { value: "" },
+                relayOnly: { checked: false },
+                harmonyOnly: { checked: false }
+            },
+            search: {
+                selectedFormats: new Set(),
+                userTouchedQuery: false,
+                userTouchedFilters: false,
+                hasRestoredSearchState: false
+            },
+            date: {
+                bounds: { minKey: 20240210, maxKey: 20240305 },
+                pendingValues: null
+            }
+        };
+        const controller = createStorageController({
+            data,
+            ui,
+            constants: {
+                DEFAULT_FORMATS: ["配信", "歌みた", "ショート", "切り抜き"],
+                SEARCH_STATE_KEY: "searchStateTest",
+                BOOKMARK_STORAGE_KEY: "bookmarksTest",
+                MAX_BOOKMARK_COUNT: 20,
+                MAX_SONGS_PER_BOOKMARK: 120
+            },
+            callbacks: {
+                getDateSelectValue: () => "",
+                applyPendingDateValues: () => {
+                    applyPendingCallCount += 1;
+                    ui.date.pendingValues = null;
+                },
+                renderBookmarks: () => {},
+                scheduleSearch: () => {}
+            }
+        });
+        globalThis.localStorage.setItem("searchStateTest", JSON.stringify({
+            query: "群青",
+            relayOnly: true,
+            harmonyOnly: false,
+            dateFrom: "2024-02-10",
+            dateTo: "2024-03-05",
+            formats: ["配信", "歌みた"]
+        }));
+
+        controller.restoreSearchState();
+
+        assert.equal(ui.el.searchBox.value, "群青");
+        assert.equal(ui.el.relayOnly.checked, true);
+        assert.equal(ui.el.harmonyOnly.checked, false);
+        assert.deepEqual(Array.from(ui.search.selectedFormats), ["配信", "歌みた"]);
+        assert.equal(ui.search.userTouchedQuery, true);
+        assert.equal(ui.search.userTouchedFilters, true);
+        assert.equal(ui.search.hasRestoredSearchState, true);
+        assert.equal(ui.date.pendingValues, null);
+        assert.equal(applyPendingCallCount, 1);
+    } finally {
+        globalThis.localStorage = prevLocalStorage;
+        restoreDom();
+    }
+});
 
 test("createBookmarkAndAdd: rejects when bookmark count limit is reached", () => {
     const prevLocalStorage = globalThis.localStorage;

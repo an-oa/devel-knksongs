@@ -252,16 +252,21 @@ export function installFakeDom() {
 
     const body = new FakeElement("body");
     const head = new FakeElement("head");
+    const documentElement = new FakeElement("html");
+    documentElement._clientHeight = 720;
     const document = {
         body,
         head,
         scrollingElement: body,
-        documentElement: { clientHeight: 720 },
+        documentElement,
         createElement(tagName) {
             return new FakeElement(tagName);
         },
         createDocumentFragment() {
             return new FakeDocumentFragment();
+        },
+        querySelectorAll() {
+            return [];
         },
         querySelector(selector) {
             const fromHead = head.querySelector(selector);
@@ -274,6 +279,9 @@ export function installFakeDom() {
     setGlobalValue("window", {
         innerHeight: 720,
         scrollBy() {},
+        matchMedia() {
+            return { matches: false };
+        },
         getComputedStyle() {
             return { overflowY: "visible" };
         }
