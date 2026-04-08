@@ -37,6 +37,17 @@ feat: move settings into dedicated sidebar panel
 - `tests/` 配下に Node のテストがあるため、JavaScript を変更したときは `node --test tests/*.mjs` を基本の確認手順として実行する。
 - 構文だけを素早く確認したいときは `node --check <file>` を使い、その結果だけでテスト完了とは扱わない。
 - コミット前後に確認結果を共有するときは、実行コマンドと pass/fail の件数を簡潔に残す。
+- ファイル移動や import の一括更新を含む変更では、移動直後に `node --check` を対象ファイルへ段階的に実行し、
+  最後に `node --test tests/*.mjs` を回してから完了扱いにする。
+
+## Refactor Safety
+
+- ディレクトリ再編や import パス変更のような広範囲リファクタリングでは、
+  「ファイル移動」と「参照更新」を別ステップで進め、各段階で確認する。
+- PowerShell の広域な文字列置換や正規表現置換で `.js` `.mjs` `.html` を一括変更しない。
+  記号や識別子が壊れることがあるため、必要ならファイル単位で小さく適用する。
+- 大規模変更時は `git diff` や `rg` で import / `src=` / `href=` の残存参照を確認し、
+  切り替え漏れを残さない。
 
 ## Cache Busters
 
