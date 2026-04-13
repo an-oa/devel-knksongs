@@ -56,10 +56,13 @@ feat: move settings into dedicated sidebar panel
 
 ## Cache Busters
 
-- UI / JavaScript を更新して公開反映が必要なときは、キャッシュバスターの `v=...` を更新する。
+- キャッシュバスターの `v=...` は、UI / JavaScript に変更を加えるたびには更新しない。
+- 公開反映や配布反映のためにブラウザキャッシュを切り替える必要があるタイミングで、`v=...` をまとめて更新する。
+- 未公開の UI / JavaScript 変更が継続している間は、既存の `v=...` を維持する。
+- 変更途中で `script.js` から読む ES Modules や、module 間の import / export に `?v=...` 付きの参照を追加・更新するときは、その時点の既存値へ揃え、新しい値にはしない。
 - `index.html` の `styles.css?v=...` と `script.js?v=...` は必ず同じ値に揃える。
 - `script.js` から読む ES Modules や、module 間の import / export に `?v=...` が付いている箇所も同じ値へ揃える。
-- 関連有無を自己判断せず、更新時点で残っている古い `v=...` を `rg -n "v=<old>|\\?v=<old>" -S .` で全検索して統一する。
+- `v=...` を更新するときは、関連有無を自己判断せず、更新前の古い値を `rg -n "v=<old>|\\?v=<old>" -S .` で全検索して一斉に統一する。
 - 更新後は `node --test tests/*.mjs` を実行し、pass/fail 件数を共有する。
 
 ## Encoding And Line Endings
