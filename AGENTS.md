@@ -45,6 +45,14 @@ feat: move settings into dedicated sidebar panel
 - ファイル移動や import の一括更新を含む変更では、移動直後に `node --check` を対象ファイルへ段階的に実行し、
   最後に `node --test tests/*.mjs` を回してから完了扱いにする。
 
+## Branch Diff Review
+
+- `stable..branch` のようなブランチ差分調査では、単なる機能要約だけでなく、
+  必要に応じて PR review 形式でリスク中心に整理する。
+- その場合は findings を先に並べ、重大度順に file/line references を付ける。
+- 要約は findings の後に短く添え、挙動差分・回帰リスク・未テスト箇所を優先して扱う。
+- ユーザーが明示的に機能要約のみを求めた場合は、この形式を強制しない。
+
 ## Refactor Safety
 
 - ディレクトリ再編や import パス変更のような広範囲リファクタリングでは、
