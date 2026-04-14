@@ -19,6 +19,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
     let updateDisplay = () => {};
     let refreshLayout = () => {};
     const refreshCardLayoutSoon = createLayoutRefreshScheduler(() => refreshLayout);
+    const YT_EMBED_HOST = "https://www.youtube.com";
 
     /**
      * サムネイル設定変更時に呼ぶ表示更新フックを登録する。
@@ -96,14 +97,14 @@ export function createYoutubeController({ ui, youtube, constants }) {
             return youtube.apiPromise;
         },
         /**
-         * 埋め込み再生用の `youtube-nocookie` URLを生成する。
+         * 埋め込み再生用の標準YouTube URLを生成する。
          * @param {*} yt
          */
         buildEmbedUrl(yt) {
             const origin = location.origin === "null"
                 ? ""
                 : `&origin=${encodeURIComponent(location.origin)}`;
-            return `https://www.youtube-nocookie.com/embed/${yt.videoId}?autoplay=1&playsinline=1&start=${yt.startSeconds}&enablejsapi=1&rel=0&cc_load_policy=0&iv_load_policy=3${origin}`;
+            return `${YT_EMBED_HOST}/embed/${yt.videoId}?autoplay=1&playsinline=1&start=${yt.startSeconds}&enablejsapi=1&rel=0&cc_load_policy=0&iv_load_policy=3${origin}`;
         },
         /**
          * プレイヤー状態変化に応じて再生状態表示を更新する。
@@ -131,7 +132,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
                 if (!document.body.contains(iframe)) return;
                 if (youtube.players.has(thumbDiv)) return;
                 const player = new window.YT.Player(iframe, {
-                    host: "https://www.youtube-nocookie.com",
+                    host: YT_EMBED_HOST,
                     events: {
                         onStateChange: (event) => this.handleStateChange(thumbDiv, event)
                     }

@@ -92,6 +92,7 @@ test("youtube: vertical videos stay landscape in thumbnail mode and switch on pl
 
         assert.equal(typeof thumb.onclick, "function");
         thumb.onclick();
+        assert.match(thumb.querySelector("iframe").src, /^https:\/\/www\.youtube\.com\/embed\/short1\?/);
         assert.equal(thumb.dataset.videoOrientation, "vertical");
         assert.equal(card.classList.contains("song-card-expanded"), true);
         assert.equal(layoutRefreshCount, 1);
