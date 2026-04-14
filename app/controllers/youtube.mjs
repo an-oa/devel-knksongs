@@ -1,4 +1,5 @@
 import { createLayoutRefreshScheduler } from "../lib/layout-anchor.mjs?v=9";
+import { scheduleScrollElementIntoView } from "../lib/results-scroll.mjs?v=9";
 import { getPlaybackUiState, getSearchUiState } from "../lib/ui-slices.mjs?v=9";
 
 export { extractYoutubeInfo } from "../lib/youtube-url.mjs?v=9";
@@ -420,11 +421,27 @@ export function createYoutubeController({ ui, youtube, constants }) {
     }
 
     /**
+     * 再生開始したカードが見切れている場合は見える位置まで寄せる。
+     * @param {*} thumbDiv
+     */
+    function revealPlaybackCardIfNeeded(thumbDiv) {
+        const card = thumbDiv instanceof HTMLElement ? thumbDiv.closest(".song-card") : null;
+        if (!(card instanceof HTMLElement)) return;
+        const header = document.querySelector(".header");
+        const headerHeight = header ? header.getBoundingClientRect().height : 0;
+        scheduleScrollElementIntoView(card, {
+            topOffset: headerHeight,
+            behavior: "smooth"
+        });
+    }
+
+    /**
      * サムネイルを埋め込みプレイヤーへ切り替えて再生開始する。
      * @param {*} thumbDiv
      * @param {*} yt
+     * @param {{ revealCard?: boolean } | undefined} options
      */
-    function startEmbeddedPlayback(thumbDiv, yt) {
+    function startEmbeddedPlayback(thumbDiv, yt, options) {
         setActiveThumb(thumbDiv);
         thumbDiv.dataset.videoId = yt.videoId;
         thumbDiv.dataset.playbackKey = buildPlaybackKey(yt);
@@ -450,6 +467,9 @@ export function createYoutubeController({ ui, youtube, constants }) {
         if (yt && yt.isVertical) {
             refreshCardLayoutSoon(thumbDiv);
         }
+        if (options && options.revealCard) {
+            revealPlaybackCardIfNeeded(thumbDiv);
+        }
     }
 
     /**
@@ -473,7 +493,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
         const img = createThumbnailImage(yt.videoId);
         thumbDiv.onclick = () => {
             if (thumbDiv.classList.contains("playing")) return;
-            startEmbeddedPlayback(thumbDiv, yt);
+            startEmbeddedPlayback(thumbDiv, yt, { revealCard: true });
         };
         thumbDiv.appendChild(img);
         if (shouldLoadThumbnailNow(thumbDiv)) {

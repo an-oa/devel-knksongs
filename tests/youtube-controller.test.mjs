@@ -109,6 +109,49 @@ test("youtube: vertical videos stay landscape in thumbnail mode and switch on pl
     }
 });
 
+test("youtube: manual playback reveals a clipped card below the sticky header", () => {
+    const cleanup = installFakeDom();
+    try {
+        const ui = createYoutubeUiState({});
+        const youtube = {
+            apiPromise: null,
+            players: new WeakMap()
+        };
+        const controller = createYoutubeController({
+            ui,
+            youtube,
+            constants: {
+                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
+                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
+                YT_IFRAME_READY_POLL_MS: 50,
+                STOP_PLAYBACK_ON_SCROLL_OUT: false
+            }
+        });
+        const header = document.createElement("div");
+        header.className = "header";
+        header._rect = { top: 0, bottom: 60, left: 0, right: 300, width: 300, height: 60 };
+        document.body.appendChild(header);
+        const card = document.createElement("div");
+        card.className = "song-card";
+        card._rect = { top: 40, bottom: 240, left: 0, right: 300, width: 300, height: 200 };
+        document.body.appendChild(card);
+        const thumb = document.createElement("div");
+        card.appendChild(thumb);
+        document.scrollingElement.scrollTop = 120;
+        const scrollCalls = [];
+        window.scrollTo = (options) => {
+            scrollCalls.push(options);
+        };
+
+        controller.updateThumbnail(thumb, { videoId: "video1", startSeconds: 45 });
+        thumb.onclick();
+
+        assert.deepEqual(scrollCalls, [{ top: 100, behavior: "smooth" }]);
+    } finally {
+        cleanup();
+    }
+});
+
 test("youtube: stale queued layout refresh requests are ignored", () => {
     const cleanup = installFakeDom();
     const previousRaf = globalThis.requestAnimationFrame;
