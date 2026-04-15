@@ -1,4 +1,4 @@
-import { findScrollableAncestor } from "./layout-anchor.mjs?v=10";
+import { findScrollableAncestor } from "./layout-anchor.mjs?v=11";
 
 /**
  * 結果リストを含むスクロール領域を先頭へ戻す。

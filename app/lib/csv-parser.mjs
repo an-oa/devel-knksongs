@@ -1,4 +1,4 @@
-import { normalizeForSearch, parseDateKey } from "../controllers/search.mjs?v=10";
+import { normalizeForSearch, parseDateKey } from "../controllers/search.mjs?v=11";
 
 /**
  * 現在仕様の曲キー（archiveId + archiveOrder）を生成する。

@@ -1,8 +1,8 @@
-import { createLayoutRefreshScheduler } from "../lib/layout-anchor.mjs?v=10";
-import { scheduleScrollElementIntoView } from "../lib/results-scroll.mjs?v=10";
-import { getPlaybackUiState, getSearchUiState } from "../lib/ui-slices.mjs?v=10";
+import { createLayoutRefreshScheduler } from "../lib/layout-anchor.mjs?v=11";
+import { scheduleScrollElementIntoView } from "../lib/results-scroll.mjs?v=11";
+import { getPlaybackUiState, getSearchUiState } from "../lib/ui-slices.mjs?v=11";
 
-export { extractYoutubeInfo } from "../lib/youtube-url.mjs?v=10";
+export { extractYoutubeInfo } from "../lib/youtube-url.mjs?v=11";
 
 /**
  * サムネイル表示と埋め込み再生の制御を行うコントローラーを作成する。
