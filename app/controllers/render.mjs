@@ -112,6 +112,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
      */
     function updateCardFromRow(entry, row) {
         const extracted = extractYoutubeInfo(row.url);
+        const bookmarkSongRef = getBookmarkSongRef(row);
         const yt = {
             ...extracted,
             isVertical: row.videoOrientation
@@ -133,7 +134,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
             btn.setAttribute("aria-label", "ブックマークから削除");
             btn.setAttribute("title", "ブックマークから削除");
             btn.onclick = () => {
-                removeSongFromActiveBookmark(row.songKey);
+                removeSongFromActiveBookmark(bookmarkSongRef);
             };
         } else {
             btn.textContent = "+";
@@ -141,9 +142,22 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
             btn.setAttribute("aria-label", "ブックマークに追加");
             btn.setAttribute("title", "ブックマークに追加");
             btn.onclick = () => {
-                openBookmarkModal(row.songKey);
+                openBookmarkModal(bookmarkSongRef);
             };
         }
+    }
+
+    /**
+     * 行データからブックマーク保存に使う参照キーを返す。
+     * @param {*} row
+     * @returns {string}
+     */
+    function getBookmarkSongRef(row) {
+        if (!row || typeof row !== "object") return "";
+        if (typeof row.bookmarkSongKey === "string" && row.bookmarkSongKey) {
+            return row.bookmarkSongKey;
+        }
+        return typeof row.songKey === "string" ? row.songKey : "";
     }
 
     /**
@@ -339,7 +353,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
         if (!bookmark || !Array.isArray(bookmark.songs) || bookmark.songs.length === 0) return;
 
         const orderedKeys = data.currentResults
-            .map((row) => (row && typeof row.songKey === "string" ? row.songKey : ""))
+            .map((row) => getBookmarkSongRef(row))
             .filter(Boolean);
         if (orderedKeys.length === 0) return;
 

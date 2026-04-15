@@ -40,6 +40,7 @@ function setupStorageController({ bookmarks, activeBookmark, maxBookmarkCount, m
             DEFAULT_FORMATS: [],
             SEARCH_STATE_KEY: "searchStateTest",
             BOOKMARK_STORAGE_KEY: "bookmarksTest",
+            BOOKMARK_STORAGE_VERSION: 2,
             MAX_BOOKMARK_COUNT: maxBookmarkCount,
             MAX_SONGS_PER_BOOKMARK: maxSongsPerBookmark
         },
@@ -81,6 +82,105 @@ test("loadBookmarks: main branch bookmarks payload is restored from bookmarksV1"
 
         assert.deepEqual(data.bookmarks, storedBookmarks);
         assert.equal(getRenderCount(), 1);
+    } finally {
+        globalThis.localStorage = prevLocalStorage;
+        restoreDom();
+    }
+});
+
+test("migrateLegacyBookmarkSongRefs: rewrites old songKey refs to bookmarkSongKey and saves versioned payload", () => {
+    const restoreDom = installFakeDom();
+    const prevLocalStorage = globalThis.localStorage;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        const storedBookmarks = {
+            p_1: {
+                name: "legacy payload",
+                songs: ["arch1::1", "arch2::2"],
+                createdAt: 1710000000000
+            }
+        };
+        const { controller, data } = setupStorageController({
+            bookmarks: {},
+            maxBookmarkCount: 20,
+            maxSongsPerBookmark: 120
+        });
+        data.allSongsRaw = [
+            {
+                sourceIndex: 0,
+                songKey: "arch1::1",
+                bookmarkSongKey: "videoA::1",
+                legacySongKey: "arch1::1::https://youtu.be/videoA"
+            },
+            {
+                sourceIndex: 1,
+                songKey: "arch2::2",
+                bookmarkSongKey: "videoB::2",
+                legacySongKey: "arch2::2::https://youtu.be/videoB"
+            }
+        ];
+        globalThis.localStorage.setItem("bookmarksTest", JSON.stringify(storedBookmarks));
+
+        controller.loadBookmarks();
+        controller.migrateLegacyBookmarkSongRefs();
+
+        assert.deepEqual(data.bookmarks, {
+            p_1: {
+                name: "legacy payload",
+                songs: ["videoA::1", "videoB::2"],
+                createdAt: 1710000000000
+            }
+        });
+        assert.deepEqual(
+            JSON.parse(globalThis.localStorage.getItem("bookmarksTest")),
+            {
+                version: 2,
+                bookmarks: data.bookmarks
+            }
+        );
+    } finally {
+        globalThis.localStorage = prevLocalStorage;
+        restoreDom();
+    }
+});
+
+test("migrateLegacyBookmarkSongRefs: preserves current bookmarkSongKey refs and upgrades payload version", () => {
+    const restoreDom = installFakeDom();
+    const prevLocalStorage = globalThis.localStorage;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        const storedBookmarks = {
+            p_1: {
+                name: "already current refs",
+                songs: ["videoA::1"],
+                createdAt: 1710000000000
+            }
+        };
+        const { controller, data } = setupStorageController({
+            bookmarks: {},
+            maxBookmarkCount: 20,
+            maxSongsPerBookmark: 120
+        });
+        data.allSongsRaw = [
+            {
+                sourceIndex: 0,
+                songKey: "arch1::1",
+                bookmarkSongKey: "videoA::1",
+                legacySongKey: "arch1::1::https://youtu.be/videoA"
+            }
+        ];
+        globalThis.localStorage.setItem("bookmarksTest", JSON.stringify(storedBookmarks));
+
+        controller.loadBookmarks();
+        controller.migrateLegacyBookmarkSongRefs();
+
+        assert.deepEqual(
+            JSON.parse(globalThis.localStorage.getItem("bookmarksTest")),
+            {
+                version: 2,
+                bookmarks: data.bookmarks
+            }
+        );
     } finally {
         globalThis.localStorage = prevLocalStorage;
         restoreDom();

@@ -7,6 +7,7 @@ import {
     CSV_CACHE_KEY,
     SEARCH_STATE_KEY,
     BOOKMARK_STORAGE_KEY,
+    BOOKMARK_STORAGE_VERSION,
     MAX_BOOKMARK_COUNT,
     MAX_SONGS_PER_BOOKMARK,
     UI_SYNC_PASSES,
@@ -44,7 +45,9 @@ import { getDateUiState, getSearchUiState } from "./lib/ui-slices.mjs?v=11";
  * @property {string} archiveId
  * @property {number | null} archiveOrder
  * @property {number} sourceIndex
+ * @property {string} videoId
  * @property {string} songKey
+ * @property {string} bookmarkSongKey
  * @property {string} legacySongKey
  * @property {string} format
  * @property {string} videoOrientation
@@ -102,6 +105,7 @@ const storageController = createStorageController({
         DEFAULT_FORMATS,
         SEARCH_STATE_KEY,
         BOOKMARK_STORAGE_KEY,
+        BOOKMARK_STORAGE_VERSION,
         MAX_BOOKMARK_COUNT,
         MAX_SONGS_PER_BOOKMARK
     },

@@ -84,10 +84,15 @@ flowchart TD
 ## データモデル（概要）
 `SongRow`
 - date / dateKey / archiveId / archiveOrder / sourceIndex
-- songKey / legacySongKey / format / videoOrientation / isRelay / isHarmony
+- videoId / songKey / bookmarkSongKey / legacySongKey / format / videoOrientation / isRelay / isHarmony
 - title / artist / titleYomi / artistYomi
 - titleNorm / artistNorm / titleYomiNorm / artistYomiNorm
 - url
+
+### 曲参照キーの役割分担
+- `songKey`: `archiveId::archiveOrder` を使う内部参照キー。カード再利用、描画更新、既存の画面内処理で利用する。
+- `bookmarkSongKey`: `videoId::archiveOrder` を優先するブックマーク保存用キー。`videoId` を抽出できない場合は `songKey` へフォールバックする。
+- ブックマーク検索では `bookmarkSongKey` を優先して曲行へ解決し、旧ブックマークの `songKey` / `legacySongKey` / 数値 index も移行対象として読み取る。
 
 ## 検索・絞り込みロジック
 - 検索語：正規化＋AND検索（スペース区切り）
@@ -203,6 +208,7 @@ flowchart LR
 - CSVキャッシュ
 - 検索条件（キーワード・日付・形態など）
 - ブックマーク情報（ブックマーク名・曲参照/順序・作成日時）
+- ブックマーク保存 payload は `version` を持ち、旧参照形式は CSV 読み込み後に現行の `bookmarkSongKey` へ保存し直す
 
 ## YouTube埋め込み
 - `youtube.com` の標準埋め込みを使用

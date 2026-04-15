@@ -157,7 +157,9 @@ export function createSearchController({ data, ui, constants }) {
         const songs = Array.isArray(bookmark.songs) ? bookmark.songs : [];
         return songs
             .map((songRef) => {
-                if (typeof songRef === "string") return lookupUi.songMapByKey.get(songRef);
+                if (typeof songRef === "string") {
+                    return lookupUi.songMapByBookmarkKey.get(songRef) || lookupUi.songMapByKey.get(songRef);
+                }
                 if (Number.isFinite(songRef)) return lookupUi.songMapByLegacyIndex.get(songRef);
                 return null;
             })
@@ -169,11 +171,18 @@ export function createSearchController({ data, ui, constants }) {
      */
     function ensureSongLookupMaps() {
         if (lookupUi.songLookupSourceRef === data.allSongsRaw &&
+            lookupUi.songMapByBookmarkKey instanceof Map &&
             lookupUi.songMapByKey instanceof Map &&
             lookupUi.songMapByLegacyIndex instanceof Map) {
             return;
         }
+        lookupUi.songMapByBookmarkKey = new Map();
         lookupUi.songMapByKey = new Map(data.allSongsRaw.map((row) => [row.songKey, row]));
+        data.allSongsRaw.forEach((row) => {
+            if (typeof row.bookmarkSongKey === "string" && row.bookmarkSongKey) {
+                lookupUi.songMapByBookmarkKey.set(row.bookmarkSongKey, row);
+            }
+        });
         lookupUi.songMapByLegacyIndex = new Map(data.allSongsRaw.map((row) => [row.sourceIndex, row]));
         lookupUi.songLookupSourceRef = data.allSongsRaw;
     }

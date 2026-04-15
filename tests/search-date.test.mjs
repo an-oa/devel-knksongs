@@ -54,6 +54,7 @@ function createSearchUiState(input) {
             pendingValues: null
         },
         lookup: {
+            songMapByBookmarkKey: new Map(),
             songMapByKey: new Map(),
             songMapByLegacyIndex: new Map(),
             songLookupSourceRef: null
@@ -66,10 +67,12 @@ function makeRow(input) {
     const artist = input.artist ?? "";
     const titleYomi = input.titleYomi ?? "";
     const artistYomi = input.artistYomi ?? "";
+    const songKey = input.songKey ?? `song-${++autoSongId}`;
     return {
         archiveId: input.archiveId ?? "",
         archiveOrder: input.archiveOrder ?? null,
-        songKey: input.songKey ?? `song-${++autoSongId}`,
+        songKey,
+        bookmarkSongKey: input.bookmarkSongKey ?? songKey,
         sourceIndex: input.sourceIndex ?? 0,
         dateKey: input.dateKey ?? null,
         format: input.format ?? "配信",
@@ -341,6 +344,54 @@ test("createSearchController: active bookmark also applies search criteria", () 
     assert.equal(data.currentResults.length, 0);
     assert.equal(data.displayLimit, 0);
     assert.equal(ui.el.resultCount.innerText, "ブックマーク: 検証 (0 件)");
+});
+
+test("createSearchController: active bookmark resolves rows by bookmarkSongKey", () => {
+    const rows = [
+        makeRow({ songKey: "arch1::1", bookmarkSongKey: "videoA::1", sourceIndex: 1, title: "青い月", artist: "A", format: "配信" }),
+        makeRow({ songKey: "arch2::2", bookmarkSongKey: "videoB::2", sourceIndex: 2, title: "赤い星", artist: "B", format: "歌みた" }),
+        makeRow({ songKey: "arch3::3", bookmarkSongKey: "videoC::3", sourceIndex: 3, title: "白い空", artist: "C", format: "配信" })
+    ];
+    const data = {
+        allSongsRaw: rows,
+        bookmarks: {
+            bm1: {
+                name: "検証",
+                songs: ["videoB::2", "videoA::1"]
+            }
+        },
+        activeBookmark: "bm1",
+        currentResults: [],
+        displayLimit: 0
+    };
+    const ui = createSearchUiState({
+        el: {
+            searchBox: { value: "" },
+            relayOnly: { checked: false },
+            harmonyOnly: { checked: false },
+            dateFromYear: null,
+            dateFromMonth: null,
+            dateFromDay: null,
+            dateToYear: null,
+            dateToMonth: null,
+            dateToDay: null,
+            resultCount: { innerText: "" }
+        },
+        selectedFormats: new Set(["配信", "歌みた"])
+    });
+    const constants = {
+        RANDOM_DISPLAY_COUNT: 10,
+        MIN_PERFORMANCE_FOR_RANDOM: 1,
+        INCREMENT_COUNT: 30,
+        SEARCH_DEBOUNCE_MS: 0,
+        DEFAULT_FORMATS: ["配信", "歌みた", "ショート"]
+    };
+
+    const controller = createSearchController({ data, ui, constants });
+    controller.search();
+
+    assert.deepEqual(data.currentResults.map((row) => row.songKey), ["arch2::2", "arch1::1"]);
+    assert.equal(ui.el.resultCount.innerText, "ブックマーク: 検証 (2 件)");
 });
 
 test("createSearchController: active bookmark uses incremental display limit", () => {

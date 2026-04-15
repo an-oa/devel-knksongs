@@ -41,6 +41,7 @@ function createRenderUiState(input) {
             cardEntriesBySourceKey: input.cardEntriesBySourceKey ?? new Map()
         },
         lookup: {
+            songMapByBookmarkKey: new Map(),
             songMapByKey: new Map(),
             songMapByLegacyIndex: new Map(),
             songLookupSourceRef: null
@@ -587,10 +588,10 @@ test("render: drag handle is bookmark-only and reorder works in both directions 
 test("render: active playback card can move back left without jumping to the end", () => {
     const cleanup = installFakeDom();
     try {
-        const rowA = makeRenderRow({ songKey: "a::1", sourceIndex: 1, title: "A" });
-        const rowB = makeRenderRow({ songKey: "b::2", sourceIndex: 2, title: "B" });
-        const rowC = makeRenderRow({ songKey: "c::3", sourceIndex: 3, title: "C" });
-        const rowD = makeRenderRow({ songKey: "d::4", sourceIndex: 4, title: "D" });
+        const rowA = makeRenderRow({ songKey: "a::1", bookmarkSongKey: "videoA::1", sourceIndex: 1, title: "A" });
+        const rowB = makeRenderRow({ songKey: "b::2", bookmarkSongKey: "videoB::2", sourceIndex: 2, title: "B" });
+        const rowC = makeRenderRow({ songKey: "c::3", bookmarkSongKey: "videoC::3", sourceIndex: 3, title: "C" });
+        const rowD = makeRenderRow({ songKey: "d::4", bookmarkSongKey: "videoD::4", sourceIndex: 4, title: "D" });
         const data = {
             currentResults: [rowA, rowB, rowC, rowD],
             displayLimit: 10,
@@ -598,7 +599,7 @@ test("render: active playback card can move back left without jumping to the end
             bookmarks: {
                 bm1: {
                     name: "test",
-                    songs: [rowA.songKey, rowB.songKey, rowC.songKey, rowD.songKey]
+                    songs: [rowA.bookmarkSongKey, rowB.bookmarkSongKey, rowC.bookmarkSongKey, rowD.bookmarkSongKey]
                 }
             }
         };
@@ -676,10 +677,10 @@ test("render: active playback card can move back left without jumping to the end
             rowD.songKey
         ]);
         assert.deepEqual(data.bookmarks.bm1.songs, [
-            rowA.songKey,
-            rowB.songKey,
-            rowC.songKey,
-            rowD.songKey
+            rowA.bookmarkSongKey,
+            rowB.bookmarkSongKey,
+            rowC.bookmarkSongKey,
+            rowD.bookmarkSongKey
         ]);
         assert.deepEqual(
             ui.el.resultList.children.map((card) => card.dataset.songKey),

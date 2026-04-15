@@ -12,6 +12,7 @@ export function createStorageController({ data, ui, constants, callbacks }) {
         DEFAULT_FORMATS,
         SEARCH_STATE_KEY,
         BOOKMARK_STORAGE_KEY,
+        BOOKMARK_STORAGE_VERSION = 1,
         MAX_BOOKMARK_COUNT = Number.POSITIVE_INFINITY,
         MAX_SONGS_PER_BOOKMARK = Number.POSITIVE_INFINITY
     } = constants;
@@ -21,6 +22,7 @@ export function createStorageController({ data, ui, constants, callbacks }) {
         renderBookmarks,
         scheduleSearch
     } = callbacks;
+    let loadedBookmarkStorageVersion = BOOKMARK_STORAGE_VERSION;
 
     /**
      * 選択中フォーマットを既定値に戻す。
@@ -91,6 +93,44 @@ export function createStorageController({ data, ui, constants, callbacks }) {
     }
 
     /**
+     * 保存済みブックマーク payload を解析し、version と本体を取り出す。
+     * @param {*} raw
+     * @returns {{ version: number, bookmarks: Record<string, { name: string, createdAt: number, songs: Array<string | number> }> }}
+     */
+    function parseStoredBookmarksPayload(raw) {
+        if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+            return { version: 1, bookmarks: {} };
+        }
+        if (Object.prototype.hasOwnProperty.call(raw, "bookmarks")) {
+            const version = Number.isFinite(raw.version) ? raw.version : 1;
+            return {
+                version,
+                bookmarks: sanitizeBookmarks(raw.bookmarks)
+            };
+        }
+        return {
+            version: 1,
+            bookmarks: sanitizeBookmarks(raw)
+        };
+    }
+
+    /**
+     * 行データからブックマーク保存に使う参照キーを返す。
+     * @param {*} row
+     * @returns {string}
+     */
+    function getBookmarkSongRefFromRow(row) {
+        if (!row || typeof row !== "object") return "";
+        if (typeof row.bookmarkSongKey === "string" && row.bookmarkSongKey.trim()) {
+            return row.bookmarkSongKey.trim();
+        }
+        if (typeof row.songKey === "string" && row.songKey.trim()) {
+            return row.songKey.trim();
+        }
+        return "";
+    }
+
+    /**
      * 旧形式の曲参照キーを現行形式へ正規化する。
      * @param {*} ref
      */
@@ -128,7 +168,11 @@ export function createStorageController({ data, ui, constants, callbacks }) {
      */
     function saveBookmarks() {
         try {
-            localStorage.setItem(BOOKMARK_STORAGE_KEY, JSON.stringify(data.bookmarks));
+            localStorage.setItem(BOOKMARK_STORAGE_KEY, JSON.stringify({
+                version: BOOKMARK_STORAGE_VERSION,
+                bookmarks: data.bookmarks
+            }));
+            loadedBookmarkStorageVersion = BOOKMARK_STORAGE_VERSION;
         } catch (e) {
             console.error("Failed to save bookmarks", e);
         }
@@ -141,7 +185,9 @@ export function createStorageController({ data, ui, constants, callbacks }) {
         try {
             const stored = localStorage.getItem(BOOKMARK_STORAGE_KEY);
             if (stored) {
-                data.bookmarks = sanitizeBookmarks(JSON.parse(stored));
+                const parsed = parseStoredBookmarksPayload(JSON.parse(stored));
+                data.bookmarks = parsed.bookmarks;
+                loadedBookmarkStorageVersion = parsed.version;
             }
         } catch (e) {
             console.error("Failed to load bookmarks", e);
@@ -154,15 +200,21 @@ export function createStorageController({ data, ui, constants, callbacks }) {
      * 旧参照形式のブックマーク曲IDを現行の `songKey` へ移行する。
      */
     function migrateLegacyBookmarkSongRefs() {
-        const legacyIndexMap = new Map(data.allSongsRaw.map((row) => [row.sourceIndex, row.songKey]));
+        const legacyIndexMap = new Map();
         const legacySongKeyMap = new Map();
-        const songKeySet = new Set();
+        const songKeyMap = new Map();
+        const bookmarkSongKeySet = new Set();
         data.allSongsRaw.forEach((row) => {
-            if (typeof row.songKey === "string" && row.songKey) {
-                songKeySet.add(row.songKey);
+            const bookmarkSongRef = getBookmarkSongRefFromRow(row);
+            if (Number.isFinite(row.sourceIndex) && bookmarkSongRef) {
+                legacyIndexMap.set(row.sourceIndex, bookmarkSongRef);
+            }
+            if (bookmarkSongRef) bookmarkSongKeySet.add(bookmarkSongRef);
+            if (typeof row.songKey === "string" && row.songKey && bookmarkSongRef) {
+                songKeyMap.set(row.songKey, bookmarkSongRef);
             }
             if (typeof row.legacySongKey === "string" && row.legacySongKey) {
-                legacySongKeyMap.set(row.legacySongKey, row.songKey);
+                legacySongKeyMap.set(row.legacySongKey, bookmarkSongRef);
             }
         });
         let updated = false;
@@ -173,11 +225,13 @@ export function createStorageController({ data, ui, constants, callbacks }) {
             prevSongs.forEach((ref) => {
                 let normalized = null;
                 if (typeof ref === "string") {
-                    if (songKeySet.has(ref)) normalized = ref;
-                    else if (legacySongKeyMap.has(ref)) normalized = legacySongKeyMap.get(ref) || null;
+                    const trimmedRef = ref.trim();
+                    if (bookmarkSongKeySet.has(trimmedRef)) normalized = trimmedRef;
+                    else if (songKeyMap.has(trimmedRef)) normalized = songKeyMap.get(trimmedRef) || null;
+                    else if (legacySongKeyMap.has(trimmedRef)) normalized = legacySongKeyMap.get(trimmedRef) || null;
                     else {
-                        const converted = normalizeLegacySongRefToCurrent(ref);
-                        if (converted && songKeySet.has(converted)) normalized = converted;
+                        const converted = normalizeLegacySongRefToCurrent(trimmedRef);
+                        if (converted && songKeyMap.has(converted)) normalized = songKeyMap.get(converted) || null;
                     }
                 } else if (Number.isFinite(ref)) {
                     normalized = legacyIndexMap.get(ref) || null;
@@ -192,7 +246,7 @@ export function createStorageController({ data, ui, constants, callbacks }) {
                 updated = true;
             }
         });
-        if (updated) saveBookmarks();
+        if (updated || loadedBookmarkStorageVersion !== BOOKMARK_STORAGE_VERSION) saveBookmarks();
     }
 
     /**

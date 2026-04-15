@@ -323,6 +323,7 @@ export function makeRenderRow(input) {
     return {
         sourceIndex: input.sourceIndex,
         songKey: input.songKey,
+        bookmarkSongKey: input.bookmarkSongKey ?? input.songKey,
         title: input.title || "title",
         artist: input.artist || "artist",
         date: input.date || "2024-01-01",

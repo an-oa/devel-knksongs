@@ -1,4 +1,5 @@
 import { normalizeForSearch, parseDateKey } from "../controllers/search.mjs?v=11";
+import { extractYoutubeInfo } from "./youtube-url.mjs?v=11";
 
 /**
  * 現在仕様の曲キー（archiveId + archiveOrder）を生成する。
@@ -9,6 +10,21 @@ function buildSongKey(input) {
     const orderPart = Number.isFinite(archiveOrder) ? String(archiveOrder) : "";
     return [
         String(archiveId || "").trim(),
+        orderPart
+    ].join("::");
+}
+
+/**
+ * ブックマーク保存用の曲キー（videoId + archiveOrder）を生成する。
+ * videoId を抽出できない場合は従来の songKey 形式へフォールバックする。
+ * @param {*} input
+ */
+function buildBookmarkSongKey(input) {
+    const { videoId, archiveId, archiveOrder } = input;
+    const keyHead = String(videoId || "").trim() || String(archiveId || "").trim();
+    const orderPart = Number.isFinite(archiveOrder) ? String(archiveOrder) : "";
+    return [
+        keyHead,
         orderPart
     ].join("::");
 }
@@ -126,6 +142,7 @@ export function parseCsvToSongs(csvText) {
         const titleYomi = r[idx("キョクメイ")];
         const artistYomi = r[idx("アーティストメイ")];
         const archiveOrder = parseArchiveOrder(r[idx("##")]);
+        const { videoId } = extractYoutubeInfo(url);
         const legacySongKey = buildLegacySongKey({ archiveId, archiveOrder, url });
         songs.push({
             date: r[idx("配信日")],
@@ -133,7 +150,9 @@ export function parseCsvToSongs(csvText) {
             archiveId,
             archiveOrder,
             sourceIndex: i,
+            videoId,
             songKey: buildSongKey({ archiveId, archiveOrder }),
+            bookmarkSongKey: buildBookmarkSongKey({ videoId, archiveId, archiveOrder }),
             legacySongKey,
             format: r[idx("形態")],
             videoOrientation: parseVideoOrientation(r[idx("画面の向き")], i + 2),
