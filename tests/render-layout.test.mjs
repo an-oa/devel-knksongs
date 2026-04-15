@@ -384,6 +384,106 @@ test("render: explicit video orientation overrides URL heuristic", () => {
     }
 });
 
+test("render: playSongByKey expands display limit and starts playback for hidden result", () => {
+    const cleanup = installFakeDom();
+    try {
+        const rows = [
+            makeRenderRow({ songKey: "song:1", sourceIndex: 1, url: "https://youtu.be/video1" }),
+            makeRenderRow({ songKey: "song:2", sourceIndex: 2, url: "https://youtu.be/video2" }),
+            makeRenderRow({ songKey: "song:3", sourceIndex: 3, url: "https://youtu.be/video3" })
+        ];
+        const data = {
+            currentResults: rows,
+            displayLimit: 1,
+            activeBookmark: null
+        };
+        const ui = createRenderUiState({
+            showThumbnails: true,
+            el: {
+                resultList: document.createElement("div"),
+                loadMoreContainer: document.createElement("div")
+            }
+        });
+        const playCalls = [];
+        const controller = createRenderController({
+            data,
+            ui,
+            isAllFormatsSelected: () => true,
+            incrementCount: 2
+        });
+        controller.setDependencies({
+            getSearchState: () => ({ queryRaw: "" }),
+            isRecommendedMode: () => false,
+            updateThumbnail: () => {},
+            extractYoutubeInfo,
+            playThumbnail: (thumbDiv, yt) => {
+                playCalls.push({ thumbDiv, yt });
+                return true;
+            },
+            restoreActivePlayback: () => {}
+        });
+
+        controller.updateDisplay();
+        const started = controller.playSongByKey("song:3");
+
+        assert.equal(started, true);
+        assert.equal(data.displayLimit, 3);
+        assert.equal(playCalls.length, 1);
+        assert.equal(playCalls[0].yt.videoId, "video3");
+        const entry = ui.render.cardEntriesBySourceKey.get("song:song:3");
+        assert.ok(entry);
+        assert.equal(playCalls[0].thumbDiv, entry.thumbDiv);
+    } finally {
+        cleanup();
+    }
+});
+
+test("render: playSongByKey expands display limit in increment-sized chunks", () => {
+    const cleanup = installFakeDom();
+    try {
+        const rows = [
+            makeRenderRow({ songKey: "song:1", sourceIndex: 1 }),
+            makeRenderRow({ songKey: "song:2", sourceIndex: 2 }),
+            makeRenderRow({ songKey: "song:3", sourceIndex: 3 }),
+            makeRenderRow({ songKey: "song:4", sourceIndex: 4 }),
+            makeRenderRow({ songKey: "song:5", sourceIndex: 5 })
+        ];
+        const data = {
+            currentResults: rows,
+            displayLimit: 1,
+            activeBookmark: null
+        };
+        const ui = createRenderUiState({
+            showThumbnails: true,
+            el: {
+                resultList: document.createElement("div"),
+                loadMoreContainer: document.createElement("div")
+            }
+        });
+        const controller = createRenderController({
+            data,
+            ui,
+            isAllFormatsSelected: () => true,
+            incrementCount: 2
+        });
+        controller.setDependencies({
+            getSearchState: () => ({ queryRaw: "" }),
+            isRecommendedMode: () => false,
+            updateThumbnail: () => {},
+            extractYoutubeInfo,
+            playThumbnail: () => true,
+            restoreActivePlayback: () => {}
+        });
+
+        controller.updateDisplay();
+        controller.playSongByKey("song:4");
+
+        assert.equal(data.displayLimit, 4);
+    } finally {
+        cleanup();
+    }
+});
+
 test("bookmark: shows load-more and increases by INCREMENT_COUNT (48)", () => {
     const cleanup = installFakeDom();
     try {

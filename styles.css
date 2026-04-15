@@ -124,6 +124,25 @@ body.hide-thumbs .thumb {
 }
 .sidebar-setting-item:last-child { margin-bottom: 0; }
 
+#settings-sidebar-panel .sidebar-group-body {
+  padding: 0;
+  background: var(--card-bg);
+  overflow: hidden;
+}
+
+#settings-sidebar-panel .sidebar-setting-item {
+  margin-bottom: 0;
+  padding: 12px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--border-color);
+  border-radius: 0;
+  background: transparent;
+}
+
+#settings-sidebar-panel .sidebar-setting-item:last-child {
+  border-bottom: 0;
+}
+
 .sidebar-link-row {
   width: 100%;
   display: flex;
@@ -137,6 +156,10 @@ body.hide-thumbs .thumb {
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
+}
+
+.sidebar-link-row + .sidebar-link-row {
+  margin-top: 12px;
 }
 
 .sidebar-link-row-arrow {
@@ -501,6 +524,17 @@ input[type="text"] {
   min-width: 0;
 }
 .menu-item-toggle span { flex: 1; min-width: 0; }
+.setting-item-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+.setting-item-help {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-mute);
+}
 
 .switch { position: relative; width: 34px; height: 18px; display: inline-block; flex-shrink: 0; }
 .switch input { opacity: 0; width: 0; height: 0; }

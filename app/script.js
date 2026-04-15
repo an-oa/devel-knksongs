@@ -22,6 +22,8 @@ import {
 } from "./state.mjs?v=11";
 import { createSearchController } from "./controllers/search.mjs?v=11";
 import { createRenderController } from "./controllers/render.mjs?v=11";
+import { createPlaybackSessionController } from "./controllers/playback-session.mjs?v=11";
+import { createPlaybackSettingsController } from "./controllers/playback-settings.mjs?v=11";
 import { createYoutubeController, extractYoutubeInfo } from "./controllers/youtube.mjs?v=11";
 import { createStorageController } from "./controllers/storage.mjs?v=11";
 import { createBookmarkUiController } from "./ui/bookmark/ui.mjs?v=11";
@@ -58,6 +60,7 @@ import { getDateUiState, getSearchUiState } from "./lib/ui-slices.mjs?v=11";
  * @property {string} titleYomi
  * @property {string} artistYomi
  * @property {string} url
+ * @property {number | null} endSeconds
  * @property {string} titleNorm
  * @property {string} artistNorm
  * @property {string} titleYomiNorm
@@ -79,7 +82,17 @@ const searchController = createSearchController({
 const renderController = createRenderController({
     data,
     ui,
-    isAllFormatsSelected: () => searchController.areAllFormatsSelected()
+    isAllFormatsSelected: () => searchController.areAllFormatsSelected(),
+    incrementCount: INCREMENT_COUNT
+});
+
+const playbackSessionController = createPlaybackSessionController({
+    data,
+    ui
+});
+
+const playbackSettingsController = createPlaybackSettingsController({
+    ui
 });
 
 const youtubeController = createYoutubeController({
@@ -162,7 +175,7 @@ const uiSyncController = createUiSyncController({
     uiSyncPasses: UI_SYNC_PASSES,
     syncSearchUI,
     applyThemeFromStorage: () => applyThemeFromStorage({ ui }),
-    applyThumbnailFromStorage: () => youtubeController.applyThumbnailFromStorage()
+    applyPlaybackSettingsFromStorage: () => playbackSettingsController.applyPlaybackSettingsFromStorage()
 });
 
 const dataLoader = createDataLoader({
@@ -184,6 +197,7 @@ renderController.setDependencies({
     isRecommendedMode: (state) => searchController.isRecommendedMode(state),
     updateThumbnail: (thumbDiv, yt) => youtubeController.updateThumbnail(thumbDiv, yt),
     extractYoutubeInfo,
+    playThumbnail: (thumbDiv, yt) => youtubeController.playThumbnail(thumbDiv, yt),
     restoreActivePlayback: () => youtubeController.restoreActivePlayback(),
     openBookmarkModal: (songKey) => sidebarController.openBookmarkModal(songKey),
     setupScrollObserver: () => youtubeController.setupScrollObserver(),
@@ -191,13 +205,27 @@ renderController.setDependencies({
     saveBookmarks: () => storageController.saveBookmarks()
 });
 
+playbackSessionController.setDependencies({
+    playSongByKey: (songKey) => renderController.playSongByKey(songKey),
+    scrollSongIntoView: (songKey) => renderController.scrollSongIntoView(songKey)
+});
+
+playbackSettingsController.setDependencies({
+    ensureThumbnailPlaybackReady: () => youtubeController.ensureThumbnailPlaybackReady(),
+    restoreActivePlayback: () => youtubeController.restoreActivePlayback(),
+    updateDisplay: () => renderController.updateDisplay(),
+    setupScrollObserver: () => youtubeController.setupScrollObserver()
+});
+
 searchController.setRenderHooks({
     updateDisplay: () => renderController.updateDisplay(),
     scrollResultsPaneToTop: () => scrollResultListToTop(ui.el.resultList)
 });
 
-youtubeController.setDisplayHook(() => renderController.updateDisplay());
 youtubeController.setLayoutHook(() => renderController.refreshLayout());
+youtubeController.setPlaybackEndedHook(({ songKey }) => {
+    playbackSessionController.continuePlayback(songKey);
+});
 
 /**
  * DOM 参照の初期化と UI 各機能のセットアップを行う。
@@ -218,7 +246,7 @@ async function initUI() {
     });
     storageController.loadBookmarks();
     setupTheme({ ui });
-    youtubeController.setupThumbnailToggle();
+    playbackSettingsController.setupPlaybackSettings();
     youtubeController.setupScrollObserver();
     uiSyncController.setupSyncEvents();
     window.addEventListener("resize", () => {

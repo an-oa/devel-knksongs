@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createYoutubeController } from "../app/controllers/youtube.mjs";
+import { createPlaybackSettingsController } from "../app/controllers/playback-settings.mjs";
 import { applyThemeFromStorage } from "../app/ui/core/elements.mjs";
-import { installFakeDom } from "./test-helpers.mjs";
+import { installFakeDom, invokeListener } from "./test-helpers.mjs";
 
 function createFakeLocalStorage() {
     const store = new Map();
@@ -23,21 +23,28 @@ function createFakeLocalStorage() {
 }
 
 /**
- * YouTube 設定系テスト用の UI 状態を作る。
+ * 再生設定系テスト用の UI 状態を作る。
  * @param {*} input
  * @returns {*}
  */
-function createYoutubeUiState(input) {
+function createPlaybackSettingsUiState(input) {
     return {
         el: {
-            thumbToggle: input.thumbToggle ?? null
+            thumbToggle: input.thumbToggle ?? null,
+            endTimeToggle: input.endTimeToggle ?? null,
+            continuousPlaybackToggle: input.continuousPlaybackToggle ?? null,
+            loopPlaybackToggle: input.loopPlaybackToggle ?? null,
+            themeToggle: input.themeToggle ?? null
         },
         search: {
             dataReady: input.dataReady ?? false
         },
         playback: {
             showThumbnails: input.showThumbnails ?? true,
-            activeThumb: null,
+            stopAtEndTime: input.stopAtEndTime ?? false,
+            continuousPlayback: input.continuousPlayback ?? false,
+            loopPlayback: input.loopPlayback ?? false,
+            activeThumb: input.activeThumb ?? null,
             scrollObserver: null
         }
     };
@@ -65,34 +72,33 @@ test("applyThemeFromStorage: main branch theme key restores dark mode state", ()
     }
 });
 
-test("setupThumbnailToggle: main branch showThumbnails=false hides thumbnails on boot", () => {
+test("setupPlaybackSettings: stored playback settings are restored on boot", () => {
     const restoreDom = installFakeDom();
     const prevLocalStorage = globalThis.localStorage;
     globalThis.localStorage = createFakeLocalStorage();
     try {
         globalThis.localStorage.setItem("showThumbnails", "false");
-        const ui = createYoutubeUiState({
+        globalThis.localStorage.setItem("stopAtEndTime", "true");
+        globalThis.localStorage.setItem("continuousPlayback", "true");
+        globalThis.localStorage.setItem("loopPlayback", "true");
+        const ui = createPlaybackSettingsUiState({
             thumbToggle: document.createElement("input"),
-            showThumbnails: true
+            endTimeToggle: document.createElement("input"),
+            continuousPlaybackToggle: document.createElement("input"),
+            loopPlaybackToggle: document.createElement("input")
         });
-        const controller = createYoutubeController({
-            ui,
-            youtube: {
-                apiPromise: null,
-                players: new WeakMap()
-            },
-            constants: {
-                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
-                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
-                YT_IFRAME_READY_POLL_MS: 50,
-                STOP_PLAYBACK_ON_SCROLL_OUT: false
-            }
-        });
+        const controller = createPlaybackSettingsController({ ui });
 
-        controller.setupThumbnailToggle();
+        controller.setupPlaybackSettings();
 
         assert.equal(ui.playback.showThumbnails, false);
+        assert.equal(ui.playback.stopAtEndTime, true);
+        assert.equal(ui.playback.continuousPlayback, true);
+        assert.equal(ui.playback.loopPlayback, true);
         assert.equal(ui.el.thumbToggle.checked, false);
+        assert.equal(ui.el.endTimeToggle.checked, true);
+        assert.equal(ui.el.continuousPlaybackToggle.checked, true);
+        assert.equal(ui.el.loopPlaybackToggle.checked, true);
         assert.equal(document.body.classList.contains("hide-thumbs"), true);
     } finally {
         globalThis.localStorage = prevLocalStorage;
@@ -100,41 +106,106 @@ test("setupThumbnailToggle: main branch showThumbnails=false hides thumbnails on
     }
 });
 
-test("applyThumbnailFromStorage: main branch showThumbnails=true is reapplied during ui sync", () => {
+test("applyPlaybackSettingsFromStorage: ui sync reapplies stored playback settings", () => {
     const restoreDom = installFakeDom();
     const prevLocalStorage = globalThis.localStorage;
     globalThis.localStorage = createFakeLocalStorage();
     try {
         globalThis.localStorage.setItem("showThumbnails", "true");
-        const ui = createYoutubeUiState({
+        globalThis.localStorage.setItem("stopAtEndTime", "true");
+        globalThis.localStorage.setItem("continuousPlayback", "true");
+        globalThis.localStorage.setItem("loopPlayback", "false");
+        const ui = createPlaybackSettingsUiState({
             thumbToggle: document.createElement("input"),
+            endTimeToggle: document.createElement("input"),
+            continuousPlaybackToggle: document.createElement("input"),
+            loopPlaybackToggle: document.createElement("input"),
             showThumbnails: false,
             dataReady: true
         });
-        const controller = createYoutubeController({
-            ui,
-            youtube: {
-                apiPromise: null,
-                players: new WeakMap()
-            },
-            constants: {
-                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
-                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
-                YT_IFRAME_READY_POLL_MS: 50,
-                STOP_PLAYBACK_ON_SCROLL_OUT: false
+        const controller = createPlaybackSettingsController({ ui });
+        let displayUpdateCount = 0;
+        controller.setDependencies({
+            updateDisplay: () => {
+                displayUpdateCount += 1;
             }
         });
-        let displayUpdateCount = 0;
-        controller.setDisplayHook(() => {
-            displayUpdateCount += 1;
-        });
 
-        controller.applyThumbnailFromStorage();
+        controller.applyPlaybackSettingsFromStorage();
 
         assert.equal(ui.playback.showThumbnails, true);
+        assert.equal(ui.playback.stopAtEndTime, true);
+        assert.equal(ui.playback.continuousPlayback, true);
+        assert.equal(ui.playback.loopPlayback, false);
         assert.equal(ui.el.thumbToggle.checked, true);
+        assert.equal(ui.el.endTimeToggle.checked, true);
+        assert.equal(ui.el.continuousPlaybackToggle.checked, true);
+        assert.equal(ui.el.loopPlaybackToggle.checked, false);
         assert.equal(document.body.classList.contains("hide-thumbs"), false);
         assert.equal(displayUpdateCount, 1);
+    } finally {
+        globalThis.localStorage = prevLocalStorage;
+        restoreDom();
+    }
+});
+
+test("setupPlaybackSettings: end time toggle restores active playback before switching mode", () => {
+    const restoreDom = installFakeDom();
+    const prevLocalStorage = globalThis.localStorage;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        globalThis.localStorage.setItem("stopAtEndTime", "true");
+        const ui = createPlaybackSettingsUiState({
+            thumbToggle: document.createElement("input"),
+            endTimeToggle: document.createElement("input"),
+            continuousPlaybackToggle: document.createElement("input"),
+            loopPlaybackToggle: document.createElement("input"),
+            stopAtEndTime: true
+        });
+        const controller = createPlaybackSettingsController({ ui });
+        let restoreCount = 0;
+        controller.setDependencies({
+            restoreActivePlayback: () => {
+                restoreCount += 1;
+            }
+        });
+
+        controller.setupPlaybackSettings();
+        ui.el.endTimeToggle.checked = false;
+        invokeListener(ui.el.endTimeToggle, "change", {});
+
+        assert.equal(ui.playback.stopAtEndTime, false);
+        assert.equal(globalThis.localStorage.getItem("stopAtEndTime"), "false");
+        assert.equal(restoreCount, 1);
+    } finally {
+        globalThis.localStorage = prevLocalStorage;
+        restoreDom();
+    }
+});
+
+test("setupPlaybackSettings: continuous and loop toggles persist playback preferences", () => {
+    const restoreDom = installFakeDom();
+    const prevLocalStorage = globalThis.localStorage;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        const ui = createPlaybackSettingsUiState({
+            thumbToggle: document.createElement("input"),
+            endTimeToggle: document.createElement("input"),
+            continuousPlaybackToggle: document.createElement("input"),
+            loopPlaybackToggle: document.createElement("input")
+        });
+        const controller = createPlaybackSettingsController({ ui });
+
+        controller.setupPlaybackSettings();
+        ui.el.continuousPlaybackToggle.checked = true;
+        invokeListener(ui.el.continuousPlaybackToggle, "change", {});
+        ui.el.loopPlaybackToggle.checked = true;
+        invokeListener(ui.el.loopPlaybackToggle, "change", {});
+
+        assert.equal(ui.playback.continuousPlayback, true);
+        assert.equal(ui.playback.loopPlayback, true);
+        assert.equal(globalThis.localStorage.getItem("continuousPlayback"), "true");
+        assert.equal(globalThis.localStorage.getItem("loopPlayback"), "true");
     } finally {
         globalThis.localStorage = prevLocalStorage;
         restoreDom();

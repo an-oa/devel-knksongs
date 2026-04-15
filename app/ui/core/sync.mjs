@@ -4,7 +4,7 @@
  *   uiSyncPasses: number,
  *   syncSearchUI: () => void,
  *   applyThemeFromStorage: () => void,
- *   applyThumbnailFromStorage: () => void
+ *   applyPlaybackSettingsFromStorage: () => void
  * }} input
  */
 export function createUiSyncController(input) {
@@ -12,7 +12,7 @@ export function createUiSyncController(input) {
         uiSyncPasses,
         syncSearchUI,
         applyThemeFromStorage,
-        applyThumbnailFromStorage
+        applyPlaybackSettingsFromStorage
     } = input;
 
     /**
@@ -72,7 +72,7 @@ export function createUiSyncController(input) {
      */
     function syncVisualUI() {
         applyThemeFromStorage();
-        applyThumbnailFromStorage();
+        applyPlaybackSettingsFromStorage();
     }
 
     /**

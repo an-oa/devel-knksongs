@@ -1,10 +1,11 @@
+import { scheduleScrollElementIntoView } from "../lib/results-scroll.mjs?v=11";
 import { getPlaybackUiState, getRenderUiState, getSearchUiState } from "../lib/ui-slices.mjs?v=11";
 
 /**
  * 検索結果カードの生成・差分反映・表示更新を担うレンダーコントローラーを作成する。
  * @param {*} ui
  */
-export function createRenderController({ data, ui, isAllFormatsSelected }) {
+export function createRenderController({ data, ui, isAllFormatsSelected, incrementCount = 48 }) {
     const searchUi = getSearchUiState(ui);
     const playbackUi = getPlaybackUiState(ui);
     const renderUi = getRenderUiState(ui);
@@ -25,6 +26,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
     let isRecommendedMode = () => false;
     let updateThumbnail = () => {};
     let extractYoutubeInfo = () => ({ videoId: "", startSeconds: 0 });
+    let playThumbnail = () => false;
     let restoreActivePlayback = () => {};
     let openBookmarkModal = () => {};
     let setupScrollObserver = () => {};
@@ -41,6 +43,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
         if (typeof next.isRecommendedMode === "function") isRecommendedMode = next.isRecommendedMode;
         if (typeof next.updateThumbnail === "function") updateThumbnail = next.updateThumbnail;
         if (typeof next.extractYoutubeInfo === "function") extractYoutubeInfo = next.extractYoutubeInfo;
+        if (typeof next.playThumbnail === "function") playThumbnail = next.playThumbnail;
         if (typeof next.restoreActivePlayback === "function") restoreActivePlayback = next.restoreActivePlayback;
         if (typeof next.openBookmarkModal === "function") openBookmarkModal = next.openBookmarkModal;
         if (typeof next.setupScrollObserver === "function") setupScrollObserver = next.setupScrollObserver;
@@ -111,14 +114,8 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
      * @param {*} row
      */
     function updateCardFromRow(entry, row) {
-        const extracted = extractYoutubeInfo(row.url);
         const bookmarkSongRef = getBookmarkSongRef(row);
-        const yt = {
-            ...extracted,
-            isVertical: row.videoOrientation
-                ? row.videoOrientation === "vertical"
-                : extracted.isVertical
-        };
+        const yt = buildYoutubeTarget(row);
         updateThumbnail(entry.thumbDiv, yt);
         updateTitleLink(entry.titleEl, row);
         entry.artistEl.textContent = row.artist || "不明";
@@ -158,6 +155,21 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
             return row.bookmarkSongKey;
         }
         return typeof row.songKey === "string" ? row.songKey : "";
+    }
+
+    /**
+     * 曲行からサムネイル/埋め込み再生に必要な YouTube 情報を組み立てる。
+     * @param {*} row
+     */
+    function buildYoutubeTarget(row) {
+        const extracted = extractYoutubeInfo(row.url);
+        return {
+            ...extracted,
+            endSeconds: row.endSeconds,
+            isVertical: row.videoOrientation
+                ? row.videoOrientation === "vertical"
+                : extracted.isVertical
+        };
     }
 
     /**
@@ -239,6 +251,61 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
      */
     function getVisibleResults() {
         return data.currentResults.slice(0, data.displayLimit);
+    }
+
+    /**
+     * 曲キーに対応する描画エントリを返す。
+     * @param {string} songKey
+     * @returns {*}
+     */
+    function getCardEntryBySongKey(songKey) {
+        if (!songKey) return null;
+        return renderUi.cardEntriesBySourceKey.get(`song:${songKey}`) || null;
+    }
+
+    /**
+     * 指定インデックスの曲が表示範囲外なら、表示上限を広げて描画する。
+     * @param {number} index
+     */
+    function ensureResultVisible(index) {
+        if (!Number.isFinite(index) || index < 0) return;
+        if (index < data.displayLimit) return;
+        const nextLimit = Math.ceil((index + 1) / incrementCount) * incrementCount;
+        data.displayLimit = Math.min(data.currentResults.length, nextLimit);
+        updateDisplay();
+    }
+
+    /**
+     * 曲キーに対応するカードを必要に応じて描画し、再生開始する。
+     * @param {string} songKey
+     * @returns {boolean}
+     */
+    function playSongByKey(songKey) {
+        const index = data.currentResults.findIndex((row) => row && row.songKey === songKey);
+        if (index === -1) return false;
+        ensureResultVisible(index);
+        let entry = getCardEntryBySongKey(songKey);
+        if (!entry) {
+            updateDisplay();
+            entry = getCardEntryBySongKey(songKey);
+        }
+        if (!entry) return false;
+        return Boolean(playThumbnail(entry.thumbDiv, buildYoutubeTarget(data.currentResults[index])));
+    }
+
+    /**
+     * 指定曲のカードが見える位置まで、固定ヘッダーを避けてスクロールする。
+     * @param {string} songKey
+     */
+    function scrollSongIntoView(songKey) {
+        const entry = getCardEntryBySongKey(songKey);
+        if (!entry) return;
+        const header = document.querySelector(".header");
+        const headerHeight = header ? header.getBoundingClientRect().height : 0;
+        scheduleScrollElementIntoView(entry.card, {
+            topOffset: headerHeight,
+            behavior: "smooth"
+        });
     }
 
     /**
@@ -615,6 +682,8 @@ export function createRenderController({ data, ui, isAllFormatsSelected }) {
 
     return {
         setDependencies,
+        playSongByKey,
+        scrollSongIntoView,
         updateDisplay,
         refreshLayout
     };

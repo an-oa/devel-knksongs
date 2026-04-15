@@ -49,21 +49,60 @@ export function restoreViewportAnchor(anchor) {
  * 最新リクエストだけが有効になる。
  * @param {*} getRefreshLayout
  */
+export function afterAnimationFrames(frameCount, callback) {
+    const remaining = Number.isFinite(frameCount) ? Math.max(0, Math.floor(frameCount)) : 0;
+    return new Promise((resolve) => {
+        function step(count) {
+            if (count <= 0) {
+                resolve(typeof callback === "function" ? callback() : undefined);
+                return;
+            }
+            requestAnimationFrame(() => {
+                step(count - 1);
+            });
+        }
+        step(remaining);
+    });
+}
+
+/**
+ * レイアウト補正が落ち着くまで2フレーム待ってから処理を実行する。
+ * @param {Function | undefined} callback
+ * @returns {Promise<*>}
+ */
+export function afterLayoutSettled(callback) {
+    return afterAnimationFrames(2, callback);
+}
+
+/**
+ * スクロール位置を維持しながらレイアウト再計算するスケジューラーを作る。
+ * 最新リクエストだけが有効になる。
+ * @param {*} getRefreshLayout
+ */
 export function createLayoutRefreshScheduler(getRefreshLayout) {
     let generation = 0;
     return function scheduleLayoutRefresh(anchorElement) {
         const requestGeneration = ++generation;
         const anchor = createViewportAnchor(anchorElement);
-        requestAnimationFrame(() => {
-            if (requestGeneration !== generation) return;
-            const refreshLayout = typeof getRefreshLayout === "function" ? getRefreshLayout() : null;
-            if (typeof refreshLayout === "function") {
-                refreshLayout();
-            }
-            restoreViewportAnchor(anchor);
-            requestAnimationFrame(() => {
-                if (requestGeneration !== generation) return;
+        return new Promise((resolve) => {
+            afterAnimationFrames(1, () => {
+                if (requestGeneration !== generation) {
+                    resolve(false);
+                    return;
+                }
+                const refreshLayout = typeof getRefreshLayout === "function" ? getRefreshLayout() : null;
+                if (typeof refreshLayout === "function") {
+                    refreshLayout();
+                }
                 restoreViewportAnchor(anchor);
+                afterAnimationFrames(1, () => {
+                    if (requestGeneration !== generation) {
+                        resolve(false);
+                        return;
+                    }
+                    restoreViewportAnchor(anchor);
+                    resolve(true);
+                });
             });
         });
     };

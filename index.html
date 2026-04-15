@@ -119,25 +119,75 @@
         <button id="close-settings-sidebar" class="close-btn" aria-label="閉じる">&times;</button>
       </div>
       <div class="sidebar-subpanel-body">
-        <div class="sidebar-section sidebar-setting-item">
-          <div class="menu-item-toggle">
-            <span>サムネイル表示</span>
-            <label class="switch">
-              <input type="checkbox" id="thumbnail-toggle" aria-label="サムネイル表示を切り替える">
-              <span class="slider"></span>
-            </label>
+        <section class="sidebar-group">
+          <div class="sidebar-group-header">
+            <div class="sidebar-group-title">表示</div>
           </div>
-        </div>
+          <div class="sidebar-group-body">
+            <div class="sidebar-section sidebar-setting-item">
+              <div class="menu-item-toggle">
+                <span>サムネイル表示</span>
+                <label class="switch">
+                  <input type="checkbox" id="thumbnail-toggle" aria-label="サムネイル表示を切り替える">
+                  <span class="slider"></span>
+                </label>
+              </div>
+            </div>
 
-        <div class="sidebar-section sidebar-setting-item">
-          <div class="menu-item-toggle">
-            <span>ダークモード</span>
-            <label class="switch">
-              <input type="checkbox" id="theme-toggle" aria-label="ダークモードを切り替える">
-              <span class="slider"></span>
-            </label>
+            <div class="sidebar-section sidebar-setting-item">
+              <div class="menu-item-toggle">
+                <span>ダークモード</span>
+                <label class="switch">
+                  <input type="checkbox" id="theme-toggle" aria-label="ダークモードを切り替える">
+                  <span class="slider"></span>
+                </label>
+              </div>
+            </div>
           </div>
-        </div>
+        </section>
+
+        <section class="sidebar-group">
+          <div class="sidebar-group-header">
+            <div class="sidebar-group-title">再生</div>
+          </div>
+          <div class="sidebar-group-body">
+            <div class="sidebar-section sidebar-setting-item">
+              <div class="menu-item-toggle">
+                <span>曲の終わりで停止する</span>
+                <label class="switch">
+                  <input type="checkbox" id="end-time-toggle" aria-label="曲の終わりで停止するかを切り替える">
+                  <span class="slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="sidebar-section sidebar-setting-item">
+              <div class="setting-item-copy">
+                <div class="menu-item-toggle">
+                  <span>終了後、次の曲を再生</span>
+                  <label class="switch">
+                    <input type="checkbox" id="continuous-playback-toggle" aria-label="終了後、次の曲を再生するかを切り替える">
+                    <span class="slider"></span>
+                  </label>
+                </div>
+                <div class="setting-item-help">現在の一覧で、次の曲へ順に進みます。</div>
+              </div>
+            </div>
+
+            <div class="sidebar-section sidebar-setting-item">
+              <div class="setting-item-copy">
+                <div class="menu-item-toggle">
+                  <span>リピート再生</span>
+                  <label class="switch">
+                    <input type="checkbox" id="loop-playback-toggle" aria-label="リピート再生を切り替える">
+                    <span class="slider"></span>
+                  </label>
+                </div>
+                <div class="setting-item-help">「終了後、次の曲を再生」がOFFでは1曲、ONでは一覧全体を繰り返します。</div>
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
 

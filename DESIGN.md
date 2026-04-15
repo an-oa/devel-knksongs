@@ -20,8 +20,11 @@
 - テストファイル:
   - `tests/search-date.test.mjs`
   - `tests/format-filter.test.mjs`
+  - `tests/playback-sequence.test.mjs`
+  - `tests/playback-session-controller.test.mjs`
   - `tests/render-layout.test.mjs`
   - `tests/youtube-controller.test.mjs`
+  - `tests/layout-anchor.test.mjs`
   - `tests/results-scroll.test.mjs`
   - `tests/csv-parser.test.mjs`
   - `tests/storage-bookmark-limit.test.mjs`
@@ -34,6 +37,7 @@
 - おすすめ表示（条件未指定時）
 - 段階表示（追加読み込み）
 - サムネイル表示と埋め込み再生
+- 再生設定（曲の終わりで停止する / 終了後、次の曲を再生 / リピート再生）
 - テーマ切替（ダーク/ライト）
 
 ## UI構成
@@ -44,9 +48,14 @@
   - リレー/ハモリ
   - ブックマーク導線（専用パネルを開く）
   - 設定導線（専用パネルを開く）
-- **サイドバー内設定パネル**：表示設定
-  - サムネイル表示
-  - ダークモード切替
+- **サイドバー内設定パネル**：表示設定と再生設定
+  - 表示
+    - サムネイル表示
+    - ダークモード切替
+  - 再生
+    - 曲の終わりで停止する
+    - 終了後、次の曲を再生
+    - リピート再生
 - **サイドバー内ブックマークパネル**：ブックマーク一覧と曲追加
   - 一覧の選択/名称変更/削除
   - 曲カードの `+` 押下時は同パネル上で既存ブックマーク選択または新規作成して追加
@@ -86,6 +95,7 @@ flowchart TD
 - date / dateKey / archiveId / archiveOrder / sourceIndex
 - videoId / songKey / bookmarkSongKey / legacySongKey / format / videoOrientation / isRelay / isHarmony
 - title / artist / titleYomi / artistYomi
+- endSeconds
 - titleNorm / artistNorm / titleYomiNorm / artistYomiNorm
 - url
 
@@ -180,7 +190,7 @@ stateDiagram-v2
 ## 状態管理
 `state`
 - `data`：全曲/結果/表示件数/ブックマーク情報/選択中ブックマーク
-- `ui`：フィルタ状態、サムネ表示、キャッシュ、ブックマーク追加の一時状態
+- `ui`：フィルタ状態、再生設定、キャッシュ、ブックマーク追加の一時状態
 - `youtube`：API準備/プレイヤー管理
 
 ```mermaid
@@ -194,7 +204,7 @@ flowchart LR
     data --> d3[表示件数]
     data --> d4[ブックマーク情報]
     ui --> u1[フィルタ状態]
-    ui --> u2[サムネ表示]
+    ui --> u2[サムネ表示と再生設定]
     ui --> u3[recommendedCache]
     ui --> u4[ブックマーク追加の一時状態]
     youtube --> y1[API準備]
@@ -205,6 +215,7 @@ flowchart LR
 ローカルストレージ保存：
 - テーマ
 - サムネ表示
+- 再生設定（曲の終わりで停止する / 終了後、次の曲を再生 / リピート再生）
 - CSVキャッシュ
 - 検索条件（キーワード・日付・形態など）
 - ブックマーク情報（ブックマーク名・曲参照/順序・作成日時）
@@ -213,9 +224,13 @@ flowchart LR
 ## YouTube埋め込み
 - `youtube.com` の標準埋め込みを使用
 - サムネイル表示ON時にクリックで埋め込み再生し、`×` でサムネイルへ戻す
+- `曲の終わりで停止する` がONの場合は CSV の `endSeconds` を埋め込み条件へ反映する
 - 手動再生でカード上端がヘッダー下に隠れる場合は、再生開始後に見える位置まで補正スクロールする
 - 曲名リンクは元の `row.url` を別タブで開く
 - 縦動画はサムネイル時は横レイアウトのまま表示し、埋め込み再生時のみ縦向き表示へ切り替える
+- `終了後、次の曲を再生` がONの場合は `data.currentResults` の順序で次曲候補を決める
+- `リピート再生` は `終了後、次の曲を再生` OFF では現在の曲、ON では結果全体を繰り返す
+- 再生終了後の継続再生フローは `playback-session.mjs` が担当し、候補選定・再生開始・追従スクロールをまとめて扱う
 
 ## アクセシビリティ
 - サイドバーを `dialog` として扱う

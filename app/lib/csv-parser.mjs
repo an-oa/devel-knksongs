@@ -69,6 +69,37 @@ function parseVideoOrientation(raw, rowNumber) {
 }
 
 /**
+ * 終了時刻列の値を秒数へ変換し、空欄や不正値は `null` を返す。
+ * @param {*} raw
+ * @param {number} rowNumber
+ */
+function parseEndTimeSeconds(raw, rowNumber) {
+    const value = String(raw || "").trim();
+    if (value === "") return null;
+    if (/^\d+$/.test(value)) {
+        const seconds = Number.parseInt(value, 10);
+        return Number.isFinite(seconds) ? seconds : null;
+    }
+    const parts = value.split(":");
+    if (parts.length < 2 || parts.length > 3 || parts.some((part) => !/^\d+$/.test(part))) {
+        console.warn(`CSV終了時刻が不正です: ${rowNumber}行目 "${value}"`);
+        return null;
+    }
+    const [hoursPart, minutesPart, secondsPart] = parts.length === 3
+        ? parts
+        : ["0", parts[0], parts[1]];
+    const hours = Number.parseInt(hoursPart, 10);
+    const minutes = Number.parseInt(minutesPart, 10);
+    const seconds = Number.parseInt(secondsPart, 10);
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes) || !Number.isFinite(seconds) ||
+        minutes >= 60 || seconds >= 60) {
+        console.warn(`CSV終了時刻が不正です: ${rowNumber}行目 "${value}"`);
+        return null;
+    }
+    return (hours * 3600) + (minutes * 60) + seconds;
+}
+
+/**
  * RFC4180ベースでCSV文字列を2次元配列へ解析する。
  * @param {*} t
  */
@@ -128,6 +159,7 @@ export function parseCsvToSongs(csvText) {
     const body = rows.slice(1);
     const idxMap = Object.fromEntries(header.map((name, index) => [name, index]));
     const idx = (n) => idxMap[n];
+    const endTimeIndex = header.includes("終了時刻") ? idx("終了時刻") : -1;
     const songs = [];
     for (let i = 0; i < body.length; i++) {
         const r = body[i];
@@ -163,6 +195,7 @@ export function parseCsvToSongs(csvText) {
             titleYomi,
             artistYomi,
             url,
+            endSeconds: endTimeIndex >= 0 ? parseEndTimeSeconds(r[endTimeIndex], i + 2) : null,
             titleNorm: normalizeForSearch(title),
             artistNorm: normalizeForSearch(artist),
             titleYomiNorm: normalizeForSearch(titleYomi),
