@@ -98,14 +98,33 @@ export function createYoutubeController({ ui, youtube, constants }) {
             return youtube.apiPromise;
         },
         /**
-         * 埋め込み再生用の標準YouTube URLを生成する。
+         * 初期再生に必要なプレーヤーパラメータを生成する。
          * @param {*} yt
          */
-        buildEmbedUrl(yt) {
-            const origin = location.origin === "null"
-                ? ""
-                : `&origin=${encodeURIComponent(location.origin)}`;
-            return `${YT_EMBED_HOST}/embed/${yt.videoId}?autoplay=1&playsinline=1&start=${yt.startSeconds}&enablejsapi=1&rel=0&cc_load_policy=0&iv_load_policy=3${origin}`;
+        buildPlayerVars(yt) {
+            const vars = {
+                autoplay: 1,
+                playsinline: 1,
+                start: yt.startSeconds,
+                enablejsapi: 1,
+                rel: 0,
+                cc_load_policy: 0,
+                iv_load_policy: 3
+            };
+            if (location.origin !== "null") {
+                vars.origin = location.origin;
+            }
+            return vars;
+        },
+        /**
+         * YouTube が生成した iframe へ必要な属性を反映する。
+         * @param {*} iframe
+         */
+        applyPlayerIframeAttributes(iframe) {
+            if (!(iframe instanceof HTMLElement)) return;
+            iframe.allow = "autoplay; encrypted-media";
+            iframe.referrerPolicy = "strict-origin-when-cross-origin";
+            iframe.allowFullscreen = true;
         },
         /**
          * プレイヤー状態変化に応じて再生状態表示を更新する。
@@ -123,21 +142,33 @@ export function createYoutubeController({ ui, youtube, constants }) {
             }
         },
         /**
-         * 生成済みiframeへYouTubeプレイヤーを紐付ける。
+         * プレーヤーホスト要素へYouTubeプレイヤーを紐付ける。
          * @param {*} thumbDiv
-         * @param {*} iframe
+         * @param {*} playerHost
          * @param {*} yt
          */
-        attachPlayer(thumbDiv, iframe, yt) {
+        attachPlayer(thumbDiv, playerHost, yt) {
             this.ensureReady().then(() => {
-                if (!document.body.contains(iframe)) return;
+                if (!document.body.contains(playerHost)) return;
                 if (youtube.players.has(thumbDiv)) return;
-                const player = new window.YT.Player(iframe, {
+                const player = new window.YT.Player(playerHost, {
                     host: YT_EMBED_HOST,
+                    videoId: yt.videoId,
+                    playerVars: this.buildPlayerVars(yt),
                     events: {
+                        onReady: (event) => {
+                            this.applyPlayerIframeAttributes(
+                                event && event.target && typeof event.target.getIframe === "function"
+                                    ? event.target.getIframe()
+                                    : null
+                            );
+                        },
                         onStateChange: (event) => this.handleStateChange(thumbDiv, event)
                     }
                 });
+                this.applyPlayerIframeAttributes(
+                    typeof player.getIframe === "function" ? player.getIframe() : null
+                );
                 youtube.players.set(thumbDiv, player);
             }).catch(() => {
                 // API読み込み失敗時は埋め込みのみで継続する
@@ -216,10 +247,10 @@ export function createYoutubeController({ ui, youtube, constants }) {
      */
     function resetThumbnailContainer(thumbDiv, videoId, playbackKey) {
         const iframe = thumbDiv.querySelector("iframe");
-        if (iframe) {
+        if (iframe || thumbDiv.querySelector(".youtube-player-host") || youtube.players.has(thumbDiv)) {
             clearActiveThumb(thumbDiv);
             youtubeApi.destroyPlayer(thumbDiv);
-            iframe.src = "about:blank";
+            if (iframe) iframe.src = "about:blank";
         }
         thumbDiv.dataset.videoId = videoId;
         thumbDiv.dataset.playbackKey = playbackKey;
@@ -303,13 +334,25 @@ export function createYoutubeController({ ui, youtube, constants }) {
     }
 
     /**
+     * 埋め込み再生用の要素またはプレイヤー参照が存在するか判定する。
+     * @param {*} thumbDiv
+     */
+    function hasEmbeddedPlaybackTarget(thumbDiv) {
+        return Boolean(
+            thumbDiv.querySelector("iframe") ||
+            thumbDiv.querySelector(".youtube-player-host") ||
+            youtube.players.has(thumbDiv)
+        );
+    }
+
+    /**
      * 現在表示中の再生対象と次の対象が同一か判定する。
      * @param {*} thumbDiv
      * @param {*} nextPlaybackKey
      */
     function isSamePlaybackTarget(thumbDiv, nextPlaybackKey) {
         if (!playbackUi.showThumbnails) return false;
-        if (!thumbDiv.querySelector("iframe")) return false;
+        if (!hasEmbeddedPlaybackTarget(thumbDiv)) return false;
         return (thumbDiv.dataset.playbackKey || "") === nextPlaybackKey;
     }
 
@@ -350,9 +393,10 @@ export function createYoutubeController({ ui, youtube, constants }) {
             }
             if (!entry.isIntersecting) {
                 if (!STOP_PLAYBACK_ON_SCROLL_OUT) return;
+                if (!hasEmbeddedPlaybackTarget(thumb)) return;
                 const iframe = thumb.querySelector("iframe");
-                if (!iframe) return;
-                iframe.src = "about:blank";
+                youtubeApi.destroyPlayer(thumb);
+                if (iframe) iframe.src = "about:blank";
                 const videoId = thumb.dataset.videoId;
                 thumb.classList.remove("playing");
                 setThumbnailOrientation(thumb, "landscape");
@@ -448,11 +492,8 @@ export function createYoutubeController({ ui, youtube, constants }) {
         setThumbnailOrientation(thumbDiv, yt && yt.isVertical ? "vertical" : "landscape");
         setPlaybackState(thumbDiv, "playing");
         setExpandedCardState(thumbDiv, Boolean(yt && yt.isVertical));
-        const ifr = document.createElement("iframe");
-        ifr.src = youtubeApi.buildEmbedUrl(yt);
-        ifr.allow = "autoplay; encrypted-media";
-        ifr.referrerPolicy = "strict-origin-when-cross-origin";
-        ifr.allowFullscreen = true;
+        const playerHost = document.createElement("div");
+        playerHost.className = "youtube-player-host";
         const close = document.createElement("button");
         close.type = "button";
         close.className = "thumb-close-btn";
@@ -462,8 +503,8 @@ export function createYoutubeController({ ui, youtube, constants }) {
             e.stopPropagation();
             restoreThumbnail(thumbDiv, yt.videoId);
         });
-        thumbDiv.replaceChildren(ifr, close);
-        youtubeApi.attachPlayer(thumbDiv, ifr, yt);
+        thumbDiv.replaceChildren(playerHost, close);
+        youtubeApi.attachPlayer(thumbDiv, playerHost, yt);
         if (yt && yt.isVertical) {
             refreshCardLayoutSoon(thumbDiv);
         }
