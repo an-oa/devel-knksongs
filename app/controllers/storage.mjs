@@ -25,6 +25,33 @@ export function createStorageController({ data, ui, constants, callbacks }) {
     let loadedBookmarkStorageVersion = BOOKMARK_STORAGE_VERSION;
 
     /**
+     * ブックマーク移行デバッグログの有効状態を返す。
+     * @returns {boolean}
+     */
+    function isBookmarkMigrationDebugEnabled() {
+        try {
+            if (window.__KNK_DEBUG_BOOKMARK_MIGRATION__ === true) return true;
+            return localStorage.getItem("debugBookmarkMigration") === "true";
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * ブックマーク移行まわりのデバッグログを出力する。
+     * @param {string} message
+     * @param {*} details
+     */
+    function debugBookmarkMigration(message, details) {
+        if (!isBookmarkMigrationDebugEnabled()) return;
+        if (details === undefined) {
+            console.debug("[bookmark-migration]", message);
+            return;
+        }
+        console.debug("[bookmark-migration]", message, details);
+    }
+
+    /**
      * 選択中フォーマットを既定値に戻す。
      */
     function setSelectedFormatsToDefault() {
@@ -188,6 +215,10 @@ export function createStorageController({ data, ui, constants, callbacks }) {
                 const parsed = parseStoredBookmarksPayload(JSON.parse(stored));
                 data.bookmarks = parsed.bookmarks;
                 loadedBookmarkStorageVersion = parsed.version;
+                debugBookmarkMigration("loaded bookmarks payload", {
+                    storedVersion: parsed.version,
+                    bookmarkCount: Object.keys(parsed.bookmarks).length
+                });
             }
         } catch (e) {
             console.error("Failed to load bookmarks", e);
@@ -204,6 +235,13 @@ export function createStorageController({ data, ui, constants, callbacks }) {
         const legacySongKeyMap = new Map();
         const songKeyMap = new Map();
         const bookmarkSongKeySet = new Set();
+        const changedBookmarkIds = [];
+        debugBookmarkMigration("start bookmark ref migration", {
+            storedVersion: loadedBookmarkStorageVersion,
+            targetVersion: BOOKMARK_STORAGE_VERSION,
+            bookmarkCount: Object.keys(data.bookmarks).length,
+            songRowCount: Array.isArray(data.allSongsRaw) ? data.allSongsRaw.length : 0
+        });
         data.allSongsRaw.forEach((row) => {
             const bookmarkSongRef = getBookmarkSongRefFromRow(row);
             if (Number.isFinite(row.sourceIndex) && bookmarkSongRef) {
@@ -218,7 +256,7 @@ export function createStorageController({ data, ui, constants, callbacks }) {
             }
         });
         let updated = false;
-        Object.values(data.bookmarks).forEach((bookmark) => {
+        Object.entries(data.bookmarks).forEach(([bookmarkId, bookmark]) => {
             const nextSongs = [];
             const seen = new Set();
             const prevSongs = Array.isArray(bookmark.songs) ? bookmark.songs : [];
@@ -244,9 +282,26 @@ export function createStorageController({ data, ui, constants, callbacks }) {
             if (prevSongs.length !== nextSongs.length || prevSongs.some((ref, idx) => ref !== nextSongs[idx])) {
                 bookmark.songs = nextSongs;
                 updated = true;
+                changedBookmarkIds.push(bookmarkId);
+                debugBookmarkMigration("bookmark refs migrated", {
+                    bookmarkId,
+                    before: prevSongs,
+                    after: nextSongs
+                });
             }
         });
-        if (updated || loadedBookmarkStorageVersion !== BOOKMARK_STORAGE_VERSION) saveBookmarks();
+        if (updated || loadedBookmarkStorageVersion !== BOOKMARK_STORAGE_VERSION) {
+            saveBookmarks();
+            debugBookmarkMigration("saved migrated bookmarks payload", {
+                changedBookmarkIds,
+                upgradedVersion: BOOKMARK_STORAGE_VERSION
+            });
+            return;
+        }
+        debugBookmarkMigration("bookmark ref migration skipped", {
+            changedBookmarkIds: [],
+            currentVersion: loadedBookmarkStorageVersion
+        });
     }
 
     /**

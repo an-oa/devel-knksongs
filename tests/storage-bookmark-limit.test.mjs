@@ -187,6 +187,85 @@ test("migrateLegacyBookmarkSongRefs: preserves current bookmarkSongKey refs and 
     }
 });
 
+test("migrateLegacyBookmarkSongRefs: emits opt-in debug logs when migration runs", () => {
+    const restoreDom = installFakeDom();
+    const prevLocalStorage = globalThis.localStorage;
+    const previousConsoleDebug = console.debug;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        const debugCalls = [];
+        console.debug = (...args) => {
+            debugCalls.push(args);
+        };
+        const storedBookmarks = {
+            p_1: {
+                name: "legacy payload",
+                songs: ["arch1::1"],
+                createdAt: 1710000000000
+            }
+        };
+        const { controller, data } = setupStorageController({
+            bookmarks: {},
+            maxBookmarkCount: 20,
+            maxSongsPerBookmark: 120
+        });
+        data.allSongsRaw = [
+            {
+                sourceIndex: 0,
+                songKey: "arch1::1",
+                bookmarkSongKey: "videoA::1",
+                legacySongKey: "arch1::1::https://youtu.be/videoA"
+            }
+        ];
+        globalThis.localStorage.setItem("debugBookmarkMigration", "true");
+        globalThis.localStorage.setItem("bookmarksTest", JSON.stringify(storedBookmarks));
+
+        controller.loadBookmarks();
+        controller.migrateLegacyBookmarkSongRefs();
+
+        assert.equal(debugCalls.length >= 3, true);
+        assert.deepEqual(debugCalls[0], [
+            "[bookmark-migration]",
+            "loaded bookmarks payload",
+            {
+                storedVersion: 1,
+                bookmarkCount: 1
+            }
+        ]);
+        assert.deepEqual(debugCalls[1], [
+            "[bookmark-migration]",
+            "start bookmark ref migration",
+            {
+                storedVersion: 1,
+                targetVersion: 2,
+                bookmarkCount: 1,
+                songRowCount: 1
+            }
+        ]);
+        assert.deepEqual(debugCalls[2], [
+            "[bookmark-migration]",
+            "bookmark refs migrated",
+            {
+                bookmarkId: "p_1",
+                before: ["arch1::1"],
+                after: ["videoA::1"]
+            }
+        ]);
+        assert.deepEqual(debugCalls[3], [
+            "[bookmark-migration]",
+            "saved migrated bookmarks payload",
+            {
+                changedBookmarkIds: ["p_1"],
+                upgradedVersion: 2
+            }
+        ]);
+    } finally {
+        console.debug = previousConsoleDebug;
+        globalThis.localStorage = prevLocalStorage;
+        restoreDom();
+    }
+});
+
 test("restoreSearchState: main branch payload restores into sliced ui state", () => {
     const restoreDom = installFakeDom();
     const prevLocalStorage = globalThis.localStorage;
