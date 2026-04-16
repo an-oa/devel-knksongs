@@ -72,7 +72,6 @@ export const state = {
     },
     youtube: {
         apiPromise: null,
-        players: new WeakMap(),
         sharedPlayback: null
     }
 };

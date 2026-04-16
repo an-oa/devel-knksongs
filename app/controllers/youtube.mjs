@@ -288,29 +288,6 @@ export function createYoutubeController({ ui, youtube, constants }) {
             return youtube.apiPromise;
         },
         /**
-         * 初期再生に必要なプレーヤーパラメータを生成する。
-         * @param {*} yt
-         */
-        buildPlayerVars(yt) {
-            const vars = {
-                autoplay: 1,
-                playsinline: 1,
-                start: yt.startSeconds,
-                enablejsapi: 1,
-                rel: 0,
-                cc_load_policy: 0,
-                iv_load_policy: 3
-            };
-            const endSeconds = getEffectiveEndSeconds(yt);
-            if (Number.isFinite(endSeconds)) {
-                vars.end = endSeconds;
-            }
-            if (location.origin !== "null") {
-                vars.origin = location.origin;
-            }
-            return vars;
-        },
-        /**
          * 埋め込み再生用の標準 YouTube URL を生成する。
          * @param {*} yt
          * @returns {string}
@@ -555,17 +532,6 @@ export function createYoutubeController({ ui, youtube, constants }) {
         document.body.appendChild(parkingNode);
         sharedPlayback.parkingNode = parkingNode;
         return parkingNode;
-    }
-
-    /**
-     * 共有プレーヤー要素を非表示の退避先へ戻す。
-     */
-    function parkSharedPlayback() {
-        const sharedPlayback = ensureSharedPlaybackElements();
-        const parkingNode = ensureSharedPlaybackParkingNode();
-        const iframe = syncSharedPlaybackIframe() || sharedPlayback.iframe;
-        parkingNode.replaceChildren(iframe, sharedPlayback.closeButton);
-        sharedPlayback.hostThumb = null;
     }
 
     /**
