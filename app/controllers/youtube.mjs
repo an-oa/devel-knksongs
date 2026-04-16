@@ -1,6 +1,12 @@
 import { createLayoutRefreshScheduler } from "../lib/layout-anchor.mjs?v=11";
 import { scheduleScrollElementIntoView } from "../lib/results-scroll.mjs?v=11";
 import { getPlaybackUiState } from "../lib/ui-slices.mjs?v=11";
+import {
+    applyYoutubePlayerIframeAttributes,
+    buildYoutubeEmbedUrl,
+    createYoutubeIframeApiLoader,
+    YT_EMBED_HOST
+} from "../lib/youtube-embed.mjs?v=11";
 
 export { extractYoutubeInfo } from "../lib/youtube-url.mjs?v=11";
 
@@ -38,8 +44,13 @@ export function createYoutubeController({ ui, youtube, constants }) {
     let playbackSessionSequence = 0;
     let playbackTransitionGeneration = 0;
     const refreshCardLayoutSoon = createLayoutRefreshScheduler(() => refreshLayout);
-    const YT_EMBED_HOST = "https://www.youtube.com";
     const PLAYBACK_START_TIMEOUT_MS = 4000;
+    const youtubeIframeApiLoader = createYoutubeIframeApiLoader({
+        youtube,
+        iframeApiSrc: YT_IFRAME_API_SRC,
+        iframeApiSelector: YT_IFRAME_API_SELECTOR,
+        readyPollMs: YT_IFRAME_READY_POLL_MS
+    });
 
     /**
      * 共有埋め込みプレーヤーの保持領域を返す。
@@ -244,48 +255,8 @@ export function createYoutubeController({ ui, youtube, constants }) {
     }
 
     const youtubeApi = {
-        /**
-         * YouTube Iframe APIが利用可能かを判定する。
-         */
-        isReady() {
-            return Boolean(window.YT && window.YT.Player);
-        },
-        /**
-         * Iframe APIが利用可能になるまでポーリングで待機する。
-         * @param {*} resolve
-         */
-        waitForReady(resolve) {
-            if (this.isReady()) {
-                resolve();
-                return;
-            }
-            setTimeout(() => this.waitForReady(resolve), YT_IFRAME_READY_POLL_MS);
-        },
-        /**
-         * Iframe APIスクリプトの読み込みと初期化完了を保証する。
-         */
         ensureReady() {
-            if (this.isReady()) return Promise.resolve();
-            if (youtube.apiPromise) return youtube.apiPromise;
-            youtube.apiPromise = new Promise((resolve, reject) => {
-                const existing = document.querySelector(YT_IFRAME_API_SELECTOR);
-                const prevCallback = window.onYouTubeIframeAPIReady;
-                window.onYouTubeIframeAPIReady = () => {
-                    if (typeof prevCallback === "function") prevCallback();
-                    resolve();
-                };
-                if (existing) {
-                    this.waitForReady(resolve);
-                    return;
-                }
-                const script = document.createElement("script");
-                script.src = YT_IFRAME_API_SRC;
-                script.async = true;
-                script.dataset.ytIframeApi = "true";
-                script.onerror = () => reject(new Error("iframe_api load failed"));
-                document.head.appendChild(script);
-            });
-            return youtube.apiPromise;
+            return youtubeIframeApiLoader.ensureReady();
         },
         /**
          * 埋め込み再生用の標準 YouTube URL を生成する。
@@ -293,33 +264,16 @@ export function createYoutubeController({ ui, youtube, constants }) {
          * @returns {string}
          */
         buildEmbedUrl(yt) {
-            const params = new URLSearchParams({
-                autoplay: "1",
-                playsinline: "1",
-                start: String(yt.startSeconds),
-                enablejsapi: "1",
-                rel: "0",
-                cc_load_policy: "0",
-                iv_load_policy: "3"
+            return buildYoutubeEmbedUrl(yt, {
+                endSeconds: getEffectiveEndSeconds(yt)
             });
-            const endSeconds = getEffectiveEndSeconds(yt);
-            if (Number.isFinite(endSeconds)) {
-                params.set("end", String(endSeconds));
-            }
-            if (location.origin !== "null") {
-                params.set("origin", location.origin);
-            }
-            return `${YT_EMBED_HOST}/embed/${yt.videoId}?${params.toString()}`;
         },
         /**
          * YouTube が生成した iframe へ必要な属性を反映する。
          * @param {*} iframe
          */
         applyPlayerIframeAttributes(iframe) {
-            if (!isHtmlElement(iframe)) return;
-            iframe.allow = "autoplay; encrypted-media";
-            iframe.referrerPolicy = "strict-origin-when-cross-origin";
-            iframe.allowFullscreen = true;
+            applyYoutubePlayerIframeAttributes(iframe);
         },
         /**
          * プレイヤー状態変化に応じて再生状態表示を更新する。
