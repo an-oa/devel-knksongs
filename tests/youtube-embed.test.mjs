@@ -4,7 +4,7 @@ import {
     applyYoutubePlayerIframeAttributes,
     buildYoutubeEmbedUrl,
     createYoutubeIframeApiLoader
-} from "../app/lib/youtube-embed.mjs";
+} from "../app/lib/youtube/embed.mjs";
 import { installFakeDom } from "./test-helpers.mjs";
 
 test("youtube embed: buildYoutubeEmbedUrl includes playback params and optional end", () => {

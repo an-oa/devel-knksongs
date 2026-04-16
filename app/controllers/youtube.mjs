@@ -5,7 +5,7 @@ import {
     buildYoutubeEmbedUrl,
     createYoutubeIframeApiLoader,
     YT_EMBED_HOST
-} from "../lib/youtube-embed.mjs?v=11";
+} from "../lib/youtube/embed.mjs?v=11";
 import {
     destroyYoutubeSharedPlayback,
     ensureYoutubeSharedPlaybackElements,
@@ -15,7 +15,7 @@ import {
     setPendingYoutubeSharedPlaybackAttach,
     setYoutubeSharedPlaybackSessionId,
     syncYoutubeSharedPlaybackIframe
-} from "../lib/youtube-shared-playback.mjs?v=11";
+} from "../lib/youtube/shared-playback.mjs?v=11";
 import {
     applyYoutubeThumbnailImage,
     createYoutubeThumbnailImage,
@@ -25,7 +25,7 @@ import {
     setYoutubeThumbnailOrientation,
     setYoutubeThumbnailPlaybackState,
     shouldLoadYoutubeThumbnailNow
-} from "../lib/youtube-thumbnail.mjs?v=11";
+} from "../lib/youtube/thumbnail.mjs?v=11";
 
 export { extractYoutubeInfo } from "../lib/youtube-url.mjs?v=11";
 

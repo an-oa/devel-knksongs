@@ -9,7 +9,7 @@ import {
     setPendingYoutubeSharedPlaybackAttach,
     setYoutubeSharedPlaybackSessionId,
     syncYoutubeSharedPlaybackIframe
-} from "../app/lib/youtube-shared-playback.mjs";
+} from "../app/lib/youtube/shared-playback.mjs";
 import { installFakeDom } from "./test-helpers.mjs";
 
 test("youtube shared playback: state initializes and keeps pending attach/session metadata", () => {

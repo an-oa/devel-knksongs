@@ -1,4 +1,4 @@
-import { scheduleScrollElementIntoView } from "./results-scroll.mjs?v=11";
+import { scheduleScrollElementIntoView } from "../results-scroll.mjs?v=11";
 
 /**
  * 現在の実行環境で HTMLElement 判定が可能な場合だけ要素型チェックする。
