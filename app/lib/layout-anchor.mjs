@@ -1,11 +1,4 @@
-/**
- * 現在の実行環境で HTMLElement 判定が可能な場合だけ要素型チェックする。
- * @param {*} value
- * @returns {boolean}
- */
-function isHtmlElement(value) {
-    return typeof HTMLElement === "function" && value instanceof HTMLElement;
-}
+import { isHtmlElement } from "./dom-utils.mjs?v=11";
 
 /**
  * 指定要素を含む最も近いスクロール可能祖先を返す。

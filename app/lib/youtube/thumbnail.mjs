@@ -1,21 +1,5 @@
+import { canUseDom, getHeaderHeight, isHtmlElement } from "../dom-utils.mjs?v=11";
 import { scheduleScrollElementIntoView } from "../results-scroll.mjs?v=11";
-
-/**
- * 現在の実行環境で HTMLElement 判定が可能な場合だけ要素型チェックする。
- * @param {*} value
- * @returns {boolean}
- */
-function isHtmlElement(value) {
-    return typeof HTMLElement === "function" && value instanceof HTMLElement;
-}
-
-/**
- * 要素生成に必要な document API が利用可能か判定する。
- * @returns {boolean}
- */
-function canUseDom() {
-    return typeof document === "object" && !!document && typeof document.createElement === "function";
-}
 
 /**
  * 遅延読み込み用のサムネイル画像要素を生成する。
@@ -93,15 +77,6 @@ export function setYoutubeThumbnailExpandedCardState(thumbDiv, isExpanded) {
 export function getSongKeyFromYoutubeThumb(thumbDiv) {
     const card = isHtmlElement(thumbDiv) ? thumbDiv.closest(".song-card") : null;
     return isHtmlElement(card) ? (card.dataset.songKey || "") : "";
-}
-
-/**
- * 固定ヘッダーの高さを返す。
- * @returns {number}
- */
-function getHeaderHeight() {
-    const header = document.querySelector(".header");
-    return header ? header.getBoundingClientRect().height : 0;
 }
 
 /**

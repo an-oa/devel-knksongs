@@ -1,4 +1,5 @@
 import { createLayoutRefreshScheduler } from "../lib/layout-anchor.mjs?v=11";
+import { canUseDom, getHeaderHeight, isHtmlElement } from "../lib/dom-utils.mjs?v=11";
 import { getPlaybackUiState } from "../lib/ui-slices.mjs?v=11";
 import {
     applyYoutubePlayerIframeAttributes,
@@ -28,23 +29,6 @@ import {
 } from "../lib/youtube/thumbnail.mjs?v=11";
 
 export { extractYoutubeInfo } from "../lib/youtube-url.mjs?v=11";
-
-/**
- * 現在の実行環境で HTMLElement 判定が可能な場合だけ要素型チェックする。
- * @param {*} value
- * @returns {boolean}
- */
-function isHtmlElement(value) {
-    return typeof HTMLElement === "function" && value instanceof HTMLElement;
-}
-
-/**
- * 要素生成に必要な document API が利用可能か判定する。
- * @returns {boolean}
- */
-function canUseDom() {
-    return typeof document === "object" && !!document && typeof document.createElement === "function";
-}
 
 /**
  * サムネイル表示と埋め込み再生の制御を行うコントローラーを作成する。
@@ -733,8 +717,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
      * サムネイル可視判定用のIntersectionObserverを再設定する。
      */
     function setupScrollObserver() {
-        const header = document.querySelector(".header");
-        const headerHeight = header ? header.getBoundingClientRect().height : 0;
+        const headerHeight = getHeaderHeight();
         if (playbackUi.scrollObserver) playbackUi.scrollObserver.disconnect();
         playbackUi.scrollObserver = new IntersectionObserver(handleScrollObserver, {
             threshold: 0,

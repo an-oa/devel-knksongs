@@ -1,13 +1,5 @@
+import { isHtmlElement } from "./dom-utils.mjs?v=11";
 import { afterLayoutSettled, findScrollableAncestor } from "./layout-anchor.mjs?v=11";
-
-/**
- * 現在の実行環境で HTMLElement 判定が可能な場合だけ要素型チェックする。
- * @param {*} value
- * @returns {boolean}
- */
-function isHtmlElement(value) {
-    return typeof HTMLElement === "function" && value instanceof HTMLElement;
-}
 
 /**
  * 結果リストを含むスクロール領域を先頭へ戻す。

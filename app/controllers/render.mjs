@@ -1,3 +1,4 @@
+import { getHeaderHeight } from "../lib/dom-utils.mjs?v=11";
 import { scheduleScrollElementIntoView } from "../lib/results-scroll.mjs?v=11";
 import { getPlaybackUiState, getRenderUiState, getSearchUiState } from "../lib/ui-slices.mjs?v=11";
 
@@ -301,10 +302,8 @@ export function createRenderController({ data, ui, isAllFormatsSelected, increme
     function scrollSongIntoView(songKey) {
         const entry = getCardEntryBySongKey(songKey);
         if (!entry) return;
-        const header = document.querySelector(".header");
-        const headerHeight = header ? header.getBoundingClientRect().height : 0;
         scheduleScrollElementIntoView(entry.card, {
-            topOffset: headerHeight,
+            topOffset: getHeaderHeight(),
             behavior: "smooth"
         });
     }

@@ -1,19 +1,4 @@
-/**
- * 現在の実行環境で HTMLElement 判定が可能な場合だけ要素型チェックする。
- * @param {*} value
- * @returns {boolean}
- */
-function isHtmlElement(value) {
-    return typeof HTMLElement === "function" && value instanceof HTMLElement;
-}
-
-/**
- * 要素生成に必要な document API が利用可能か判定する。
- * @returns {boolean}
- */
-function canUseDom() {
-    return typeof document === "object" && !!document && typeof document.createElement === "function";
-}
+import { canUseDom, isHtmlElement } from "../dom-utils.mjs?v=11";
 
 /**
  * 共有埋め込みプレーヤーの保持領域を返す。

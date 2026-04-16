@@ -1,13 +1,6 @@
-const YT_EMBED_HOST = "https://www.youtube.com";
+import { isHtmlElement } from "../dom-utils.mjs?v=11";
 
-/**
- * 現在の実行環境で HTMLElement 判定が可能な場合だけ要素型チェックする。
- * @param {*} value
- * @returns {boolean}
- */
-function isHtmlElement(value) {
-    return typeof HTMLElement === "function" && value instanceof HTMLElement;
-}
+const YT_EMBED_HOST = "https://www.youtube.com";
 
 /**
  * YouTube Iframe API の読み込み完了を扱うローダーを作成する。
