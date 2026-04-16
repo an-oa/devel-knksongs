@@ -18,6 +18,58 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
     const setupScrollObserver = callbacks.setupScrollObserver;
 
     /**
+     * 再生設定定義を返す。
+     * @returns {Array<*>}
+     */
+    function getPlaybackSettingDefinitions() {
+        return [
+            {
+                stateKey: "showThumbnails",
+                elementKey: "thumbToggle",
+                storageKey: THUMBNAIL_STORAGE_KEY,
+                defaultValue: false,
+                syncValue(value) {
+                    document.body.classList.toggle("hide-thumbs", !value);
+                    ensureThumbnailPlaybackReady();
+                },
+                afterStorageApply(previousValue, nextValue) {
+                    if (previousValue === nextValue || !searchUi.dataReady) return;
+                    updateDisplay();
+                    setupScrollObserver();
+                },
+                afterToggleChange() {
+                    updateDisplay();
+                    setupScrollObserver();
+                }
+            },
+            {
+                stateKey: "stopAtEndTime",
+                elementKey: "endTimeToggle",
+                storageKey: STOP_AT_END_TIME_STORAGE_KEY,
+                defaultValue: false,
+                afterStorageApply(previousValue, nextValue) {
+                    if (previousValue !== nextValue) restoreActivePlayback();
+                },
+                afterToggleChange(previousValue, nextValue) {
+                    if (previousValue !== nextValue) restoreActivePlayback();
+                }
+            },
+            {
+                stateKey: "continuousPlayback",
+                elementKey: "continuousPlaybackToggle",
+                storageKey: CONTINUOUS_PLAYBACK_STORAGE_KEY,
+                defaultValue: false
+            },
+            {
+                stateKey: "loopPlayback",
+                elementKey: "loopPlaybackToggle",
+                storageKey: LOOP_PLAYBACK_STORAGE_KEY,
+                defaultValue: false
+            }
+        ];
+    }
+
+    /**
      * 保存済み真偽値設定を返す。
      * @param {string} key
      * @param {boolean} defaultValue
@@ -29,35 +81,59 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
     }
 
     /**
+     * 現在値とトグル状態へ設定値を反映する。
+     * @param {*} definition
+     * @param {boolean} value
+     */
+    function applyPlaybackSettingValue(definition, value) {
+        playbackUi[definition.stateKey] = value;
+        const toggle = ui.el[definition.elementKey];
+        if (toggle) toggle.checked = value;
+        if (typeof definition.syncValue === "function") {
+            definition.syncValue(value);
+        }
+    }
+
+    /**
+     * 保存領域から全再生設定の値を読み出す。
+     * @param {Array<*>} definitions
+     * @returns {Map<string, boolean>}
+     */
+    function readPlaybackSettingValues(definitions) {
+        return new Map(definitions.map((definition) => [
+            definition.stateKey,
+            loadStoredBoolean(definition.storageKey, definition.defaultValue)
+        ]));
+    }
+
+    /**
+     * トグル変更時の設定更新と副作用実行を行う。
+     * @param {*} definition
+     * @param {boolean} nextValue
+     */
+    function handlePlaybackSettingChange(definition, nextValue) {
+        const previousValue = Boolean(playbackUi[definition.stateKey]);
+        if (previousValue === nextValue) return;
+        applyPlaybackSettingValue(definition, nextValue);
+        localStorage.setItem(definition.storageKey, nextValue);
+        if (typeof definition.afterToggleChange === "function") {
+            definition.afterToggleChange(previousValue, nextValue);
+        }
+    }
+
+    /**
      * 現在の再生設定を UI 状態とトグルへ反映する。
      */
     function applyPlaybackSettingsFromStorage() {
-        const thumbToggle = ui.el.thumbToggle;
-        const endTimeToggle = ui.el.endTimeToggle;
-        const continuousPlaybackToggle = ui.el.continuousPlaybackToggle;
-        const loopPlaybackToggle = ui.el.loopPlaybackToggle;
-        const isShow = loadStoredBoolean(THUMBNAIL_STORAGE_KEY, false);
-        const stopAtEndTime = loadStoredBoolean(STOP_AT_END_TIME_STORAGE_KEY, false);
-        const continuousPlayback = loadStoredBoolean(CONTINUOUS_PLAYBACK_STORAGE_KEY, false);
-        const loopPlayback = loadStoredBoolean(LOOP_PLAYBACK_STORAGE_KEY, false);
-        const prevShow = playbackUi.showThumbnails;
-        const prevStopAtEndTime = playbackUi.stopAtEndTime;
-        playbackUi.showThumbnails = isShow;
-        playbackUi.stopAtEndTime = stopAtEndTime;
-        playbackUi.continuousPlayback = continuousPlayback;
-        playbackUi.loopPlayback = loopPlayback;
-        if (thumbToggle) thumbToggle.checked = isShow;
-        if (endTimeToggle) endTimeToggle.checked = stopAtEndTime;
-        if (continuousPlaybackToggle) continuousPlaybackToggle.checked = continuousPlayback;
-        if (loopPlaybackToggle) loopPlaybackToggle.checked = loopPlayback;
-        document.body.classList.toggle("hide-thumbs", !isShow);
-        ensureThumbnailPlaybackReady();
-        if (prevStopAtEndTime !== stopAtEndTime) {
-            restoreActivePlayback();
-        }
-        if (prevShow !== isShow && searchUi.dataReady) {
-            updateDisplay();
-            setupScrollObserver();
+        const definitions = getPlaybackSettingDefinitions();
+        const nextValues = readPlaybackSettingValues(definitions);
+        for (const definition of definitions) {
+            const previousValue = Boolean(playbackUi[definition.stateKey]);
+            const nextValue = Boolean(nextValues.get(definition.stateKey));
+            applyPlaybackSettingValue(definition, nextValue);
+            if (typeof definition.afterStorageApply === "function") {
+                definition.afterStorageApply(previousValue, nextValue);
+            }
         }
     }
 
@@ -65,44 +141,13 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
      * 再生設定トグルを初期化して変更内容を保存する。
      */
     function setupPlaybackSettings() {
-        const thumbToggle = ui.el.thumbToggle;
-        const endTimeToggle = ui.el.endTimeToggle;
-        const continuousPlaybackToggle = ui.el.continuousPlaybackToggle;
-        const loopPlaybackToggle = ui.el.loopPlaybackToggle;
+        const definitions = getPlaybackSettingDefinitions();
         applyPlaybackSettingsFromStorage();
-
-        if (thumbToggle) {
-            thumbToggle.addEventListener("change", () => {
-                const checked = thumbToggle.checked;
-                playbackUi.showThumbnails = checked;
-                document.body.classList.toggle("hide-thumbs", !checked);
-                localStorage.setItem(THUMBNAIL_STORAGE_KEY, checked);
-                ensureThumbnailPlaybackReady();
-                updateDisplay();
-                setupScrollObserver();
-            });
-        }
-        if (endTimeToggle) {
-            endTimeToggle.addEventListener("change", () => {
-                const checked = endTimeToggle.checked;
-                if (playbackUi.stopAtEndTime === checked) return;
-                playbackUi.stopAtEndTime = checked;
-                localStorage.setItem(STOP_AT_END_TIME_STORAGE_KEY, checked);
-                restoreActivePlayback();
-            });
-        }
-        if (continuousPlaybackToggle) {
-            continuousPlaybackToggle.addEventListener("change", () => {
-                const checked = continuousPlaybackToggle.checked;
-                playbackUi.continuousPlayback = checked;
-                localStorage.setItem(CONTINUOUS_PLAYBACK_STORAGE_KEY, checked);
-            });
-        }
-        if (loopPlaybackToggle) {
-            loopPlaybackToggle.addEventListener("change", () => {
-                const checked = loopPlaybackToggle.checked;
-                playbackUi.loopPlayback = checked;
-                localStorage.setItem(LOOP_PLAYBACK_STORAGE_KEY, checked);
+        for (const definition of definitions) {
+            const toggle = ui.el[definition.elementKey];
+            if (!toggle) continue;
+            toggle.addEventListener("change", () => {
+                handlePlaybackSettingChange(definition, toggle.checked);
             });
         }
     }
