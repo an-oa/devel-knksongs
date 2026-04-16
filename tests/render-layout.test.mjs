@@ -384,7 +384,7 @@ test("render: explicit video orientation overrides URL heuristic", () => {
     }
 });
 
-test("render: playSongByKey expands display limit and starts playback for hidden result", () => {
+test("render: playSongByKey expands display limit and starts playback for hidden result", async () => {
     const cleanup = installFakeDom();
     try {
         const rows = [
@@ -424,7 +424,7 @@ test("render: playSongByKey expands display limit and starts playback for hidden
         });
 
         controller.updateDisplay();
-        const started = controller.playSongByKey("song:3");
+        const started = await controller.playSongByKey("song:3");
 
         assert.equal(started, true);
         assert.equal(data.displayLimit, 3);
@@ -438,7 +438,7 @@ test("render: playSongByKey expands display limit and starts playback for hidden
     }
 });
 
-test("render: playSongByKey expands display limit in increment-sized chunks", () => {
+test("render: playSongByKey expands display limit in increment-sized chunks", async () => {
     const cleanup = installFakeDom();
     try {
         const rows = [
@@ -476,7 +476,7 @@ test("render: playSongByKey expands display limit in increment-sized chunks", ()
         });
 
         controller.updateDisplay();
-        controller.playSongByKey("song:4");
+        await controller.playSongByKey("song:4");
 
         assert.equal(data.displayLimit, 4);
     } finally {

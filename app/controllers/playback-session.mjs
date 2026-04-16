@@ -23,9 +23,9 @@ export function createPlaybackSessionController({ data, ui }) {
     /**
      * 現在の再生設定に従い、終了した曲の次候補を順に再生する。
      * @param {string} finishedSongKey
-     * @returns {boolean}
+     * @returns {Promise<boolean>}
      */
-    function continuePlayback(finishedSongKey) {
+    async function continuePlayback(finishedSongKey) {
         const candidates = getPlaybackContinuationCandidates(
             data.currentResults,
             finishedSongKey,
@@ -35,7 +35,7 @@ export function createPlaybackSessionController({ data, ui }) {
             }
         );
         for (const songKey of candidates) {
-            if (playSongByKey(songKey)) {
+            if (await Promise.resolve(playSongByKey(songKey))) {
                 scrollSongIntoView(songKey);
                 return true;
             }

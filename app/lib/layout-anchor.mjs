@@ -1,4 +1,13 @@
 /**
+ * 現在の実行環境で HTMLElement 判定が可能な場合だけ要素型チェックする。
+ * @param {*} value
+ * @returns {boolean}
+ */
+function isHtmlElement(value) {
+    return typeof HTMLElement === "function" && value instanceof HTMLElement;
+}
+
+/**
  * 指定要素を含む最も近いスクロール可能祖先を返す。
  * @param {*} element
  */
@@ -11,7 +20,7 @@ export function findScrollableAncestor(element) {
         if (isScrollable) return current;
         current = current.parentElement;
     }
-    return document.scrollingElement instanceof HTMLElement ? document.scrollingElement : document.documentElement;
+    return isHtmlElement(document.scrollingElement) ? document.scrollingElement : document.documentElement;
 }
 
 /**
@@ -19,7 +28,7 @@ export function findScrollableAncestor(element) {
  * @param {*} element
  */
 export function createViewportAnchor(element) {
-    if (!(element instanceof HTMLElement) || !element.isConnected) return null;
+    if (!isHtmlElement(element) || !element.isConnected) return null;
     return {
         element,
         container: findScrollableAncestor(element),
@@ -32,7 +41,7 @@ export function createViewportAnchor(element) {
  * @param {*} anchor
  */
 export function restoreViewportAnchor(anchor) {
-    if (!anchor || !(anchor.element instanceof HTMLElement) || !anchor.element.isConnected) return;
+    if (!anchor || !isHtmlElement(anchor.element) || !anchor.element.isConnected) return;
     const nextTop = anchor.element.getBoundingClientRect().top;
     const delta = nextTop - anchor.top;
     if (Math.abs(delta) < 1) return;
@@ -55,6 +64,10 @@ export function afterAnimationFrames(frameCount, callback) {
         function step(count) {
             if (count <= 0) {
                 resolve(typeof callback === "function" ? callback() : undefined);
+                return;
+            }
+            if (typeof requestAnimationFrame !== "function") {
+                resolve(undefined);
                 return;
             }
             requestAnimationFrame(() => {

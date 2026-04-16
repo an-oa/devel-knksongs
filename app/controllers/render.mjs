@@ -278,19 +278,20 @@ export function createRenderController({ data, ui, isAllFormatsSelected, increme
     /**
      * 曲キーに対応するカードを必要に応じて描画し、再生開始する。
      * @param {string} songKey
-     * @returns {boolean}
+     * @returns {Promise<boolean>}
      */
     function playSongByKey(songKey) {
         const index = data.currentResults.findIndex((row) => row && row.songKey === songKey);
-        if (index === -1) return false;
+        if (index === -1) return Promise.resolve(false);
         ensureResultVisible(index);
         let entry = getCardEntryBySongKey(songKey);
         if (!entry) {
             updateDisplay();
             entry = getCardEntryBySongKey(songKey);
         }
-        if (!entry) return false;
-        return Boolean(playThumbnail(entry.thumbDiv, buildYoutubeTarget(data.currentResults[index])));
+        if (!entry) return Promise.resolve(false);
+        return Promise.resolve(playThumbnail(entry.thumbDiv, buildYoutubeTarget(data.currentResults[index])))
+            .then((didStart) => Boolean(didStart));
     }
 
     /**

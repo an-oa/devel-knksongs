@@ -27,7 +27,18 @@ test("playback sequence: wraps to head when loop is enabled", () => {
 
     assert.deepEqual(
         getSequentialPlaybackCandidates(results, "song-3", true),
-        ["song-1", "song-2", "song-3"]
+        ["song-1", "song-2"]
+    );
+});
+
+test("playback sequence: single-item loop repeats the same song", () => {
+    const results = [
+        { songKey: "song-1" }
+    ];
+
+    assert.deepEqual(
+        getSequentialPlaybackCandidates(results, "song-1", true),
+        ["song-1"]
     );
 });
 

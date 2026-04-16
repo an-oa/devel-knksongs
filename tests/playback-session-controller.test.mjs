@@ -17,7 +17,7 @@ function createPlaybackUi(options) {
     };
 }
 
-test("playback session: advances to next song and scrolls it into view", () => {
+test("playback session: advances to next song and scrolls it into view", async () => {
     const data = {
         currentResults: [
             { songKey: "song:1" },
@@ -38,13 +38,13 @@ test("playback session: advances to next song and scrolls it into view", () => {
         }
     });
 
-    const continued = controller.continuePlayback("song:1");
+    const continued = await controller.continuePlayback("song:1");
 
     assert.equal(continued, true);
     assert.deepEqual(calls, ["play:song:2", "scroll:song:2"]);
 });
 
-test("playback session: tries later candidates when the next song cannot start", () => {
+test("playback session: tries later candidates when the next song cannot start", async () => {
     const data = {
         currentResults: [
             { songKey: "song:1" },
@@ -65,13 +65,13 @@ test("playback session: tries later candidates when the next song cannot start",
         }
     });
 
-    const continued = controller.continuePlayback("song:1");
+    const continued = await controller.continuePlayback("song:1");
 
     assert.equal(continued, true);
     assert.deepEqual(calls, ["play:song:2", "play:song:3", "scroll:song:3"]);
 });
 
-test("playback session: repeats current song when loop-only mode is enabled", () => {
+test("playback session: repeats current song when loop-only mode is enabled", async () => {
     const data = {
         currentResults: [
             { songKey: "song:1" },
@@ -91,8 +91,35 @@ test("playback session: repeats current song when loop-only mode is enabled", ()
         }
     });
 
-    const continued = controller.continuePlayback("song:2");
+    const continued = await controller.continuePlayback("song:2");
 
     assert.equal(continued, true);
     assert.deepEqual(calls, ["play:song:2", "scroll:song:2"]);
+});
+
+test("playback session: awaits async playback failure before trying the next candidate", async () => {
+    const data = {
+        currentResults: [
+            { songKey: "song:1" },
+            { songKey: "song:2" },
+            { songKey: "song:3" }
+        ]
+    };
+    const ui = createPlaybackUi({ continuousPlayback: true });
+    const calls = [];
+    const controller = createPlaybackSessionController({ data, ui });
+    controller.setDependencies({
+        playSongByKey: (songKey) => {
+            calls.push(`play:${songKey}`);
+            return Promise.resolve(songKey === "song:3");
+        },
+        scrollSongIntoView: (songKey) => {
+            calls.push(`scroll:${songKey}`);
+        }
+    });
+
+    const continued = await controller.continuePlayback("song:1");
+
+    assert.equal(continued, true);
+    assert.deepEqual(calls, ["play:song:2", "play:song:3", "scroll:song:3"]);
 });

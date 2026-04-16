@@ -19,11 +19,14 @@ export function getSequentialPlaybackCandidates(results, currentSongKey, shouldL
     }
     if (!shouldLoop) return candidates;
 
-    for (let index = 0; index <= currentIndex; index++) {
+    for (let index = 0; index < currentIndex; index++) {
         const songKey = results[index] && results[index].songKey;
         if (typeof songKey === "string" && songKey) {
             candidates.push(songKey);
         }
+    }
+    if (candidates.length === 0 && typeof currentSongKey === "string" && currentSongKey) {
+        candidates.push(currentSongKey);
     }
     return candidates;
 }

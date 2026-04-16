@@ -1,6 +1,15 @@
 import { afterLayoutSettled, findScrollableAncestor } from "./layout-anchor.mjs?v=11";
 
 /**
+ * 現在の実行環境で HTMLElement 判定が可能な場合だけ要素型チェックする。
+ * @param {*} value
+ * @returns {boolean}
+ */
+function isHtmlElement(value) {
+    return typeof HTMLElement === "function" && value instanceof HTMLElement;
+}
+
+/**
  * 結果リストを含むスクロール領域を先頭へ戻す。
  * @param {*} resultList
  */
@@ -22,7 +31,7 @@ export function scrollResultListToTop(resultList) {
  * @param {{ topOffset?: number, behavior?: "auto" | "smooth" } | undefined} options
  */
 export function scrollElementIntoView(element, options) {
-    if (!(element instanceof HTMLElement) || !element.isConnected) return;
+    if (!isHtmlElement(element) || !element.isConnected) return;
     const scrollContainer = findScrollableAncestor(element);
     if (!scrollContainer) return;
     const topOffset = Number.isFinite(options && options.topOffset) ? options.topOffset : 0;
