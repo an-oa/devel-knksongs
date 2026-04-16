@@ -466,6 +466,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
                 debugYoutube("attachPlayer failed to create player", {
                     playbackSessionId
                 });
+                settlePlaybackStartAttempt(playbackSessionId, true);
                 return null;
             }).finally(() => {
                 sharedPlayback.playerPromise = null;

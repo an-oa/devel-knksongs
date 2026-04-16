@@ -35,9 +35,13 @@ export function createPlaybackSessionController({ data, ui }) {
             }
         );
         for (const songKey of candidates) {
-            if (await Promise.resolve(playSongByKey(songKey))) {
+            const didStart = await Promise.resolve(playSongByKey(songKey));
+            if (didStart) {
                 scrollSongIntoView(songKey);
                 return true;
+            }
+            if (playbackUi.activeThumb) {
+                return false;
             }
         }
         return false;

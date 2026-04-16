@@ -12,7 +12,8 @@ function createPlaybackUi(options) {
     return {
         playback: {
             continuousPlayback: Boolean(settings.continuousPlayback),
-            loopPlayback: Boolean(settings.loopPlayback)
+            loopPlayback: Boolean(settings.loopPlayback),
+            activeThumb: settings.activeThumb ?? null
         }
     };
 }
@@ -122,4 +123,39 @@ test("playback session: awaits async playback failure before trying the next can
 
     assert.equal(continued, true);
     assert.deepEqual(calls, ["play:song:2", "play:song:3", "scroll:song:3"]);
+});
+
+test("playback session: stops trying later candidates after manual playback takes over", async () => {
+    const data = {
+        currentResults: [
+            { songKey: "song:1" },
+            { songKey: "song:2" },
+            { songKey: "song:3" }
+        ]
+    };
+    const ui = createPlaybackUi({ continuousPlayback: true });
+    const calls = [];
+    const controller = createPlaybackSessionController({ data, ui });
+    controller.setDependencies({
+        playSongByKey: async (songKey) => {
+            calls.push(`play:${songKey}`);
+            if (songKey === "song:2") {
+                ui.playback.activeThumb = {
+                    dataset: {
+                        songKey: "song:manual"
+                    }
+                };
+                return false;
+            }
+            return true;
+        },
+        scrollSongIntoView: (songKey) => {
+            calls.push(`scroll:${songKey}`);
+        }
+    });
+
+    const continued = await controller.continuePlayback("song:1");
+
+    assert.equal(continued, false);
+    assert.deepEqual(calls, ["play:song:2"]);
 });

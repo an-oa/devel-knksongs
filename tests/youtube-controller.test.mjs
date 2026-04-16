@@ -877,6 +877,67 @@ test("youtube: playback start timeout restores the thumbnail", async () => {
     }
 });
 
+test("youtube: iframe playback stays mounted when iframe api loading fails", async () => {
+    const cleanup = installFakeDom();
+    const previousSetTimeout = globalThis.setTimeout;
+    const previousClearTimeout = globalThis.clearTimeout;
+    let timeoutCallback = null;
+    setGlobalValue("setTimeout", (cb) => {
+        timeoutCallback = cb;
+        return {
+            unref() {}
+        };
+    });
+    setGlobalValue("clearTimeout", () => {});
+    try {
+        const ui = createYoutubeUiState({});
+        const youtube = {
+            apiPromise: null,
+            players: new WeakMap()
+        };
+        const controller = createYoutubeController({
+            ui,
+            youtube,
+            constants: {
+                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
+                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
+                YT_IFRAME_READY_POLL_MS: 50,
+                STOP_PLAYBACK_ON_SCROLL_OUT: false
+            }
+        });
+
+        const thumb = document.createElement("div");
+        document.body.appendChild(thumb);
+        const playbackPromise = controller.playThumbnail(thumb, {
+            videoId: "video-fallback",
+            startSeconds: 12
+        });
+        await Promise.resolve();
+
+        const apiScript = document.head.children[0];
+        assert.equal(apiScript.tagName, "SCRIPT");
+        assert.equal(typeof apiScript.onerror, "function");
+        apiScript.onerror();
+        await youtube.apiPromise.catch(() => {});
+        await Promise.resolve();
+
+        assert.ok(thumb.querySelector("iframe"));
+        assert.equal(typeof timeoutCallback, "function");
+
+        timeoutCallback();
+        await Promise.resolve();
+
+        assert.equal(await playbackPromise, true);
+        assert.ok(thumb.querySelector("iframe"));
+        assert.equal(thumb.querySelector("img"), null);
+        assert.equal(ui.playback.activeThumb, thumb);
+    } finally {
+        setGlobalValue("setTimeout", previousSetTimeout);
+        setGlobalValue("clearTimeout", previousClearTimeout);
+        cleanup();
+    }
+});
+
 test("youtube: embed url includes end time when stopAtEndTime is enabled", async () => {
     const cleanup = installFakeDom();
     try {
