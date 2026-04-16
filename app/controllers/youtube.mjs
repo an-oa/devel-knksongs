@@ -1,5 +1,4 @@
 import { createLayoutRefreshScheduler } from "../lib/layout-anchor.mjs?v=11";
-import { scheduleScrollElementIntoView } from "../lib/results-scroll.mjs?v=11";
 import { getPlaybackUiState } from "../lib/ui-slices.mjs?v=11";
 import {
     applyYoutubePlayerIframeAttributes,
@@ -7,6 +6,26 @@ import {
     createYoutubeIframeApiLoader,
     YT_EMBED_HOST
 } from "../lib/youtube-embed.mjs?v=11";
+import {
+    destroyYoutubeSharedPlayback,
+    ensureYoutubeSharedPlaybackElements,
+    ensureYoutubeSharedPlaybackParkingNode,
+    getYoutubeSharedPlaybackState,
+    getYoutubeSharedPlaybackThumb,
+    setPendingYoutubeSharedPlaybackAttach,
+    setYoutubeSharedPlaybackSessionId,
+    syncYoutubeSharedPlaybackIframe
+} from "../lib/youtube-shared-playback.mjs?v=11";
+import {
+    applyYoutubeThumbnailImage,
+    createYoutubeThumbnailImage,
+    getSongKeyFromYoutubeThumb,
+    revealYoutubePlaybackCardIfNeeded,
+    setYoutubeThumbnailExpandedCardState,
+    setYoutubeThumbnailOrientation,
+    setYoutubeThumbnailPlaybackState,
+    shouldLoadYoutubeThumbnailNow
+} from "../lib/youtube-thumbnail.mjs?v=11";
 
 export { extractYoutubeInfo } from "../lib/youtube-url.mjs?v=11";
 
@@ -57,20 +76,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
      * @returns {*}
      */
     function getSharedPlaybackState() {
-        if (!youtube.sharedPlayback) {
-            youtube.sharedPlayback = {
-                player: null,
-                playerPromise: null,
-                pendingAttach: null,
-                iframe: null,
-                closeButton: null,
-                parkingNode: null,
-                hostThumb: null,
-                sessionId: 0,
-                playbackStartAttempt: null
-            };
-        }
-        return youtube.sharedPlayback;
+        return getYoutubeSharedPlaybackState(youtube);
     }
 
     /**
@@ -78,15 +84,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
      * @returns {*}
      */
     function syncSharedPlaybackIframe() {
-        const sharedPlayback = getSharedPlaybackState();
-        const player = sharedPlayback.player;
-        if (player && typeof player.getIframe === "function") {
-            const iframe = player.getIframe();
-            if (isHtmlElement(iframe)) {
-                sharedPlayback.iframe = iframe;
-            }
-        }
-        return sharedPlayback.iframe;
+        return syncYoutubeSharedPlaybackIframe(youtube);
     }
 
     /**
@@ -94,8 +92,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
      * @param {number} sessionId
      */
     function setSharedPlaybackSessionId(sessionId) {
-        const sharedPlayback = getSharedPlaybackState();
-        sharedPlayback.sessionId = Number.isFinite(sessionId) && sessionId > 0 ? sessionId : 0;
+        setYoutubeSharedPlaybackSessionId(youtube, sessionId);
     }
 
     /**
@@ -104,11 +101,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
      * @param {number} playbackSessionId
      */
     function setPendingSharedPlaybackAttach(iframe, playbackSessionId) {
-        const sharedPlayback = getSharedPlaybackState();
-        sharedPlayback.pendingAttach = {
-            iframe,
-            playbackSessionId
-        };
+        setPendingYoutubeSharedPlaybackAttach(youtube, iframe, playbackSessionId);
     }
 
     /**
@@ -117,10 +110,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
      * @returns {*}
      */
     function getSharedPlaybackThumb(sessionId) {
-        const sharedPlayback = getSharedPlaybackState();
-        if (!(Number.isFinite(sessionId) && sessionId > 0)) return null;
-        if (sharedPlayback.sessionId !== sessionId) return null;
-        return isHtmlElement(sharedPlayback.hostThumb) ? sharedPlayback.hostThumb : null;
+        return getYoutubeSharedPlaybackThumb(youtube, sessionId);
     }
 
     /**
@@ -286,7 +276,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
                 playbackSessionId,
                 playerState: event && event.data,
                 hasThumb: isHtmlElement(thumbDiv),
-                activeSongKey: isHtmlElement(thumbDiv) ? getSongKeyFromThumb(thumbDiv) : ""
+                activeSongKey: isHtmlElement(thumbDiv) ? getSongKeyFromYoutubeThumb(thumbDiv) : ""
             });
             if (!isHtmlElement(thumbDiv)) return;
             if (!isCurrentPlaybackSession(thumbDiv, playbackSessionId)) return;
@@ -294,13 +284,13 @@ export function createYoutubeController({ ui, youtube, constants }) {
                 debugYoutube("ignored stale player state event", {
                     playbackSessionId,
                     playerState: event && event.data,
-                    activeSongKey: getSongKeyFromThumb(thumbDiv)
+                    activeSongKey: getSongKeyFromYoutubeThumb(thumbDiv)
                 });
                 return;
             }
             if (event.data === window.YT.PlayerState.ENDED) {
                 settlePlaybackStartAttempt(playbackSessionId, false);
-                const endedSongKey = getSongKeyFromThumb(thumbDiv);
+                const endedSongKey = getSongKeyFromYoutubeThumb(thumbDiv);
                 const endedGeneration = advancePlaybackTransitionGeneration();
                 Promise.resolve(restoreThumbnail(thumbDiv, thumbDiv.dataset.videoId || "", {
                     preserveTransitionGeneration: true
@@ -314,12 +304,12 @@ export function createYoutubeController({ ui, youtube, constants }) {
                 return;
             }
             if (event.data === window.YT.PlayerState.PAUSED) {
-                setPlaybackState(thumbDiv, "stopped");
+                setYoutubeThumbnailPlaybackState(thumbDiv, "stopped");
                 return;
             }
             if (event.data === window.YT.PlayerState.PLAYING) {
                 settlePlaybackStartAttempt(playbackSessionId, true);
-                setPlaybackState(thumbDiv, "playing");
+                setYoutubeThumbnailPlaybackState(thumbDiv, "playing");
             }
         },
         /**
@@ -459,15 +449,12 @@ export function createYoutubeController({ ui, youtube, constants }) {
      * @returns {*}
      */
     function ensureSharedPlaybackElements() {
-        const sharedPlayback = getSharedPlaybackState();
-        syncSharedPlaybackIframe();
-        if (!isHtmlElement(sharedPlayback.iframe)) {
-            sharedPlayback.iframe = createSharedPlaybackFrame();
-        }
-        if (!isHtmlElement(sharedPlayback.closeButton)) {
-            sharedPlayback.closeButton = createSharedPlaybackCloseButton();
-        }
-        return sharedPlayback;
+        return ensureYoutubeSharedPlaybackElements({
+            youtube,
+            syncIframe: () => syncSharedPlaybackIframe(),
+            createFrame: () => createSharedPlaybackFrame(),
+            createCloseButton: () => createSharedPlaybackCloseButton()
+        });
     }
 
     /**
@@ -475,51 +462,18 @@ export function createYoutubeController({ ui, youtube, constants }) {
      * @returns {*}
      */
     function ensureSharedPlaybackParkingNode() {
-        if (!canUseDom()) return null;
-        const sharedPlayback = getSharedPlaybackState();
-        if (isHtmlElement(sharedPlayback.parkingNode) && document.body.contains(sharedPlayback.parkingNode)) {
-            return sharedPlayback.parkingNode;
-        }
-        const parkingNode = document.createElement("div");
-        parkingNode.hidden = true;
-        parkingNode.setAttribute("aria-hidden", "true");
-        document.body.appendChild(parkingNode);
-        sharedPlayback.parkingNode = parkingNode;
-        return parkingNode;
+        return ensureYoutubeSharedPlaybackParkingNode(youtube);
     }
 
     /**
      * 共有プレーヤー実体を破棄し、再生成できる初期状態へ戻す。
      */
     function destroySharedPlayback() {
-        const sharedPlayback = getSharedPlaybackState();
-        const iframe = syncSharedPlaybackIframe() || sharedPlayback.iframe;
-        debugYoutube("destroySharedPlayback", {
-            hasPlayer: Boolean(sharedPlayback.player),
-            hasIframe: isHtmlElement(iframe)
+        destroyYoutubeSharedPlayback({
+            youtube,
+            syncIframe: () => syncSharedPlaybackIframe(),
+            debug: (message, details) => debugYoutube(message, details)
         });
-        if (sharedPlayback.player && typeof sharedPlayback.player.destroy === "function") {
-            try {
-                sharedPlayback.player.destroy();
-            } catch {
-                debugYoutube("destroySharedPlayback failed");
-            }
-        }
-        if (isHtmlElement(iframe) && iframe.parentNode) {
-            iframe.parentNode.removeChild(iframe);
-        }
-        if (isHtmlElement(sharedPlayback.closeButton) && sharedPlayback.closeButton.parentNode) {
-            sharedPlayback.closeButton.parentNode.removeChild(sharedPlayback.closeButton);
-        }
-        if (isHtmlElement(sharedPlayback.parkingNode)) {
-            sharedPlayback.parkingNode.replaceChildren();
-        }
-        sharedPlayback.player = null;
-        sharedPlayback.playerPromise = null;
-        sharedPlayback.pendingAttach = null;
-        sharedPlayback.iframe = null;
-        sharedPlayback.hostThumb = null;
-        setSharedPlaybackSessionId(0);
     }
 
     /**
@@ -549,21 +503,21 @@ export function createYoutubeController({ ui, youtube, constants }) {
                 setSharedPlaybackSessionId(0);
             }
             debugYoutube("detachSharedPlayback skipped because iframe is not mounted in thumb", {
-                songKey: getSongKeyFromThumb(thumbDiv)
+                songKey: getSongKeyFromYoutubeThumb(thumbDiv)
             });
             return false;
         }
         const iframe = syncSharedPlaybackIframe();
         const shouldStopPlayback = !(options && options.stopPlayback === false);
         debugYoutube("detachSharedPlayback", {
-            songKey: getSongKeyFromThumb(thumbDiv),
+            songKey: getSongKeyFromYoutubeThumb(thumbDiv),
             shouldStopPlayback
         });
         const stopped = shouldStopPlayback ? stopSharedPlaybackPlayer() : false;
         if (shouldStopPlayback && !stopped && isHtmlElement(iframe)) {
             iframe.src = "about:blank";
             debugYoutube("detachSharedPlayback fell back to about:blank", {
-                songKey: getSongKeyFromThumb(thumbDiv)
+                songKey: getSongKeyFromYoutubeThumb(thumbDiv)
             });
         }
         destroySharedPlayback();
@@ -582,8 +536,8 @@ export function createYoutubeController({ ui, youtube, constants }) {
         let sharedPlayback = getSharedPlaybackState();
         if (sharedPlayback.player || sharedPlayback.iframe || sharedPlayback.hostThumb) {
             debugYoutube("mountSharedPlayback recreating iframe-backed player", {
-                previousSongKey: getSongKeyFromThumb(sharedPlayback.hostThumb),
-                nextSongKey: getSongKeyFromThumb(thumbDiv),
+                previousSongKey: getSongKeyFromYoutubeThumb(sharedPlayback.hostThumb),
+                nextSongKey: getSongKeyFromYoutubeThumb(thumbDiv),
                 videoId: yt && yt.videoId,
                 playbackSessionId
             });
@@ -599,7 +553,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
         sharedPlayback.hostThumb = thumbDiv;
         setSharedPlaybackSessionId(playbackSessionId);
         debugYoutube("mountSharedPlayback using iframe src", {
-            songKey: getSongKeyFromThumb(thumbDiv),
+            songKey: getSongKeyFromYoutubeThumb(thumbDiv),
             videoId: yt && yt.videoId,
             playbackSessionId,
             iframeSrc: iframe.src
@@ -692,85 +646,9 @@ export function createYoutubeController({ ui, youtube, constants }) {
         thumbDiv.dataset.playbackKey = playbackKey;
         setPlaybackSessionId(thumbDiv, 0);
         thumbDiv.classList.remove("playing");
-        setExpandedCardState(thumbDiv, false);
+        setYoutubeThumbnailExpandedCardState(thumbDiv, false);
         thumbDiv.onclick = null;
         thumbDiv.replaceChildren();
-    }
-
-    /**
-     * 遅延読み込み用のサムネイル画像要素を生成する。
-     * @param {*} videoId
-     */
-    function createThumbnailImage(videoId) {
-        if (!canUseDom()) return null;
-        const img = document.createElement("img");
-        img.dataset.src = `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
-        return img;
-    }
-
-    /**
-     * サムネイル画像をコンテナへ適用する。
-     * @param {*} thumbDiv
-     * @param {*} videoId
-     * @param {*} options
-     */
-    function applyThumbnailImage(thumbDiv, videoId, options) {
-        const img = createThumbnailImage(videoId);
-        if (!isHtmlElement(img)) return;
-        if (options && options.eager) img.src = img.dataset.src;
-        thumbDiv.replaceChildren(img);
-    }
-
-    /**
-     * サムネイルを即時読み込みすべき可視領域内か判定する。
-     * @param {*} thumbDiv
-     */
-    function shouldLoadThumbnailNow(thumbDiv) {
-        const rect = thumbDiv.getBoundingClientRect();
-        const viewHeight = window.innerHeight || document.documentElement.clientHeight;
-        return rect.bottom > 0 && rect.top < viewHeight;
-    }
-
-    /**
-     * サムネイル要素の再生状態クラスを更新する。
-     * @param {*} thumbDiv
-     * @param {*} state
-     */
-    function setPlaybackState(thumbDiv, state) {
-        thumbDiv.classList.remove("playing");
-        if (state === "playing") {
-            thumbDiv.classList.add("playing");
-        }
-    }
-
-    /**
-     * サムネイル/プレイヤー枠の向きをデータ属性へ反映する。
-     * @param {*} thumbDiv
-     * @param {*} yt
-     */
-    function setThumbnailOrientation(thumbDiv, orientation) {
-        thumbDiv.dataset.videoOrientation = orientation === "vertical" ? "vertical" : "landscape";
-    }
-
-    /**
-     * 縦再生で前面表示が必要なカード状態を切り替える。
-     * @param {*} thumbDiv
-     * @param {*} isExpanded
-     */
-    function setExpandedCardState(thumbDiv, isExpanded) {
-        const card = isHtmlElement(thumbDiv) ? thumbDiv.closest(".song-card") : null;
-        if (!isHtmlElement(card)) return;
-        card.classList.toggle("song-card-expanded", Boolean(isExpanded));
-    }
-
-    /**
-     * サムネイルに対応する曲キーを返す。
-     * @param {*} thumbDiv
-     * @returns {string}
-     */
-    function getSongKeyFromThumb(thumbDiv) {
-        const card = isHtmlElement(thumbDiv) ? thumbDiv.closest(".song-card") : null;
-        return isHtmlElement(card) ? (card.dataset.songKey || "") : "";
     }
 
     /**
@@ -839,10 +717,10 @@ export function createYoutubeController({ ui, youtube, constants }) {
                 const videoId = thumb.dataset.videoId;
                 setPlaybackSessionId(thumb, 0);
                 thumb.classList.remove("playing");
-                setThumbnailOrientation(thumb, "landscape");
-                setExpandedCardState(thumb, false);
+                setYoutubeThumbnailOrientation(thumb, "landscape");
+                setYoutubeThumbnailExpandedCardState(thumb, false);
                 if (videoId) {
-                    applyThumbnailImage(thumb, videoId);
+                    applyYoutubeThumbnailImage(thumb, videoId);
                 } else {
                     thumb.replaceChildren();
                 }
@@ -883,11 +761,11 @@ export function createYoutubeController({ ui, youtube, constants }) {
         thumbDiv.dataset.videoId = videoId;
         thumbDiv.dataset.playbackKey = "";
         setPlaybackSessionId(thumbDiv, 0);
-        setThumbnailOrientation(thumbDiv, "landscape");
-        setPlaybackState(thumbDiv, "stopped");
-        setExpandedCardState(thumbDiv, false);
+        setYoutubeThumbnailOrientation(thumbDiv, "landscape");
+        setYoutubeThumbnailPlaybackState(thumbDiv, "stopped");
+        setYoutubeThumbnailExpandedCardState(thumbDiv, false);
         if (videoId) {
-            applyThumbnailImage(thumbDiv, videoId, { eager: true });
+            applyYoutubeThumbnailImage(thumbDiv, videoId, { eager: true });
         } else {
             thumbDiv.replaceChildren();
         }
@@ -908,21 +786,6 @@ export function createYoutubeController({ ui, youtube, constants }) {
     }
 
     /**
-     * 再生開始したカードが見切れている場合は見える位置まで寄せる。
-     * @param {*} thumbDiv
-     */
-    function revealPlaybackCardIfNeeded(thumbDiv) {
-        const card = isHtmlElement(thumbDiv) ? thumbDiv.closest(".song-card") : null;
-        if (!isHtmlElement(card)) return;
-        const header = document.querySelector(".header");
-        const headerHeight = header ? header.getBoundingClientRect().height : 0;
-        scheduleScrollElementIntoView(card, {
-            topOffset: headerHeight,
-            behavior: "smooth"
-        });
-    }
-
-    /**
      * サムネイルを埋め込みプレイヤーへ切り替えて再生開始する。
      * @param {*} thumbDiv
      * @param {*} yt
@@ -937,9 +800,9 @@ export function createYoutubeController({ ui, youtube, constants }) {
         thumbDiv.dataset.videoId = yt.videoId;
         thumbDiv.dataset.playbackKey = buildPlaybackKey(yt);
         setPlaybackSessionId(thumbDiv, playbackSessionId);
-        setThumbnailOrientation(thumbDiv, yt && yt.isVertical ? "vertical" : "landscape");
-        setPlaybackState(thumbDiv, "playing");
-        setExpandedCardState(thumbDiv, Boolean(yt && yt.isVertical));
+        setYoutubeThumbnailOrientation(thumbDiv, yt && yt.isVertical ? "vertical" : "landscape");
+        setYoutubeThumbnailPlaybackState(thumbDiv, "playing");
+        setYoutubeThumbnailExpandedCardState(thumbDiv, Boolean(yt && yt.isVertical));
         Promise.resolve(mountSharedPlayback(thumbDiv, yt, playbackSessionId)).then((didMount) => {
             if (didMount) return;
             settlePlaybackStartAttempt(playbackSessionId, false);
@@ -952,7 +815,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
             refreshCardLayoutSoon(thumbDiv);
         }
         if (options && options.revealCard) {
-            revealPlaybackCardIfNeeded(thumbDiv);
+            revealYoutubePlaybackCardIfNeeded(thumbDiv);
         }
         return playbackStartPromise;
     }
@@ -979,22 +842,22 @@ export function createYoutubeController({ ui, youtube, constants }) {
         const nextPlaybackKey = buildPlaybackKey(yt);
         if (isSamePlaybackTarget(thumbDiv, nextPlaybackKey)) {
             thumbDiv.dataset.videoId = yt.videoId;
-            setThumbnailOrientation(thumbDiv, yt && yt.isVertical ? "vertical" : "landscape");
+            setYoutubeThumbnailOrientation(thumbDiv, yt && yt.isVertical ? "vertical" : "landscape");
             return;
         }
         resetThumbnailContainer(thumbDiv, yt.videoId, nextPlaybackKey);
-        setThumbnailOrientation(thumbDiv, "landscape");
+        setYoutubeThumbnailOrientation(thumbDiv, "landscape");
 
         if (!playbackUi.showThumbnails) return;
         if (!yt.videoId) return;
 
-        const img = createThumbnailImage(yt.videoId);
+        const img = createYoutubeThumbnailImage(yt.videoId);
         thumbDiv.onclick = () => {
             if (thumbDiv.classList.contains("playing")) return;
             startEmbeddedPlayback(thumbDiv, yt, { revealCard: true });
         };
         thumbDiv.appendChild(img);
-        if (shouldLoadThumbnailNow(thumbDiv)) {
+        if (shouldLoadYoutubeThumbnailNow(thumbDiv)) {
             img.src = img.dataset.src;
         }
     }
