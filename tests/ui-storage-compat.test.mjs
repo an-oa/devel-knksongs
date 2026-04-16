@@ -50,6 +50,21 @@ function createPlaybackSettingsUiState(input) {
     };
 }
 
+/**
+ * 再生設定テスト用の依存関数を作る。
+ * @param {*} input
+ * @returns {*}
+ */
+function createPlaybackSettingsCallbacks(input) {
+    const callbacks = input || {};
+    return {
+        ensureThumbnailPlaybackReady: callbacks.ensureThumbnailPlaybackReady || (() => {}),
+        restoreActivePlayback: callbacks.restoreActivePlayback || (() => {}),
+        updateDisplay: callbacks.updateDisplay || (() => {}),
+        setupScrollObserver: callbacks.setupScrollObserver || (() => {})
+    };
+}
+
 test("applyThemeFromStorage: main branch theme key restores dark mode state", () => {
     const restoreDom = installFakeDom();
     const prevLocalStorage = globalThis.localStorage;
@@ -87,7 +102,10 @@ test("setupPlaybackSettings: stored playback settings are restored on boot", () 
             continuousPlaybackToggle: document.createElement("input"),
             loopPlaybackToggle: document.createElement("input")
         });
-        const controller = createPlaybackSettingsController({ ui });
+        const controller = createPlaybackSettingsController({
+            ui,
+            callbacks: createPlaybackSettingsCallbacks()
+        });
 
         controller.setupPlaybackSettings();
 
@@ -123,13 +141,15 @@ test("applyPlaybackSettingsFromStorage: ui sync reapplies stored playback settin
             showThumbnails: false,
             dataReady: true
         });
-        const controller = createPlaybackSettingsController({ ui });
-        let displayUpdateCount = 0;
-        controller.setDependencies({
-            updateDisplay: () => {
-                displayUpdateCount += 1;
-            }
+        const controller = createPlaybackSettingsController({
+            ui,
+            callbacks: createPlaybackSettingsCallbacks({
+                updateDisplay: () => {
+                    displayUpdateCount += 1;
+                }
+            })
         });
+        let displayUpdateCount = 0;
 
         controller.applyPlaybackSettingsFromStorage();
 
@@ -162,13 +182,15 @@ test("setupPlaybackSettings: end time toggle restores active playback before swi
             loopPlaybackToggle: document.createElement("input"),
             stopAtEndTime: true
         });
-        const controller = createPlaybackSettingsController({ ui });
-        let restoreCount = 0;
-        controller.setDependencies({
-            restoreActivePlayback: () => {
-                restoreCount += 1;
-            }
+        const controller = createPlaybackSettingsController({
+            ui,
+            callbacks: createPlaybackSettingsCallbacks({
+                restoreActivePlayback: () => {
+                    restoreCount += 1;
+                }
+            })
         });
+        let restoreCount = 0;
 
         controller.setupPlaybackSettings();
         ui.el.endTimeToggle.checked = false;
@@ -194,7 +216,10 @@ test("setupPlaybackSettings: continuous and loop toggles persist playback prefer
             continuousPlaybackToggle: document.createElement("input"),
             loopPlaybackToggle: document.createElement("input")
         });
-        const controller = createPlaybackSettingsController({ ui });
+        const controller = createPlaybackSettingsController({
+            ui,
+            callbacks: createPlaybackSettingsCallbacks()
+        });
 
         controller.setupPlaybackSettings();
         ui.el.continuousPlaybackToggle.checked = true;

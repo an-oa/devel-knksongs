@@ -7,44 +7,15 @@ const LOOP_PLAYBACK_STORAGE_KEY = "loopPlayback";
 
 /**
  * 再生設定の保存値反映とトグル配線を扱うコントローラーを作成する。
- * @param {{ ui: *, callbacks?: * }} input
+ * @param {{ ui: *, callbacks: * }} input
  */
 export function createPlaybackSettingsController({ ui, callbacks }) {
     const playbackUi = getPlaybackUiState(ui);
     const searchUi = getSearchUiState(ui);
-    const settingsCallbacks = callbacks || {};
-    let ensureThumbnailPlaybackReady = typeof settingsCallbacks.ensureThumbnailPlaybackReady === "function"
-        ? settingsCallbacks.ensureThumbnailPlaybackReady
-        : () => {};
-    let restoreActivePlayback = typeof settingsCallbacks.restoreActivePlayback === "function"
-        ? settingsCallbacks.restoreActivePlayback
-        : () => {};
-    let updateDisplay = typeof settingsCallbacks.updateDisplay === "function"
-        ? settingsCallbacks.updateDisplay
-        : () => {};
-    let setupScrollObserver = typeof settingsCallbacks.setupScrollObserver === "function"
-        ? settingsCallbacks.setupScrollObserver
-        : () => {};
-
-    /**
-     * 設定反映時に利用する依存関数を差し替える。
-     * @param {*} next
-     */
-    function setDependencies(next) {
-        if (!next) return;
-        if (typeof next.ensureThumbnailPlaybackReady === "function") {
-            ensureThumbnailPlaybackReady = next.ensureThumbnailPlaybackReady;
-        }
-        if (typeof next.restoreActivePlayback === "function") {
-            restoreActivePlayback = next.restoreActivePlayback;
-        }
-        if (typeof next.updateDisplay === "function") {
-            updateDisplay = next.updateDisplay;
-        }
-        if (typeof next.setupScrollObserver === "function") {
-            setupScrollObserver = next.setupScrollObserver;
-        }
-    }
+    const ensureThumbnailPlaybackReady = callbacks.ensureThumbnailPlaybackReady;
+    const restoreActivePlayback = callbacks.restoreActivePlayback;
+    const updateDisplay = callbacks.updateDisplay;
+    const setupScrollObserver = callbacks.setupScrollObserver;
 
     /**
      * 保存済み真偽値設定を返す。
@@ -137,7 +108,6 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
     }
 
     return {
-        setDependencies,
         setupPlaybackSettings,
         applyPlaybackSettingsFromStorage
     };

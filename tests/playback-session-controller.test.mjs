@@ -18,6 +18,18 @@ function createPlaybackUi(options) {
     };
 }
 
+/**
+ * 再生セッション用の依存関数を作る。
+ * @param {*} input
+ * @returns {*}
+ */
+function createPlaybackSessionCallbacks(input) {
+    return {
+        playSongByKey: input.playSongByKey,
+        scrollSongIntoView: input.scrollSongIntoView
+    };
+}
+
 test("playback session: advances to next song and scrolls it into view", async () => {
     const data = {
         currentResults: [
@@ -28,8 +40,10 @@ test("playback session: advances to next song and scrolls it into view", async (
     };
     const ui = createPlaybackUi({ continuousPlayback: true });
     const calls = [];
-    const controller = createPlaybackSessionController({ data, ui });
-    controller.setDependencies({
+    const controller = createPlaybackSessionController({
+        data,
+        ui,
+        callbacks: createPlaybackSessionCallbacks({
         playSongByKey: (songKey) => {
             calls.push(`play:${songKey}`);
             return true;
@@ -37,6 +51,7 @@ test("playback session: advances to next song and scrolls it into view", async (
         scrollSongIntoView: (songKey) => {
             calls.push(`scroll:${songKey}`);
         }
+        })
     });
 
     const continued = await controller.continuePlayback("song:1");
@@ -55,8 +70,10 @@ test("playback session: tries later candidates when the next song cannot start",
     };
     const ui = createPlaybackUi({ continuousPlayback: true });
     const calls = [];
-    const controller = createPlaybackSessionController({ data, ui });
-    controller.setDependencies({
+    const controller = createPlaybackSessionController({
+        data,
+        ui,
+        callbacks: createPlaybackSessionCallbacks({
         playSongByKey: (songKey) => {
             calls.push(`play:${songKey}`);
             return songKey === "song:3";
@@ -64,6 +81,7 @@ test("playback session: tries later candidates when the next song cannot start",
         scrollSongIntoView: (songKey) => {
             calls.push(`scroll:${songKey}`);
         }
+        })
     });
 
     const continued = await controller.continuePlayback("song:1");
@@ -81,8 +99,10 @@ test("playback session: repeats current song when loop-only mode is enabled", as
     };
     const ui = createPlaybackUi({ loopPlayback: true });
     const calls = [];
-    const controller = createPlaybackSessionController({ data, ui });
-    controller.setDependencies({
+    const controller = createPlaybackSessionController({
+        data,
+        ui,
+        callbacks: createPlaybackSessionCallbacks({
         playSongByKey: (songKey) => {
             calls.push(`play:${songKey}`);
             return true;
@@ -90,6 +110,7 @@ test("playback session: repeats current song when loop-only mode is enabled", as
         scrollSongIntoView: (songKey) => {
             calls.push(`scroll:${songKey}`);
         }
+        })
     });
 
     const continued = await controller.continuePlayback("song:2");
@@ -108,8 +129,10 @@ test("playback session: awaits async playback failure before trying the next can
     };
     const ui = createPlaybackUi({ continuousPlayback: true });
     const calls = [];
-    const controller = createPlaybackSessionController({ data, ui });
-    controller.setDependencies({
+    const controller = createPlaybackSessionController({
+        data,
+        ui,
+        callbacks: createPlaybackSessionCallbacks({
         playSongByKey: (songKey) => {
             calls.push(`play:${songKey}`);
             return Promise.resolve(songKey === "song:3");
@@ -117,6 +140,7 @@ test("playback session: awaits async playback failure before trying the next can
         scrollSongIntoView: (songKey) => {
             calls.push(`scroll:${songKey}`);
         }
+        })
     });
 
     const continued = await controller.continuePlayback("song:1");
@@ -135,8 +159,10 @@ test("playback session: stops trying later candidates after manual playback take
     };
     const ui = createPlaybackUi({ continuousPlayback: true });
     const calls = [];
-    const controller = createPlaybackSessionController({ data, ui });
-    controller.setDependencies({
+    const controller = createPlaybackSessionController({
+        data,
+        ui,
+        callbacks: createPlaybackSessionCallbacks({
         playSongByKey: async (songKey) => {
             calls.push(`play:${songKey}`);
             if (songKey === "song:2") {
@@ -152,6 +178,7 @@ test("playback session: stops trying later candidates after manual playback take
         scrollSongIntoView: (songKey) => {
             calls.push(`scroll:${songKey}`);
         }
+        })
     });
 
     const continued = await controller.continuePlayback("song:1");

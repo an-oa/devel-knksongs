@@ -3,22 +3,12 @@ import { getPlaybackUiState } from "../lib/ui-slices.mjs?v=11";
 
 /**
  * 再生終了後の継続再生と追従スクロールを制御する。
- * @param {{ data: *, ui: * }} input
+ * @param {{ data: *, ui: *, callbacks: { playSongByKey: Function, scrollSongIntoView: Function } }} input
  */
-export function createPlaybackSessionController({ data, ui }) {
+export function createPlaybackSessionController({ data, ui, callbacks }) {
     const playbackUi = getPlaybackUiState(ui);
-    let playSongByKey = () => false;
-    let scrollSongIntoView = () => {};
-
-    /**
-     * 再生制御に必要な依存関数を差し替える。
-     * @param {{ playSongByKey?: Function, scrollSongIntoView?: Function } | undefined} next
-     */
-    function setDependencies(next) {
-        if (!next) return;
-        if (typeof next.playSongByKey === "function") playSongByKey = next.playSongByKey;
-        if (typeof next.scrollSongIntoView === "function") scrollSongIntoView = next.scrollSongIntoView;
-    }
+    const playSongByKey = callbacks.playSongByKey;
+    const scrollSongIntoView = callbacks.scrollSongIntoView;
 
     /**
      * 現在の再生設定に従い、終了した曲の次候補を順に再生する。
@@ -48,7 +38,6 @@ export function createPlaybackSessionController({ data, ui }) {
     }
 
     return {
-        setDependencies,
         continuePlayback
     };
 }

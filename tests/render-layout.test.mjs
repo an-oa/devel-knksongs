@@ -49,6 +49,34 @@ function createRenderUiState(input) {
     };
 }
 
+/**
+ * render コントローラー用の依存関数を作る。
+ * @param {*} input
+ * @returns {*}
+ */
+function createRenderCallbacks(input) {
+    const callbacks = input || {};
+    return {
+        getSearchState: callbacks.getSearchState || (() => ({
+            queryRaw: "",
+            relayOnly: false,
+            harmonyOnly: false,
+            dateFromKey: null,
+            dateToKey: null,
+            hasDateFilter: false
+        })),
+        isRecommendedMode: callbacks.isRecommendedMode || (() => false),
+        updateThumbnail: callbacks.updateThumbnail || (() => {}),
+        extractYoutubeInfo: callbacks.extractYoutubeInfo || (() => ({ videoId: "", startSeconds: 0 })),
+        playThumbnail: callbacks.playThumbnail || (() => false),
+        restoreActivePlayback: callbacks.restoreActivePlayback || (() => {}),
+        openBookmarkModal: callbacks.openBookmarkModal || (() => {}),
+        setupScrollObserver: callbacks.setupScrollObserver || (() => {}),
+        removeSongFromActiveBookmark: callbacks.removeSongFromActiveBookmark || (() => {}),
+        saveBookmarks: callbacks.saveBookmarks || (() => {})
+    };
+}
+
 test("render: empty results stop active playback", () => {
     const cleanup = installFakeDom();
     try {
@@ -68,16 +96,13 @@ test("render: empty results stop active playback", () => {
         const controller = createRenderController({
             data,
             ui,
-            isAllFormatsSelected: () => true
-        });
-        controller.setDependencies({
-            getSearchState: () => ({ queryRaw: "" }),
-            isRecommendedMode: () => false,
-            updateThumbnail: () => {},
-            extractYoutubeInfo: () => ({ videoId: "video1", startSeconds: 0 }),
-            restoreActivePlayback: () => {
-                restoreCount += 1;
-            }
+            isAllFormatsSelected: () => true,
+            callbacks: createRenderCallbacks({
+                getSearchState: () => ({ queryRaw: "" }),
+                restoreActivePlayback: () => {
+                    restoreCount += 1;
+                }
+            })
         });
 
         controller.updateDisplay();
@@ -106,16 +131,13 @@ test("render: active card kept in next nodes does not stop playback", () => {
         const controller = createRenderController({
             data,
             ui,
-            isAllFormatsSelected: () => true
-        });
-        controller.setDependencies({
-            getSearchState: () => ({ queryRaw: "" }),
-            isRecommendedMode: () => false,
-            updateThumbnail: () => {},
-            extractYoutubeInfo: () => ({ videoId: "video1", startSeconds: 0 }),
-            restoreActivePlayback: () => {
-                restoreCount += 1;
-            }
+            isAllFormatsSelected: () => true,
+            callbacks: createRenderCallbacks({
+                getSearchState: () => ({ queryRaw: "" }),
+                restoreActivePlayback: () => {
+                    restoreCount += 1;
+                }
+            })
         });
 
         controller.updateDisplay();
@@ -152,16 +174,13 @@ test("render: active card hidden from next nodes stops playback", () => {
         const controller = createRenderController({
             data,
             ui,
-            isAllFormatsSelected: () => true
-        });
-        controller.setDependencies({
-            getSearchState: () => ({ queryRaw: "" }),
-            isRecommendedMode: () => false,
-            updateThumbnail: () => {},
-            extractYoutubeInfo: () => ({ videoId: "video1", startSeconds: 0 }),
-            restoreActivePlayback: () => {
-                restoreCount += 1;
-            }
+            isAllFormatsSelected: () => true,
+            callbacks: createRenderCallbacks({
+                getSearchState: () => ({ queryRaw: "" }),
+                restoreActivePlayback: () => {
+                    restoreCount += 1;
+                }
+            })
         });
 
         controller.updateDisplay();
@@ -198,17 +217,13 @@ test("render: cards keep fixed columns while preserving DOM order", () => {
         const controller = createRenderController({
             data,
             ui,
-            isAllFormatsSelected: () => true
+            isAllFormatsSelected: () => true,
+            callbacks: createRenderCallbacks({
+                getSearchState: () => ({ queryRaw: "" })
+            })
         });
         ui.el.resultList._clientWidth = 700;
         ui.el.resultList._rect = { top: 0, bottom: 200, left: 0, right: 700, width: 700, height: 200 };
-        controller.setDependencies({
-            getSearchState: () => ({ queryRaw: "" }),
-            isRecommendedMode: () => false,
-            updateThumbnail: () => {},
-            extractYoutubeInfo: () => ({ videoId: "video1", startSeconds: 0 }),
-            restoreActivePlayback: () => {}
-        });
 
         controller.updateDisplay();
         const entryA = ui.render.cardEntriesBySourceKey.get(`song:${rowA.songKey}`);
@@ -252,17 +267,13 @@ test("render: card height changes only shift cards in the same column", () => {
         const controller = createRenderController({
             data,
             ui,
-            isAllFormatsSelected: () => true
+            isAllFormatsSelected: () => true,
+            callbacks: createRenderCallbacks({
+                getSearchState: () => ({ queryRaw: "" })
+            })
         });
         ui.el.resultList._clientWidth = 700;
         ui.el.resultList._rect = { top: 0, bottom: 200, left: 0, right: 700, width: 700, height: 200 };
-        controller.setDependencies({
-            getSearchState: () => ({ queryRaw: "" }),
-            isRecommendedMode: () => false,
-            updateThumbnail: () => {},
-            extractYoutubeInfo: () => ({ videoId: "video1", startSeconds: 0 }),
-            restoreActivePlayback: () => {}
-        });
 
         controller.updateDisplay();
         const entryA = ui.render.cardEntriesBySourceKey.get("song:a::1");
@@ -317,14 +328,10 @@ test("render: refreshLayout shrinks container height after card height decreases
         const controller = createRenderController({
             data,
             ui,
-            isAllFormatsSelected: () => true
-        });
-        controller.setDependencies({
-            getSearchState: () => ({ queryRaw: "" }),
-            isRecommendedMode: () => false,
-            updateThumbnail: () => {},
-            extractYoutubeInfo: () => ({ videoId: "video1", startSeconds: 0 }),
-            restoreActivePlayback: () => {}
+            isAllFormatsSelected: () => true,
+            callbacks: createRenderCallbacks({
+                getSearchState: () => ({ queryRaw: "" })
+            })
         });
 
         controller.updateDisplay();
@@ -365,16 +372,14 @@ test("render: explicit video orientation overrides URL heuristic", () => {
         const controller = createRenderController({
             data,
             ui,
-            isAllFormatsSelected: () => true
-        });
-        controller.setDependencies({
-            getSearchState: () => ({ queryRaw: "" }),
-            isRecommendedMode: () => false,
-            updateThumbnail: (_, yt) => {
-                received = yt;
-            },
-            extractYoutubeInfo,
-            restoreActivePlayback: () => {}
+            isAllFormatsSelected: () => true,
+            callbacks: createRenderCallbacks({
+                getSearchState: () => ({ queryRaw: "" }),
+                updateThumbnail: (_, yt) => {
+                    received = yt;
+                },
+                extractYoutubeInfo
+            })
         });
 
         controller.updateDisplay();
@@ -409,18 +414,15 @@ test("render: playSongByKey expands display limit and starts playback for hidden
             data,
             ui,
             isAllFormatsSelected: () => true,
-            incrementCount: 2
-        });
-        controller.setDependencies({
-            getSearchState: () => ({ queryRaw: "" }),
-            isRecommendedMode: () => false,
-            updateThumbnail: () => {},
-            extractYoutubeInfo,
-            playThumbnail: (thumbDiv, yt) => {
-                playCalls.push({ thumbDiv, yt });
-                return true;
-            },
-            restoreActivePlayback: () => {}
+            incrementCount: 2,
+            callbacks: createRenderCallbacks({
+                getSearchState: () => ({ queryRaw: "" }),
+                extractYoutubeInfo,
+                playThumbnail: (thumbDiv, yt) => {
+                    playCalls.push({ thumbDiv, yt });
+                    return true;
+                }
+            })
         });
 
         controller.updateDisplay();
@@ -464,15 +466,12 @@ test("render: playSongByKey expands display limit in increment-sized chunks", as
             data,
             ui,
             isAllFormatsSelected: () => true,
-            incrementCount: 2
-        });
-        controller.setDependencies({
-            getSearchState: () => ({ queryRaw: "" }),
-            isRecommendedMode: () => false,
-            updateThumbnail: () => {},
-            extractYoutubeInfo,
-            playThumbnail: () => true,
-            restoreActivePlayback: () => {}
+            incrementCount: 2,
+            callbacks: createRenderCallbacks({
+                getSearchState: () => ({ queryRaw: "" }),
+                extractYoutubeInfo,
+                playThumbnail: () => true
+            })
         });
 
         controller.updateDisplay();
@@ -538,21 +537,18 @@ test("bookmark: shows load-more and increases by INCREMENT_COUNT (48)", () => {
         const renderController = createRenderController({
             data,
             ui,
-            isAllFormatsSelected: () => true
-        });
-        renderController.setDependencies({
-            getSearchState: () => ({
-                queryRaw: "",
-                relayOnly: false,
-                harmonyOnly: false,
-                dateFromKey: null,
-                dateToKey: null,
-                hasDateFilter: false
-            }),
-            isRecommendedMode: () => false,
-            updateThumbnail: () => {},
-            extractYoutubeInfo: (url) => ({ videoId: String(url || ""), startSeconds: 0 }),
-            restoreActivePlayback: () => {}
+            isAllFormatsSelected: () => true,
+            callbacks: createRenderCallbacks({
+                getSearchState: () => ({
+                    queryRaw: "",
+                    relayOnly: false,
+                    harmonyOnly: false,
+                    dateFromKey: null,
+                    dateToKey: null,
+                    hasDateFilter: false
+                }),
+                extractYoutubeInfo: (url) => ({ videoId: String(url || ""), startSeconds: 0 })
+            })
         });
 
         const searchController = createSearchController({
@@ -564,11 +560,11 @@ test("bookmark: shows load-more and increases by INCREMENT_COUNT (48)", () => {
                 INCREMENT_COUNT: 48,
                 SEARCH_DEBOUNCE_MS: 0,
                 DEFAULT_FORMATS: ["配信", "歌みた", "ショート", "切り抜き"]
+            },
+            callbacks: {
+                updateDisplay: () => renderController.updateDisplay(),
+                scrollResultsPaneToTop: () => {}
             }
-        });
-        searchController.setRenderHooks({
-            updateDisplay: () => renderController.updateDisplay(),
-            scrollResultsPaneToTop: () => {}
         });
 
         searchController.search();
@@ -619,17 +615,13 @@ test("render: drag handle is bookmark-only and reorder works in both directions 
         const controller = createRenderController({
             data,
             ui,
-            isAllFormatsSelected: () => true
-        });
-        controller.setDependencies({
-            getSearchState: () => ({ queryRaw: "" }),
-            isRecommendedMode: () => false,
-            updateThumbnail: () => {},
-            extractYoutubeInfo: () => ({ videoId: "video1", startSeconds: 0 }),
-            restoreActivePlayback: () => {},
-            saveBookmarks: () => {
-                saveCount += 1;
-            }
+            isAllFormatsSelected: () => true,
+            callbacks: createRenderCallbacks({
+                getSearchState: () => ({ queryRaw: "" }),
+                saveBookmarks: () => {
+                    saveCount += 1;
+                }
+            })
         });
 
         controller.updateDisplay();
@@ -712,15 +704,11 @@ test("render: active playback card can move back left without jumping to the end
         const controller = createRenderController({
             data,
             ui,
-            isAllFormatsSelected: () => true
-        });
-        controller.setDependencies({
-            getSearchState: () => ({ queryRaw: "" }),
-            isRecommendedMode: () => false,
-            updateThumbnail: () => {},
-            extractYoutubeInfo: () => ({ videoId: "video1", startSeconds: 0 }),
-            restoreActivePlayback: () => {},
-            saveBookmarks: () => {}
+            isAllFormatsSelected: () => true,
+            callbacks: createRenderCallbacks({
+                getSearchState: () => ({ queryRaw: "" }),
+                saveBookmarks: () => {}
+            })
         });
 
         controller.updateDisplay();

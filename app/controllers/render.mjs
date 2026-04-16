@@ -4,9 +4,9 @@ import { getPlaybackUiState, getRenderUiState, getSearchUiState } from "../lib/u
 
 /**
  * 検索結果カードの生成・差分反映・表示更新を担うレンダーコントローラーを作成する。
- * @param {*} ui
+ * @param {{ data: *, ui: *, isAllFormatsSelected: Function, incrementCount?: number, callbacks: * }} input
  */
-export function createRenderController({ data, ui, isAllFormatsSelected, incrementCount = 48 }) {
+export function createRenderController({ data, ui, isAllFormatsSelected, incrementCount = 48, callbacks }) {
     const searchUi = getSearchUiState(ui);
     const playbackUi = getPlaybackUiState(ui);
     const renderUi = getRenderUiState(ui);
@@ -16,41 +16,16 @@ export function createRenderController({ data, ui, isAllFormatsSelected, increme
         { minWidth: 1000, columns: 3 },
         { minWidth: 600, columns: 2 }
     ];
-    let getSearchState = () => ({
-        queryRaw: "",
-        relayOnly: false,
-        harmonyOnly: false,
-        dateFromKey: null,
-        dateToKey: null,
-        hasDateFilter: false
-    });
-    let isRecommendedMode = () => false;
-    let updateThumbnail = () => {};
-    let extractYoutubeInfo = () => ({ videoId: "", startSeconds: 0 });
-    let playThumbnail = () => false;
-    let restoreActivePlayback = () => {};
-    let openBookmarkModal = () => {};
-    let setupScrollObserver = () => {};
-    let removeSongFromActiveBookmark = () => {};
-    let saveBookmarks = () => {};
-
-    /**
-     * 描画時に利用する外部依存関数を差し替える。
-     * @param {*} next
-     */
-    function setDependencies(next) {
-        if (!next) return;
-        if (typeof next.getSearchState === "function") getSearchState = next.getSearchState;
-        if (typeof next.isRecommendedMode === "function") isRecommendedMode = next.isRecommendedMode;
-        if (typeof next.updateThumbnail === "function") updateThumbnail = next.updateThumbnail;
-        if (typeof next.extractYoutubeInfo === "function") extractYoutubeInfo = next.extractYoutubeInfo;
-        if (typeof next.playThumbnail === "function") playThumbnail = next.playThumbnail;
-        if (typeof next.restoreActivePlayback === "function") restoreActivePlayback = next.restoreActivePlayback;
-        if (typeof next.openBookmarkModal === "function") openBookmarkModal = next.openBookmarkModal;
-        if (typeof next.setupScrollObserver === "function") setupScrollObserver = next.setupScrollObserver;
-        if (typeof next.removeSongFromActiveBookmark === "function") removeSongFromActiveBookmark = next.removeSongFromActiveBookmark;
-        if (typeof next.saveBookmarks === "function") saveBookmarks = next.saveBookmarks;
-    }
+    const getSearchState = callbacks.getSearchState;
+    const isRecommendedMode = callbacks.isRecommendedMode;
+    const updateThumbnail = callbacks.updateThumbnail;
+    const extractYoutubeInfo = callbacks.extractYoutubeInfo;
+    const playThumbnail = callbacks.playThumbnail;
+    const restoreActivePlayback = callbacks.restoreActivePlayback;
+    const openBookmarkModal = callbacks.openBookmarkModal;
+    const setupScrollObserver = callbacks.setupScrollObserver;
+    const removeSongFromActiveBookmark = callbacks.removeSongFromActiveBookmark;
+    const saveBookmarks = callbacks.saveBookmarks;
 
     /**
      * 結果カードを構成するDOM要素一式を生成する。
@@ -681,7 +656,6 @@ export function createRenderController({ data, ui, isAllFormatsSelected, increme
     }
 
     return {
-        setDependencies,
         playSongByKey,
         scrollSongIntoView,
         updateDisplay,
