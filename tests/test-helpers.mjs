@@ -197,6 +197,16 @@ class FakeElement {
         return null;
     }
 
+    querySelectorAll(selector) {
+        const matcher = createMatcher(selector);
+        const matches = [];
+        for (const child of this.children) {
+            if (matcher(child)) matches.push(child);
+            matches.push(...child.querySelectorAll(selector));
+        }
+        return matches;
+    }
+
     setAttribute(name, value) {
         this.attributes.set(name, String(value));
     }
@@ -217,6 +227,18 @@ class FakeElement {
         this._events.set(type, listener);
     }
 
+    focus() {
+        if (globalThis.document) {
+            globalThis.document.activeElement = this;
+        }
+    }
+
+    blur() {
+        if (globalThis.document && globalThis.document.activeElement === this) {
+            globalThis.document.activeElement = null;
+        }
+    }
+
     getBoundingClientRect() {
         if (this._rect) return this._rect;
         return { top: 0, bottom: 100, left: 0, right: 100, width: 100, height: 100 };
@@ -227,6 +249,16 @@ class FakeDocumentFragment extends FakeElement {
     constructor() {
         super("#fragment");
     }
+}
+
+function findElementById(root, id) {
+    if (!root) return null;
+    if (root.getAttribute && root.getAttribute("id") === id) return root;
+    for (const child of root.children || []) {
+        const found = findElementById(child, id);
+        if (found) return found;
+    }
+    return null;
 }
 
 function createMatcher(selector) {
@@ -259,6 +291,8 @@ export function installFakeDom() {
         head,
         scrollingElement: body,
         documentElement,
+        activeElement: null,
+        _events: new Map(),
         createElement(tagName) {
             return new FakeElement(tagName);
         },
@@ -272,6 +306,12 @@ export function installFakeDom() {
             const fromHead = head.querySelector(selector);
             if (fromHead) return fromHead;
             return body.querySelector(selector);
+        },
+        getElementById(id) {
+            return findElementById(head, id) || findElementById(body, id);
+        },
+        addEventListener(type, listener) {
+            this._events.set(type, listener);
         }
     };
 
@@ -284,6 +324,10 @@ export function installFakeDom() {
         },
         getComputedStyle() {
             return { overflowY: "visible" };
+        },
+        _events: new Map(),
+        addEventListener(type, listener) {
+            this._events.set(type, listener);
         }
     });
     setGlobalValue("HTMLElement", FakeElement);
