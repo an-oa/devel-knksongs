@@ -4,7 +4,7 @@
 
 - 1行目は英語の件名で、`type: summary` 形式にする。
   - `type` には Conventional Commits の種別を使う。
-  - `type` は現状 `feat` `fix` `refactor` `docs` `chore` が使われている。
+  - `type` は現状 `feat` `fix` `refactor` `docs` `chore` `test` が使われている。
 - 2行目は空行にする。
 - 3行目以降は日本語の箇条書きにする。
 - 箇条書きは `- ` で始め、必要なら次行を2スペースでインデントして折り返す。
