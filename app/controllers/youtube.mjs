@@ -27,6 +27,11 @@ import {
     setYoutubeThumbnailPlaybackState,
     shouldLoadYoutubeThumbnailNow
 } from "../lib/youtube/thumbnail.mjs?v=11";
+import {
+    createYoutubePlaybackState,
+    isYoutubePlaybackSessionActive,
+    reduceYoutubePlaybackState
+} from "../lib/youtube/playback-state.mjs?v=11";
 
 export { extractYoutubeInfo } from "../lib/youtube-url.mjs?v=11";
 
@@ -44,8 +49,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
     const playbackUi = getPlaybackUiState(ui);
     let refreshLayout = () => {};
     let handlePlaybackEnded = () => {};
-    let playbackSessionSequence = 0;
-    let playbackTransitionGeneration = 0;
+    let playbackState = createYoutubePlaybackState();
     const refreshCardLayoutSoon = createLayoutRefreshScheduler(() => refreshLayout);
     const PLAYBACK_START_TIMEOUT_MS = 4000;
     const youtubeIframeApiLoader = createYoutubeIframeApiLoader({
@@ -122,6 +126,16 @@ export function createYoutubeController({ ui, youtube, constants }) {
             return;
         }
         console.debug("[youtube]", message, details);
+    }
+
+    /**
+     * 再生状態機械へイベントを適用し、最新 state を返す。
+     * @param {{ type: string, sessionId?: number, preserveTransitionGeneration?: boolean }} event
+     * @returns {*}
+     */
+    function applyPlaybackStateEvent(event) {
+        playbackState = reduceYoutubePlaybackState(playbackState, event);
+        return playbackState;
     }
 
     /**
@@ -275,12 +289,15 @@ export function createYoutubeController({ ui, youtube, constants }) {
             if (event.data === window.YT.PlayerState.ENDED) {
                 settlePlaybackStartAttempt(playbackSessionId, false);
                 const endedSongKey = getSongKeyFromYoutubeThumb(thumbDiv);
-                const endedGeneration = advancePlaybackTransitionGeneration();
+                const endedGeneration = applyPlaybackStateEvent({
+                    type: "PLAYBACK_ENDED",
+                    sessionId: playbackSessionId
+                }).transitionGeneration;
                 Promise.resolve(restoreThumbnail(thumbDiv, thumbDiv.dataset.videoId || "", {
                     preserveTransitionGeneration: true
                 })).then((restored) => {
                     if (!restored) return;
-                    if (endedGeneration !== playbackTransitionGeneration) return;
+                    if (endedGeneration !== playbackState.transitionGeneration) return;
                     if (endedSongKey) {
                         handlePlaybackEnded({ songKey: endedSongKey });
                     }
@@ -293,6 +310,10 @@ export function createYoutubeController({ ui, youtube, constants }) {
             }
             if (event.data === window.YT.PlayerState.PLAYING) {
                 settlePlaybackStartAttempt(playbackSessionId, true);
+                applyPlaybackStateEvent({
+                    type: "PLAYBACK_STARTED",
+                    sessionId: playbackSessionId
+                });
                 setYoutubeThumbnailPlaybackState(thumbDiv, "playing");
             }
         },
@@ -555,24 +576,6 @@ export function createYoutubeController({ ui, youtube, constants }) {
     }
 
     /**
-     * 新しい再生セッションIDを採番する。
-     * @returns {number}
-     */
-    function createPlaybackSessionId() {
-        playbackSessionSequence += 1;
-        return playbackSessionSequence;
-    }
-
-    /**
-     * 再生遷移の世代番号を進めて返す。
-     * @returns {number}
-     */
-    function advancePlaybackTransitionGeneration() {
-        playbackTransitionGeneration += 1;
-        return playbackTransitionGeneration;
-    }
-
-    /**
      * サムネイルに紐づく再生セッションIDを返す。
      * @param {*} thumbDiv
      * @returns {number}
@@ -604,7 +607,8 @@ export function createYoutubeController({ ui, youtube, constants }) {
      * @returns {boolean}
      */
     function isCurrentPlaybackSession(thumbDiv, sessionId) {
-        return Number.isFinite(sessionId) && sessionId > 0 && getPlaybackSessionId(thumbDiv) === sessionId;
+        return isYoutubePlaybackSessionActive(playbackState, sessionId) &&
+            getPlaybackSessionId(thumbDiv) === sessionId;
     }
 
     /**
@@ -623,7 +627,12 @@ export function createYoutubeController({ ui, youtube, constants }) {
      * @param {*} playbackKey
      */
     function resetThumbnailContainer(thumbDiv, videoId, playbackKey) {
+        const previousSessionId = getPlaybackSessionId(thumbDiv);
         cancelPlaybackStartAttemptForThumb(thumbDiv);
+        applyPlaybackStateEvent({
+            type: "CLEAR_PLAYBACK",
+            sessionId: previousSessionId
+        });
         clearActiveThumb(thumbDiv);
         detachSharedPlayback(thumbDiv);
         thumbDiv.dataset.videoId = videoId;
@@ -735,9 +744,11 @@ export function createYoutubeController({ ui, youtube, constants }) {
      * @param {*} videoId
      */
     function restoreThumbnail(thumbDiv, videoId, options) {
-        if (!(options && options.preserveTransitionGeneration)) {
-            advancePlaybackTransitionGeneration();
-        }
+        applyPlaybackStateEvent({
+            type: "RESTORE_PLAYBACK",
+            sessionId: getPlaybackSessionId(thumbDiv),
+            preserveTransitionGeneration: Boolean(options && options.preserveTransitionGeneration)
+        });
         cancelPlaybackStartAttemptForThumb(thumbDiv);
         clearActiveThumb(thumbDiv);
         detachSharedPlayback(thumbDiv);
@@ -763,6 +774,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
         if (!activeThumb) return;
         if (!activeThumb.isConnected) {
             playbackUi.activeThumb = null;
+            applyPlaybackStateEvent({ type: "CLEAR_PLAYBACK" });
             return;
         }
         restoreThumbnail(activeThumb, activeThumb.dataset.videoId || "");
@@ -776,9 +788,10 @@ export function createYoutubeController({ ui, youtube, constants }) {
      * @returns {Promise<boolean>}
      */
     function startEmbeddedPlayback(thumbDiv, yt, options) {
-        const playbackSessionId = createPlaybackSessionId();
+        const playbackSessionId = applyPlaybackStateEvent({
+            type: "REQUEST_PLAYBACK"
+        }).activeSessionId;
         const playbackStartPromise = createPlaybackStartAttempt(playbackSessionId);
-        advancePlaybackTransitionGeneration();
         setActiveThumb(thumbDiv, { preserveTransitionGeneration: true });
         thumbDiv.dataset.videoId = yt.videoId;
         thumbDiv.dataset.playbackKey = buildPlaybackKey(yt);
