@@ -571,6 +571,12 @@ export function createYoutubeController({ ui, youtube, constants }) {
             if (!restored) return;
             if (expectedGeneration !== playbackState.transitionGeneration) return;
             if (!shouldNotifyStartFailure) return;
+            debugYoutube("playback start failed hook", {
+                songKey: failedSongKey,
+                playbackMode,
+                reason: options && options.reason ? options.reason : "unknown",
+                errorCode: options && options.errorCode
+            });
             handlePlaybackStartFailed({
                 songKey: failedSongKey,
                 playbackMode
