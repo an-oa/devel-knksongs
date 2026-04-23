@@ -222,6 +222,10 @@ youtubeController.setLayoutHook(() => renderController.refreshLayout());
 youtubeController.setPlaybackEndedHook(({ songKey }) => {
     playbackSessionController.continuePlayback(songKey);
 });
+youtubeController.setPlaybackStartFailedHook(({ songKey, playbackMode }) => {
+    if (playbackMode !== "manual") return;
+    playbackSessionController.continuePlayback(songKey);
+});
 
 /**
  * DOM 参照の初期化と UI 各機能のセットアップを行う。

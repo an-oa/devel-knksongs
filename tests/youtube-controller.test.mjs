@@ -1335,9 +1335,13 @@ test("youtube: stale ended event from a closed player does not notify playback c
             }
         });
         const endedCalls = [];
+        const failedCalls = [];
         let stateChangeHandler = null;
         controller.setPlaybackEndedHook(({ songKey }) => {
             endedCalls.push(songKey);
+        });
+        controller.setPlaybackStartFailedHook((payload) => {
+            failedCalls.push(payload);
         });
         globalThis.window.YT = {
             PlayerState: {
@@ -1554,9 +1558,13 @@ test("youtube: ended before playback starts restores thumbnail without notifying
             }
         });
         const endedCalls = [];
+        const failedCalls = [];
         let stateChangeHandler = null;
         controller.setPlaybackEndedHook(({ songKey }) => {
             endedCalls.push(songKey);
+        });
+        controller.setPlaybackStartFailedHook((payload) => {
+            failedCalls.push(payload);
         });
         globalThis.window.YT = {
             PlayerState: {
@@ -1587,6 +1595,12 @@ test("youtube: ended before playback starts restores thumbnail without notifying
 
         assert.equal(await playbackPromise, false);
         assert.deepEqual(endedCalls, []);
+        assert.deepEqual(failedCalls, [
+            {
+                songKey: "song:instant-end",
+                playbackMode: "manual"
+            }
+        ]);
         assert.equal(ui.playback.activeThumb, null);
         assert.ok(thumb.querySelector("img"));
     } finally {
@@ -1664,6 +1678,10 @@ test("youtube: playThumbnail resolves false and restores the thumbnail after a p
                 STOP_PLAYBACK_ON_SCROLL_OUT: false
             }
         });
+        const failedCalls = [];
+        controller.setPlaybackStartFailedHook((payload) => {
+            failedCalls.push(payload);
+        });
         let errorHandler = null;
         globalThis.window.YT = {
             PlayerState: {
@@ -1687,8 +1705,12 @@ test("youtube: playThumbnail resolves false and restores the thumbnail after a p
             }
         };
 
+        const card = document.createElement("div");
+        card.className = "song-card";
+        card.dataset.songKey = "song:player-error";
+        document.body.appendChild(card);
         const thumb = document.createElement("div");
-        document.body.appendChild(thumb);
+        card.appendChild(thumb);
         thumb.dataset.videoId = "video-error";
         const playbackPromise = controller.playThumbnail(thumb, { videoId: "video-error", startSeconds: 0 });
         await Promise.resolve();
@@ -1698,6 +1720,12 @@ test("youtube: playThumbnail resolves false and restores the thumbnail after a p
         assert.equal(await playbackPromise, false);
         assert.ok(thumb.querySelector("img"));
         assert.equal(thumb.classList.contains("playing"), false);
+        assert.deepEqual(failedCalls, [
+            {
+                songKey: "song:player-error",
+                playbackMode: "manual"
+            }
+        ]);
     } finally {
         cleanup();
     }

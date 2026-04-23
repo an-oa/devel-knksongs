@@ -305,6 +305,26 @@ test("same thumbnail can be replayed after returning from the embedded player", 
     }).toBe(2);
 });
 
+test("manual playback failure advances to the next result when continuous playback is enabled", async ({ page }) => {
+    await enablePlaybackSettings(page, { continuousPlayback: true });
+    await setMockVideoBehavior(page, "reject-alpha", "auto-error");
+    await setMockVideoBehavior(page, "reject-beta", "auto-playing");
+    await filterBySongTitle(page, "Reject");
+
+    const firstCard = getSongCard(page, "Reject Alpha");
+    const secondCard = getSongCard(page, "Reject Beta");
+    await expect(firstCard).toBeVisible();
+    await expect(secondCard).toBeVisible();
+
+    await firstCard.locator(".thumb").click();
+
+    await expect(firstCard.locator("iframe")).toHaveCount(0);
+    await expect(secondCard.locator("iframe")).toBeVisible();
+    await expect.poll(async () => {
+        return page.evaluate(() => window.__knkMockYoutube.latestVideoId());
+    }).toBe("reject-beta");
+});
+
 test("continuous playback advances to the next result after the current song ends", async ({ page }) => {
     await enablePlaybackSettings(page, { continuousPlayback: true });
     await setMockVideoBehavior(page, "chain-beta", "auto-playing");

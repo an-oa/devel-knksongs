@@ -49,6 +49,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
     const playbackUi = getPlaybackUiState(ui);
     let refreshLayout = () => {};
     let handlePlaybackEnded = () => {};
+    let handlePlaybackStartFailed = () => {};
     let playbackState = createYoutubePlaybackState();
     const refreshCardLayoutSoon = createLayoutRefreshScheduler(() => refreshLayout);
     const PLAYBACK_START_TIMEOUT_MS = 4000;
@@ -261,6 +262,16 @@ export function createYoutubeController({ ui, youtube, constants }) {
     }
 
     /**
+     * 再生開始失敗時のフックを登録する。
+     * @param {*} fn
+     */
+    function setPlaybackStartFailedHook(fn) {
+        if (typeof fn === "function") {
+            handlePlaybackStartFailed = fn;
+        }
+    }
+
+    /**
      * 実行環境がiOS系WebKitかどうかを判定する。
      */
     function isIOSWebKit() {
@@ -319,6 +330,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
                 const shouldNotifyPlaybackEnded = playbackState.phase === "playing";
                 settlePlaybackStartAttempt(playbackSessionId, false);
                 const endedSongKey = getSongKeyFromYoutubeThumb(thumbDiv);
+                const endedPlaybackMode = getPlaybackMode(thumbDiv);
                 const endedGeneration = applyPlaybackStateEvent({
                     type: "PLAYBACK_ENDED",
                     sessionId: playbackSessionId
@@ -330,6 +342,13 @@ export function createYoutubeController({ ui, youtube, constants }) {
                     if (endedGeneration !== playbackState.transitionGeneration) return;
                     if (shouldNotifyPlaybackEnded && endedSongKey) {
                         handlePlaybackEnded({ songKey: endedSongKey });
+                        return;
+                    }
+                    if (endedSongKey) {
+                        handlePlaybackStartFailed({
+                            songKey: endedSongKey,
+                            playbackMode: endedPlaybackMode
+                        });
                     }
                 });
                 return;
@@ -358,6 +377,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
             if (!isCurrentPlaybackSession(thumbDiv, playbackSessionId)) return;
             settlePlaybackStartAttempt(playbackSessionId, false);
             handlePlaybackStartFailure(thumbDiv, {
+                sessionId: playbackSessionId,
                 playbackMode: getPlaybackMode(thumbDiv),
                 reason: "player-error",
                 errorCode: event && event.data
@@ -523,14 +543,28 @@ export function createYoutubeController({ ui, youtube, constants }) {
     /**
      * 再生開始失敗時の後始末を行い、通常サムネイル表示へ戻す。
      * @param {*} thumbDiv
-     * @param {{ playbackMode?: string, reason?: string, errorCode?: * } | undefined} options
+     * @param {{ playbackMode?: string, reason?: string, errorCode?: *, sessionId?: number } | undefined} options
      */
     function handlePlaybackStartFailure(thumbDiv, options) {
         const playbackMode = options && options.playbackMode ? options.playbackMode : getPlaybackMode(thumbDiv);
+        const failedSongKey = getSongKeyFromYoutubeThumb(thumbDiv);
+        const failedSessionId = Number.isFinite(options && options.sessionId) ? options.sessionId : 0;
+        const shouldNotifyStartFailure =
+            Boolean(failedSongKey) &&
+            (!failedSessionId || isCurrentPlaybackSession(thumbDiv, failedSessionId));
         if (playbackMode === "autoplay") {
             logAutoplayPlaybackFailure(thumbDiv, options);
         }
-        restoreThumbnail(thumbDiv, thumbDiv.dataset.videoId || "");
+        const expectedGeneration = playbackState.transitionGeneration + 1;
+        Promise.resolve(restoreThumbnail(thumbDiv, thumbDiv.dataset.videoId || "")).then((restored) => {
+            if (!restored) return;
+            if (expectedGeneration !== playbackState.transitionGeneration) return;
+            if (!shouldNotifyStartFailure) return;
+            handlePlaybackStartFailed({
+                songKey: failedSongKey,
+                playbackMode
+            });
+        });
     }
 
     /**
@@ -895,12 +929,14 @@ export function createYoutubeController({ ui, youtube, constants }) {
             if (didMount) return;
             settlePlaybackStartAttempt(playbackSessionId, false);
             handlePlaybackStartFailure(thumbDiv, {
+                sessionId: playbackSessionId,
                 playbackMode,
                 reason: "mount-failed"
             });
         }).catch((error) => {
             settlePlaybackStartAttempt(playbackSessionId, false);
             handlePlaybackStartFailure(thumbDiv, {
+                sessionId: playbackSessionId,
                 playbackMode,
                 reason: error && typeof error.code === "string"
                     ? error.code
@@ -964,6 +1000,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
     return {
         setLayoutHook,
         setPlaybackEndedHook,
+        setPlaybackStartFailedHook,
         isIOSWebKit,
         ensureThumbnailPlaybackReady: ensureYoutubeApiForThumbnails,
         setupScrollObserver,
