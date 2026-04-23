@@ -212,7 +212,6 @@ async function enablePlaybackSettings(page, options) {
     if (settings.continuousPlayback) {
         await ensureToggleEnabled(page, "#continuous-playback-toggle");
     }
-    await waitForMockYoutube(page);
     await page.locator("#close-settings-panel").click();
     await expect(page.locator("#searchBox")).toBeVisible();
 }
@@ -278,6 +277,7 @@ test("manual playback mounts an iframe from the thumbnail", async ({ page }) => 
     await expect(manualCard).toBeVisible();
 
     await manualCard.locator(".thumb").click();
+    await waitForMockYoutube(page);
 
     await expect(manualCard.locator("iframe")).toBeVisible();
     await expect(manualCard.locator(".thumb-close-btn")).toBeVisible();
@@ -291,6 +291,7 @@ test("same thumbnail can be replayed after returning from the embedded player", 
     await expect(replayCard).toBeVisible();
 
     await replayCard.locator(".thumb").click();
+    await waitForMockYoutube(page);
     await expect(replayCard.locator("iframe")).toBeVisible();
     await expect(page.locator(".thumb.playing")).toHaveCount(1);
 
