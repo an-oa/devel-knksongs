@@ -88,6 +88,10 @@ class FakeElement {
         return this.children[0] || null;
     }
 
+    get childElementCount() {
+        return this.children.length;
+    }
+
     get lastElementChild() {
         return this.children[this.children.length - 1] || null;
     }
@@ -239,6 +243,22 @@ class FakeElement {
 
     addEventListener(type, listener) {
         this._events.set(type, listener);
+    }
+
+    click() {
+        const event = {
+            target: this,
+            currentTarget: this,
+            preventDefault() {},
+            stopPropagation() {}
+        };
+        const listener = this._events.get("click");
+        if (typeof listener === "function") {
+            listener(event);
+        }
+        if (typeof this.onclick === "function") {
+            this.onclick(event);
+        }
     }
 
     focus() {

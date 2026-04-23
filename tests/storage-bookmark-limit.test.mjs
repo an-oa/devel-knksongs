@@ -88,6 +88,49 @@ test("loadBookmarks: main branch bookmarks payload is restored from bookmarksV1"
     }
 });
 
+test("loadBookmarks: invalid bookmark payload is sanitized and deduplicated", () => {
+    const restoreDom = installFakeDom();
+    const prevLocalStorage = globalThis.localStorage;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        const { controller, data, getRenderCount } = setupStorageController({
+            bookmarks: {},
+            maxBookmarkCount: 20,
+            maxSongsPerBookmark: 120
+        });
+        globalThis.localStorage.setItem("bookmarksTest", JSON.stringify({
+            version: 2,
+            bookmarks: {
+                keep: {
+                    name: "  Saved List  ",
+                    songs: ["song-1", "song-1", " ", 4, 4, null],
+                    createdAt: 1710000000000
+                },
+                emptyName: {
+                    name: "   ",
+                    songs: ["song-2"],
+                    createdAt: 1710000000001
+                },
+                invalid: null
+            }
+        }));
+
+        controller.loadBookmarks();
+
+        assert.deepEqual(data.bookmarks, {
+            keep: {
+                name: "Saved List",
+                songs: ["song-1", 4],
+                createdAt: 1710000000000
+            }
+        });
+        assert.equal(getRenderCount(), 1);
+    } finally {
+        globalThis.localStorage = prevLocalStorage;
+        restoreDom();
+    }
+});
+
 test("migrateLegacyBookmarkSongRefs: rewrites old songKey refs to bookmarkSongKey and saves versioned payload", () => {
     const restoreDom = installFakeDom();
     const prevLocalStorage = globalThis.localStorage;
@@ -334,6 +377,78 @@ test("restoreSearchState: main branch payload restores into sliced ui state", ()
         assert.equal(ui.search.hasRestoredSearchState, true);
         assert.equal(ui.date.pendingValues, null);
         assert.equal(applyPendingCallCount, 1);
+    } finally {
+        globalThis.localStorage = prevLocalStorage;
+        restoreDom();
+    }
+});
+
+test("restoreSearchState: invalid saved formats fall back to defaults and sync checkboxes", () => {
+    const restoreDom = installFakeDom();
+    const prevLocalStorage = globalThis.localStorage;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        const formatCheckboxes = [
+            { value: "配信", checked: false },
+            { value: "歌みた", checked: false }
+        ];
+        document.querySelectorAll = (selector) => {
+            assert.equal(selector, '#formatsList input[type="checkbox"]');
+            return formatCheckboxes;
+        };
+        const ui = {
+            el: {
+                searchBox: { value: "" },
+                relayOnly: { checked: false },
+                harmonyOnly: { checked: false }
+            },
+            search: {
+                selectedFormats: new Set(["旧値"]),
+                userTouchedQuery: false,
+                userTouchedFilters: false,
+                hasRestoredSearchState: false
+            },
+            date: {
+                bounds: null,
+                pendingValues: null
+            }
+        };
+        const controller = createStorageController({
+            data: {
+                allSongsRaw: [],
+                bookmarks: {},
+                activeBookmark: null
+            },
+            ui,
+            constants: {
+                DEFAULT_FORMATS: ["配信", "歌みた"],
+                SEARCH_STATE_KEY: "searchStateTest",
+                BOOKMARK_STORAGE_KEY: "bookmarksTest",
+                MAX_BOOKMARK_COUNT: 20,
+                MAX_SONGS_PER_BOOKMARK: 120
+            },
+            callbacks: {
+                getDateSelectValue: () => "",
+                applyPendingDateValues: () => {},
+                renderBookmarks: () => {},
+                scheduleSearch: () => {}
+            }
+        });
+        globalThis.localStorage.setItem("searchStateTest", JSON.stringify({
+            query: "",
+            relayOnly: false,
+            harmonyOnly: false,
+            dateFrom: "",
+            dateTo: "",
+            formats: ["存在しない形式"]
+        }));
+
+        controller.restoreSearchState();
+
+        assert.deepEqual(Array.from(ui.search.selectedFormats), ["配信", "歌みた"]);
+        assert.equal(formatCheckboxes[0].checked, true);
+        assert.equal(formatCheckboxes[1].checked, true);
+        assert.equal(ui.search.hasRestoredSearchState, true);
     } finally {
         globalThis.localStorage = prevLocalStorage;
         restoreDom();

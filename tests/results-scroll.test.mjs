@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { scrollResultListToTop } from "../app/lib/results-scroll.mjs";
+import { scheduleScrollElementIntoView, scrollResultListToTop } from "../app/lib/results-scroll.mjs";
 import { installFakeDom } from "./test-helpers.mjs";
 
 test("scroll: falls back to window scroll when result list has no scrollable ancestor", () => {
@@ -47,6 +47,54 @@ test("scroll: uses nearest scrollable ancestor when present", () => {
         assert.deepEqual(container.scrollToCalls, [{ top: 0, behavior: "auto" }]);
         assert.equal(windowScrollCalls, 0);
     } finally {
+        cleanup();
+    }
+});
+
+test("scroll: scheduleScrollElementIntoView waits for layout settling before scrolling", async () => {
+    const cleanup = installFakeDom();
+    const previousRequestAnimationFrame = globalThis.requestAnimationFrame;
+    const frameQueue = [];
+    globalThis.requestAnimationFrame = (callback) => {
+        frameQueue.push(callback);
+        return frameQueue.length;
+    };
+    try {
+        const container = document.createElement("div");
+        container._scrollHeight = 500;
+        container._clientHeight = 200;
+        container.scrollTop = 0;
+        container.scrollToCalls = [];
+        container.scrollTo = (options) => {
+            container.scrollToCalls.push(options);
+        };
+        container._rect = { top: 100, bottom: 300, left: 0, right: 200, width: 200, height: 200 };
+        const target = document.createElement("div");
+        target._rect = { top: 350, bottom: 450, left: 0, right: 200, width: 200, height: 100 };
+        document.body.appendChild(container);
+        container.appendChild(target);
+        window.getComputedStyle = (element) => ({
+            overflowY: element === container ? "auto" : "visible"
+        });
+
+        const pending = scheduleScrollElementIntoView(target, {
+            topOffset: 20,
+            behavior: "smooth"
+        });
+
+        assert.deepEqual(container.scrollToCalls, []);
+        assert.equal(frameQueue.length, 1);
+
+        frameQueue.shift()();
+        assert.deepEqual(container.scrollToCalls, []);
+        assert.equal(frameQueue.length, 1);
+
+        frameQueue.shift()();
+        await pending;
+
+        assert.deepEqual(container.scrollToCalls, [{ top: 230, behavior: "smooth" }]);
+    } finally {
+        globalThis.requestAnimationFrame = previousRequestAnimationFrame;
         cleanup();
     }
 });
