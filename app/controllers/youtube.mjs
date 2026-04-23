@@ -425,6 +425,12 @@ export function createYoutubeController({ ui, youtube, constants }) {
                 debugYoutube("attachPlayer failed to create player", {
                     playbackSessionId
                 });
+                const thumbDiv = getSharedPlaybackThumb(playbackSessionId);
+                if (getPlaybackMode(thumbDiv) === "autoplay") {
+                    const error = new Error("iframe api unavailable for autoplay");
+                    error.code = "iframe-api-load-failed";
+                    throw error;
+                }
                 settlePlaybackStartAttempt(playbackSessionId, true);
                 return null;
             }).finally(() => {
@@ -891,11 +897,13 @@ export function createYoutubeController({ ui, youtube, constants }) {
                 playbackMode,
                 reason: "mount-failed"
             });
-        }).catch(() => {
+        }).catch((error) => {
             settlePlaybackStartAttempt(playbackSessionId, false);
             handlePlaybackStartFailure(thumbDiv, {
                 playbackMode,
-                reason: "mount-error"
+                reason: error && typeof error.code === "string"
+                    ? error.code
+                    : "mount-error"
             });
         });
         if (yt && yt.isVertical) {
