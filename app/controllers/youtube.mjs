@@ -1,5 +1,6 @@
 import { createLayoutRefreshScheduler } from "../lib/layout-anchor.mjs?v=11";
 import { canUseDom, getHeaderHeight, isHtmlElement } from "../lib/dom-utils.mjs?v=11";
+import { debugPlayback, tracePlayback } from "../lib/playback-debug.mjs?v=11";
 import { getPlaybackUiState } from "../lib/ui-slices.mjs?v=11";
 import {
     applyYoutubePlayerIframeAttributes,
@@ -100,44 +101,6 @@ export function createYoutubeController({ ui, youtube, constants }) {
      */
     function getSharedPlaybackThumb(sessionId) {
         return getYoutubeSharedPlaybackThumb(youtube, sessionId);
-    }
-
-    /**
-     * YouTube 再利用デバッグログの有効状態を返す。
-     * @returns {boolean}
-     */
-    function isYoutubeDebugEnabled() {
-        try {
-            if (window.__KNK_DEBUG_YOUTUBE__ === true) return true;
-            return localStorage.getItem("debugYoutubePlayer") === "true";
-        } catch {
-            return false;
-        }
-    }
-
-    /**
-     * YouTube 再利用まわりのデバッグログを出力する。
-     * @param {string} message
-     * @param {*} details
-     */
-    function debugYoutube(message, details) {
-        if (!isYoutubeDebugEnabled()) return;
-        if (details === undefined) {
-            console.debug("[youtube]", message);
-            return;
-        }
-        console.debug("[youtube]", message, details);
-    }
-
-    /**
-     * YouTube デバッグログに呼び出し元 stack trace を追加する。
-     * @param {string} message
-     * @param {*} details
-     */
-    function traceYoutubeDebug(message, details) {
-        if (!isYoutubeDebugEnabled()) return;
-        debugYoutube(message, details);
-        console.trace("[youtube trace]", message);
     }
 
     /**
@@ -321,7 +284,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
          */
         handleStateChange(event, playbackSessionId) {
             const thumbDiv = getSharedPlaybackThumb(playbackSessionId);
-            debugYoutube("player state change", {
+            debugPlayback("youtube", "player state change", {
                 playbackSessionId,
                 playerState: event && event.data,
                 hasThumb: isHtmlElement(thumbDiv),
@@ -330,7 +293,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
             if (!isHtmlElement(thumbDiv)) return;
             if (!isCurrentPlaybackSession(thumbDiv, playbackSessionId)) return;
             if (event.data !== window.YT.PlayerState.PLAYING && isStalePlayerStateEvent(event)) {
-                debugYoutube("ignored stale player state event", {
+                debugPlayback("youtube", "ignored stale player state event", {
                     playbackSessionId,
                     playerState: event && event.data,
                     activeSongKey: getSongKeyFromYoutubeThumb(thumbDiv)
@@ -404,13 +367,13 @@ export function createYoutubeController({ ui, youtube, constants }) {
             setPendingSharedPlaybackAttach(iframe, playbackSessionId);
             if (sharedPlayback.playerPromise) {
                 setSharedPlaybackSessionId(playbackSessionId);
-                debugYoutube("attachPlayer waiting for existing playerPromise", {
+                debugPlayback("youtube", "attachPlayer waiting for existing playerPromise", {
                     playbackSessionId
                 });
                 return sharedPlayback.playerPromise;
             }
             setSharedPlaybackSessionId(playbackSessionId);
-            debugYoutube("attachPlayer creating player", {
+            debugPlayback("youtube", "attachPlayer creating player", {
                 playbackSessionId
             });
             sharedPlayback.playerPromise = this.ensureReady().then(() => {
@@ -448,13 +411,13 @@ export function createYoutubeController({ ui, youtube, constants }) {
                 });
                 this.applyPlayerIframeAttributes(nextIframe);
                 syncSharedPlaybackIframe();
-                debugYoutube("attachPlayer created player", {
+                debugPlayback("youtube", "attachPlayer created player", {
                     playbackSessionId: nextPlaybackSessionId
                 });
                 return latestSharedPlayback.player;
             }).catch(() => {
                 // API読み込み失敗時は埋め込みのみで継続する
-                debugYoutube("attachPlayer failed to create player", {
+                debugPlayback("youtube", "attachPlayer failed to create player", {
                     playbackSessionId
                 });
                 const thumbDiv = getSharedPlaybackThumb(playbackSessionId);
@@ -481,10 +444,10 @@ export function createYoutubeController({ ui, youtube, constants }) {
         if (!player || typeof player.stopVideo !== "function") return false;
         try {
             player.stopVideo();
-            debugYoutube("stopPlayer called");
+            debugPlayback("youtube", "stopPlayer called");
             return true;
         } catch {
-            debugYoutube("stopPlayer failed");
+            debugPlayback("youtube", "stopPlayer failed");
             return false;
         }
     }
@@ -544,8 +507,8 @@ export function createYoutubeController({ ui, youtube, constants }) {
      * @param {{ reason?: string, errorCode?: * } | undefined} options
      */
     function logAutoplayPlaybackFailure(thumbDiv, options) {
-        if (!isYoutubeDebugEnabled()) return;
-        debugYoutube(
+        debugPlayback(
+            "youtube",
             "autoplay playback start failed; skipping candidate",
             buildAutoplayFailureDebugDetails(thumbDiv, options)
         );
@@ -571,7 +534,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
             if (!restored) return;
             if (expectedGeneration !== playbackState.transitionGeneration) return;
             if (!shouldNotifyStartFailure) return;
-            debugYoutube("playback start failed hook", {
+            debugPlayback("youtube", "playback start failed hook", {
                 songKey: failedSongKey,
                 playbackMode,
                 reason: options && options.reason ? options.reason : "unknown",
@@ -612,7 +575,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
         destroyYoutubeSharedPlayback({
             youtube,
             syncIframe: () => syncSharedPlaybackIframe(),
-            debug: (message, details) => debugYoutube(message, details)
+                debug: (message, details) => debugPlayback("youtube", message, details)
         });
     }
 
@@ -642,21 +605,21 @@ export function createYoutubeController({ ui, youtube, constants }) {
                 sharedPlayback.hostThumb = null;
                 setSharedPlaybackSessionId(0);
             }
-            debugYoutube("detachSharedPlayback skipped because iframe is not mounted in thumb", {
+            debugPlayback("youtube", "detachSharedPlayback skipped because iframe is not mounted in thumb", {
                 songKey: getSongKeyFromYoutubeThumb(thumbDiv)
             });
             return false;
         }
         const iframe = syncSharedPlaybackIframe();
         const shouldStopPlayback = !(options && options.stopPlayback === false);
-        traceYoutubeDebug("detachSharedPlayback", {
+        tracePlayback("youtube", "detachSharedPlayback", {
             songKey: getSongKeyFromYoutubeThumb(thumbDiv),
             shouldStopPlayback
         });
         const stopped = shouldStopPlayback ? stopSharedPlaybackPlayer() : false;
         if (shouldStopPlayback && !stopped && isHtmlElement(iframe)) {
             iframe.src = "about:blank";
-            debugYoutube("detachSharedPlayback fell back to about:blank", {
+            debugPlayback("youtube", "detachSharedPlayback fell back to about:blank", {
                 songKey: getSongKeyFromYoutubeThumb(thumbDiv)
             });
         }
@@ -675,7 +638,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
     function mountSharedPlayback(thumbDiv, yt, playbackSessionId) {
         let sharedPlayback = getSharedPlaybackState();
         if (sharedPlayback.player || sharedPlayback.iframe || sharedPlayback.hostThumb) {
-            debugYoutube("mountSharedPlayback recreating iframe-backed player", {
+            debugPlayback("youtube", "mountSharedPlayback recreating iframe-backed player", {
                 previousSongKey: getSongKeyFromYoutubeThumb(sharedPlayback.hostThumb),
                 nextSongKey: getSongKeyFromYoutubeThumb(thumbDiv),
                 videoId: yt && yt.videoId,
@@ -692,7 +655,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
         thumbDiv.replaceChildren(iframe, sharedPlayback.closeButton);
         sharedPlayback.hostThumb = thumbDiv;
         setSharedPlaybackSessionId(playbackSessionId);
-        debugYoutube("mountSharedPlayback using iframe src", {
+        debugPlayback("youtube", "mountSharedPlayback using iframe src", {
             songKey: getSongKeyFromYoutubeThumb(thumbDiv),
             videoId: yt && yt.videoId,
             playbackSessionId,
@@ -880,7 +843,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
      * @param {*} videoId
      */
     function restoreThumbnail(thumbDiv, videoId, options) {
-        traceYoutubeDebug("restoreThumbnail", {
+        tracePlayback("youtube", "restoreThumbnail", {
             songKey: getSongKeyFromYoutubeThumb(thumbDiv),
             videoId,
             playbackMode: getPlaybackMode(thumbDiv),
@@ -920,7 +883,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
             applyPlaybackStateEvent({ type: "CLEAR_PLAYBACK" });
             return;
         }
-        traceYoutubeDebug("restoreActivePlayback", {
+        tracePlayback("youtube", "restoreActivePlayback", {
             songKey: getSongKeyFromYoutubeThumb(activeThumb),
             videoId: activeThumb.dataset.videoId || "",
             playbackMode: getPlaybackMode(activeThumb),

@@ -39,6 +39,7 @@ import { createUiSyncController } from "./ui/core/sync.mjs?v=11";
 import { createDataLoader } from "./ui/core/data.mjs?v=11";
 import { createSidebarController } from "./ui/sidebar/ui.mjs?v=11";
 import { getDateUiState, getSearchUiState } from "./lib/ui-slices.mjs?v=11";
+import { debugPlayback } from "./lib/playback-debug.mjs?v=11";
 
 /**
  * @typedef {Object} SongRow
@@ -66,33 +67,6 @@ import { getDateUiState, getSearchUiState } from "./lib/ui-slices.mjs?v=11";
  * @property {string} titleYomiNorm
  * @property {string} artistYomiNorm
  */
-
-/**
- * 再生系デバッグログの有効状態を返す。
- * @returns {boolean}
- */
-function isPlaybackDebugEnabled() {
-    try {
-        if (window.__KNK_DEBUG_YOUTUBE__ === true) return true;
-        return localStorage.getItem("debugYoutubePlayer") === "true";
-    } catch {
-        return false;
-    }
-}
-
-/**
- * 再生フロー橋渡し時のデバッグログを出力する。
- * @param {string} message
- * @param {*} details
- */
-function debugPlaybackBridge(message, details) {
-    if (!isPlaybackDebugEnabled()) return;
-    if (details === undefined) {
-        console.debug("[script]", message);
-        return;
-    }
-    console.debug("[script]", message, details);
-}
 
 const searchController = createSearchController({
     data,
@@ -247,18 +221,18 @@ const dataLoader = createDataLoader({
 
 youtubeController.setLayoutHook(() => renderController.refreshLayout());
 youtubeController.setPlaybackEndedHook(({ songKey }) => {
-    debugPlaybackBridge("continuePlayback requested from playback ended", {
+    debugPlayback("script", "continuePlayback requested from playback ended", {
         songKey
     });
     playbackSessionController.continuePlayback(songKey);
 });
 youtubeController.setPlaybackStartFailedHook(({ songKey, playbackMode }) => {
-    debugPlaybackBridge("playback start failed hook received", {
+    debugPlayback("script", "playback start failed hook received", {
         songKey,
         playbackMode
     });
     if (playbackMode !== "manual") return;
-    debugPlaybackBridge("continuePlayback requested from manual playback start failure", {
+    debugPlayback("script", "continuePlayback requested from manual playback start failure", {
         songKey
     });
     playbackSessionController.continuePlayback(songKey);
