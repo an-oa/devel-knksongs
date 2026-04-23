@@ -28,6 +28,34 @@ export function createRenderController({ data, ui, isAllFormatsSelected, increme
     const saveBookmarks = callbacks.saveBookmarks;
 
     /**
+     * 再生系デバッグログの有効状態を返す。
+     * @returns {boolean}
+     */
+    function isPlaybackDebugEnabled() {
+        try {
+            if (window.__KNK_DEBUG_YOUTUBE__ === true) return true;
+            return localStorage.getItem("debugYoutubePlayer") === "true";
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * 描画更新由来の再生停止診断ログを stack trace 付きで出す。
+     * @param {string} message
+     * @param {*} details
+     */
+    function traceRenderPlayback(message, details) {
+        if (!isPlaybackDebugEnabled()) return;
+        if (details === undefined) {
+            console.debug("[render]", message);
+        } else {
+            console.debug("[render]", message, details);
+        }
+        console.trace("[render trace]", message);
+    }
+
+    /**
      * 結果カードを構成するDOM要素一式を生成する。
      */
     function createCardElements() {
@@ -321,6 +349,12 @@ export function createRenderController({ data, ui, isAllFormatsSelected, increme
     function stopActivePlaybackIfHidden(activeState) {
         if (!activeState.activeThumb) return;
         if (activeState.isActiveCardInNextNodes) return;
+        traceRenderPlayback("stopActivePlaybackIfHidden", {
+            activeSongKey: activeState.activeCard instanceof HTMLElement
+                ? (activeState.activeCard.dataset.songKey || "")
+                : "",
+            hasEmbeddedPlayer: activeState.hasEmbeddedPlayer
+        });
         restoreActivePlayback();
     }
 
@@ -650,6 +684,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected, increme
      * 収集・描画・監視更新までの表示更新パイプラインを行う。
      */
     function updateDisplay() {
+        traceRenderPlayback("updateDisplay");
         const displayState = collectDisplayState();
         prepareDisplayObservation();
         const rendered = renderDisplayState(displayState);
