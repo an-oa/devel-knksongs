@@ -1,6 +1,7 @@
 import { getPlaybackUiState, getSearchUiState } from "../lib/ui-slices.mjs?v=11";
 
 const THUMBNAIL_STORAGE_KEY = "showThumbnails";
+const EXPERIMENTAL_PLAYBACK_SETTINGS_STORAGE_KEY = "showExperimentalPlaybackSettings";
 const STOP_AT_END_TIME_STORAGE_KEY = "stopAtEndTime";
 const CONTINUOUS_PLAYBACK_STORAGE_KEY = "continuousPlayback";
 const LOOP_PLAYBACK_STORAGE_KEY = "loopPlayback";
@@ -16,6 +17,17 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
     const restoreActivePlayback = callbacks.restoreActivePlayback;
     const updateDisplay = callbacks.updateDisplay;
     const setupScrollObserver = callbacks.setupScrollObserver;
+
+    /**
+     * 実験的な再生設定セクションの表示状態を切り替える。
+     * @param {boolean} value
+     */
+    function syncExperimentalPlaybackVisibility(value) {
+        const playbackSettingsGroup = ui.el.playbackSettingsGroup;
+        if (!playbackSettingsGroup) return;
+        playbackSettingsGroup.hidden = !value;
+        playbackSettingsGroup.setAttribute("aria-hidden", value ? "false" : "true");
+    }
 
     /**
      * 再生設定定義を返す。
@@ -40,6 +52,15 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
                 afterToggleChange() {
                     updateDisplay();
                     setupScrollObserver();
+                }
+            },
+            {
+                stateKey: "showExperimentalPlaybackSettings",
+                elementKey: "experimentalPlaybackToggle",
+                storageKey: EXPERIMENTAL_PLAYBACK_SETTINGS_STORAGE_KEY,
+                defaultValue: false,
+                syncValue(value) {
+                    syncExperimentalPlaybackVisibility(value);
                 }
             },
             {
