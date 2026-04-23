@@ -114,7 +114,12 @@ flowchart TD
 - 実行コマンド:
   - `node --test tests/*.mjs`
   - `npm run test:e2e`
+- Playwright のスモークテストを初回実行する前に、以下を準備してください。
+  - `npm install`
+  - `npx playwright install chromium`
+  - `python3` が PATH 上で利用できること
 - Playwright のスモークテストでは、静的サイトはローカル配信し、CSV と YouTube Iframe API は mock / fixture に差し替えて回帰確認します。
+- `npm run test:e2e` は Playwright 側で `python3 -m http.server 4173 --bind 127.0.0.1` を起動して静的サイトを配信します。
 - 現時点の Playwright 対象は Chromium です。iOS Safari は別途、実機または手動スモーク確認を想定します。
 
 ---
