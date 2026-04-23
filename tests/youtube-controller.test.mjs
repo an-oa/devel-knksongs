@@ -1304,6 +1304,7 @@ test("youtube: ended playback notifies song key for playback continuation", asyn
         thumb.onclick();
         await Promise.resolve();
 
+        stateChangeHandler({ data: globalThis.window.YT.PlayerState.PLAYING });
         stateChangeHandler({ data: globalThis.window.YT.PlayerState.ENDED });
         await Promise.resolve();
 
@@ -1435,6 +1436,7 @@ test("youtube: ended playback waits for layout refresh before notifying", async 
         controller.playThumbnail(thumb, { videoId: "video-wait", startSeconds: 0 });
         await Promise.resolve();
 
+        stateChangeHandler({ data: globalThis.window.YT.PlayerState.PLAYING });
         stateChangeHandler({ data: globalThis.window.YT.PlayerState.ENDED });
         assert.deepEqual(order, []);
 
@@ -1506,6 +1508,7 @@ test("youtube: ended playback does not continue after a newer playback starts", 
         controller.updateThumbnail(firstThumb, { videoId: "video-first", startSeconds: 0 });
         firstThumb.onclick();
         await Promise.resolve();
+        stateChangeHandlers[0]({ data: globalThis.window.YT.PlayerState.PLAYING });
 
         const secondCard = document.createElement("div");
         secondCard.className = "song-card";
@@ -1528,6 +1531,65 @@ test("youtube: ended playback does not continue after a newer playback starts", 
         assert.equal(ui.playback.activeThumb, secondThumb);
     } finally {
         setGlobalValue("requestAnimationFrame", previousRaf);
+        cleanup();
+    }
+});
+
+test("youtube: ended before playback starts restores thumbnail without notifying continuation", async () => {
+    const cleanup = installFakeDom();
+    try {
+        const ui = createYoutubeUiState({});
+        const youtube = {
+            apiPromise: null,
+            players: new WeakMap()
+        };
+        const controller = createYoutubeController({
+            ui,
+            youtube,
+            constants: {
+                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
+                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
+                YT_IFRAME_READY_POLL_MS: 50,
+                STOP_PLAYBACK_ON_SCROLL_OUT: false
+            }
+        });
+        const endedCalls = [];
+        let stateChangeHandler = null;
+        controller.setPlaybackEndedHook(({ songKey }) => {
+            endedCalls.push(songKey);
+        });
+        globalThis.window.YT = {
+            PlayerState: {
+                PAUSED: 2,
+                ENDED: 0,
+                PLAYING: 1
+            },
+            Player: class {
+                constructor(_, options) {
+                    stateChangeHandler = options.events.onStateChange;
+                }
+
+                destroy() {}
+            }
+        };
+
+        const card = document.createElement("div");
+        card.className = "song-card";
+        card.dataset.songKey = "song:instant-end";
+        document.body.appendChild(card);
+        const thumb = document.createElement("div");
+        card.appendChild(thumb);
+        const playbackPromise = controller.playThumbnail(thumb, { videoId: "video-instant-end", startSeconds: 0 });
+        await Promise.resolve();
+
+        stateChangeHandler({ data: globalThis.window.YT.PlayerState.ENDED });
+        await Promise.resolve();
+
+        assert.equal(await playbackPromise, false);
+        assert.deepEqual(endedCalls, []);
+        assert.equal(ui.playback.activeThumb, null);
+        assert.ok(thumb.querySelector("img"));
+    } finally {
         cleanup();
     }
 });

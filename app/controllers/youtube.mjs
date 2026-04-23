@@ -316,6 +316,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
                 return;
             }
             if (event.data === window.YT.PlayerState.ENDED) {
+                const shouldNotifyPlaybackEnded = playbackState.phase === "playing";
                 settlePlaybackStartAttempt(playbackSessionId, false);
                 const endedSongKey = getSongKeyFromYoutubeThumb(thumbDiv);
                 const endedGeneration = applyPlaybackStateEvent({
@@ -327,7 +328,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
                 })).then((restored) => {
                     if (!restored) return;
                     if (endedGeneration !== playbackState.transitionGeneration) return;
-                    if (endedSongKey) {
+                    if (shouldNotifyPlaybackEnded && endedSongKey) {
                         handlePlaybackEnded({ songKey: endedSongKey });
                     }
                 });
