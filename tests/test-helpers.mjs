@@ -52,7 +52,7 @@ class FakeElement {
         this.attributes = new Map();
         this.onclick = null;
         this.textContent = "";
-        this.innerHTML = "";
+        this._innerHTML = "";
         this.hidden = false;
         this.type = "";
         this._events = new Map();
@@ -68,6 +68,20 @@ class FakeElement {
             .split(/\s+/)
             .filter(Boolean)
             .forEach((token) => this.classList.add(token));
+    }
+
+    get innerHTML() {
+        return this._innerHTML;
+    }
+
+    set innerHTML(value) {
+        this._innerHTML = String(value || "");
+        this.children.forEach((child) => {
+            child.parentElement = null;
+        });
+        this.children = [];
+        this.textContent = "";
+        parseSimpleInnerHtml(this, this._innerHTML);
     }
 
     get firstChild() {
@@ -270,10 +284,54 @@ function createMatcher(selector) {
     return (el) => el.tagName === tag;
 }
 
+function parseSimpleInnerHtml(root, html) {
+    const source = String(html || "");
+    if (!source.trim()) return;
+    const tokenPattern = /<\/?([a-zA-Z0-9-]+)([^>]*)>|([^<]+)/g;
+    const stack = [root];
+    let match;
+
+    while ((match = tokenPattern.exec(source))) {
+        const [, tagName, attrs, text] = match;
+        const current = stack[stack.length - 1];
+        if (!current) break;
+
+        if (text) {
+            const decoded = text.replace(/&times;/g, "×");
+            if (decoded.trim()) {
+                current.textContent += decoded.trim();
+            }
+            continue;
+        }
+
+        if (match[0].startsWith("</")) {
+            if (stack.length > 1) stack.pop();
+            continue;
+        }
+
+        const element = new FakeElement(tagName);
+        const attrPattern = /([a-zA-Z0-9:-]+)="([^"]*)"/g;
+        let attrMatch;
+        while ((attrMatch = attrPattern.exec(attrs || ""))) {
+            const [, name, attrValue] = attrMatch;
+            if (name === "class") {
+                element.className = attrValue;
+            } else {
+                element.setAttribute(name, attrValue);
+            }
+        }
+        current.appendChild(element);
+        if (!match[0].endsWith("/>")) {
+            stack.push(element);
+        }
+    }
+}
+
 export function installFakeDom() {
     const previous = {
         document: globalThis.document,
         window: globalThis.window,
+        Element: globalThis.Element,
         HTMLElement: globalThis.HTMLElement,
         navigator: globalThis.navigator,
         location: globalThis.location,
@@ -330,6 +388,7 @@ export function installFakeDom() {
             this._events.set(type, listener);
         }
     });
+    setGlobalValue("Element", FakeElement);
     setGlobalValue("HTMLElement", FakeElement);
     setGlobalValue("navigator", { maxTouchPoints: 0 });
     setGlobalValue("location", { origin: "https://example.test" });
@@ -346,6 +405,7 @@ export function installFakeDom() {
     return () => {
         setGlobalValue("document", previous.document);
         setGlobalValue("window", previous.window);
+        setGlobalValue("Element", previous.Element);
         setGlobalValue("HTMLElement", previous.HTMLElement);
         setGlobalValue("navigator", previous.navigator);
         setGlobalValue("location", previous.location);
