@@ -55,6 +55,25 @@ function attachMockPlayerIframe(host, options) {
     return iframe;
 }
 
+/**
+ * localStorage の最小モックを作る。
+ * @returns {{ getItem: Function, setItem: Function, removeItem: Function }}
+ */
+function createFakeLocalStorage() {
+    const store = new Map();
+    return {
+        getItem(key) {
+            return store.has(key) ? store.get(key) : null;
+        },
+        setItem(key, value) {
+            store.set(String(key), String(value));
+        },
+        removeItem(key) {
+            store.delete(key);
+        }
+    };
+}
+
 test("youtube: disconnected active thumb is cleared without restore work", () => {
     const cleanup = installFakeDom();
     try {
@@ -877,6 +896,64 @@ test("youtube: playback start timeout restores the thumbnail", async () => {
     }
 });
 
+test("youtube: autoplay timeout restores the thumbnail and clears the active thumb", async () => {
+    const cleanup = installFakeDom();
+    const previousSetTimeout = globalThis.setTimeout;
+    const previousClearTimeout = globalThis.clearTimeout;
+    let timeoutCallback = null;
+    setGlobalValue("setTimeout", (cb) => {
+        timeoutCallback = cb;
+        return {
+            unref() {}
+        };
+    });
+    setGlobalValue("clearTimeout", () => {});
+    try {
+        const ui = createYoutubeUiState({});
+        const youtube = {
+            apiPromise: null,
+            players: new WeakMap()
+        };
+        const controller = createYoutubeController({
+            ui,
+            youtube,
+            constants: {
+                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
+                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
+                YT_IFRAME_READY_POLL_MS: 50,
+                STOP_PLAYBACK_ON_SCROLL_OUT: false
+            }
+        });
+
+        const card = document.createElement("div");
+        card.className = "song-card";
+        document.body.appendChild(card);
+        const thumb = document.createElement("div");
+        card.appendChild(thumb);
+        const playbackPromise = controller.playThumbnail(thumb, {
+            videoId: "video-auto-timeout",
+            startSeconds: 0
+        }, {
+            playbackMode: "autoplay"
+        });
+        await Promise.resolve();
+
+        assert.equal(typeof timeoutCallback, "function");
+
+        timeoutCallback();
+        await Promise.resolve();
+
+        assert.equal(await playbackPromise, false);
+        assert.ok(thumb.querySelector("img"));
+        assert.equal(thumb.querySelector("iframe"), null);
+        assert.equal(ui.playback.activeThumb, null);
+    } finally {
+        setGlobalValue("setTimeout", previousSetTimeout);
+        setGlobalValue("clearTimeout", previousClearTimeout);
+        cleanup();
+    }
+});
+
 test("youtube: iframe playback stays mounted when iframe api loading fails", async () => {
     const cleanup = installFakeDom();
     const previousSetTimeout = globalThis.setTimeout;
@@ -1501,6 +1578,91 @@ test("youtube: playThumbnail resolves false and restores the thumbnail after a p
         assert.ok(thumb.querySelector("img"));
         assert.equal(thumb.classList.contains("playing"), false);
     } finally {
+        cleanup();
+    }
+});
+
+test("youtube: autoplay timeout emits debug logs only when debug mode is enabled", async () => {
+    const cleanup = installFakeDom();
+    const previousSetTimeout = globalThis.setTimeout;
+    const previousClearTimeout = globalThis.clearTimeout;
+    const previousConsoleDebug = console.debug;
+    const previousLocalStorage = globalThis.localStorage;
+    let timeoutCallback = null;
+    const debugCalls = [];
+    setGlobalValue("setTimeout", (cb) => {
+        timeoutCallback = cb;
+        return {
+            unref() {}
+        };
+    });
+    setGlobalValue("clearTimeout", () => {});
+    setGlobalValue("localStorage", createFakeLocalStorage());
+    console.debug = (...args) => {
+        debugCalls.push(args);
+    };
+    try {
+        const ui = createYoutubeUiState({});
+        const youtube = {
+            apiPromise: null,
+            players: new WeakMap()
+        };
+        const controller = createYoutubeController({
+            ui,
+            youtube,
+            constants: {
+                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
+                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
+                YT_IFRAME_READY_POLL_MS: 50,
+                STOP_PLAYBACK_ON_SCROLL_OUT: false
+            }
+        });
+
+        const thumb = document.createElement("div");
+        document.body.appendChild(thumb);
+        const playbackPromise = controller.playThumbnail(thumb, {
+            videoId: "video-autoplay-debug",
+            startSeconds: 30
+        }, {
+            playbackMode: "autoplay"
+        });
+        await Promise.resolve();
+
+        timeoutCallback();
+        await Promise.resolve();
+        assert.equal(await playbackPromise, false);
+        assert.deepEqual(debugCalls, []);
+
+        globalThis.localStorage.setItem("debugYoutubePlayer", "true");
+
+        const secondPlaybackPromise = controller.playThumbnail(thumb, {
+            videoId: "video-autoplay-debug-2",
+            startSeconds: 45
+        }, {
+            playbackMode: "autoplay"
+        });
+        await Promise.resolve();
+
+        timeoutCallback();
+        await Promise.resolve();
+        assert.equal(await secondPlaybackPromise, false);
+        assert.equal(
+            debugCalls.some((args) => JSON.stringify(args) === JSON.stringify([
+                "[youtube]",
+                "autoplay playback start failed; skipping candidate",
+                {
+                    songKey: "",
+                    videoId: "video-autoplay-debug-2",
+                    reason: "start-timeout"
+                }
+            ])),
+            true
+        );
+    } finally {
+        console.debug = previousConsoleDebug;
+        setGlobalValue("localStorage", previousLocalStorage);
+        setGlobalValue("setTimeout", previousSetTimeout);
+        setGlobalValue("clearTimeout", previousClearTimeout);
         cleanup();
     }
 });

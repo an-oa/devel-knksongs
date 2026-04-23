@@ -266,7 +266,9 @@ export function createRenderController({ data, ui, isAllFormatsSelected, increme
             entry = getCardEntryBySongKey(songKey);
         }
         if (!entry) return Promise.resolve(false);
-        return Promise.resolve(playThumbnail(entry.thumbDiv, buildYoutubeTarget(data.currentResults[index])))
+        return Promise.resolve(playThumbnail(entry.thumbDiv, buildYoutubeTarget(data.currentResults[index]), {
+            playbackMode: "autoplay"
+        }))
             .then((didStart) => Boolean(didStart));
     }
 
