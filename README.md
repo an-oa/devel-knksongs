@@ -95,6 +95,7 @@ flowchart TD
 - 配布物はHTML/CSS/JavaScriptのみで、npm等の同梱依存はありません。
 - サムネイル表示/埋め込み再生まわりでは YouTube Iframe API を動的に利用します。
 - 開発時テストは Node.js 標準の `node:test` を利用します。
+- ブラウザ回帰確認として Playwright による Chromium スモークテストを追加できます。
 
 ## テスト(開発者向け)
 
@@ -105,12 +106,16 @@ flowchart TD
   - 再生終了後の継続再生フロー制御のテスト (`tests/playback-session-controller.test.mjs`)
   - 描画/レイアウトまわりの回帰テスト（ブックマーク時のドラッグ並び替え・順序保存を含む） (`tests/render-layout.test.mjs`)
   - YouTubeサムネイル/埋め込み再生まわりのテスト (`tests/youtube-controller.test.mjs`)
+  - Chromium 上での YouTube 再生スモークテスト (`tests/e2e/youtube-smoke.spec.mjs`)
   - レイアウト補正待機のテスト (`tests/layout-anchor.test.mjs`)
   - 結果一覧スクロール制御のテスト (`tests/results-scroll.test.mjs`)
   - CSVパースのテスト (`tests/csv-parser.test.mjs`)
   - ストレージ(ブックマーク上限/リネーム)の単体テスト (`tests/storage-bookmark-limit.test.mjs`)
 - 実行コマンド:
   - `node --test tests/*.mjs`
+  - `npm run test:e2e`
+- Playwright のスモークテストでは、静的サイトはローカル配信し、CSV と YouTube Iframe API は mock / fixture に差し替えて回帰確認します。
+- 現時点の Playwright 対象は Chromium です。iOS Safari は別途、実機または手動スモーク確認を想定します。
 
 ---
 
