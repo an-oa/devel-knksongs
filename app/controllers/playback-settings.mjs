@@ -19,7 +19,7 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
     const setupScrollObserver = callbacks.setupScrollObserver;
 
     /**
-     * 実験的な再生設定セクションの表示状態を切り替える。
+     * 実験的なセクションの表示状態を切り替える。
      * @param {boolean} value
      */
     function syncExperimentalPlaybackVisibility(value) {
