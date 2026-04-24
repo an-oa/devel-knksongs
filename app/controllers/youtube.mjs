@@ -1,12 +1,12 @@
-import { createLayoutRefreshScheduler } from "../lib/layout-anchor.mjs?v=11";
-import { canUseDom, getHeaderHeight, isHtmlElement } from "../lib/dom-utils.mjs?v=11";
-import { debugPlayback, tracePlayback } from "../lib/playback-debug.mjs?v=11";
-import { getPlaybackUiState } from "../lib/ui-slices.mjs?v=11";
+import { createLayoutRefreshScheduler } from "../lib/layout-anchor.mjs?v=12";
+import { canUseDom, getHeaderHeight, isHtmlElement } from "../lib/dom-utils.mjs?v=12";
+import { debugPlayback, tracePlayback } from "../lib/playback-debug.mjs?v=12";
+import { getPlaybackUiState } from "../lib/ui-slices.mjs?v=12";
 import {
     applyYoutubePlayerIframeAttributes,
     buildYoutubeEmbedUrl,
     createYoutubeIframeApiLoader
-} from "../lib/youtube/embed.mjs?v=11";
+} from "../lib/youtube/embed.mjs?v=12";
 import {
     destroyYoutubeSharedPlayback,
     ensureYoutubeSharedPlaybackElements,
@@ -16,7 +16,7 @@ import {
     setPendingYoutubeSharedPlaybackAttach,
     setYoutubeSharedPlaybackSessionId,
     syncYoutubeSharedPlaybackIframe
-} from "../lib/youtube/shared-playback.mjs?v=11";
+} from "../lib/youtube/shared-playback.mjs?v=12";
 import {
     applyYoutubeThumbnailImage,
     createYoutubeThumbnailImage,
@@ -26,20 +26,20 @@ import {
     setYoutubeThumbnailOrientation,
     setYoutubeThumbnailPlaybackState,
     shouldLoadYoutubeThumbnailNow
-} from "../lib/youtube/thumbnail.mjs?v=11";
+} from "../lib/youtube/thumbnail.mjs?v=12";
 import {
     createYoutubePlaybackState,
     isYoutubePlaybackSessionActive,
     reduceYoutubePlaybackState
-} from "../lib/youtube/playback-state.mjs?v=11";
+} from "../lib/youtube/playback-state.mjs?v=12";
 import {
     createYoutubePlaybackStartAttemptManager
-} from "../lib/youtube/playback-start-attempt.mjs?v=11";
+} from "../lib/youtube/playback-start-attempt.mjs?v=12";
 import {
     createYoutubePlayerAdapter
-} from "../lib/youtube/player-adapter.mjs?v=11";
+} from "../lib/youtube/player-adapter.mjs?v=12";
 
-export { extractYoutubeInfo } from "../lib/youtube-url.mjs?v=11";
+export { extractYoutubeInfo } from "../lib/youtube-url.mjs?v=12";
 
 /**
  * サムネイル表示と埋め込み再生の制御を行うコントローラーを作成する。

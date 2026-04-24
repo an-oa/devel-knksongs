@@ -1,5 +1,5 @@
-import { isHtmlElement } from "../dom-utils.mjs?v=11";
-import { YT_EMBED_HOST } from "./embed.mjs?v=11";
+import { isHtmlElement } from "../dom-utils.mjs?v=12";
+import { YT_EMBED_HOST } from "./embed.mjs?v=12";
 
 /**
  * 共有 iframe に YouTube Iframe API の Player を紐付ける adapter を作成する。

@@ -1,9 +1,9 @@
-import { getDateUiState, getSearchUiState } from "../lib/ui-slices.mjs?v=11";
+import { getDateUiState, getSearchUiState } from "../lib/ui-slices.mjs?v=12";
 import {
     buildStoredBookmarksPayload,
     migrateLegacyBookmarkSongRefsToCurrent,
     parseStoredBookmarksPayload
-} from "../lib/storage/bookmark-schema.mjs?v=11";
+} from "../lib/storage/bookmark-schema.mjs?v=12";
 
 /**
  * ブックマークと検索状態の保存・復元を扱うストレージコントローラーを作成する。

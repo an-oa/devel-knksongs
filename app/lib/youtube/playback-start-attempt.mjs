@@ -1,4 +1,4 @@
-import { isHtmlElement } from "../dom-utils.mjs?v=11";
+import { isHtmlElement } from "../dom-utils.mjs?v=12";
 
 export const DEFAULT_PLAYBACK_START_TIMEOUT_MS = 4000;
 

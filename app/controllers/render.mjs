@@ -1,9 +1,9 @@
-import { getHeaderHeight } from "../lib/dom-utils.mjs?v=11";
-import { tracePlayback } from "../lib/playback-debug.mjs?v=11";
-import { scheduleScrollElementIntoView } from "../lib/results-scroll.mjs?v=11";
-import { createBookmarkDragReorderController } from "../lib/render/drag-reorder.mjs?v=11";
-import { applyMasonryLayout } from "../lib/render/masonry-layout.mjs?v=11";
-import { getPlaybackUiState, getRenderUiState, getSearchUiState } from "../lib/ui-slices.mjs?v=11";
+import { getHeaderHeight } from "../lib/dom-utils.mjs?v=12";
+import { tracePlayback } from "../lib/playback-debug.mjs?v=12";
+import { scheduleScrollElementIntoView } from "../lib/results-scroll.mjs?v=12";
+import { createBookmarkDragReorderController } from "../lib/render/drag-reorder.mjs?v=12";
+import { applyMasonryLayout } from "../lib/render/masonry-layout.mjs?v=12";
+import { getPlaybackUiState, getRenderUiState, getSearchUiState } from "../lib/ui-slices.mjs?v=12";
 
 /**
  * 検索結果カードの生成・差分反映・表示更新を担うレンダーコントローラーを作成する。

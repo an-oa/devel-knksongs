@@ -1,4 +1,4 @@
-import { getSearchUiState } from "../../lib/ui-slices.mjs?v=11";
+import { getSearchUiState } from "../../lib/ui-slices.mjs?v=12";
 
 /**
  * 初期化時に利用する DOM 要素参照をまとめて取得する。

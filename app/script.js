@@ -19,27 +19,27 @@ import {
     data,
     ui,
     youtube
-} from "./state.mjs?v=11";
-import { createSearchController } from "./controllers/search.mjs?v=11";
-import { createRenderController } from "./controllers/render.mjs?v=11";
-import { createPlaybackSessionController } from "./controllers/playback-session.mjs?v=11";
-import { createPlaybackSettingsController } from "./controllers/playback-settings.mjs?v=11";
-import { createYoutubeController, extractYoutubeInfo } from "./controllers/youtube.mjs?v=11";
-import { createStorageController } from "./controllers/storage.mjs?v=11";
-import { createBookmarkUiController } from "./ui/bookmark/ui.mjs?v=11";
-import { scrollResultListToTop } from "./lib/results-scroll.mjs?v=11";
-import { getFormatFilterLabel } from "./lib/format-filter.mjs?v=11";
+} from "./state.mjs?v=12";
+import { createSearchController } from "./controllers/search.mjs?v=12";
+import { createRenderController } from "./controllers/render.mjs?v=12";
+import { createPlaybackSessionController } from "./controllers/playback-session.mjs?v=12";
+import { createPlaybackSettingsController } from "./controllers/playback-settings.mjs?v=12";
+import { createYoutubeController, extractYoutubeInfo } from "./controllers/youtube.mjs?v=12";
+import { createStorageController } from "./controllers/storage.mjs?v=12";
+import { createBookmarkUiController } from "./ui/bookmark/ui.mjs?v=12";
+import { scrollResultListToTop } from "./lib/results-scroll.mjs?v=12";
+import { getFormatFilterLabel } from "./lib/format-filter.mjs?v=12";
 import {
     collectUiElements,
     applyThemeFromStorage,
     setupTheme,
     initFilterMenu
-} from "./ui/core/elements.mjs?v=11";
-import { createUiSyncController } from "./ui/core/sync.mjs?v=11";
-import { createDataLoader } from "./ui/core/data.mjs?v=11";
-import { createSidebarController } from "./ui/sidebar/ui.mjs?v=11";
-import { getDateUiState, getSearchUiState } from "./lib/ui-slices.mjs?v=11";
-import { debugPlayback } from "./lib/playback-debug.mjs?v=11";
+} from "./ui/core/elements.mjs?v=12";
+import { createUiSyncController } from "./ui/core/sync.mjs?v=12";
+import { createDataLoader } from "./ui/core/data.mjs?v=12";
+import { createSidebarController } from "./ui/sidebar/ui.mjs?v=12";
+import { getDateUiState, getSearchUiState } from "./lib/ui-slices.mjs?v=12";
+import { debugPlayback } from "./lib/playback-debug.mjs?v=12";
 
 /**
  * @typedef {Object} SongRow

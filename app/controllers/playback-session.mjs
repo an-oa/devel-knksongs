@@ -1,6 +1,6 @@
-import { getPlaybackContinuationCandidates } from "../lib/playback-sequence.mjs?v=11";
-import { debugPlayback } from "../lib/playback-debug.mjs?v=11";
-import { getPlaybackUiState } from "../lib/ui-slices.mjs?v=11";
+import { getPlaybackContinuationCandidates } from "../lib/playback-sequence.mjs?v=12";
+import { debugPlayback } from "../lib/playback-debug.mjs?v=12";
+import { getPlaybackUiState } from "../lib/ui-slices.mjs?v=12";
 
 /**
  * 再生終了後の継続再生と追従スクロールを制御する。
