@@ -93,7 +93,7 @@ const renderController = createRenderController({
         isRecommendedMode: (state) => searchController.isRecommendedMode(state),
         updateThumbnail: (thumbDiv, yt) => youtubeController.updateThumbnail(thumbDiv, yt),
         extractYoutubeInfo,
-        playThumbnail: (thumbDiv, yt) => youtubeController.playThumbnail(thumbDiv, yt),
+        playThumbnail: (thumbDiv, yt, options) => youtubeController.playThumbnail(thumbDiv, yt, options),
         restoreActivePlayback: () => youtubeController.restoreActivePlayback(),
         openBookmarkModal: (songKey) => sidebarController.openBookmarkModal(songKey),
         setupScrollObserver: () => youtubeController.setupScrollObserver(),
