@@ -169,13 +169,13 @@ test("applyPlaybackSettingsFromStorage: ui sync reapplies stored playback settin
 
         assert.equal(ui.playback.showThumbnails, true);
         assert.equal(ui.playback.showExperimentalPlaybackSettings, false);
-        assert.equal(ui.playback.stopAtEndTime, true);
-        assert.equal(ui.playback.continuousPlayback, true);
+        assert.equal(ui.playback.stopAtEndTime, false);
+        assert.equal(ui.playback.continuousPlayback, false);
         assert.equal(ui.playback.loopPlayback, false);
         assert.equal(ui.el.thumbToggle.checked, true);
         assert.equal(ui.el.experimentalPlaybackToggle.checked, false);
-        assert.equal(ui.el.endTimeToggle.checked, true);
-        assert.equal(ui.el.continuousPlaybackToggle.checked, true);
+        assert.equal(ui.el.endTimeToggle.checked, false);
+        assert.equal(ui.el.continuousPlaybackToggle.checked, false);
         assert.equal(ui.el.loopPlaybackToggle.checked, false);
         assert.equal(ui.el.playbackSettingsGroup.hidden, true);
         assert.equal(ui.el.playbackSettingsGroup.getAttribute("aria-hidden"), "true");
@@ -187,11 +187,52 @@ test("applyPlaybackSettingsFromStorage: ui sync reapplies stored playback settin
     }
 });
 
+test("applyPlaybackSettingsFromStorage: hidden experimental playback settings do not restore hidden playback behavior", () => {
+    const restoreDom = installFakeDom();
+    const prevLocalStorage = globalThis.localStorage;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        globalThis.localStorage.setItem("showExperimentalPlaybackSettings", "false");
+        globalThis.localStorage.setItem("stopAtEndTime", "true");
+        globalThis.localStorage.setItem("continuousPlayback", "true");
+        globalThis.localStorage.setItem("loopPlayback", "true");
+        const ui = createPlaybackSettingsUiState({
+            thumbToggle: document.createElement("input"),
+            experimentalPlaybackToggle: document.createElement("input"),
+            endTimeToggle: document.createElement("input"),
+            continuousPlaybackToggle: document.createElement("input"),
+            loopPlaybackToggle: document.createElement("input"),
+            playbackSettingsGroup: document.createElement("section")
+        });
+        const controller = createPlaybackSettingsController({
+            ui,
+            callbacks: createPlaybackSettingsCallbacks()
+        });
+
+        controller.applyPlaybackSettingsFromStorage();
+
+        assert.equal(ui.playback.showExperimentalPlaybackSettings, false);
+        assert.equal(ui.playback.stopAtEndTime, false);
+        assert.equal(ui.playback.continuousPlayback, false);
+        assert.equal(ui.playback.loopPlayback, false);
+        assert.equal(ui.el.experimentalPlaybackToggle.checked, false);
+        assert.equal(ui.el.endTimeToggle.checked, false);
+        assert.equal(ui.el.continuousPlaybackToggle.checked, false);
+        assert.equal(ui.el.loopPlaybackToggle.checked, false);
+        assert.equal(ui.el.playbackSettingsGroup.hidden, true);
+        assert.equal(ui.el.playbackSettingsGroup.getAttribute("aria-hidden"), "true");
+    } finally {
+        globalThis.localStorage = prevLocalStorage;
+        restoreDom();
+    }
+});
+
 test("setupPlaybackSettings: end time toggle restores active playback before switching mode", () => {
     const restoreDom = installFakeDom();
     const prevLocalStorage = globalThis.localStorage;
     globalThis.localStorage = createFakeLocalStorage();
     try {
+        globalThis.localStorage.setItem("showExperimentalPlaybackSettings", "true");
         globalThis.localStorage.setItem("stopAtEndTime", "true");
         const ui = createPlaybackSettingsUiState({
             thumbToggle: document.createElement("input"),
@@ -230,6 +271,7 @@ test("setupPlaybackSettings: continuous and loop toggles persist playback prefer
     const prevLocalStorage = globalThis.localStorage;
     globalThis.localStorage = createFakeLocalStorage();
     try {
+        globalThis.localStorage.setItem("showExperimentalPlaybackSettings", "true");
         const ui = createPlaybackSettingsUiState({
             thumbToggle: document.createElement("input"),
             experimentalPlaybackToggle: document.createElement("input"),
@@ -287,6 +329,47 @@ test("setupPlaybackSettings: experimental playback toggle shows and hides playba
 
         assert.equal(ui.playback.showExperimentalPlaybackSettings, true);
         assert.equal(globalThis.localStorage.getItem("showExperimentalPlaybackSettings"), "true");
+        assert.equal(ui.el.playbackSettingsGroup.hidden, false);
+        assert.equal(ui.el.playbackSettingsGroup.getAttribute("aria-hidden"), "false");
+    } finally {
+        globalThis.localStorage = prevLocalStorage;
+        restoreDom();
+    }
+});
+
+test("setupPlaybackSettings: enabling experimental playback restores stored playback preferences", () => {
+    const restoreDom = installFakeDom();
+    const prevLocalStorage = globalThis.localStorage;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        globalThis.localStorage.setItem("showExperimentalPlaybackSettings", "false");
+        globalThis.localStorage.setItem("stopAtEndTime", "true");
+        globalThis.localStorage.setItem("continuousPlayback", "true");
+        globalThis.localStorage.setItem("loopPlayback", "false");
+        const ui = createPlaybackSettingsUiState({
+            thumbToggle: document.createElement("input"),
+            experimentalPlaybackToggle: document.createElement("input"),
+            endTimeToggle: document.createElement("input"),
+            continuousPlaybackToggle: document.createElement("input"),
+            loopPlaybackToggle: document.createElement("input"),
+            playbackSettingsGroup: document.createElement("section")
+        });
+        const controller = createPlaybackSettingsController({
+            ui,
+            callbacks: createPlaybackSettingsCallbacks()
+        });
+
+        controller.setupPlaybackSettings();
+        ui.el.experimentalPlaybackToggle.checked = true;
+        invokeListener(ui.el.experimentalPlaybackToggle, "change", {});
+
+        assert.equal(ui.playback.showExperimentalPlaybackSettings, true);
+        assert.equal(ui.playback.stopAtEndTime, true);
+        assert.equal(ui.playback.continuousPlayback, true);
+        assert.equal(ui.playback.loopPlayback, false);
+        assert.equal(ui.el.endTimeToggle.checked, true);
+        assert.equal(ui.el.continuousPlaybackToggle.checked, true);
+        assert.equal(ui.el.loopPlaybackToggle.checked, false);
         assert.equal(ui.el.playbackSettingsGroup.hidden, false);
         assert.equal(ui.el.playbackSettingsGroup.getAttribute("aria-hidden"), "false");
     } finally {

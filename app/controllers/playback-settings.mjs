@@ -30,6 +30,35 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
     }
 
     /**
+     * 実験設定に属する定義か判定する。
+     * @param {*} definition
+     * @returns {boolean}
+     */
+    function isExperimentalPlaybackDefinition(definition) {
+        return Boolean(definition && definition.experimental);
+    }
+
+    /**
+     * 実験設定の表示状態に応じて、隠し設定の実効値を反映する。
+     * @param {Array<*>} definitions
+     * @param {"afterStorageApply" | "afterToggleChange"} hookName
+     */
+    function applyExperimentalPlaybackSettingValues(definitions, hookName) {
+        const experimentalEnabled = Boolean(playbackUi.showExperimentalPlaybackSettings);
+        for (const definition of definitions) {
+            if (!isExperimentalPlaybackDefinition(definition)) continue;
+            const previousValue = Boolean(playbackUi[definition.stateKey]);
+            const nextValue = experimentalEnabled
+                ? loadStoredBoolean(definition.storageKey, definition.defaultValue)
+                : false;
+            applyPlaybackSettingValue(definition, nextValue);
+            if (typeof definition[hookName] === "function") {
+                definition[hookName](previousValue, nextValue);
+            }
+        }
+    }
+
+    /**
      * 再生設定定義を返す。
      * @returns {Array<*>}
      */
@@ -61,9 +90,22 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
                 defaultValue: false,
                 syncValue(value) {
                     syncExperimentalPlaybackVisibility(value);
+                },
+                afterStorageApply() {
+                    applyExperimentalPlaybackSettingValues(
+                        getPlaybackSettingDefinitions(),
+                        "afterStorageApply"
+                    );
+                },
+                afterToggleChange() {
+                    applyExperimentalPlaybackSettingValues(
+                        getPlaybackSettingDefinitions(),
+                        "afterToggleChange"
+                    );
                 }
             },
             {
+                experimental: true,
                 stateKey: "stopAtEndTime",
                 elementKey: "endTimeToggle",
                 storageKey: STOP_AT_END_TIME_STORAGE_KEY,
@@ -76,12 +118,14 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
                 }
             },
             {
+                experimental: true,
                 stateKey: "continuousPlayback",
                 elementKey: "continuousPlaybackToggle",
                 storageKey: CONTINUOUS_PLAYBACK_STORAGE_KEY,
                 defaultValue: false
             },
             {
+                experimental: true,
                 stateKey: "loopPlayback",
                 elementKey: "loopPlaybackToggle",
                 storageKey: LOOP_PLAYBACK_STORAGE_KEY,
@@ -133,6 +177,10 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
      * @param {boolean} nextValue
      */
     function handlePlaybackSettingChange(definition, nextValue) {
+        if (isExperimentalPlaybackDefinition(definition) && !playbackUi.showExperimentalPlaybackSettings) {
+            applyPlaybackSettingValue(definition, false);
+            return;
+        }
         const previousValue = Boolean(playbackUi[definition.stateKey]);
         if (previousValue === nextValue) return;
         applyPlaybackSettingValue(definition, nextValue);
@@ -149,6 +197,7 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
         const definitions = getPlaybackSettingDefinitions();
         const nextValues = readPlaybackSettingValues(definitions);
         for (const definition of definitions) {
+            if (isExperimentalPlaybackDefinition(definition)) continue;
             const previousValue = Boolean(playbackUi[definition.stateKey]);
             const nextValue = Boolean(nextValues.get(definition.stateKey));
             applyPlaybackSettingValue(definition, nextValue);
