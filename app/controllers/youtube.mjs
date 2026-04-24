@@ -5,8 +5,7 @@ import { getPlaybackUiState } from "../lib/ui-slices.mjs?v=11";
 import {
     applyYoutubePlayerIframeAttributes,
     buildYoutubeEmbedUrl,
-    createYoutubeIframeApiLoader,
-    YT_EMBED_HOST
+    createYoutubeIframeApiLoader
 } from "../lib/youtube/embed.mjs?v=11";
 import {
     destroyYoutubeSharedPlayback,
@@ -36,6 +35,9 @@ import {
 import {
     createYoutubePlaybackStartAttemptManager
 } from "../lib/youtube/playback-start-attempt.mjs?v=11";
+import {
+    createYoutubePlayerAdapter
+} from "../lib/youtube/player-adapter.mjs?v=11";
 
 export { extractYoutubeInfo } from "../lib/youtube-url.mjs?v=11";
 
@@ -218,13 +220,6 @@ export function createYoutubeController({ ui, youtube, constants }) {
             });
         },
         /**
-         * YouTube が生成した iframe へ必要な属性を反映する。
-         * @param {*} iframe
-         */
-        applyPlayerIframeAttributes(iframe) {
-            applyYoutubePlayerIframeAttributes(iframe);
-        },
-        /**
          * プレイヤー状態変化に応じて再生状態表示を更新する。
          * @param {*} event
          * @param {number} playbackSessionId
@@ -303,84 +298,45 @@ export function createYoutubeController({ ui, youtube, constants }) {
                 reason: "player-error",
                 errorCode: event && event.data
             });
-        },
-        /**
-         * 生成済み iframe へ YouTube プレイヤーを紐付ける。
-         * @param {*} iframe
-         * @param {number} playbackSessionId
-         */
-        attachPlayer(iframe, playbackSessionId) {
-            const sharedPlayback = getSharedPlaybackState();
-            setPendingSharedPlaybackAttach(iframe, playbackSessionId);
-            if (sharedPlayback.playerPromise) {
-                setSharedPlaybackSessionId(playbackSessionId);
-                debugPlayback("youtube", "attachPlayer waiting for existing playerPromise", {
-                    playbackSessionId
-                });
-                return sharedPlayback.playerPromise;
-            }
-            setSharedPlaybackSessionId(playbackSessionId);
-            debugPlayback("youtube", "attachPlayer creating player", {
-                playbackSessionId
-            });
-            sharedPlayback.playerPromise = this.ensureReady().then(() => {
-                const latestSharedPlayback = getSharedPlaybackState();
-                const pendingAttach = latestSharedPlayback.pendingAttach;
-                if (!pendingAttach) return null;
-                const nextIframe = pendingAttach.iframe;
-                const nextPlaybackSessionId = pendingAttach.playbackSessionId;
-                setSharedPlaybackSessionId(nextPlaybackSessionId);
-                if (!isHtmlElement(nextIframe)) return null;
-                if (!document.body.contains(nextIframe)) return null;
-                if (latestSharedPlayback.parkingNode && nextIframe.parentElement === latestSharedPlayback.parkingNode) {
-                    return null;
-                }
-                if (latestSharedPlayback.player) return latestSharedPlayback.player;
-                latestSharedPlayback.player = new window.YT.Player(nextIframe, {
-                    host: YT_EMBED_HOST,
-                    events: {
-                        onReady: (event) => {
-                            this.applyPlayerIframeAttributes(
-                                event && event.target && typeof event.target.getIframe === "function"
-                                    ? event.target.getIframe()
-                                    : nextIframe
-                            );
-                        },
-                        onStateChange: (event) => this.handleStateChange(
-                            event,
-                            nextPlaybackSessionId
-                        ),
-                        onError: (event) => this.handlePlayerError(
-                            event,
-                            nextPlaybackSessionId
-                        )
-                    }
-                });
-                this.applyPlayerIframeAttributes(nextIframe);
-                syncSharedPlaybackIframe();
-                debugPlayback("youtube", "attachPlayer created player", {
-                    playbackSessionId: nextPlaybackSessionId
-                });
-                return latestSharedPlayback.player;
-            }).catch(() => {
-                // API読み込み失敗時は埋め込みのみで継続する
-                debugPlayback("youtube", "attachPlayer failed to create player", {
-                    playbackSessionId
-                });
-                const thumbDiv = getSharedPlaybackThumb(playbackSessionId);
-                if (getPlaybackMode(thumbDiv) === "autoplay") {
-                    const error = new Error("iframe api unavailable for autoplay");
-                    error.code = "iframe-api-load-failed";
-                    throw error;
-                }
-                playbackStartAttempts.settle(playbackSessionId, true);
-                return null;
-            }).finally(() => {
-                sharedPlayback.playerPromise = null;
-            });
-            return sharedPlayback.playerPromise;
         }
     };
+
+    const youtubePlayerAdapter = createYoutubePlayerAdapter({
+        getSharedPlaybackState,
+        setPendingAttach: (iframe, playbackSessionId) => {
+            setPendingSharedPlaybackAttach(iframe, playbackSessionId);
+        },
+        setSessionId: (playbackSessionId) => {
+            setSharedPlaybackSessionId(playbackSessionId);
+        },
+        ensureReady: () => youtubeApi.ensureReady(),
+        applyIframeAttributes: (iframe) => applyYoutubePlayerIframeAttributes(iframe),
+        syncIframe: () => syncSharedPlaybackIframe(),
+        handleStateChange: (event, playbackSessionId) => youtubeApi.handleStateChange(event, playbackSessionId),
+        handlePlayerError: (event, playbackSessionId) => youtubeApi.handlePlayerError(event, playbackSessionId),
+        handleAttachFailure: (_error, playbackSessionId) => handleYoutubePlayerAttachFailure(playbackSessionId),
+        debug: (message, details) => debugPlayback("youtube", message, details)
+    });
+
+    /**
+     * YouTube Iframe API への接続失敗時に再生方針を適用する。
+     * @param {number} playbackSessionId
+     * @returns {*}
+     */
+    function handleYoutubePlayerAttachFailure(playbackSessionId) {
+        // API読み込み失敗時は埋め込みのみで継続する
+        debugPlayback("youtube", "attachPlayer failed to create player", {
+            playbackSessionId
+        });
+        const thumbDiv = getSharedPlaybackThumb(playbackSessionId);
+        if (getPlaybackMode(thumbDiv) === "autoplay") {
+            const error = new Error("iframe api unavailable for autoplay");
+            error.code = "iframe-api-load-failed";
+            throw error;
+        }
+        playbackStartAttempts.settle(playbackSessionId, true);
+        return null;
+    }
 
     /**
      * 共有プレイヤーを停止できたか返す。
@@ -406,7 +362,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
     function createSharedPlaybackFrame() {
         if (!canUseDom()) return null;
         const iframe = document.createElement("iframe");
-        youtubeApi.applyPlayerIframeAttributes(iframe);
+        applyYoutubePlayerIframeAttributes(iframe);
         return iframe;
     }
 
@@ -608,7 +564,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
             playbackSessionId,
             iframeSrc: iframe.src
         });
-        return youtubeApi.attachPlayer(iframe, playbackSessionId)
+        return youtubePlayerAdapter.attach(iframe, playbackSessionId)
             .then(() => Boolean(thumbDiv.querySelector("iframe")));
     }
 
