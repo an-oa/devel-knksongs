@@ -17,6 +17,8 @@
    - 変更影響に応じたテストを実行
    - 既存テストを回すだけでなく、バグ修正や仕様追加に対応する回帰テストを必要に応じて追加
    - 現在の基本コマンド: `node --test tests/*.mjs`
+   - YouTube 再生やサイドバー操作などブラウザ上の回帰に関わる変更では、
+     `npm run test:e2e` も実行する。
 5. **必要なら DESIGN.md / README.md へ反映**
    - 合意した設計が長期的に有用な場合のみ追記
    - 次の変更は原則ドキュメント追記対象:
@@ -68,6 +70,7 @@ flowchart TD
    - 変更したファイル群へ `node --check <file>` を段階的に実行
    - 残存参照は `rg` で確認
    - 最後に `node --test tests/*.mjs`
+   - ブラウザ操作や YouTube smoke に影響する場合は `npm run test:e2e`
 
 ### 置換作業の注意
 - PowerShell の一括文字列置換や広い正規表現置換は、
@@ -77,7 +80,7 @@ flowchart TD
 - 置換後は、壊れやすいファイルを優先して目視確認する。
   例:
   `index.html`
-  エントリーポイントの `script.js`
+  エントリーポイントの `app/script.js`
   import を多く持つコントローラー
   テストの先頭 import 群
 

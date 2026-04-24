@@ -40,13 +40,17 @@ feat: move settings into dedicated sidebar panel
 ## JavaScript Function Docs
 
 - 実装側の `.js` / `.mjs` では、関数の直前に `/** ... */` の JSDoc を置いて機能を説明する書き方が広く使われている。
-- 特に `script.js` `bookmark-ui.mjs` `search.mjs` `storage.mjs` `render.mjs` `youtube.mjs` では、この形式が主流になっている。
+- 特に `app/script.js` `app/ui/bookmark/ui.mjs` `app/controllers/search.mjs`
+  `app/controllers/storage.mjs` `app/controllers/render.mjs`
+  `app/controllers/youtube.mjs` では、この形式が主流になっている。
 - 短い委譲関数や一部テスト補助関数では省略されている箇所もあるが、新しく JavaScript の関数を追加するときは、関数の先頭に JSDoc を付けて機能を説明する。
 - 必要に応じて `@param` `@returns` を付け、既存コードの粒度に合わせて簡潔に書く。
 
 ## Verification
 
 - `tests/` 配下に Node のテストがあるため、JavaScript を変更したときは `node --test tests/*.mjs` を基本の確認手順として実行する。
+- YouTube 再生やサイドバー操作などブラウザ上の回帰に関わる変更では、
+  `npm run test:e2e` も実行する。
 - 構文だけを素早く確認したいときは `node --check <file>` を使い、その結果だけでテスト完了とは扱わない。
 - コミット前後に確認結果を共有するときは、実行コマンドと pass/fail の件数を簡潔に残す。
 - ファイル移動や import の一括更新を含む変更では、移動直後に `node --check` を対象ファイルへ段階的に実行し、
@@ -74,41 +78,25 @@ feat: move settings into dedicated sidebar panel
 - キャッシュバスターの `v=...` は、UI / JavaScript に変更を加えるたびには更新しない。
 - 公開反映や配布反映のためにブラウザキャッシュを切り替える必要があるタイミングで、`v=...` をまとめて更新する。
 - 未公開の UI / JavaScript 変更が継続している間は、既存の `v=...` を維持する。
-- 変更途中で `script.js` から読む ES Modules や、module 間の import / export に `?v=...` 付きの参照を追加・更新するときは、その時点の既存値へ揃え、新しい値にはしない。
-- `index.html` の `styles.css?v=...` と `script.js?v=...` は必ず同じ値に揃える。
-- `script.js` から読む ES Modules や、module 間の import / export に `?v=...` が付いている箇所も同じ値へ揃える。
+- 変更途中で `app/script.js` から読む ES Modules や、module 間の import / export に `?v=...` 付きの参照を追加・更新するときは、その時点の既存値へ揃え、新しい値にはしない。
+- `index.html` の `styles.css?v=...` と `app/script.js?v=...` は必ず同じ値に揃える。
+- `app/script.js` から読む ES Modules や、module 間の import / export に `?v=...` が付いている箇所も同じ値へ揃える。
 - `v=...` を更新するときは、関連有無を自己判断せず、更新前の古い値を `rg -n "v=<old>|\\?v=<old>" -S .` で全検索して一斉に統一する。
 - 更新後は `node --test tests/*.mjs` を実行し、pass/fail 件数を共有する。
 
 ## Encoding And Line Endings
 
-- 2026-04-08 時点で確認した `.js` `.mjs` `.html` `.css` `.md` は、すべて `UTF-8 BOMなし` かつ `LF`。
+- 2026-04-25 時点で確認した `.js` `.mjs` `.html` `.css` `.md` は、すべて `UTF-8 BOMなし` かつ `LF`。
 - リポジトリ直下に `.gitattributes` と `.editorconfig` は現状存在しない。
 
-| File | Encoding | Line Ending |
+| Path | Encoding | Line Ending |
 | --- | --- | --- |
-| `bookmark-ui.mjs` | UTF-8 BOMなし | LF |
-| `csv-parser.mjs` | UTF-8 BOMなし | LF |
+| `AGENTS.md` | UTF-8 BOMなし | LF |
 | `DESIGN.md` | UTF-8 BOMなし | LF |
-| `format-filter.mjs` | UTF-8 BOMなし | LF |
-| `index.html` | UTF-8 BOMなし | LF |
-| `layout-anchor.mjs` | UTF-8 BOMなし | LF |
 | `README.md` | UTF-8 BOMなし | LF |
-| `render.mjs` | UTF-8 BOMなし | LF |
-| `results-scroll.mjs` | UTF-8 BOMなし | LF |
-| `script.js` | UTF-8 BOMなし | LF |
-| `search.mjs` | UTF-8 BOMなし | LF |
-| `state.mjs` | UTF-8 BOMなし | LF |
-| `storage.mjs` | UTF-8 BOMなし | LF |
-| `styles.css` | UTF-8 BOMなし | LF |
-| `tests/csv-parser.test.mjs` | UTF-8 BOMなし | LF |
-| `tests/format-filter.test.mjs` | UTF-8 BOMなし | LF |
-| `tests/render-layout.test.mjs` | UTF-8 BOMなし | LF |
-| `tests/results-scroll.test.mjs` | UTF-8 BOMなし | LF |
-| `tests/search-date.test.mjs` | UTF-8 BOMなし | LF |
-| `tests/storage-bookmark-limit.test.mjs` | UTF-8 BOMなし | LF |
-| `tests/test-helpers.mjs` | UTF-8 BOMなし | LF |
-| `tests/youtube-controller.test.mjs` | UTF-8 BOMなし | LF |
 | `WORKFLOW.md` | UTF-8 BOMなし | LF |
-| `youtube-url.mjs` | UTF-8 BOMなし | LF |
-| `youtube.mjs` | UTF-8 BOMなし | LF |
+| `index.html` | UTF-8 BOMなし | LF |
+| `styles.css` | UTF-8 BOMなし | LF |
+| `app/**/*.js` / `app/**/*.mjs` | UTF-8 BOMなし | LF |
+| `tests/**/*.mjs` | UTF-8 BOMなし | LF |
+| `playwright.config.mjs` | UTF-8 BOMなし | LF |
