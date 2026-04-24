@@ -33,6 +33,9 @@ import {
     isYoutubePlaybackSessionActive,
     reduceYoutubePlaybackState
 } from "../lib/youtube/playback-state.mjs?v=11";
+import {
+    createYoutubePlaybackStartAttemptManager
+} from "../lib/youtube/playback-start-attempt.mjs?v=11";
 
 export { extractYoutubeInfo } from "../lib/youtube-url.mjs?v=11";
 
@@ -53,7 +56,6 @@ export function createYoutubeController({ ui, youtube, constants }) {
     let handlePlaybackStartFailed = () => {};
     let playbackState = createYoutubePlaybackState();
     const refreshCardLayoutSoon = createLayoutRefreshScheduler(() => refreshLayout);
-    const PLAYBACK_START_TIMEOUT_MS = 4000;
     const youtubeIframeApiLoader = createYoutubeIframeApiLoader({
         youtube,
         iframeApiSrc: YT_IFRAME_API_SRC,
@@ -152,68 +154,13 @@ export function createYoutubeController({ ui, youtube, constants }) {
         }
     }
 
-    /**
-     * 指定セッションの再生開始待ちを完了扱いにする。
-     * @param {number | undefined} sessionId
-     * @param {boolean} didStart
-     * @returns {boolean}
-     */
-    function settlePlaybackStartAttempt(sessionId, didStart) {
-        const sharedPlayback = getSharedPlaybackState();
-        const attempt = sharedPlayback.playbackStartAttempt;
-        if (!attempt) return false;
-        if (Number.isFinite(sessionId) && sessionId > 0 && attempt.sessionId !== sessionId) {
-            return false;
-        }
-        sharedPlayback.playbackStartAttempt = null;
-        if (attempt.timeoutId) {
-            clearTimeout(attempt.timeoutId);
-        }
-        attempt.resolve(Boolean(didStart));
-        return true;
-    }
-
-    /**
-     * 指定セッションの再生開始待ち Promise を作成する。
-     * @param {number} sessionId
-     * @returns {Promise<boolean>}
-     */
-    function createPlaybackStartAttempt(sessionId, input) {
-        const context = input || {};
-        settlePlaybackStartAttempt(undefined, false);
-        return new Promise((resolve) => {
-            const timeoutId = setTimeout(() => {
-                const didSettle = settlePlaybackStartAttempt(sessionId, false);
-                if (!didSettle) return;
-                const thumbDiv = isHtmlElement(context.thumbDiv)
-                    ? context.thumbDiv
-                    : getSharedPlaybackThumb(sessionId);
-                if (!isHtmlElement(thumbDiv)) return;
-                if (!isCurrentPlaybackSession(thumbDiv, sessionId)) return;
-                handlePlaybackStartFailure(thumbDiv, {
-                    playbackMode: context.playbackMode,
-                    reason: "start-timeout"
-                });
-            }, PLAYBACK_START_TIMEOUT_MS);
-            if (timeoutId && typeof timeoutId.unref === "function") {
-                timeoutId.unref();
-            }
-            getSharedPlaybackState().playbackStartAttempt = {
-                sessionId,
-                resolve,
-                timeoutId
-            };
-        });
-    }
-
-    /**
-     * 指定サムネイルに紐づく再生開始待ちを失敗扱いで閉じる。
-     * @param {*} thumbDiv
-     * @returns {boolean}
-     */
-    function cancelPlaybackStartAttemptForThumb(thumbDiv) {
-        return settlePlaybackStartAttempt(getPlaybackSessionId(thumbDiv), false);
-    }
+    const playbackStartAttempts = createYoutubePlaybackStartAttemptManager({
+        getSharedPlaybackState,
+        getThumbForSession: (sessionId) => getSharedPlaybackThumb(sessionId),
+        getSessionIdForThumb: (thumbDiv) => getPlaybackSessionId(thumbDiv),
+        isCurrentSession: (thumbDiv, sessionId) => isCurrentPlaybackSession(thumbDiv, sessionId),
+        handleStartFailure: (thumbDiv, options) => handlePlaybackStartFailure(thumbDiv, options)
+    });
 
     /**
      * レイアウト再計算フックを登録する。
@@ -302,7 +249,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
             }
             if (event.data === window.YT.PlayerState.ENDED) {
                 const shouldNotifyPlaybackEnded = playbackState.phase === "playing";
-                settlePlaybackStartAttempt(playbackSessionId, false);
+                playbackStartAttempts.settle(playbackSessionId, false);
                 const endedSongKey = getSongKeyFromYoutubeThumb(thumbDiv);
                 const endedPlaybackMode = getPlaybackMode(thumbDiv);
                 const endedGeneration = applyPlaybackStateEvent({
@@ -332,7 +279,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
                 return;
             }
             if (event.data === window.YT.PlayerState.PLAYING) {
-                settlePlaybackStartAttempt(playbackSessionId, true);
+                playbackStartAttempts.settle(playbackSessionId, true);
                 applyPlaybackStateEvent({
                     type: "PLAYBACK_STARTED",
                     sessionId: playbackSessionId
@@ -349,7 +296,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
             const thumbDiv = getSharedPlaybackThumb(playbackSessionId);
             if (!isHtmlElement(thumbDiv)) return;
             if (!isCurrentPlaybackSession(thumbDiv, playbackSessionId)) return;
-            settlePlaybackStartAttempt(playbackSessionId, false);
+            playbackStartAttempts.settle(playbackSessionId, false);
             handlePlaybackStartFailure(thumbDiv, {
                 sessionId: playbackSessionId,
                 playbackMode: getPlaybackMode(thumbDiv),
@@ -426,7 +373,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
                     error.code = "iframe-api-load-failed";
                     throw error;
                 }
-                settlePlaybackStartAttempt(playbackSessionId, true);
+                playbackStartAttempts.settle(playbackSessionId, true);
                 return null;
             }).finally(() => {
                 sharedPlayback.playerPromise = null;
@@ -726,7 +673,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
      */
     function resetThumbnailContainer(thumbDiv, videoId, playbackKey) {
         const previousSessionId = getPlaybackSessionId(thumbDiv);
-        cancelPlaybackStartAttemptForThumb(thumbDiv);
+        playbackStartAttempts.cancelForThumb(thumbDiv);
         applyPlaybackStateEvent({
             type: "CLEAR_PLAYBACK",
             sessionId: previousSessionId
@@ -804,7 +751,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
             }
             if (!entry.isIntersecting) {
                 if (!STOP_PLAYBACK_ON_SCROLL_OUT) return;
-                cancelPlaybackStartAttemptForThumb(thumb);
+                playbackStartAttempts.cancelForThumb(thumb);
                 if (!detachSharedPlayback(thumb)) return;
                 const videoId = thumb.dataset.videoId;
                 setPlaybackSessionId(thumb, 0);
@@ -854,7 +801,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
             sessionId: getPlaybackSessionId(thumbDiv),
             preserveTransitionGeneration: Boolean(options && options.preserveTransitionGeneration)
         });
-        cancelPlaybackStartAttemptForThumb(thumbDiv);
+        playbackStartAttempts.cancelForThumb(thumbDiv);
         clearActiveThumb(thumbDiv);
         detachSharedPlayback(thumbDiv);
         thumbDiv.dataset.videoId = videoId;
@@ -904,7 +851,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
         const playbackSessionId = applyPlaybackStateEvent({
             type: "REQUEST_PLAYBACK"
         }).activeSessionId;
-        const playbackStartPromise = createPlaybackStartAttempt(playbackSessionId, {
+        const playbackStartPromise = playbackStartAttempts.create(playbackSessionId, {
             thumbDiv,
             yt,
             playbackMode
@@ -919,14 +866,14 @@ export function createYoutubeController({ ui, youtube, constants }) {
         setYoutubeThumbnailExpandedCardState(thumbDiv, Boolean(yt && yt.isVertical));
         Promise.resolve(mountSharedPlayback(thumbDiv, yt, playbackSessionId)).then((didMount) => {
             if (didMount) return;
-            settlePlaybackStartAttempt(playbackSessionId, false);
+            playbackStartAttempts.settle(playbackSessionId, false);
             handlePlaybackStartFailure(thumbDiv, {
                 sessionId: playbackSessionId,
                 playbackMode,
                 reason: "mount-failed"
             });
         }).catch((error) => {
-            settlePlaybackStartAttempt(playbackSessionId, false);
+            playbackStartAttempts.settle(playbackSessionId, false);
             handlePlaybackStartFailure(thumbDiv, {
                 sessionId: playbackSessionId,
                 playbackMode,
