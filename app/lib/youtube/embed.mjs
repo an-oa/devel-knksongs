@@ -39,24 +39,62 @@ export function createYoutubeIframeApiLoader({
     function ensureReady() {
         if (isReady()) return Promise.resolve();
         if (youtube.apiPromise) return youtube.apiPromise;
-        youtube.apiPromise = new Promise((resolve, reject) => {
+        let script = null;
+        let resolveReady = () => {};
+        const prevCallback = window.onYouTubeIframeAPIReady;
+
+        /**
+         * このローダーが差し替えた ready callback を失敗時に戻す。
+         */
+        function restoreCallback() {
+            if (window.onYouTubeIframeAPIReady === readyCallback) {
+                window.onYouTubeIframeAPIReady = prevCallback;
+            }
+        }
+
+        /**
+         * 読み込みに失敗した Iframe API script を再試行前に取り除く。
+         */
+        function removeScript() {
+            if (isHtmlElement(script) && script.parentElement) {
+                script.parentElement.removeChild(script);
+            }
+        }
+
+        /**
+         * YouTube Iframe API の ready callback を処理する。
+         */
+        function readyCallback() {
+            if (typeof prevCallback === "function") prevCallback();
+            resolveReady();
+        }
+
+        const apiPromise = new Promise((resolve, reject) => {
             const existing = document.querySelector(iframeApiSelector);
-            const prevCallback = window.onYouTubeIframeAPIReady;
-            window.onYouTubeIframeAPIReady = () => {
-                if (typeof prevCallback === "function") prevCallback();
-                resolve();
+            resolveReady = resolve;
+            window.onYouTubeIframeAPIReady = readyCallback;
+            const rejectWithCleanup = (error) => {
+                restoreCallback();
+                removeScript();
+                reject(error);
             };
             if (existing) {
                 waitForReady(resolve);
                 return;
             }
-            const script = document.createElement("script");
+            script = document.createElement("script");
             script.src = iframeApiSrc;
             script.async = true;
             script.dataset.ytIframeApi = "true";
-            script.onerror = () => reject(new Error("iframe_api load failed"));
+            script.onerror = () => rejectWithCleanup(new Error("iframe_api load failed"));
             document.head.appendChild(script);
+        }).catch((error) => {
+            if (youtube.apiPromise === apiPromise) {
+                youtube.apiPromise = null;
+            }
+            throw error;
         });
+        youtube.apiPromise = apiPromise;
         return youtube.apiPromise;
     }
 

@@ -68,3 +68,42 @@ test("youtube embed: createYoutubeIframeApiLoader appends iframe api script and 
         cleanup();
     }
 });
+
+test("youtube embed: failed iframe api load clears cache and can retry", async () => {
+    const cleanup = installFakeDom();
+    try {
+        const youtube = { apiPromise: null };
+        const loader = createYoutubeIframeApiLoader({
+            youtube,
+            iframeApiSrc: "https://www.youtube.com/iframe_api",
+            iframeApiSelector: 'script[data-yt-iframe-api="true"]',
+            readyPollMs: 50
+        });
+        const previousReady = () => {};
+        globalThis.window.onYouTubeIframeAPIReady = previousReady;
+
+        const failedLoad = loader.ensureReady();
+        const failedScript = document.head.children[0] || null;
+        assert.ok(failedScript);
+
+        failedScript.onerror();
+
+        await assert.rejects(failedLoad, /iframe_api load failed/);
+        assert.equal(youtube.apiPromise, null);
+        assert.equal(document.head.children.length, 0);
+        assert.equal(globalThis.window.onYouTubeIframeAPIReady, previousReady);
+
+        const retryLoad = loader.ensureReady();
+        const retryScript = document.head.children[0] || null;
+        assert.ok(retryScript);
+        assert.notEqual(retryScript, failedScript);
+
+        globalThis.window.YT = { Player: class {} };
+        globalThis.window.onYouTubeIframeAPIReady();
+
+        await retryLoad;
+        assert.equal(await youtube.apiPromise, undefined);
+    } finally {
+        cleanup();
+    }
+});
