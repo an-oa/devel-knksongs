@@ -339,6 +339,28 @@ export function createYoutubeController({ ui, youtube, constants }) {
     }
 
     /**
+     * Player 接続前に始まった再生状態を取りこぼさないよう、現在状態を反映する。
+     * @param {*} player
+     * @param {number} playbackSessionId
+     */
+    function syncAttachedPlayerState(player, playbackSessionId) {
+        if (!player || typeof player.getPlayerState !== "function") return;
+        try {
+            const currentState = player.getPlayerState();
+            if (currentState === window.YT.PlayerState.PLAYING) {
+                youtubeApi.handleStateChange({
+                    data: currentState,
+                    target: player
+                }, playbackSessionId);
+            }
+        } catch {
+            debugPlayback("youtube", "failed to read attached player state", {
+                playbackSessionId
+            });
+        }
+    }
+
+    /**
      * 共有プレイヤーを停止できたか返す。
      * @returns {boolean}
      */
@@ -565,7 +587,10 @@ export function createYoutubeController({ ui, youtube, constants }) {
             iframeSrc: iframe.src
         });
         return youtubePlayerAdapter.attach(iframe, playbackSessionId)
-            .then(() => Boolean(thumbDiv.querySelector("iframe")));
+            .then((player) => {
+                syncAttachedPlayerState(player, playbackSessionId);
+                return Boolean(thumbDiv.querySelector("iframe"));
+            });
     }
 
     /**
@@ -821,7 +846,10 @@ export function createYoutubeController({ ui, youtube, constants }) {
         setYoutubeThumbnailPlaybackState(thumbDiv, "playing");
         setYoutubeThumbnailExpandedCardState(thumbDiv, Boolean(yt && yt.isVertical));
         Promise.resolve(mountSharedPlayback(thumbDiv, yt, playbackSessionId)).then((didMount) => {
-            if (didMount) return;
+            if (didMount) {
+                playbackStartAttempts.armStartTimeout(playbackSessionId);
+                return;
+            }
             playbackStartAttempts.settle(playbackSessionId, false);
             handlePlaybackStartFailure(thumbDiv, {
                 sessionId: playbackSessionId,

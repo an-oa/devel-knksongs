@@ -7,7 +7,7 @@ import { installFakeDom, setGlobalValue } from "./test-helpers.mjs";
 
 /**
  * 再生開始待ち manager のテスト用状態を作る。
- * @param {{ isCurrentSession?: boolean } | undefined} options
+ * @param {{ isCurrentSession?: boolean, timeoutMs?: number, setupTimeoutMs?: number } | undefined} options
  * @returns {*}
  */
 function createAttemptHarness(options = {}) {
@@ -25,7 +25,8 @@ function createAttemptHarness(options = {}) {
         handleStartFailure: (target, details) => {
             failures.push({ target, details });
         },
-        timeoutMs: 10
+        timeoutMs: options.timeoutMs ?? 10,
+        setupTimeoutMs: options.setupTimeoutMs ?? 10
     });
     return { failures, manager, sharedPlayback, thumb };
 }
@@ -55,7 +56,7 @@ test("youtube playback start attempt: settle resolves current attempt and clears
     }
 });
 
-test("youtube playback start attempt: timeout resolves false and reports start failure", async () => {
+test("youtube playback start attempt: setup timeout resolves false and reports start failure", async () => {
     const cleanup = installFakeDom();
     const previousSetTimeout = globalThis.setTimeout;
     const previousClearTimeout = globalThis.clearTimeout;
@@ -77,6 +78,49 @@ test("youtube playback start attempt: timeout resolves false and reports start f
         assert.equal(await attemptPromise, false);
         assert.equal(failures.length, 1);
         assert.equal(failures[0].target, thumb);
+        assert.deepEqual(failures[0].details, {
+            playbackMode: "autoplay",
+            reason: "setup-timeout"
+        });
+    } finally {
+        setGlobalValue("setTimeout", previousSetTimeout);
+        setGlobalValue("clearTimeout", previousClearTimeout);
+        cleanup();
+    }
+});
+
+test("youtube playback start attempt: armStartTimeout switches from setup wait to playback start wait", async () => {
+    const cleanup = installFakeDom();
+    const previousSetTimeout = globalThis.setTimeout;
+    const previousClearTimeout = globalThis.clearTimeout;
+    const timeoutCalls = [];
+    const clearCalls = [];
+    setGlobalValue("setTimeout", (callback, delay) => {
+        const timeoutId = { delay };
+        timeoutCalls.push({ callback, delay, timeoutId });
+        return timeoutId;
+    });
+    setGlobalValue("clearTimeout", (timeoutId) => {
+        clearCalls.push(timeoutId);
+    });
+    try {
+        const { failures, manager, thumb } = createAttemptHarness({
+            timeoutMs: 10,
+            setupTimeoutMs: 50
+        });
+        const attemptPromise = manager.create(1, { thumbDiv: thumb, playbackMode: "autoplay" });
+
+        assert.equal(timeoutCalls.length, 1);
+        assert.equal(timeoutCalls[0].delay, 50);
+        assert.equal(manager.armStartTimeout(1), true);
+        assert.equal(timeoutCalls.length, 2);
+        assert.equal(timeoutCalls[1].delay, 10);
+        assert.deepEqual(clearCalls, [timeoutCalls[0].timeoutId]);
+
+        timeoutCalls[1].callback();
+
+        assert.equal(await attemptPromise, false);
+        assert.equal(failures.length, 1);
         assert.deepEqual(failures[0].details, {
             playbackMode: "autoplay",
             reason: "start-timeout"

@@ -1,6 +1,7 @@
 import { isHtmlElement } from "../dom-utils.mjs?v=12";
 
 export const DEFAULT_PLAYBACK_START_TIMEOUT_MS = 4000;
+export const DEFAULT_PLAYBACK_SETUP_TIMEOUT_MS = 10000;
 
 /**
  * YouTube 埋め込み再生の開始待ちを管理する。
@@ -10,9 +11,10 @@ export const DEFAULT_PLAYBACK_START_TIMEOUT_MS = 4000;
  *   getSessionIdForThumb: Function,
  *   isCurrentSession: Function,
  *   handleStartFailure: Function,
- *   timeoutMs?: number
+ *   timeoutMs?: number,
+ *   setupTimeoutMs?: number
  * }} input
- * @returns {{ create: Function, settle: Function, cancelForThumb: Function }}
+ * @returns {{ create: Function, armStartTimeout: Function, settle: Function, cancelForThumb: Function }}
  */
 export function createYoutubePlaybackStartAttemptManager(input) {
     const {
@@ -25,6 +27,36 @@ export function createYoutubePlaybackStartAttemptManager(input) {
     const timeoutMs = Number.isFinite(input.timeoutMs)
         ? input.timeoutMs
         : DEFAULT_PLAYBACK_START_TIMEOUT_MS;
+    const setupTimeoutMs = Number.isFinite(input.setupTimeoutMs)
+        ? input.setupTimeoutMs
+        : DEFAULT_PLAYBACK_SETUP_TIMEOUT_MS;
+
+    /**
+     * 再生開始待ちのタイムアウトを開始する。
+     * @param {*} attempt
+     * @param {number} timeoutDurationMs
+     * @param {string} reason
+     * @returns {*}
+     */
+    function startTimeout(attempt, timeoutDurationMs, reason) {
+        const timeoutId = setTimeout(() => {
+            const didSettle = settle(attempt.sessionId, false);
+            if (!didSettle) return;
+            const thumbDiv = isHtmlElement(attempt.context.thumbDiv)
+                ? attempt.context.thumbDiv
+                : getThumbForSession(attempt.sessionId);
+            if (!isHtmlElement(thumbDiv)) return;
+            if (!isCurrentSession(thumbDiv, attempt.sessionId)) return;
+            handleStartFailure(thumbDiv, {
+                playbackMode: attempt.context.playbackMode,
+                reason
+            });
+        }, timeoutDurationMs);
+        if (timeoutId && typeof timeoutId.unref === "function") {
+            timeoutId.unref();
+        }
+        return timeoutId;
+    }
 
     /**
      * 指定セッションの再生開始待ちを完了扱いにする。
@@ -57,28 +89,34 @@ export function createYoutubePlaybackStartAttemptManager(input) {
         const context = inputContext || {};
         settle(undefined, false);
         return new Promise((resolve) => {
-            const timeoutId = setTimeout(() => {
-                const didSettle = settle(sessionId, false);
-                if (!didSettle) return;
-                const thumbDiv = isHtmlElement(context.thumbDiv)
-                    ? context.thumbDiv
-                    : getThumbForSession(sessionId);
-                if (!isHtmlElement(thumbDiv)) return;
-                if (!isCurrentSession(thumbDiv, sessionId)) return;
-                handleStartFailure(thumbDiv, {
-                    playbackMode: context.playbackMode,
-                    reason: "start-timeout"
-                });
-            }, timeoutMs);
-            if (timeoutId && typeof timeoutId.unref === "function") {
-                timeoutId.unref();
-            }
-            getSharedPlaybackState().playbackStartAttempt = {
+            const attempt = {
                 sessionId,
                 resolve,
-                timeoutId
+                timeoutId: null,
+                context
             };
+            attempt.timeoutId = startTimeout(attempt, setupTimeoutMs, "setup-timeout");
+            getSharedPlaybackState().playbackStartAttempt = attempt;
         });
+    }
+
+    /**
+     * プレーヤー接続後の再生開始タイムアウトへ切り替える。
+     * @param {number} sessionId
+     * @returns {boolean}
+     */
+    function armStartTimeout(sessionId) {
+        const sharedPlayback = getSharedPlaybackState();
+        const attempt = sharedPlayback.playbackStartAttempt;
+        if (!attempt) return false;
+        if (Number.isFinite(sessionId) && sessionId > 0 && attempt.sessionId !== sessionId) {
+            return false;
+        }
+        if (attempt.timeoutId) {
+            clearTimeout(attempt.timeoutId);
+        }
+        attempt.timeoutId = startTimeout(attempt, timeoutMs, "start-timeout");
+        return true;
     }
 
     /**
@@ -92,6 +130,7 @@ export function createYoutubePlaybackStartAttemptManager(input) {
 
     return {
         create,
+        armStartTimeout,
         settle,
         cancelForThumb
     };

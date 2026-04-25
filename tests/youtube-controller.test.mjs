@@ -1281,6 +1281,45 @@ test("youtube: playThumbnail resolves true after the player enters PLAYING", asy
     }
 });
 
+test("youtube: playThumbnail resolves true when attached player is already playing", async () => {
+    const cleanup = installFakeDom();
+    try {
+        const ui = createYoutubeUiState({});
+        const { controller } = createYoutubeControllerHarness({ ui });
+        globalThis.window.YT = {
+            PlayerState: {
+                PAUSED: 2,
+                ENDED: 0,
+                PLAYING: 1
+            },
+            Player: class {
+                constructor(host, options) {
+                    this.iframe = attachMockPlayerIframe(host, options);
+                }
+
+                getIframe() {
+                    return this.iframe;
+                }
+
+                getPlayerState() {
+                    return globalThis.window.YT.PlayerState.PLAYING;
+                }
+
+                destroy() {}
+            }
+        };
+
+        const thumb = document.createElement("div");
+        document.body.appendChild(thumb);
+        const playbackPromise = controller.playThumbnail(thumb, { videoId: "video-already-playing", startSeconds: 0 });
+        await Promise.resolve();
+
+        assert.equal(await playbackPromise, true);
+    } finally {
+        cleanup();
+    }
+});
+
 test("youtube: playThumbnail resolves false and restores the thumbnail after a player error", async () => {
     const cleanup = installFakeDom();
     try {
@@ -1397,7 +1436,7 @@ test("youtube: autoplay timeout emits debug logs only when debug mode is enabled
                 {
                     songKey: "",
                     videoId: "video-autoplay-debug-2",
-                    reason: "start-timeout"
+                    reason: "setup-timeout"
                 }
             ])),
             true
