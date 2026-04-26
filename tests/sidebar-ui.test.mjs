@@ -222,3 +222,195 @@ test("sidebar: escape closes settings panel, removes inert, and restores focus",
         restoreDom();
     }
 });
+
+test("sidebar: openBookmarkModal opens sidebar first when closed and passes closeSidebarOnExit", () => {
+    const restoreDom = installFakeDom();
+    try {
+        const { ui, closeSidebarBtn } = createSidebarUiState();
+        const launcher = document.createElement("button");
+        document.body.appendChild(launcher);
+        launcher.focus();
+        const openBookmarkCalls = [];
+        const controller = createSidebarController({
+            data: { displayLimit: 48 },
+            ui,
+            constants: { incrementCount: 48 },
+            callbacks: createSidebarCallbacks({
+                bookmarkUiController: {
+                    closeBookmarkModal() {},
+                    openBookmarkBrowser() {},
+                    setupBookmarkHandlers() {},
+                    openBookmarkModal(songKey, options) {
+                        openBookmarkCalls.push({ songKey, options });
+                    },
+                    removeSongFromActiveBookmark() {},
+                    clearActiveBookmark() {}
+                }
+            })
+        });
+
+        controller.setupUIHandlers();
+        controller.openBookmarkModal("song-42");
+
+        assert.equal(ui.el.sidebar.classList.contains("active"), true);
+        assert.equal(openBookmarkCalls.length, 1);
+        assert.equal(openBookmarkCalls[0].songKey, "song-42");
+        assert.equal(openBookmarkCalls[0].options.returnFocusEl, launcher);
+        assert.equal(openBookmarkCalls[0].options.closeSidebarOnExit, true);
+        assert.equal(document.activeElement, closeSidebarBtn);
+    } finally {
+        restoreDom();
+    }
+});
+
+test("sidebar: escape prioritizes settings panel over bookmark panel", () => {
+    const restoreDom = installFakeDom();
+    try {
+        const { ui, openSidebarBtn } = createSidebarUiState();
+        let bookmarkCloseCount = 0;
+        const controller = createSidebarController({
+            data: { displayLimit: 48 },
+            ui,
+            constants: { incrementCount: 48 },
+            callbacks: createSidebarCallbacks({
+                bookmarkUiController: {
+                    closeBookmarkModal() {
+                        bookmarkCloseCount += 1;
+                    },
+                    openBookmarkBrowser() {},
+                    setupBookmarkHandlers() {},
+                    openBookmarkModal() {},
+                    removeSongFromActiveBookmark() {},
+                    clearActiveBookmark() {}
+                }
+            })
+        });
+
+        controller.setupUIHandlers();
+        invokeListener(openSidebarBtn, "click", {});
+        ui.el.settingsSidebarPanel.hidden = false;
+        ui.el.bookmarkSidebarPanel.hidden = false;
+        ui.el.openSettingsPanelBtn.focus();
+
+        const keydownListener = document._events.get("keydown");
+        let prevented = false;
+        keydownListener({
+            key: "Escape",
+            preventDefault() {
+                prevented = true;
+            }
+        });
+
+        assert.equal(prevented, true);
+        assert.equal(ui.el.settingsSidebarPanel.hidden, true);
+        assert.equal(ui.el.bookmarkSidebarPanel.hidden, false);
+        assert.equal(bookmarkCloseCount, 1);
+        assert.equal(document.activeElement, ui.el.openSettingsPanelBtn);
+    } finally {
+        restoreDom();
+    }
+});
+
+test("sidebar: ios year change clears lower date selects and removes updating class after two frames", () => {
+    const restoreDom = installFakeDom();
+    const previousRequestAnimationFrame = globalThis.requestAnimationFrame;
+    const frameQueue = [];
+    globalThis.requestAnimationFrame = (callback) => {
+        frameQueue.push(callback);
+        return frameQueue.length;
+    };
+    try {
+        const { ui } = createSidebarUiState();
+        const fromGroup = document.createElement("div");
+        fromGroup.className = "date-select-group";
+        fromGroup.append(ui.el.dateFromYear, ui.el.dateFromMonth, ui.el.dateFromDay);
+        ui.el.sidebar.appendChild(fromGroup);
+        ui.el.dateFromYear.value = "2026";
+        ui.el.dateFromMonth.value = "03";
+        ui.el.dateFromDay.value = "11";
+        const markFilterTouchedArgs = [];
+        let clampCount = 0;
+        let syncCount = 0;
+        const controller = createSidebarController({
+            data: { displayLimit: 48 },
+            ui,
+            constants: { incrementCount: 48 },
+            callbacks: {
+                ...createSidebarCallbacks(),
+                isIOSWebKit: () => true,
+                markFilterTouched: (options) => {
+                    markFilterTouchedArgs.push(options);
+                },
+                clampDateInputsIfNeeded: () => {
+                    clampCount += 1;
+                },
+                syncDateSelectOptions: () => {
+                    syncCount += 1;
+                }
+            }
+        });
+
+        controller.setupUIHandlers();
+        invokeListener(ui.el.dateFromYear, "change", { target: ui.el.dateFromYear });
+
+        assert.equal(fromGroup.classList.contains("is-updating"), true);
+        assert.equal(ui.el.dateFromMonth.value, "");
+        assert.equal(ui.el.dateFromDay.value, "");
+        assert.deepEqual(markFilterTouchedArgs, [{ immediate: true }]);
+        assert.equal(clampCount, 1);
+        assert.equal(syncCount, 1);
+
+        frameQueue.shift()();
+        assert.equal(fromGroup.classList.contains("is-updating"), true);
+        frameQueue.shift()();
+        assert.equal(fromGroup.classList.contains("is-updating"), false);
+    } finally {
+        globalThis.requestAnimationFrame = previousRequestAnimationFrame;
+        restoreDom();
+    }
+});
+
+test("sidebar: tab focus is trapped within the active sidebar in both directions", () => {
+    const restoreDom = installFakeDom();
+    try {
+        const { ui, openSidebarBtn, closeSidebarBtn } = createSidebarUiState();
+        const controller = createSidebarController({
+            data: { displayLimit: 48 },
+            ui,
+            constants: { incrementCount: 48 },
+            callbacks: createSidebarCallbacks()
+        });
+
+        controller.setupUIHandlers();
+        invokeListener(openSidebarBtn, "click", {});
+
+        const keydownListener = document._events.get("keydown");
+        let preventedForward = false;
+        ui.el.clearDateToBtn.focus();
+        keydownListener({
+            key: "Tab",
+            shiftKey: false,
+            preventDefault() {
+                preventedForward = true;
+            }
+        });
+
+        assert.equal(preventedForward, true);
+        assert.equal(document.activeElement, closeSidebarBtn);
+
+        let preventedBackward = false;
+        closeSidebarBtn.focus();
+        keydownListener({
+            key: "Tab",
+            shiftKey: true,
+            preventDefault() {
+                preventedBackward = true;
+            }
+        });
+
+        assert.equal(preventedBackward, true);
+        assert.equal(document.activeElement, ui.el.clearDateToBtn);
+    } finally {
+        restoreDom();
+    }
+});

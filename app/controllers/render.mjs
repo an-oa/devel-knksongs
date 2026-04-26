@@ -1,4 +1,5 @@
 import { getHeaderHeight } from "../lib/dom-utils.mjs?v=11";
+import { tracePlayback } from "../lib/playback-debug.mjs?v=11";
 import { scheduleScrollElementIntoView } from "../lib/results-scroll.mjs?v=11";
 import { getPlaybackUiState, getRenderUiState, getSearchUiState } from "../lib/ui-slices.mjs?v=11";
 
@@ -26,34 +27,6 @@ export function createRenderController({ data, ui, isAllFormatsSelected, increme
     const setupScrollObserver = callbacks.setupScrollObserver;
     const removeSongFromActiveBookmark = callbacks.removeSongFromActiveBookmark;
     const saveBookmarks = callbacks.saveBookmarks;
-
-    /**
-     * 再生系デバッグログの有効状態を返す。
-     * @returns {boolean}
-     */
-    function isPlaybackDebugEnabled() {
-        try {
-            if (window.__KNK_DEBUG_YOUTUBE__ === true) return true;
-            return localStorage.getItem("debugYoutubePlayer") === "true";
-        } catch {
-            return false;
-        }
-    }
-
-    /**
-     * 描画更新由来の再生停止診断ログを stack trace 付きで出す。
-     * @param {string} message
-     * @param {*} details
-     */
-    function traceRenderPlayback(message, details) {
-        if (!isPlaybackDebugEnabled()) return;
-        if (details === undefined) {
-            console.debug("[render]", message);
-        } else {
-            console.debug("[render]", message, details);
-        }
-        console.trace("[render trace]", message);
-    }
 
     /**
      * 結果カードを構成するDOM要素一式を生成する。
@@ -349,7 +322,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected, increme
     function stopActivePlaybackIfHidden(activeState) {
         if (!activeState.activeThumb) return;
         if (activeState.isActiveCardInNextNodes) return;
-        traceRenderPlayback("stopActivePlaybackIfHidden", {
+        tracePlayback("render", "stopActivePlaybackIfHidden", {
             activeSongKey: activeState.activeCard instanceof HTMLElement
                 ? (activeState.activeCard.dataset.songKey || "")
                 : "",
@@ -684,7 +657,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected, increme
      * 収集・描画・監視更新までの表示更新パイプラインを行う。
      */
     function updateDisplay() {
-        traceRenderPlayback("updateDisplay");
+        tracePlayback("render", "updateDisplay");
         const displayState = collectDisplayState();
         prepareDisplayObservation();
         const rendered = renderDisplayState(displayState);

@@ -52,117 +52,6 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
     }
 
     /**
-     * 実験設定に属する定義か判定する。
-     * @param {*} definition
-     * @returns {boolean}
-     */
-    function isExperimentalPlaybackDefinition(definition) {
-        return Boolean(definition && definition.experimental);
-    }
-
-    /**
-     * 実験設定の表示状態に応じて、隠し設定の実効値を反映する。
-     * @param {Array<*>} definitions
-     * @param {"afterStorageApply" | "afterToggleChange"} hookName
-     */
-    function applyExperimentalPlaybackSettingValues(definitions, hookName) {
-        const experimentalEnabled = isExperimentalPlaybackSettingsEffective();
-        for (const definition of definitions) {
-            if (!isExperimentalPlaybackDefinition(definition)) continue;
-            const previousValue = Boolean(playbackUi[definition.stateKey]);
-            const nextValue = experimentalEnabled
-                ? loadStoredBoolean(definition.storageKey, definition.defaultValue)
-                : false;
-            applyPlaybackSettingValue(definition, nextValue);
-            if (typeof definition[hookName] === "function") {
-                definition[hookName](previousValue, nextValue);
-            }
-        }
-    }
-
-    /**
-     * 再生設定定義を返す。
-     * @returns {Array<*>}
-     */
-    function getPlaybackSettingDefinitions() {
-        return [
-            {
-                stateKey: "showThumbnails",
-                elementKey: "thumbToggle",
-                storageKey: THUMBNAIL_STORAGE_KEY,
-                defaultValue: false,
-                syncValue(value) {
-                    document.body.classList.toggle("hide-thumbs", !value);
-                    syncExperimentalPlaybackToggleVisibility(value);
-                    syncExperimentalPlaybackVisibility();
-                    ensureThumbnailPlaybackReady();
-                },
-                afterStorageApply(previousValue, nextValue) {
-                    if (previousValue === nextValue || !searchUi.dataReady) return;
-                    updateDisplay();
-                    setupScrollObserver();
-                },
-                afterToggleChange() {
-                    updateDisplay();
-                    setupScrollObserver();
-                    applyExperimentalPlaybackSettingValues(
-                        getPlaybackSettingDefinitions(),
-                        "afterToggleChange"
-                    );
-                }
-            },
-            {
-                stateKey: "showExperimentalPlaybackSettings",
-                elementKey: "experimentalPlaybackToggle",
-                storageKey: EXPERIMENTAL_PLAYBACK_SETTINGS_STORAGE_KEY,
-                defaultValue: false,
-                syncValue() {
-                    syncExperimentalPlaybackVisibility();
-                },
-                afterStorageApply() {
-                    applyExperimentalPlaybackSettingValues(
-                        getPlaybackSettingDefinitions(),
-                        "afterStorageApply"
-                    );
-                },
-                afterToggleChange() {
-                    applyExperimentalPlaybackSettingValues(
-                        getPlaybackSettingDefinitions(),
-                        "afterToggleChange"
-                    );
-                }
-            },
-            {
-                experimental: true,
-                stateKey: "stopAtEndTime",
-                elementKey: "endTimeToggle",
-                storageKey: STOP_AT_END_TIME_STORAGE_KEY,
-                defaultValue: false,
-                afterStorageApply(previousValue, nextValue) {
-                    if (previousValue !== nextValue) restoreActivePlayback();
-                },
-                afterToggleChange(previousValue, nextValue) {
-                    if (previousValue !== nextValue) restoreActivePlayback();
-                }
-            },
-            {
-                experimental: true,
-                stateKey: "continuousPlayback",
-                elementKey: "continuousPlaybackToggle",
-                storageKey: CONTINUOUS_PLAYBACK_STORAGE_KEY,
-                defaultValue: false
-            },
-            {
-                experimental: true,
-                stateKey: "loopPlayback",
-                elementKey: "loopPlaybackToggle",
-                storageKey: LOOP_PLAYBACK_STORAGE_KEY,
-                defaultValue: false
-            }
-        ];
-    }
-
-    /**
      * 保存済み真偽値設定を返す。
      * @param {string} key
      * @param {boolean} defaultValue
@@ -188,6 +77,102 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
     }
 
     /**
+     * 設定定義へ現在値を反映し、副作用フックがあれば呼ぶ。
+     * @param {*} definition
+     * @param {boolean} nextValue
+     * @param {"afterStorageApply" | "afterToggleChange"} hookName
+     */
+    function applyPlaybackDefinitionValue(definition, nextValue, hookName) {
+        const previousValue = Boolean(playbackUi[definition.stateKey]);
+        applyPlaybackSettingValue(definition, nextValue);
+        if (typeof definition[hookName] === "function") {
+            definition[hookName](previousValue, nextValue);
+        }
+    }
+
+    const experimentalDefinitions = [
+        {
+            stateKey: "stopAtEndTime",
+            elementKey: "endTimeToggle",
+            storageKey: STOP_AT_END_TIME_STORAGE_KEY,
+            defaultValue: false,
+            afterStorageApply(previousValue, nextValue) {
+                if (previousValue !== nextValue) restoreActivePlayback();
+            },
+            afterToggleChange(previousValue, nextValue) {
+                if (previousValue !== nextValue) restoreActivePlayback();
+            }
+        },
+        {
+            stateKey: "continuousPlayback",
+            elementKey: "continuousPlaybackToggle",
+            storageKey: CONTINUOUS_PLAYBACK_STORAGE_KEY,
+            defaultValue: false
+        },
+        {
+            stateKey: "loopPlayback",
+            elementKey: "loopPlaybackToggle",
+            storageKey: LOOP_PLAYBACK_STORAGE_KEY,
+            defaultValue: false
+        }
+    ];
+
+    /**
+     * 実験設定の表示状態に応じて、隠し設定の実効値を反映する。
+     * @param {"afterStorageApply" | "afterToggleChange"} hookName
+     */
+    function applyExperimentalPlaybackSettingValues(hookName) {
+        const experimentalEnabled = isExperimentalPlaybackSettingsEffective();
+        for (const definition of experimentalDefinitions) {
+            const nextValue = experimentalEnabled
+                ? loadStoredBoolean(definition.storageKey, definition.defaultValue)
+                : false;
+            applyPlaybackDefinitionValue(definition, nextValue, hookName);
+        }
+    }
+
+    const definitions = [
+        {
+            stateKey: "showThumbnails",
+            elementKey: "thumbToggle",
+            storageKey: THUMBNAIL_STORAGE_KEY,
+            defaultValue: false,
+            syncValue(value) {
+                document.body.classList.toggle("hide-thumbs", !value);
+                syncExperimentalPlaybackToggleVisibility(value);
+                syncExperimentalPlaybackVisibility();
+                ensureThumbnailPlaybackReady();
+            },
+            afterStorageApply(previousValue, nextValue) {
+                if (previousValue === nextValue || !searchUi.dataReady) return;
+                updateDisplay();
+                setupScrollObserver();
+            },
+            afterToggleChange() {
+                updateDisplay();
+                setupScrollObserver();
+                applyExperimentalPlaybackSettingValues("afterToggleChange");
+            }
+        },
+        {
+            stateKey: "showExperimentalPlaybackSettings",
+            elementKey: "experimentalPlaybackToggle",
+            storageKey: EXPERIMENTAL_PLAYBACK_SETTINGS_STORAGE_KEY,
+            defaultValue: false,
+            syncValue(value) {
+                syncExperimentalPlaybackVisibility();
+            },
+            afterStorageApply() {
+                applyExperimentalPlaybackSettingValues("afterStorageApply");
+            },
+            afterToggleChange() {
+                applyExperimentalPlaybackSettingValues("afterToggleChange");
+            }
+        },
+        ...experimentalDefinitions
+    ];
+
+    /**
      * 保存領域から全再生設定の値を読み出す。
      * @param {Array<*>} definitions
      * @returns {Map<string, boolean>}
@@ -205,7 +190,7 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
      * @param {boolean} nextValue
      */
     function handlePlaybackSettingChange(definition, nextValue) {
-        if (isExperimentalPlaybackDefinition(definition) && !isExperimentalPlaybackSettingsEffective()) {
+        if (experimentalDefinitions.includes(definition) && !isExperimentalPlaybackSettingsEffective()) {
             applyPlaybackSettingValue(definition, false);
             return;
         }
@@ -222,16 +207,11 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
      * 現在の再生設定を UI 状態とトグルへ反映する。
      */
     function applyPlaybackSettingsFromStorage() {
-        const definitions = getPlaybackSettingDefinitions();
         const nextValues = readPlaybackSettingValues(definitions);
         for (const definition of definitions) {
-            if (isExperimentalPlaybackDefinition(definition)) continue;
-            const previousValue = Boolean(playbackUi[definition.stateKey]);
             const nextValue = Boolean(nextValues.get(definition.stateKey));
-            applyPlaybackSettingValue(definition, nextValue);
-            if (typeof definition.afterStorageApply === "function") {
-                definition.afterStorageApply(previousValue, nextValue);
-            }
+            if (experimentalDefinitions.includes(definition)) continue;
+            applyPlaybackDefinitionValue(definition, nextValue, "afterStorageApply");
         }
     }
 
@@ -239,7 +219,6 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
      * 再生設定トグルを初期化して変更内容を保存する。
      */
     function setupPlaybackSettings() {
-        const definitions = getPlaybackSettingDefinitions();
         applyPlaybackSettingsFromStorage();
         for (const definition of definitions) {
             const toggle = ui.el[definition.elementKey];
