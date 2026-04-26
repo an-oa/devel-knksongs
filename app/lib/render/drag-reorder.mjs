@@ -1,4 +1,4 @@
-import { isHtmlElement } from "../dom-utils.mjs?v=11";
+import { isHtmlElement } from "../dom-utils.mjs?v=13";
 
 /**
  * イベント対象から曲カード要素を返す。
