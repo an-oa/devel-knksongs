@@ -616,13 +616,13 @@ test("youtube: replay ignores ended event while the next same-thumb start is sti
     }
 });
 
-test("youtube: playback start timeout restores the thumbnail", async () => {
+test("youtube: playback start timeout leaves the iframe mounted as unconfirmed", async () => {
     const cleanup = installFakeDom();
     const previousSetTimeout = globalThis.setTimeout;
     const previousClearTimeout = globalThis.clearTimeout;
-    let timeoutCallback = null;
-    setGlobalValue("setTimeout", (cb) => {
-        timeoutCallback = cb;
+    const timeoutCalls = [];
+    setGlobalValue("setTimeout", (cb, delay) => {
+        timeoutCalls.push({ cb, delay });
         return 1;
     });
     setGlobalValue("clearTimeout", () => {});
@@ -655,17 +655,24 @@ test("youtube: playback start timeout restores the thumbnail", async () => {
             startSeconds: 0
         });
         await Promise.resolve();
-
-        assert.ok(thumb.querySelector("iframe"));
-        assert.equal(typeof timeoutCallback, "function");
-
-        timeoutCallback();
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
         await Promise.resolve();
 
-        assert.equal(await playbackPromise, false);
-        assert.ok(thumb.querySelector("img"));
-        assert.equal(thumb.querySelector("iframe"), null);
-        assert.equal(ui.playback.activeThumb, null);
+        assert.ok(thumb.querySelector("iframe"));
+        const startTimeout = timeoutCalls.find((call) => call.delay === 5000);
+        assert.equal(typeof startTimeout?.cb, "function");
+
+        startTimeout.cb();
+        await Promise.resolve();
+
+        assert.equal(await playbackPromise, "unconfirmed");
+        assert.ok(thumb.querySelector("iframe"));
+        assert.equal(thumb.querySelector("img"), null);
+        assert.equal(ui.playback.activeThumb, thumb);
     } finally {
         setGlobalValue("setTimeout", previousSetTimeout);
         setGlobalValue("clearTimeout", previousClearTimeout);
@@ -673,13 +680,13 @@ test("youtube: playback start timeout restores the thumbnail", async () => {
     }
 });
 
-test("youtube: autoplay timeout restores the thumbnail and clears the active thumb", async () => {
+test("youtube: autoplay timeout leaves the iframe mounted as unconfirmed", async () => {
     const cleanup = installFakeDom();
     const previousSetTimeout = globalThis.setTimeout;
     const previousClearTimeout = globalThis.clearTimeout;
-    let timeoutCallback = null;
-    setGlobalValue("setTimeout", (cb) => {
-        timeoutCallback = cb;
+    const timeoutCalls = [];
+    setGlobalValue("setTimeout", (cb, delay) => {
+        timeoutCalls.push({ cb, delay });
         return {
             unref() {}
         };
@@ -688,6 +695,24 @@ test("youtube: autoplay timeout restores the thumbnail and clears the active thu
     try {
         const ui = createYoutubeUiState({});
         const { controller } = createYoutubeControllerHarness({ ui });
+        window.YT = {
+            PlayerState: {
+                ENDED: 0,
+                PLAYING: 1,
+                PAUSED: 2
+            },
+            Player: class {
+                constructor(host) {
+                    this.iframe = attachMockPlayerIframe(host);
+                }
+
+                getIframe() {
+                    return this.iframe;
+                }
+
+                destroy() {}
+            }
+        };
 
         const card = document.createElement("div");
         card.className = "song-card";
@@ -701,16 +726,23 @@ test("youtube: autoplay timeout restores the thumbnail and clears the active thu
             playbackMode: "autoplay"
         });
         await Promise.resolve();
-
-        assert.equal(typeof timeoutCallback, "function");
-
-        timeoutCallback();
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
         await Promise.resolve();
 
-        assert.equal(await playbackPromise, false);
-        assert.ok(thumb.querySelector("img"));
-        assert.equal(thumb.querySelector("iframe"), null);
-        assert.equal(ui.playback.activeThumb, null);
+        const startTimeout = timeoutCalls.find((call) => call.delay === 5000);
+        assert.equal(typeof startTimeout?.cb, "function");
+
+        startTimeout.cb();
+        await Promise.resolve();
+
+        assert.equal(await playbackPromise, "unconfirmed");
+        assert.ok(thumb.querySelector("iframe"));
+        assert.equal(thumb.querySelector("img"), null);
+        assert.equal(ui.playback.activeThumb, thumb);
     } finally {
         setGlobalValue("setTimeout", previousSetTimeout);
         setGlobalValue("clearTimeout", previousClearTimeout);
@@ -1281,6 +1313,45 @@ test("youtube: playThumbnail resolves true after the player enters PLAYING", asy
     }
 });
 
+test("youtube: playThumbnail resolves true when attached player is already playing", async () => {
+    const cleanup = installFakeDom();
+    try {
+        const ui = createYoutubeUiState({});
+        const { controller } = createYoutubeControllerHarness({ ui });
+        globalThis.window.YT = {
+            PlayerState: {
+                PAUSED: 2,
+                ENDED: 0,
+                PLAYING: 1
+            },
+            Player: class {
+                constructor(host, options) {
+                    this.iframe = attachMockPlayerIframe(host, options);
+                }
+
+                getIframe() {
+                    return this.iframe;
+                }
+
+                getPlayerState() {
+                    return globalThis.window.YT.PlayerState.PLAYING;
+                }
+
+                destroy() {}
+            }
+        };
+
+        const thumb = document.createElement("div");
+        document.body.appendChild(thumb);
+        const playbackPromise = controller.playThumbnail(thumb, { videoId: "video-already-playing", startSeconds: 0 });
+        await Promise.resolve();
+
+        assert.equal(await playbackPromise, true);
+    } finally {
+        cleanup();
+    }
+});
+
 test("youtube: playThumbnail resolves false and restores the thumbnail after a player error", async () => {
     const cleanup = installFakeDom();
     try {
@@ -1397,7 +1468,7 @@ test("youtube: autoplay timeout emits debug logs only when debug mode is enabled
                 {
                     songKey: "",
                     videoId: "video-autoplay-debug-2",
-                    reason: "start-timeout"
+                    reason: "setup-timeout"
                 }
             ])),
             true

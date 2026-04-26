@@ -257,7 +257,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected, increme
     /**
      * 曲キーに対応するカードを必要に応じて描画し、再生開始する。
      * @param {string} songKey
-     * @returns {Promise<boolean>}
+     * @returns {Promise<boolean | string>}
      */
     function playSongByKey(songKey) {
         const index = data.currentResults.findIndex((row) => row && row.songKey === songKey);
@@ -272,7 +272,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected, increme
         return Promise.resolve(playThumbnail(entry.thumbDiv, buildYoutubeTarget(data.currentResults[index]), {
             playbackMode: "autoplay"
         }))
-            .then((didStart) => Boolean(didStart));
+            .then((playbackResult) => playbackResult);
     }
 
     /**

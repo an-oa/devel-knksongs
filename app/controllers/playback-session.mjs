@@ -1,6 +1,7 @@
 import { getPlaybackContinuationCandidates } from "../lib/playback-sequence.mjs?v=11";
 import { debugPlayback } from "../lib/playback-debug.mjs?v=11";
 import { getPlaybackUiState } from "../lib/ui-slices.mjs?v=11";
+import { YOUTUBE_PLAYBACK_START_UNCONFIRMED } from "../lib/youtube/playback-start-attempt.mjs?v=11";
 
 /**
  * 再生終了後の継続再生と追従スクロールを制御する。
@@ -32,20 +33,27 @@ export function createPlaybackSessionController({ data, ui, callbacks }) {
             loopPlayback: playbackUi.loopPlayback
         });
         for (const songKey of candidates) {
-            const didStart = await Promise.resolve(playSongByKey(songKey));
+            const playbackResult = await Promise.resolve(playSongByKey(songKey));
             debugPlayback("playback-session", "continuePlayback playSongByKey result", {
                 finishedSongKey,
                 candidateSongKey: songKey,
-                didStart,
+                playbackResult,
                 hasActiveThumb: Boolean(playbackUi.activeThumb)
             });
-            if (didStart) {
+            if (playbackResult === true) {
                 scrollSongIntoView(songKey);
                 debugPlayback("playback-session", "continuePlayback advanced", {
                     finishedSongKey,
                     nextSongKey: songKey
                 });
                 return true;
+            }
+            if (playbackResult === YOUTUBE_PLAYBACK_START_UNCONFIRMED) {
+                debugPlayback("playback-session", "continuePlayback stopped because playback start is unconfirmed", {
+                    finishedSongKey,
+                    candidateSongKey: songKey
+                });
+                return false;
             }
             if (playbackUi.activeThumb) {
                 debugPlayback("playback-session", "continuePlayback stopped because playback was taken over", {

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createPlaybackSessionController } from "../app/controllers/playback-session.mjs";
+import { YOUTUBE_PLAYBACK_START_UNCONFIRMED } from "../app/lib/youtube/playback-start-attempt.mjs";
 
 /**
  * 再生セッション制御テスト用の UI 状態を作る。
@@ -147,6 +148,36 @@ test("playback session: awaits async playback failure before trying the next can
 
     assert.equal(continued, true);
     assert.deepEqual(calls, ["play:song:2", "play:song:3", "scroll:song:3"]);
+});
+
+test("playback session: stops trying later candidates when playback start is unconfirmed", async () => {
+    const data = {
+        currentResults: [
+            { songKey: "song:1" },
+            { songKey: "song:2" },
+            { songKey: "song:3" }
+        ]
+    };
+    const ui = createPlaybackUi({ continuousPlayback: true });
+    const calls = [];
+    const controller = createPlaybackSessionController({
+        data,
+        ui,
+        callbacks: createPlaybackSessionCallbacks({
+        playSongByKey: (songKey) => {
+            calls.push(`play:${songKey}`);
+            return YOUTUBE_PLAYBACK_START_UNCONFIRMED;
+        },
+        scrollSongIntoView: (songKey) => {
+            calls.push(`scroll:${songKey}`);
+        }
+        })
+    });
+
+    const continued = await controller.continuePlayback("song:1");
+
+    assert.equal(continued, false);
+    assert.deepEqual(calls, ["play:song:2"]);
 });
 
 test("playback session: stops trying later candidates after manual playback takes over", async () => {
