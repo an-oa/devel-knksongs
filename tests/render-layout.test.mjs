@@ -418,8 +418,8 @@ test("render: playSongByKey expands display limit and starts playback for hidden
             callbacks: createRenderCallbacks({
                 getSearchState: () => ({ queryRaw: "" }),
                 extractYoutubeInfo,
-                playThumbnail: (thumbDiv, yt) => {
-                    playCalls.push({ thumbDiv, yt });
+                playThumbnail: (thumbDiv, yt, options) => {
+                    playCalls.push({ thumbDiv, yt, options });
                     return true;
                 }
             })
@@ -432,6 +432,9 @@ test("render: playSongByKey expands display limit and starts playback for hidden
         assert.equal(data.displayLimit, 3);
         assert.equal(playCalls.length, 1);
         assert.equal(playCalls[0].yt.videoId, "video3");
+        assert.deepEqual(playCalls[0].options, {
+            playbackMode: "autoplay"
+        });
         const entry = ui.render.cardEntriesBySourceKey.get("song:song:3");
         assert.ok(entry);
         assert.equal(playCalls[0].thumbDiv, entry.thumbDiv);
