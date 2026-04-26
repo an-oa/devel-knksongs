@@ -23,7 +23,7 @@
   - サムネイル表示をONにした場合、サムネイルをクリックしてページ内で埋め込み再生できます(×で閉じてサムネに戻ります)。
   - 埋め込み再生は標準の `youtube.com` 埋め込みを使用します(曲名リンクは通常の `youtube.com` / `youtu.be` を開きます)。
     - 一部のモバイル環境では、再生開始時刻が反映されない場合があります(端末/ブラウザ/YouTube側の挙動差によります)。
-  - 設定パネルの再生設定で、次の挙動を切り替えられます。
+  - 設定パネルで「実験的な機能を表示」をONにすると、次の再生設定を切り替えられます。
     - 曲の終わりで停止する: CSVの終了時刻がある曲は、その時刻で再生を止めます。
     - 終了後、次の曲を再生: 現在の一覧順で、次の曲へ順に進みます。
     - リピート再生: 「終了後、次の曲を再生」がOFFなら現在の曲、ONなら一覧全体を繰り返します。
@@ -45,8 +45,9 @@
   - おすすめ一覧は条件変更でおすすめ表示を離れて戻っても維持され、CSVの再読み込み時に再抽出されます。
 - 表示テーマを切り替えられます。
   - ダークモード切替に対応します(設定はブラウザに保存されます)。
-- 設定パネルで表示設定と再生設定を切り替えられます。
+- 設定パネルで表示設定と実験的な再生設定を切り替えられます。
   - 表示: サムネイル表示 / ダークモード
+  - 実験的な機能を表示: ONにすると再生設定を表示します。
   - 再生: 曲の終わりで停止する / 終了後、次の曲を再生 / リピート再生
 
 ---
@@ -90,9 +91,9 @@ flowchart TD
 
 ## データソース(開発者向けメモ)
 
-- 公開スプレッドシートをCSVとして参照します(`state.mjs` の `PUBLIC_CSV_URL` で指定します)。
+- 公開スプレッドシートをCSVとして参照します(`app/state.mjs` の `PUBLIC_CSV_URL` で指定します)。
 - フロントエンドのみで動作します(静的ホスティング想定)。
-- 配布物はHTML/CSS/JavaScriptのみで、npm等の同梱依存はありません。
+- 配布物はHTML/CSS/JavaScriptのみで、実行時にnpm等の同梱依存はありません。
 - サムネイル表示/埋め込み再生まわりでは YouTube Iframe API を動的に利用します。
 - 開発時テストは Node.js 標準の `node:test` を利用します。
 - ブラウザ回帰確認として Playwright による Chromium スモークテストを追加できます。
@@ -100,17 +101,29 @@ flowchart TD
 ## テスト(開発者向け)
 
 - 現在は以下のテストを用意しています。
+  - ブックマーク保存スキーマ/移行のテスト (`tests/bookmark-storage-schema.test.mjs`)
+  - ブックマークUIのテスト (`tests/bookmark-ui.test.mjs`)
+  - CSVパースのテスト (`tests/csv-parser.test.mjs`)
+  - 初期データ読み込みとCSVキャッシュのテスト (`tests/data-loader.test.mjs`)
+  - DOM補助関数のテスト (`tests/dom-utils.test.mjs`)
   - 検索/日付フィルタ/ブックマーク検索のロジック (`tests/search-date.test.mjs`)
   - フォーマット表示ラベルのテスト (`tests/format-filter.test.mjs`)
   - 「終了後、次の曲を再生」/リピート再生の純粋ロジック (`tests/playback-sequence.test.mjs`)
   - 再生終了後の継続再生フロー制御のテスト (`tests/playback-session-controller.test.mjs`)
-  - 描画/レイアウトまわりの回帰テスト（ブックマーク時のドラッグ並び替え・順序保存を含む） (`tests/render-layout.test.mjs`)
-  - YouTubeサムネイル/埋め込み再生まわりのテスト (`tests/youtube-controller.test.mjs`)
-  - Chromium 上での YouTube 再生スモークテスト (`tests/e2e/youtube-smoke.spec.mjs`)
+  - 描画/レイアウトまわりの回帰テスト (`tests/render-layout.test.mjs`)
+  - ブックマーク時のドラッグ並び替えテスト (`tests/render-drag-reorder.test.mjs`)
+  - masonryレイアウト計算のテスト (`tests/render-masonry-layout.test.mjs`)
   - レイアウト補正待機のテスト (`tests/layout-anchor.test.mjs`)
   - 結果一覧スクロール制御のテスト (`tests/results-scroll.test.mjs`)
-  - CSVパースのテスト (`tests/csv-parser.test.mjs`)
+  - サイドバーUIのテスト (`tests/sidebar-ui.test.mjs`)
   - ストレージ(ブックマーク上限/リネーム)の単体テスト (`tests/storage-bookmark-limit.test.mjs`)
+  - UI設定/ストレージ互換のテスト (`tests/ui-storage-compat.test.mjs`)
+  - UI同期のテスト (`tests/ui-sync.test.mjs`)
+  - YouTubeサムネイル/埋め込み再生まわりの統合テスト (`tests/youtube-controller.test.mjs`)
+  - YouTube埋め込みURL/API loader のテスト (`tests/youtube-embed.test.mjs`)
+  - YouTube playback state / start attempt / player adapter の単体テスト (`tests/youtube-playback-state.test.mjs`, `tests/youtube-playback-start-attempt.test.mjs`, `tests/youtube-player-adapter.test.mjs`)
+  - YouTube shared playback / thumbnail helper の単体テスト (`tests/youtube-shared-playback.test.mjs`, `tests/youtube-thumbnail.test.mjs`)
+  - Chromium 上での YouTube 再生スモークテスト (`tests/e2e/youtube-smoke.spec.mjs`)
 - 実行コマンド:
   - `node --test tests/*.mjs`
   - `npm run test:e2e`
@@ -130,7 +143,9 @@ flowchart TD
 
 - テーマ(ダーク/ライト)。
 - サムネイル表示ON/OFF。
+- 実験的な機能の表示ON/OFF。
 - 再生設定(曲の終わりで停止する / 終了後、次の曲を再生 / リピート再生)。
+  - 実験的な機能がOFFの間は、保存済みの再生設定は保持されますが実効値としては無効になります。
 - 検索状態(検索語・絞り込み条件・日付条件)。
 - ブックマーク情報(ブックマーク名・曲の対応/順序・作成日時)。
   - 保存形式は version 付き payload で管理し、旧形式は読み込み後に現行形式へ保存し直します。

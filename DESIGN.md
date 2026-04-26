@@ -10,25 +10,43 @@
 ## 全体構成
 - 静的フロントエンドのみ（HTML/CSS/JS, ES Modules）
 - データ取得：公開スプレッドシートのCSV
-- 同梱の外部ライブラリ依存：なし
+- 実行時の同梱外部ライブラリ依存：なし
 - 埋め込み再生まわりでは YouTube Iframe API を動的に利用
-- 開発時テスト：Node.js 標準 `node:test` を利用
+- 開発時テスト：Node.js 標準 `node:test` と Playwright Chromium smoke を利用
 
 ## テスト方針（現状）
-- 対象: 検索ロジック、日付フィルタ、ブックマーク検索、描画/再生まわりの回帰
-- 重点ケース: ブックマーク表示時のみ有効なドラッグ並び替えと、並び順の永続化
+- 対象: 検索ロジック、日付フィルタ、ブックマーク検索、描画/再生/保存/サイドバーまわりの回帰
+- 重点ケース: ブックマーク表示時のみ有効なドラッグ並び替えと、並び順の永続化、YouTube 継続再生の失敗復旧
 - テストファイル:
+  - `tests/bookmark-storage-schema.test.mjs`
+  - `tests/bookmark-ui.test.mjs`
+  - `tests/csv-parser.test.mjs`
+  - `tests/data-loader.test.mjs`
+  - `tests/dom-utils.test.mjs`
   - `tests/search-date.test.mjs`
   - `tests/format-filter.test.mjs`
   - `tests/playback-sequence.test.mjs`
   - `tests/playback-session-controller.test.mjs`
+  - `tests/render-drag-reorder.test.mjs`
   - `tests/render-layout.test.mjs`
+  - `tests/render-masonry-layout.test.mjs`
+  - `tests/sidebar-ui.test.mjs`
+  - `tests/storage-bookmark-limit.test.mjs`
+  - `tests/ui-storage-compat.test.mjs`
+  - `tests/ui-sync.test.mjs`
   - `tests/youtube-controller.test.mjs`
+  - `tests/youtube-embed.test.mjs`
+  - `tests/youtube-playback-start-attempt.test.mjs`
+  - `tests/youtube-playback-state.test.mjs`
+  - `tests/youtube-player-adapter.test.mjs`
+  - `tests/youtube-shared-playback.test.mjs`
+  - `tests/youtube-thumbnail.test.mjs`
   - `tests/layout-anchor.test.mjs`
   - `tests/results-scroll.test.mjs`
-  - `tests/csv-parser.test.mjs`
-  - `tests/storage-bookmark-limit.test.mjs`
-- 実行コマンド: `node --test tests/*.mjs`
+  - `tests/e2e/youtube-smoke.spec.mjs`
+- 実行コマンド:
+  - `node --test tests/*.mjs`
+  - `npm run test:e2e`
 
 ## 主要機能
 - 検索（曲名/アーティスト名/読み、複数キーワード）
@@ -37,22 +55,23 @@
 - おすすめ表示（条件未指定時）
 - 段階表示（追加読み込み）
 - サムネイル表示と埋め込み再生
-- 再生設定（曲の終わりで停止する / 終了後、次の曲を再生 / リピート再生）
+- 実験的な再生設定（曲の終わりで停止する / 終了後、次の曲を再生 / リピート再生）
 - テーマ切替（ダーク/ライト）
 
 ## UI構成
 - **サイドバー**：検索・絞り込み・設定
   - 検索入力
   - 日付選択（年/月/日セレクト、From/To）
-  - 形態フィルタ（配信/オリ曲/歌みた/ショート/切り抜き）
+  - 形態フィルタ（配信/オリ曲/歌みた/ショート/切り抜き。UI上はオリ曲/歌みたを1項目として扱う）
   - リレー/ハモリ
   - ブックマーク導線（専用パネルを開く）
   - 設定導線（専用パネルを開く）
-- **サイドバー内設定パネル**：表示設定と再生設定
+- **サイドバー内設定パネル**：表示設定と実験的な再生設定
   - 表示
     - サムネイル表示
     - ダークモード切替
-  - 再生
+    - 実験的な機能を表示
+  - 再生（実験的な機能を表示した場合のみ表示・有効化）
     - 曲の終わりで停止する
     - 終了後、次の曲を再生
     - リピート再生
@@ -123,7 +142,7 @@ flowchart TD
 ### 条件判定（「未指定」の定義）
 - キーワードが空（検索ボックスが空）
 - 日付が未指定（From/To ともに年・月・日が未選択）
-- 形態フィルタ4項目がすべてON（配信/オリ曲/歌みた/ショート/切り抜き）
+- 形態フィルタ4項目がすべてON（配信 / オリ曲/歌みた / ショート / 切り抜き）
 - リレー/ハモリがOFF
 - ブックマークが未選択
 
@@ -177,7 +196,7 @@ stateDiagram-v2
 - 条件を変更しておすすめから離脱→条件を元に戻す場合は、同じおすすめ並びを維持
 
 ### キャッシュの扱い
-- おすすめ一覧は `ui.recommendedCache` に保持
+- おすすめ一覧は `ui.search.recommendedCache` に保持
 - 条件変更ではキャッシュを破棄しない
 - CSV再読み込み時のみキャッシュを破棄
 
@@ -190,7 +209,7 @@ stateDiagram-v2
 ## 状態管理
 `state`
 - `data`：全曲/結果/表示件数/ブックマーク情報/選択中ブックマーク
-- `ui`：フィルタ状態、再生設定、キャッシュ、ブックマーク追加の一時状態
+- `ui`：検索/日付/再生/描画/設定パネル/ブックマークパネルなどの画面状態
 - `youtube`：API準備/プレイヤー管理
 
 ```mermaid
@@ -203,10 +222,10 @@ flowchart LR
     data --> d2[結果]
     data --> d3[表示件数]
     data --> d4[ブックマーク情報]
-    ui --> u1[フィルタ状態]
-    ui --> u2[サムネ表示と再生設定]
-    ui --> u3[recommendedCache]
-    ui --> u4[ブックマーク追加の一時状態]
+    ui --> u1[search: フィルタ状態とrecommendedCache]
+    ui --> u2[playback: サムネ表示と再生設定]
+    ui --> u3[render: カード再利用Map]
+    ui --> u4[settings/bookmark panel: 一時状態]
     youtube --> y1[API準備]
     youtube --> y2[プレイヤー管理]
 ```
@@ -215,7 +234,9 @@ flowchart LR
 ローカルストレージ保存：
 - テーマ
 - サムネ表示
+- 実験的な機能の表示状態
 - 再生設定（曲の終わりで停止する / 終了後、次の曲を再生 / リピート再生）
+  - 実験的な機能が非表示の間は、保存値を保持しつつ実効値はOFFとして扱う
 - CSVキャッシュ
 - 検索条件（キーワード・日付・形態など）
 - ブックマーク情報（ブックマーク名・曲参照/順序・作成日時）
@@ -246,8 +267,8 @@ flowchart LR
 ## 制約・注意点
 - iOSでは埋め込み再生に制約あり
 - Safari等でCSSキャッシュが残ることがあるため更新時はバスター推奨
-- `index.html` の `styles.css?v=...` と `script.js?v=...` は同じ値で運用する
+- `index.html` の `styles.css?v=...` と `app/script.js?v=...` は同じ値で運用する
   - UI/JS変更ごとには上げず、公開反映や配布反映の直前にまとめて値を上げる
-- `script.js` から読む ES Modules を更新した場合は、対応する import の `?v=...` も上げる
+- `app/script.js` から読む ES Modules を更新した場合は、対応する import の `?v=...` も上げる
   - 変更途中は既存値へ揃え、公開時に全体を同じ値へ切り替える
 - 日付入力はセレクト方式（ブラウザ互換性優先）
