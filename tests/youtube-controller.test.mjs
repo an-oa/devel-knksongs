@@ -1,78 +1,18 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createYoutubeController, extractYoutubeInfo } from "../app/controllers/youtube.mjs";
+import { extractYoutubeInfo } from "../app/controllers/youtube.mjs";
 import {
     installFakeDom,
     invokeListener,
     setGlobalValue
 } from "./test-helpers.mjs";
-
-/**
- * youtube 系テスト用の UI 状態を作る。
- * @param {*} input
- * @returns {*}
- */
-function createYoutubeUiState(input) {
-    return {
-        el: {
-            thumbToggle: input.thumbToggle ?? null,
-            endTimeToggle: input.endTimeToggle ?? null
-        },
-        search: {
-            dataReady: input.dataReady ?? false
-        },
-        playback: {
-            showThumbnails: input.showThumbnails ?? true,
-            stopAtEndTime: input.stopAtEndTime ?? false,
-            activeThumb: input.activeThumb ?? null,
-            scrollObserver: null
-        }
-    };
-}
-
-/**
- * テスト用の YT.Player モックで、既存 iframe をそのまま利用する。
- * @param {*} host
- * @param {*} options
- * @returns {*}
- */
-function attachMockPlayerIframe(host, options) {
-    const iframe = host && host.tagName === "IFRAME"
-        ? host
-        : document.createElement("iframe");
-    if (iframe !== host && host && typeof host.appendChild === "function") {
-        host.appendChild(iframe);
-    }
-    if (options && options.events && typeof options.events.onReady === "function") {
-        options.events.onReady({
-            target: {
-                getIframe() {
-                    return iframe;
-                }
-            }
-        });
-    }
-    return iframe;
-}
-
-/**
- * localStorage の最小モックを作る。
- * @returns {{ getItem: Function, setItem: Function, removeItem: Function }}
- */
-function createFakeLocalStorage() {
-    const store = new Map();
-    return {
-        getItem(key) {
-            return store.has(key) ? store.get(key) : null;
-        },
-        setItem(key, value) {
-            store.set(String(key), String(value));
-        },
-        removeItem(key) {
-            store.delete(key);
-        }
-    };
-}
+import {
+    attachMockPlayerIframe,
+    createFakeLocalStorage,
+    createYoutubeControllerHarness,
+    createYoutubeUiState,
+    installYoutubePlayerConstructor
+} from "./youtube-harness.mjs";
 
 test("youtube: disconnected active thumb is cleared without restore work", () => {
     const cleanup = installFakeDom();
@@ -80,20 +20,7 @@ test("youtube: disconnected active thumb is cleared without restore work", () =>
         const ui = createYoutubeUiState({
             activeThumb: document.createElement("div")
         });
-        const youtube = {
-            apiPromise: null,
-            players: new WeakMap()
-        };
-        const controller = createYoutubeController({
-            ui,
-            youtube,
-            constants: {
-                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
-                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
-                YT_IFRAME_READY_POLL_MS: 50,
-                STOP_PLAYBACK_ON_SCROLL_OUT: false
-            }
-        });
+        const { controller } = createYoutubeControllerHarness({ ui });
 
         controller.restoreActivePlayback();
         assert.equal(ui.playback.activeThumb, null);
@@ -111,20 +38,7 @@ test("youtube: vertical videos stay landscape in thumbnail mode and switch on if
     const cleanup = installFakeDom();
     try {
         const ui = createYoutubeUiState({});
-        const youtube = {
-            apiPromise: null,
-            players: new WeakMap()
-        };
-        const controller = createYoutubeController({
-            ui,
-            youtube,
-            constants: {
-                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
-                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
-                YT_IFRAME_READY_POLL_MS: 50,
-                STOP_PLAYBACK_ON_SCROLL_OUT: false
-            }
-        });
+        const { controller } = createYoutubeControllerHarness({ ui });
         let layoutRefreshCount = 0;
         controller.setLayoutHook(() => {
             layoutRefreshCount += 1;
@@ -161,45 +75,25 @@ test("youtube: player init uses prebuilt iframe src and binds YT.Player to it", 
     const cleanup = installFakeDom();
     try {
         const ui = createYoutubeUiState({});
-        const youtube = {
-            apiPromise: null,
-            players: new WeakMap()
-        };
-        const controller = createYoutubeController({
-            ui,
-            youtube,
-            constants: {
-                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
-                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
-                YT_IFRAME_READY_POLL_MS: 50,
-                STOP_PLAYBACK_ON_SCROLL_OUT: false
-            }
-        });
+        const { controller } = createYoutubeControllerHarness({ ui });
         const playerCalls = [];
-        window.YT = {
-            PlayerState: {
-                ENDED: 0,
-                PLAYING: 1,
-                PAUSED: 2
-            },
-            Player: class {
-                constructor(host, options) {
-                    playerCalls.push({ host, options });
-                    const iframe = document.createElement("iframe");
-                    host.appendChild(iframe);
-                    this._iframe = iframe;
-                    if (options.events && typeof options.events.onReady === "function") {
-                        options.events.onReady({ target: this });
-                    }
+        installYoutubePlayerConstructor(class {
+            constructor(host, options) {
+                playerCalls.push({ host, options });
+                const iframe = document.createElement("iframe");
+                host.appendChild(iframe);
+                this._iframe = iframe;
+                if (options.events && typeof options.events.onReady === "function") {
+                    options.events.onReady({ target: this });
                 }
-
-                getIframe() {
-                    return this._iframe;
-                }
-
-                destroy() {}
             }
-        };
+
+            getIframe() {
+                return this._iframe;
+            }
+
+            destroy() {}
+        });
 
         const thumb = document.createElement("div");
         document.body.appendChild(thumb);
@@ -234,20 +128,7 @@ test("youtube: manual playback reveals a clipped card below the sticky header", 
     const cleanup = installFakeDom();
     try {
         const ui = createYoutubeUiState({});
-        const youtube = {
-            apiPromise: null,
-            players: new WeakMap()
-        };
-        const controller = createYoutubeController({
-            ui,
-            youtube,
-            constants: {
-                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
-                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
-                YT_IFRAME_READY_POLL_MS: 50,
-                STOP_PLAYBACK_ON_SCROLL_OUT: false
-            }
-        });
+        const { controller } = createYoutubeControllerHarness({ ui });
         const header = document.createElement("div");
         header.className = "header";
         header._rect = { top: 0, bottom: 60, left: 0, right: 300, width: 300, height: 60 };
@@ -283,20 +164,7 @@ test("youtube: stale queued layout refresh requests are ignored", () => {
     });
     try {
         const ui = createYoutubeUiState({});
-        const youtube = {
-            apiPromise: null,
-            players: new WeakMap()
-        };
-        const controller = createYoutubeController({
-            ui,
-            youtube,
-            constants: {
-                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
-                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
-                YT_IFRAME_READY_POLL_MS: 50,
-                STOP_PLAYBACK_ON_SCROLL_OUT: false
-            }
-        });
+        const { controller } = createYoutubeControllerHarness({ ui });
         let layoutRefreshCount = 0;
         controller.setLayoutHook(() => {
             layoutRefreshCount += 1;
@@ -331,20 +199,7 @@ test("youtube: after explicit restore, same target does not auto-resume on redra
     const cleanup = installFakeDom();
     try {
         const ui = createYoutubeUiState({});
-        const youtube = {
-            apiPromise: null,
-            players: new WeakMap()
-        };
-        const controller = createYoutubeController({
-            ui,
-            youtube,
-            constants: {
-                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
-                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
-                YT_IFRAME_READY_POLL_MS: 50,
-                STOP_PLAYBACK_ON_SCROLL_OUT: false
-            }
-        });
+        const { controller } = createYoutubeControllerHarness({ ui });
 
         const thumb = document.createElement("div");
         document.body.appendChild(thumb);
@@ -373,20 +228,7 @@ test("youtube: switching to another thumbnail recreates the shared player", asyn
         const ui = createYoutubeUiState({
             stopAtEndTime: true
         });
-        const youtube = {
-            apiPromise: null,
-            players: new WeakMap()
-        };
-        const controller = createYoutubeController({
-            ui,
-            youtube,
-            constants: {
-                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
-                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
-                YT_IFRAME_READY_POLL_MS: 50,
-                STOP_PLAYBACK_ON_SCROLL_OUT: false
-            }
-        });
+        const { controller } = createYoutubeControllerHarness({ ui });
         const playerInstances = [];
         window.YT = {
             PlayerState: {
@@ -463,20 +305,7 @@ test("youtube: pending shared player init uses the latest clicked thumbnail", as
         const ui = createYoutubeUiState({
             stopAtEndTime: true
         });
-        const youtube = {
-            apiPromise: null,
-            players: new WeakMap()
-        };
-        const controller = createYoutubeController({
-            ui,
-            youtube,
-            constants: {
-                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
-                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
-                YT_IFRAME_READY_POLL_MS: 50,
-                STOP_PLAYBACK_ON_SCROLL_OUT: false
-            }
-        });
+        const { controller } = createYoutubeControllerHarness({ ui });
         const playerCalls = [];
         window.YT = {
             PlayerState: {
@@ -533,20 +362,7 @@ test("youtube: same thumbnail recreates a fresh player after restore", async () 
         const ui = createYoutubeUiState({
             stopAtEndTime: true
         });
-        const youtube = {
-            apiPromise: null,
-            players: new WeakMap()
-        };
-        const controller = createYoutubeController({
-            ui,
-            youtube,
-            constants: {
-                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
-                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
-                YT_IFRAME_READY_POLL_MS: 50,
-                STOP_PLAYBACK_ON_SCROLL_OUT: false
-            }
-        });
+        const { controller } = createYoutubeControllerHarness({ ui });
         const playerInstances = [];
         window.YT = {
             PlayerState: {
@@ -618,20 +434,7 @@ test("youtube: stale ended event from a previous same-thumb playback does not te
         const ui = createYoutubeUiState({
             stopAtEndTime: true
         });
-        const youtube = {
-            apiPromise: null,
-            players: new WeakMap()
-        };
-        const controller = createYoutubeController({
-            ui,
-            youtube,
-            constants: {
-                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
-                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
-                YT_IFRAME_READY_POLL_MS: 50,
-                STOP_PLAYBACK_ON_SCROLL_OUT: false
-            }
-        });
+        const { controller } = createYoutubeControllerHarness({ ui });
         let playerInstance = null;
         let stateChangeHandler = null;
         window.YT = {
@@ -725,20 +528,7 @@ test("youtube: replay ignores ended event while the next same-thumb start is sti
         const ui = createYoutubeUiState({
             stopAtEndTime: true
         });
-        const youtube = {
-            apiPromise: null,
-            players: new WeakMap()
-        };
-        const controller = createYoutubeController({
-            ui,
-            youtube,
-            constants: {
-                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
-                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
-                YT_IFRAME_READY_POLL_MS: 50,
-                STOP_PLAYBACK_ON_SCROLL_OUT: false
-            }
-        });
+        const { controller } = createYoutubeControllerHarness({ ui });
         let playerInstance = null;
         let stateChangeHandler = null;
         window.YT = {
@@ -838,20 +628,7 @@ test("youtube: playback start timeout restores the thumbnail", async () => {
     setGlobalValue("clearTimeout", () => {});
     try {
         const ui = createYoutubeUiState({});
-        const youtube = {
-            apiPromise: null,
-            players: new WeakMap()
-        };
-        const controller = createYoutubeController({
-            ui,
-            youtube,
-            constants: {
-                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
-                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
-                YT_IFRAME_READY_POLL_MS: 50,
-                STOP_PLAYBACK_ON_SCROLL_OUT: false
-            }
-        });
+        const { controller } = createYoutubeControllerHarness({ ui });
         window.YT = {
             PlayerState: {
                 ENDED: 0,
@@ -910,20 +687,7 @@ test("youtube: autoplay timeout restores the thumbnail and clears the active thu
     setGlobalValue("clearTimeout", () => {});
     try {
         const ui = createYoutubeUiState({});
-        const youtube = {
-            apiPromise: null,
-            players: new WeakMap()
-        };
-        const controller = createYoutubeController({
-            ui,
-            youtube,
-            constants: {
-                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
-                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
-                YT_IFRAME_READY_POLL_MS: 50,
-                STOP_PLAYBACK_ON_SCROLL_OUT: false
-            }
-        });
+        const { controller } = createYoutubeControllerHarness({ ui });
 
         const card = document.createElement("div");
         card.className = "song-card";
@@ -968,20 +732,7 @@ test("youtube: iframe playback stays mounted when iframe api loading fails", asy
     setGlobalValue("clearTimeout", () => {});
     try {
         const ui = createYoutubeUiState({});
-        const youtube = {
-            apiPromise: null,
-            players: new WeakMap()
-        };
-        const controller = createYoutubeController({
-            ui,
-            youtube,
-            constants: {
-                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
-                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
-                YT_IFRAME_READY_POLL_MS: 50,
-                STOP_PLAYBACK_ON_SCROLL_OUT: false
-            }
-        });
+        const { youtube, controller } = createYoutubeControllerHarness({ ui });
 
         const thumb = document.createElement("div");
         document.body.appendChild(thumb);
@@ -1029,20 +780,7 @@ test("youtube: autoplay playback is restored when iframe api loading fails", asy
     setGlobalValue("clearTimeout", () => {});
     try {
         const ui = createYoutubeUiState({});
-        const youtube = {
-            apiPromise: null,
-            players: new WeakMap()
-        };
-        const controller = createYoutubeController({
-            ui,
-            youtube,
-            constants: {
-                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
-                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
-                YT_IFRAME_READY_POLL_MS: 50,
-                STOP_PLAYBACK_ON_SCROLL_OUT: false
-            }
-        });
+        const { youtube, controller } = createYoutubeControllerHarness({ ui });
 
         const thumb = document.createElement("div");
         document.body.appendChild(thumb);
@@ -1080,20 +818,7 @@ test("youtube: embed url includes end time when stopAtEndTime is enabled", async
         const ui = createYoutubeUiState({
             stopAtEndTime: true
         });
-        const youtube = {
-            apiPromise: null,
-            players: new WeakMap()
-        };
-        const controller = createYoutubeController({
-            ui,
-            youtube,
-            constants: {
-                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
-                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
-                YT_IFRAME_READY_POLL_MS: 50,
-                STOP_PLAYBACK_ON_SCROLL_OUT: false
-            }
-        });
+        const { controller } = createYoutubeControllerHarness({ ui });
         globalThis.window.YT = {
             PlayerState: {
                 PAUSED: 2,
@@ -1134,20 +859,7 @@ test("youtube: embed url omits end time when stopAtEndTime is disabled", async (
         const ui = createYoutubeUiState({
             stopAtEndTime: false
         });
-        const youtube = {
-            apiPromise: null,
-            players: new WeakMap()
-        };
-        const controller = createYoutubeController({
-            ui,
-            youtube,
-            constants: {
-                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
-                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
-                YT_IFRAME_READY_POLL_MS: 50,
-                STOP_PLAYBACK_ON_SCROLL_OUT: false
-            }
-        });
+        const { controller } = createYoutubeControllerHarness({ ui });
         globalThis.window.YT = {
             PlayerState: {
                 PAUSED: 2,
@@ -1186,20 +898,7 @@ test("youtube: ended playback restores thumbnail while paused playback keeps ifr
     const cleanup = installFakeDom();
     try {
         const ui = createYoutubeUiState({});
-        const youtube = {
-            apiPromise: null,
-            players: new WeakMap()
-        };
-        const controller = createYoutubeController({
-            ui,
-            youtube,
-            constants: {
-                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
-                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
-                YT_IFRAME_READY_POLL_MS: 50,
-                STOP_PLAYBACK_ON_SCROLL_OUT: false
-            }
-        });
+        const { controller } = createYoutubeControllerHarness({ ui });
 
         let playerInstance = null;
         let stateChangeHandler = null;
@@ -1260,20 +959,7 @@ test("youtube: ended playback notifies song key for playback continuation", asyn
     const cleanup = installFakeDom();
     try {
         const ui = createYoutubeUiState({});
-        const youtube = {
-            apiPromise: null,
-            players: new WeakMap()
-        };
-        const controller = createYoutubeController({
-            ui,
-            youtube,
-            constants: {
-                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
-                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
-                YT_IFRAME_READY_POLL_MS: 50,
-                STOP_PLAYBACK_ON_SCROLL_OUT: false
-            }
-        });
+        const { controller } = createYoutubeControllerHarness({ ui });
         let endedSongKey = "";
         let stateChangeHandler = null;
         controller.setPlaybackEndedHook(({ songKey }) => {
@@ -1320,20 +1006,7 @@ test("youtube: stale ended event from a closed player does not notify playback c
     const cleanup = installFakeDom();
     try {
         const ui = createYoutubeUiState({});
-        const youtube = {
-            apiPromise: null,
-            players: new WeakMap()
-        };
-        const controller = createYoutubeController({
-            ui,
-            youtube,
-            constants: {
-                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
-                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
-                YT_IFRAME_READY_POLL_MS: 50,
-                STOP_PLAYBACK_ON_SCROLL_OUT: false
-            }
-        });
+        const { controller } = createYoutubeControllerHarness({ ui });
         const endedCalls = [];
         const failedCalls = [];
         let stateChangeHandler = null;
@@ -1394,20 +1067,7 @@ test("youtube: ended playback waits for layout refresh before notifying", async 
     });
     try {
         const ui = createYoutubeUiState({});
-        const youtube = {
-            apiPromise: null,
-            players: new WeakMap()
-        };
-        const controller = createYoutubeController({
-            ui,
-            youtube,
-            constants: {
-                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
-                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
-                YT_IFRAME_READY_POLL_MS: 50,
-                STOP_PLAYBACK_ON_SCROLL_OUT: false
-            }
-        });
+        const { controller } = createYoutubeControllerHarness({ ui });
         const order = [];
         let stateChangeHandler = null;
         controller.setLayoutHook(() => {
@@ -1469,20 +1129,7 @@ test("youtube: ended playback does not continue after a newer playback starts", 
     });
     try {
         const ui = createYoutubeUiState({});
-        const youtube = {
-            apiPromise: null,
-            players: new WeakMap()
-        };
-        const controller = createYoutubeController({
-            ui,
-            youtube,
-            constants: {
-                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
-                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
-                YT_IFRAME_READY_POLL_MS: 50,
-                STOP_PLAYBACK_ON_SCROLL_OUT: false
-            }
-        });
+        const { controller } = createYoutubeControllerHarness({ ui });
         const endedCalls = [];
         const stateChangeHandlers = [];
         controller.setPlaybackEndedHook(({ songKey }) => {
@@ -1543,20 +1190,7 @@ test("youtube: ended before playback starts restores thumbnail without notifying
     const cleanup = installFakeDom();
     try {
         const ui = createYoutubeUiState({});
-        const youtube = {
-            apiPromise: null,
-            players: new WeakMap()
-        };
-        const controller = createYoutubeController({
-            ui,
-            youtube,
-            constants: {
-                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
-                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
-                YT_IFRAME_READY_POLL_MS: 50,
-                STOP_PLAYBACK_ON_SCROLL_OUT: false
-            }
-        });
+        const { controller } = createYoutubeControllerHarness({ ui });
         const endedCalls = [];
         const failedCalls = [];
         let stateChangeHandler = null;
@@ -1612,20 +1246,7 @@ test("youtube: playThumbnail resolves true after the player enters PLAYING", asy
     const cleanup = installFakeDom();
     try {
         const ui = createYoutubeUiState({});
-        const youtube = {
-            apiPromise: null,
-            players: new WeakMap()
-        };
-        const controller = createYoutubeController({
-            ui,
-            youtube,
-            constants: {
-                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
-                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
-                YT_IFRAME_READY_POLL_MS: 50,
-                STOP_PLAYBACK_ON_SCROLL_OUT: false
-            }
-        });
+        const { controller } = createYoutubeControllerHarness({ ui });
         let stateChangeHandler = null;
         globalThis.window.YT = {
             PlayerState: {
@@ -1664,20 +1285,7 @@ test("youtube: playThumbnail resolves false and restores the thumbnail after a p
     const cleanup = installFakeDom();
     try {
         const ui = createYoutubeUiState({});
-        const youtube = {
-            apiPromise: null,
-            players: new WeakMap()
-        };
-        const controller = createYoutubeController({
-            ui,
-            youtube,
-            constants: {
-                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
-                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
-                YT_IFRAME_READY_POLL_MS: 50,
-                STOP_PLAYBACK_ON_SCROLL_OUT: false
-            }
-        });
+        const { controller } = createYoutubeControllerHarness({ ui });
         const failedCalls = [];
         controller.setPlaybackStartFailedHook((payload) => {
             failedCalls.push(payload);
@@ -1752,20 +1360,7 @@ test("youtube: autoplay timeout emits debug logs only when debug mode is enabled
     };
     try {
         const ui = createYoutubeUiState({});
-        const youtube = {
-            apiPromise: null,
-            players: new WeakMap()
-        };
-        const controller = createYoutubeController({
-            ui,
-            youtube,
-            constants: {
-                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
-                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
-                YT_IFRAME_READY_POLL_MS: 50,
-                STOP_PLAYBACK_ON_SCROLL_OUT: false
-            }
-        });
+        const { controller } = createYoutubeControllerHarness({ ui });
 
         const thumb = document.createElement("div");
         document.body.appendChild(thumb);
@@ -1820,20 +1415,7 @@ test("youtube: recreating the shared player does not fail the newer playback att
     const cleanup = installFakeDom();
     try {
         const ui = createYoutubeUiState({});
-        const youtube = {
-            apiPromise: null,
-            players: new WeakMap()
-        };
-        const controller = createYoutubeController({
-            ui,
-            youtube,
-            constants: {
-                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
-                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
-                YT_IFRAME_READY_POLL_MS: 50,
-                STOP_PLAYBACK_ON_SCROLL_OUT: false
-            }
-        });
+        const { controller } = createYoutubeControllerHarness({ ui });
         const stateChangeHandlers = [];
         globalThis.window.YT = {
             PlayerState: {
