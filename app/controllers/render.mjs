@@ -1,6 +1,8 @@
 import { getHeaderHeight } from "../lib/dom-utils.mjs?v=11";
 import { tracePlayback } from "../lib/playback-debug.mjs?v=11";
 import { scheduleScrollElementIntoView } from "../lib/results-scroll.mjs?v=11";
+import { createBookmarkDragReorderController } from "../lib/render/drag-reorder.mjs?v=11";
+import { applyMasonryLayout } from "../lib/render/masonry-layout.mjs?v=11";
 import { getPlaybackUiState, getRenderUiState, getSearchUiState } from "../lib/ui-slices.mjs?v=11";
 
 /**
@@ -11,12 +13,6 @@ export function createRenderController({ data, ui, isAllFormatsSelected, increme
     const searchUi = getSearchUiState(ui);
     const playbackUi = getPlaybackUiState(ui);
     const renderUi = getRenderUiState(ui);
-    const MASONRY_GAP_PX = 12;
-    const MASONRY_BREAKPOINTS = [
-        { minWidth: 1400, columns: 4 },
-        { minWidth: 1000, columns: 3 },
-        { minWidth: 600, columns: 2 }
-    ];
     const getSearchState = callbacks.getSearchState;
     const isRecommendedMode = callbacks.isRecommendedMode;
     const updateThumbnail = callbacks.updateThumbnail;
@@ -27,6 +23,12 @@ export function createRenderController({ data, ui, isAllFormatsSelected, increme
     const setupScrollObserver = callbacks.setupScrollObserver;
     const removeSongFromActiveBookmark = callbacks.removeSongFromActiveBookmark;
     const saveBookmarks = callbacks.saveBookmarks;
+    const dragReorderController = createBookmarkDragReorderController({
+        data,
+        getBookmarkSongRef: (row) => getBookmarkSongRef(row),
+        saveBookmarks,
+        updateDisplay: () => updateDisplay()
+    });
 
     /**
      * 結果カードを構成するDOM要素一式を生成する。
@@ -71,11 +73,11 @@ export function createRenderController({ data, ui, isAllFormatsSelected, increme
         dragHandle.hidden = true;
         dragHandle.draggable = false;
 
-        dragHandle.addEventListener("dragstart", onDragStart);
-        dragHandle.addEventListener("dragend", onDragEnd);
-        card.addEventListener("dragover", onDragOver);
-        card.addEventListener("dragleave", onDragLeave);
-        card.addEventListener("drop", onDrop);
+        dragHandle.addEventListener("dragstart", dragReorderController.onDragStart);
+        dragHandle.addEventListener("dragend", dragReorderController.onDragEnd);
+        card.addEventListener("dragover", dragReorderController.onDragOver);
+        card.addEventListener("dragleave", dragReorderController.onDragLeave);
+        card.addEventListener("drop", dragReorderController.onDrop);
 
         rightGroup.append(tags, actionBtn);
         footer.append(leftGroup, rightGroup);
@@ -331,95 +333,6 @@ export function createRenderController({ data, ui, isAllFormatsSelected, increme
         restoreActivePlayback();
     }
 
-    function onDragStart(event) {
-        if (!data.activeBookmark) {
-            event.preventDefault();
-            return;
-        }
-        const handle = event.currentTarget;
-        if (!(handle instanceof HTMLElement)) return;
-        const card = handle.closest(".song-card");
-        if (!(card instanceof HTMLElement)) return;
-        const songKey = card.dataset.songKey || "";
-        if (!songKey) {
-            event.preventDefault();
-            return;
-        }
-        event.dataTransfer.setData("text/plain", songKey);
-        event.dataTransfer.effectAllowed = "move";
-        card.classList.add("dragging");
-    }
-
-    function onDragEnd(event) {
-        const handle = event.currentTarget;
-        if (!(handle instanceof HTMLElement)) return;
-        const card = handle.closest(".song-card");
-        if (!(card instanceof HTMLElement)) return;
-        card.classList.remove("dragging");
-        card.classList.remove("drag-over");
-    }
-
-    function onDragOver(event) {
-        if (!data.activeBookmark) return;
-        event.preventDefault();
-        const targetCard = event.target.closest(".song-card");
-        if (!(targetCard instanceof HTMLElement)) return;
-        targetCard.classList.add("drag-over");
-    }
-
-    function onDragLeave(event) {
-        const targetCard = event.target.closest(".song-card");
-        if (!(targetCard instanceof HTMLElement)) return;
-        targetCard.classList.remove("drag-over");
-    }
-
-    function onDrop(event) {
-        if (!data.activeBookmark) return;
-        event.preventDefault();
-        const draggedKey = event.dataTransfer.getData("text/plain");
-        const targetCard = event.target.closest(".song-card");
-        if (!targetCard) return;
-        targetCard.classList.remove("drag-over");
-
-        const targetKey = targetCard.dataset.songKey;
-        if (draggedKey === targetKey) return;
-
-        const fromIndex = data.currentResults.findIndex(song => song.songKey === draggedKey);
-        const toIndex = data.currentResults.findIndex(song => song.songKey === targetKey);
-
-        if (fromIndex === -1 || toIndex === -1) return;
-
-        const [movedItem] = data.currentResults.splice(fromIndex, 1);
-        data.currentResults.splice(toIndex, 0, movedItem);
-
-        persistActiveBookmarkOrder();
-        saveBookmarks();
-
-        updateDisplay();
-    }
-
-    function persistActiveBookmarkOrder() {
-        if (!data.activeBookmark) return;
-        const bookmark = data.bookmarks[data.activeBookmark];
-        if (!bookmark || !Array.isArray(bookmark.songs) || bookmark.songs.length === 0) return;
-
-        const orderedKeys = data.currentResults
-            .map((row) => getBookmarkSongRef(row))
-            .filter(Boolean);
-        if (orderedKeys.length === 0) return;
-
-        const reorderSet = new Set(orderedKeys);
-        const queue = orderedKeys.slice();
-        const nextSongs = bookmark.songs.map((songKey) => {
-            if (!reorderSet.has(songKey)) return songKey;
-            return queue.length > 0 ? queue.shift() : songKey;
-        });
-
-        const changed = nextSongs.some((songKey, idx) => songKey !== bookmark.songs[idx]);
-        if (!changed) return;
-        bookmark.songs = nextSongs;
-    }
-
     /**
      * 結果配列からカードノードを再利用しつつ構築する。
      * @param {*} results
@@ -531,57 +444,12 @@ export function createRenderController({ data, ui, isAllFormatsSelected, increme
         reconcileNodesByOrder(container, nodes);
     }
 
-    function getMasonryColumnCount(containerWidth) {
-        for (const rule of MASONRY_BREAKPOINTS) {
-            if (containerWidth >= rule.minWidth) return rule.columns;
-        }
-        return 1;
-    }
-
     /**
      * DOM順を列固定で保ちつつカードを絶対配置する。
      * 同じ列のカードだけが上下に影響し、他列の位置は維持される。
      */
     function refreshLayout() {
-        const container = ui.el.resultList;
-        if (!container) return;
-        const cards = Array.from(container.children).filter((node) => (
-            node instanceof HTMLElement &&
-            node.classList.contains("song-card")
-        ));
-        if (cards.length === 0) {
-            container.style.height = "";
-            return;
-        }
-        const containerRect = container.getBoundingClientRect();
-        const containerWidth = container.clientWidth || containerRect.width || 0;
-        if (containerWidth <= 0) return;
-        const columnCount = getMasonryColumnCount(containerWidth);
-        const totalGap = MASONRY_GAP_PX * (columnCount - 1);
-        const columnWidth = Math.max(0, (containerWidth - totalGap) / columnCount);
-        const columnHeights = Array.from({ length: columnCount }, () => 0);
-        for (const node of cards) {
-            node.style.width = `${columnWidth}px`;
-            node.style.left = "0px";
-            node.style.top = "0px";
-            node.style.transform = "translate(0px, 0px)";
-        }
-        for (let index = 0; index < cards.length; index++) {
-            const node = cards[index];
-            const contentHeight = Number.isFinite(node.scrollHeight) && node.scrollHeight > 0
-                ? node.scrollHeight
-                : node.getBoundingClientRect().height;
-            const columnIndex = index % columnCount;
-            const top = columnHeights[columnIndex];
-            const left = (columnWidth + MASONRY_GAP_PX) * columnIndex;
-            node.style.left = `${left}px`;
-            node.style.top = `${top}px`;
-            node.style.transform = "none";
-            node.dataset.layoutColumn = String(columnIndex);
-            columnHeights[columnIndex] = top + contentHeight + MASONRY_GAP_PX;
-        }
-        const tallest = Math.max(...columnHeights);
-        container.style.height = `${Math.max(0, tallest - MASONRY_GAP_PX)}px`;
+        applyMasonryLayout(ui.el.resultList);
     }
 
     /**
