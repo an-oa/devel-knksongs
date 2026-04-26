@@ -50,6 +50,10 @@ web_modules/
 # Optional npm cache directory
 .npm
 
+# Playwright artifacts
+playwright-report/
+test-results/
+
 # Optional eslint cache
 .eslintcache
 
