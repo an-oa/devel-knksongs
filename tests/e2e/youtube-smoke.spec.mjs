@@ -190,14 +190,10 @@ async function closeSidebar(page) {
  */
 async function ensureToggleEnabled(page, selector) {
     const toggle = page.locator(selector);
-    if (!(await toggle.isChecked())) {
-        await toggle.evaluate((node) => {
-            if (!(node instanceof HTMLInputElement) || node.checked) return;
-            node.checked = true;
-            node.dispatchEvent(new Event("input", { bubbles: true }));
-            node.dispatchEvent(new Event("change", { bubbles: true }));
-        });
-    }
+    const switchLabel = toggle.locator("xpath=ancestor::label[1]");
+    await expect(switchLabel).toBeVisible();
+    if (await toggle.isChecked()) return;
+    await switchLabel.click();
 }
 
 /**
@@ -210,6 +206,7 @@ async function enablePlaybackSettings(page, options) {
     await openSettingsPanel(page);
     await ensureToggleEnabled(page, "#thumbnail-toggle");
     if (settings.continuousPlayback) {
+        await ensureToggleEnabled(page, "#experimental-playback-toggle");
         await ensureToggleEnabled(page, "#continuous-playback-toggle");
     }
     await page.locator("#close-settings-panel").click();
@@ -267,6 +264,31 @@ test.beforeEach(async ({ page }) => {
     });
     await page.reload();
     await waitForInitialLoad(page);
+});
+
+test("settings shows experimental playback toggle only when thumbnails are enabled", async ({ page }) => {
+    await openSettingsPanel(page);
+
+    const thumbnailSwitch = page.locator("#thumbnail-toggle").locator("xpath=ancestor::label[1]");
+    const experimentalToggleSection = page.locator("#experimental-playback-toggle-section");
+    const experimentalToggle = page.locator("#experimental-playback-toggle");
+    const themeSwitch = page.locator("#theme-toggle").locator("xpath=ancestor::label[1]");
+
+    await expect(themeSwitch).toBeVisible();
+    await expect(experimentalToggleSection).toBeHidden();
+    await expect(experimentalToggle).toBeDisabled();
+
+    await thumbnailSwitch.click();
+
+    await expect(themeSwitch).toBeVisible();
+    await expect(experimentalToggleSection).toBeVisible();
+    await expect(experimentalToggle).toBeEnabled();
+
+    await thumbnailSwitch.click();
+
+    await expect(themeSwitch).toBeVisible();
+    await expect(experimentalToggleSection).toBeHidden();
+    await expect(experimentalToggle).toBeDisabled();
 });
 
 test("manual playback mounts an iframe from the thumbnail", async ({ page }) => {
@@ -349,6 +371,74 @@ test("continuous playback advances to the next result after the current song end
     await expect.poll(async () => {
         return page.evaluate(() => window.__knkMockYoutube.latestVideoId());
     }).toBe("chain-beta");
+});
+
+test("continuous playback does not double-start the first successful autoplay successor after a rejection", async ({ page }) => {
+    await enablePlaybackSettings(page, { continuousPlayback: true });
+    await filterBySongTitle(page, "Artist");
+    await setMockVideoBehavior(page, "replay-video", "auto-error");
+    await setMockVideoBehavior(page, "chain-alpha", "auto-playing");
+
+    const manualCard = getSongCard(page, "Manual Song");
+    const replayCard = getSongCard(page, "Replay Song");
+    const chainCard = getSongCard(page, "Chain Alpha");
+    await expect(manualCard).toBeVisible();
+    await expect(replayCard).toBeVisible();
+    await expect(chainCard).toBeVisible();
+
+    await manualCard.locator(".thumb").click();
+    await expect(manualCard.locator("iframe")).toBeVisible();
+
+    await page.evaluate(() => {
+        const playerIndex = window.__knkMockYoutube.latestIndex();
+        window.__knkMockYoutube.emit(playerIndex, window.YT.PlayerState.PLAYING);
+        window.__knkMockYoutube.emit(playerIndex, window.YT.PlayerState.ENDED);
+    });
+
+    await expect(replayCard.locator("iframe")).toHaveCount(0);
+    await expect(chainCard.locator("iframe")).toBeVisible();
+    await expect.poll(async () => {
+        return page.evaluate(() => window.__knkMockYoutube.playerCount());
+    }).toBe(3);
+});
+
+test("autoplay rejection is logged as autoplay and does not use the manual failure bridge", async ({ page }) => {
+    const debugMessages = [];
+    page.on("console", (message) => {
+        debugMessages.push(message.text());
+    });
+    await page.evaluate(() => {
+        window.__KNK_DEBUG_YOUTUBE__ = true;
+    });
+    await enablePlaybackSettings(page, { continuousPlayback: true });
+    await filterBySongTitle(page, "Artist");
+    await setMockVideoBehavior(page, "replay-video", "auto-error");
+    await setMockVideoBehavior(page, "chain-alpha", "auto-playing");
+
+    const manualCard = getSongCard(page, "Manual Song");
+    const chainCard = getSongCard(page, "Chain Alpha");
+    await expect(manualCard).toBeVisible();
+
+    await manualCard.locator(".thumb").click();
+    await expect(manualCard.locator("iframe")).toBeVisible();
+
+    await page.evaluate(() => {
+        const playerIndex = window.__knkMockYoutube.latestIndex();
+        window.__knkMockYoutube.emit(playerIndex, window.YT.PlayerState.PLAYING);
+        window.__knkMockYoutube.emit(playerIndex, window.YT.PlayerState.ENDED);
+    });
+
+    await expect(chainCard.locator("iframe")).toBeVisible();
+    await expect.poll(() => {
+        return debugMessages.some((message) => message.includes(
+            "[youtube] autoplay playback start failed; skipping candidate"
+        ));
+    }).toBe(true);
+    await expect(
+        debugMessages.some((message) => message.includes(
+            "[script] continuePlayback requested from manual playback start failure"
+        ))
+    ).toBe(false);
 });
 
 test("autoplay rejection fallback restores the candidate thumbnail instead of leaving it stuck", async ({ page }) => {

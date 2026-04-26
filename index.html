@@ -143,10 +143,23 @@
                 </label>
               </div>
             </div>
+
+            <div id="experimental-playback-toggle-section" class="sidebar-section sidebar-setting-item">
+              <div class="setting-item-copy">
+                <div class="menu-item-toggle">
+                  <span>実験的な機能を表示</span>
+                  <label class="switch">
+                    <input type="checkbox" id="experimental-playback-toggle" aria-label="実験的な再生機能を表示するかを切り替える">
+                    <span class="slider"></span>
+                  </label>
+                </div>
+                <div class="setting-item-help">ONにすると、実験中の機能を表示します。</div>
+              </div>
+            </div>
           </div>
         </section>
 
-        <section class="sidebar-group">
+        <section id="playback-settings-group" class="sidebar-group" aria-hidden="true" hidden>
           <div class="sidebar-group-header">
             <div class="sidebar-group-title">再生</div>
           </div>
