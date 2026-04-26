@@ -47,6 +47,9 @@ export const state = {
         playback: {
             scrollObserver: null,
             showThumbnails: false,
+            stopAtEndTime: false,
+            continuousPlayback: false,
+            loopPlayback: false,
             activeThumb: null
         },
         lookup: {
@@ -69,7 +72,7 @@ export const state = {
     },
     youtube: {
         apiPromise: null,
-        players: new WeakMap()
+        sharedPlayback: null
     }
 };
 

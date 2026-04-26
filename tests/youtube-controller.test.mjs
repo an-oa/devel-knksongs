@@ -14,16 +14,45 @@ import {
  */
 function createYoutubeUiState(input) {
     return {
-        el: {},
+        el: {
+            thumbToggle: input.thumbToggle ?? null,
+            endTimeToggle: input.endTimeToggle ?? null
+        },
         search: {
             dataReady: input.dataReady ?? false
         },
         playback: {
             showThumbnails: input.showThumbnails ?? true,
+            stopAtEndTime: input.stopAtEndTime ?? false,
             activeThumb: input.activeThumb ?? null,
             scrollObserver: null
         }
     };
+}
+
+/**
+ * テスト用の YT.Player モックで、既存 iframe をそのまま利用する。
+ * @param {*} host
+ * @param {*} options
+ * @returns {*}
+ */
+function attachMockPlayerIframe(host, options) {
+    const iframe = host && host.tagName === "IFRAME"
+        ? host
+        : document.createElement("iframe");
+    if (iframe !== host && host && typeof host.appendChild === "function") {
+        host.appendChild(iframe);
+    }
+    if (options && options.events && typeof options.events.onReady === "function") {
+        options.events.onReady({
+            target: {
+                getIframe() {
+                    return iframe;
+                }
+            }
+        });
+    }
+    return iframe;
 }
 
 test("youtube: disconnected active thumb is cleared without restore work", () => {
@@ -59,7 +88,7 @@ test("youtube: shorts url is treated as vertical playback target", () => {
     assert.deepEqual(yt, { videoId: "abc123", startSeconds: 45, isVertical: true });
 });
 
-test("youtube: vertical videos stay landscape in thumbnail mode and switch on playback", () => {
+test("youtube: vertical videos stay landscape in thumbnail mode and switch on iframe playback", () => {
     const cleanup = installFakeDom();
     try {
         const ui = createYoutubeUiState({});
@@ -92,7 +121,7 @@ test("youtube: vertical videos stay landscape in thumbnail mode and switch on pl
 
         assert.equal(typeof thumb.onclick, "function");
         thumb.onclick();
-        assert.ok(thumb.querySelector(".youtube-player-host"));
+        assert.match(thumb.querySelector("iframe").src, /^https:\/\/www\.youtube\.com\/embed\/short1\?/);
         assert.equal(thumb.dataset.videoOrientation, "vertical");
         assert.equal(card.classList.contains("song-card-expanded"), true);
         assert.equal(layoutRefreshCount, 1);
@@ -109,7 +138,7 @@ test("youtube: vertical videos stay landscape in thumbnail mode and switch on pl
     }
 });
 
-test("youtube: player init uses YT.Player with playerVars instead of prebuilt iframe src", async () => {
+test("youtube: player init uses prebuilt iframe src and binds YT.Player to it", async () => {
     const cleanup = installFakeDom();
     try {
         const ui = createYoutubeUiState({});
@@ -161,21 +190,19 @@ test("youtube: player init uses YT.Player with playerVars instead of prebuilt if
         await Promise.resolve();
 
         assert.equal(playerCalls.length, 1);
-        assert.equal(playerCalls[0].host.tagName, "DIV");
-        assert.equal(playerCalls[0].host.classList.contains("youtube-player-host"), true);
-        assert.equal(playerCalls[0].options.videoId, "video1");
-        assert.deepEqual(playerCalls[0].options.playerVars, {
-            autoplay: 1,
-            playsinline: 1,
-            start: 45,
-            enablejsapi: 1,
-            rel: 0,
-            cc_load_policy: 0,
-            iv_load_policy: 3,
-            origin: "https://example.test"
-        });
+        assert.equal(playerCalls[0].host.tagName, "IFRAME");
+        assert.match(
+            playerCalls[0].host.src,
+            /^https:\/\/www\.youtube\.com\/embed\/video1\?/
+        );
+        assert.equal(playerCalls[0].options.videoId, undefined);
+        assert.equal(playerCalls[0].options.playerVars, undefined);
         const iframe = thumb.querySelector("iframe");
         assert.ok(iframe);
+        assert.match(iframe.src, /^https:\/\/www\.youtube\.com\/embed\/video1\?/);
+        assert.match(iframe.src, /autoplay=1/);
+        assert.match(iframe.src, /start=45/);
+        assert.match(iframe.src, /enablejsapi=1/);
         assert.equal(iframe.allow, "autoplay; encrypted-media");
         assert.equal(iframe.referrerPolicy, "strict-origin-when-cross-origin");
         assert.equal(iframe.allowFullscreen, true);
@@ -316,6 +343,1234 @@ test("youtube: after explicit restore, same target does not auto-resume on redra
         assert.equal(thumb.querySelector("iframe"), null);
         assert.ok(thumb.querySelector("img"));
         assert.equal(typeof thumb.onclick, "function");
+    } finally {
+        cleanup();
+    }
+});
+
+test("youtube: switching to another thumbnail recreates the shared player", async () => {
+    const cleanup = installFakeDom();
+    try {
+        const ui = createYoutubeUiState({
+            stopAtEndTime: true
+        });
+        const youtube = {
+            apiPromise: null,
+            players: new WeakMap()
+        };
+        const controller = createYoutubeController({
+            ui,
+            youtube,
+            constants: {
+                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
+                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
+                YT_IFRAME_READY_POLL_MS: 50,
+                STOP_PLAYBACK_ON_SCROLL_OUT: false
+            }
+        });
+        const playerInstances = [];
+        window.YT = {
+            PlayerState: {
+                ENDED: 0,
+                PLAYING: 1,
+                PAUSED: 2
+            },
+            Player: class {
+                constructor(host) {
+                    this.iframe = attachMockPlayerIframe(host);
+                    this.stopCalls = 0;
+                    this.destroyCalls = 0;
+                    this.lastLoadArgs = null;
+                    playerInstances.push(this);
+                }
+
+                getIframe() {
+                    return this.iframe;
+                }
+
+                stopVideo() {
+                    this.stopCalls += 1;
+                }
+
+                loadVideoById(args) {
+                    this.lastLoadArgs = args;
+                }
+
+                destroy() {
+                    this.destroyCalls += 1;
+                }
+            }
+        };
+
+        const cardA = document.createElement("div");
+        const cardB = document.createElement("div");
+        cardA.className = "song-card";
+        cardB.className = "song-card";
+        const thumbA = document.createElement("div");
+        const thumbB = document.createElement("div");
+        cardA.appendChild(thumbA);
+        cardB.appendChild(thumbB);
+        document.body.append(cardA, cardB);
+
+        controller.updateThumbnail(thumbA, { videoId: "video1", startSeconds: 5, endSeconds: 25 });
+        controller.updateThumbnail(thumbB, { videoId: "video2", startSeconds: 15, endSeconds: 45 });
+
+        thumbA.onclick();
+        await Promise.resolve();
+
+        const firstIframe = thumbA.querySelector("iframe");
+        assert.ok(firstIframe);
+        assert.equal(playerInstances.length, 1);
+
+        thumbB.onclick();
+        await Promise.resolve();
+
+        const secondIframe = thumbB.querySelector("iframe");
+        assert.equal(thumbA.querySelector("iframe"), null);
+        assert.ok(secondIframe);
+        assert.notEqual(secondIframe, firstIframe);
+        assert.equal(playerInstances.length, 2);
+        assert.equal(playerInstances[0].stopCalls, 1);
+        assert.equal(playerInstances[0].destroyCalls, 1);
+        assert.equal(playerInstances[0].lastLoadArgs, null);
+    } finally {
+        cleanup();
+    }
+});
+
+test("youtube: pending shared player init uses the latest clicked thumbnail", async () => {
+    const cleanup = installFakeDom();
+    try {
+        const ui = createYoutubeUiState({
+            stopAtEndTime: true
+        });
+        const youtube = {
+            apiPromise: null,
+            players: new WeakMap()
+        };
+        const controller = createYoutubeController({
+            ui,
+            youtube,
+            constants: {
+                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
+                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
+                YT_IFRAME_READY_POLL_MS: 50,
+                STOP_PLAYBACK_ON_SCROLL_OUT: false
+            }
+        });
+        const playerCalls = [];
+        window.YT = {
+            PlayerState: {
+                ENDED: 0,
+                PLAYING: 1,
+                PAUSED: 2
+            },
+            Player: class {
+                constructor(host, options) {
+                    this.iframe = attachMockPlayerIframe(host, options);
+                    playerCalls.push({ host, options, iframe: this.iframe });
+                }
+
+                getIframe() {
+                    return this.iframe;
+                }
+
+                destroy() {}
+            }
+        };
+
+        const cardA = document.createElement("div");
+        const cardB = document.createElement("div");
+        cardA.className = "song-card";
+        cardB.className = "song-card";
+        cardA.dataset.songKey = "song:a";
+        cardB.dataset.songKey = "song:b";
+        const thumbA = document.createElement("div");
+        const thumbB = document.createElement("div");
+        cardA.appendChild(thumbA);
+        cardB.appendChild(thumbB);
+        document.body.append(cardA, cardB);
+
+        controller.updateThumbnail(thumbA, { videoId: "video-a", startSeconds: 5, endSeconds: 25 });
+        controller.updateThumbnail(thumbB, { videoId: "video-b", startSeconds: 15, endSeconds: 45 });
+
+        thumbA.onclick();
+        thumbB.onclick();
+        await Promise.resolve();
+
+        assert.equal(playerCalls.length, 1);
+        assert.equal(playerCalls[0].host.tagName, "IFRAME");
+        assert.match(playerCalls[0].host.src, /^https:\/\/www\.youtube\.com\/embed\/video-b\?/);
+        assert.equal(thumbA.querySelector("iframe"), null);
+        assert.ok(thumbB.querySelector("iframe"));
+    } finally {
+        cleanup();
+    }
+});
+
+test("youtube: same thumbnail recreates a fresh player after restore", async () => {
+    const cleanup = installFakeDom();
+    try {
+        const ui = createYoutubeUiState({
+            stopAtEndTime: true
+        });
+        const youtube = {
+            apiPromise: null,
+            players: new WeakMap()
+        };
+        const controller = createYoutubeController({
+            ui,
+            youtube,
+            constants: {
+                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
+                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
+                YT_IFRAME_READY_POLL_MS: 50,
+                STOP_PLAYBACK_ON_SCROLL_OUT: false
+            }
+        });
+        const playerInstances = [];
+        window.YT = {
+            PlayerState: {
+                ENDED: 0,
+                PLAYING: 1,
+                PAUSED: 2
+            },
+            Player: class {
+                constructor(host) {
+                    this.iframe = attachMockPlayerIframe(host);
+                    this.stopCalls = 0;
+                    this.lastLoadArgs = null;
+                    playerInstances.push(this);
+                }
+
+                getIframe() {
+                    return this.iframe;
+                }
+
+                stopVideo() {
+                    this.stopCalls += 1;
+                }
+
+                loadVideoById(args) {
+                    this.lastLoadArgs = args;
+                }
+
+                destroy() {}
+            }
+        };
+
+        const card = document.createElement("div");
+        card.className = "song-card";
+        const thumb = document.createElement("div");
+        card.appendChild(thumb);
+        document.body.append(card);
+
+        controller.updateThumbnail(thumb, { videoId: "video1", startSeconds: 5, endSeconds: 25 });
+        thumb.onclick();
+        await Promise.resolve();
+
+        const firstIframe = thumb.querySelector("iframe");
+        assert.ok(firstIframe);
+        assert.equal(playerInstances.length, 1);
+
+        const close = thumb.querySelector("button");
+        invokeListener(close, "click", {
+            stopPropagation() {}
+        });
+
+        assert.equal(playerInstances[0].stopCalls, 1);
+        assert.ok(thumb.querySelector("img"));
+
+        thumb.onclick();
+        await Promise.resolve();
+
+        const secondIframe = thumb.querySelector("iframe");
+        assert.notEqual(secondIframe, firstIframe);
+        assert.equal(playerInstances.length, 2);
+        assert.equal(playerInstances[0].lastLoadArgs, null);
+    } finally {
+        cleanup();
+    }
+});
+
+test("youtube: stale ended event from a previous same-thumb playback does not tear down the replay", async () => {
+    const cleanup = installFakeDom();
+    try {
+        const ui = createYoutubeUiState({
+            stopAtEndTime: true
+        });
+        const youtube = {
+            apiPromise: null,
+            players: new WeakMap()
+        };
+        const controller = createYoutubeController({
+            ui,
+            youtube,
+            constants: {
+                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
+                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
+                YT_IFRAME_READY_POLL_MS: 50,
+                STOP_PLAYBACK_ON_SCROLL_OUT: false
+            }
+        });
+        let playerInstance = null;
+        let stateChangeHandler = null;
+        window.YT = {
+            PlayerState: {
+                ENDED: 0,
+                PLAYING: 1,
+                PAUSED: 2
+            },
+            Player: class {
+                constructor(host, options) {
+                    this.iframe = attachMockPlayerIframe(host, options);
+                    this.currentState = -1;
+                    stateChangeHandler = options.events.onStateChange;
+                    playerInstance = this;
+                }
+
+                getIframe() {
+                    return this.iframe;
+                }
+
+                getPlayerState() {
+                    return this.currentState;
+                }
+
+                stopVideo() {}
+
+                loadVideoById() {
+                    this.currentState = -1;
+                }
+
+                destroy() {}
+            }
+        };
+
+        const card = document.createElement("div");
+        card.className = "song-card";
+        card.dataset.songKey = "song:same";
+        const thumb = document.createElement("div");
+        card.appendChild(thumb);
+        document.body.append(card);
+
+        controller.updateThumbnail(thumb, { videoId: "video1", startSeconds: 5, endSeconds: 25 });
+        thumb.onclick();
+        await Promise.resolve();
+
+        playerInstance.currentState = window.YT.PlayerState.PLAYING;
+        stateChangeHandler({
+            data: window.YT.PlayerState.PLAYING,
+            target: playerInstance
+        });
+
+        const close = thumb.querySelector("button");
+        invokeListener(close, "click", {
+            stopPropagation() {}
+        });
+        await Promise.resolve();
+
+        const replayPromise = controller.playThumbnail(thumb, {
+            videoId: "video1",
+            startSeconds: 5,
+            endSeconds: 25
+        });
+        await Promise.resolve();
+
+        playerInstance.currentState = window.YT.PlayerState.PLAYING;
+        stateChangeHandler({
+            data: window.YT.PlayerState.ENDED,
+            target: playerInstance
+        });
+        await Promise.resolve();
+
+        assert.ok(thumb.querySelector("iframe"));
+        assert.equal(ui.playback.activeThumb, thumb);
+
+        stateChangeHandler({
+            data: window.YT.PlayerState.PLAYING,
+            target: playerInstance
+        });
+
+        assert.equal(await replayPromise, true);
+        assert.ok(thumb.querySelector("iframe"));
+        assert.equal(ui.playback.activeThumb, thumb);
+    } finally {
+        cleanup();
+    }
+});
+
+test("youtube: replay ignores ended event while the next same-thumb start is still pending", async () => {
+    const cleanup = installFakeDom();
+    try {
+        const ui = createYoutubeUiState({
+            stopAtEndTime: true
+        });
+        const youtube = {
+            apiPromise: null,
+            players: new WeakMap()
+        };
+        const controller = createYoutubeController({
+            ui,
+            youtube,
+            constants: {
+                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
+                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
+                YT_IFRAME_READY_POLL_MS: 50,
+                STOP_PLAYBACK_ON_SCROLL_OUT: false
+            }
+        });
+        let playerInstance = null;
+        let stateChangeHandler = null;
+        window.YT = {
+            PlayerState: {
+                ENDED: 0,
+                PLAYING: 1,
+                PAUSED: 2
+            },
+            Player: class {
+                constructor(host, options) {
+                    this.iframe = attachMockPlayerIframe(host, options);
+                    this.currentState = -1;
+                    stateChangeHandler = options.events.onStateChange;
+                    playerInstance = this;
+                }
+
+                getIframe() {
+                    return this.iframe;
+                }
+
+                getPlayerState() {
+                    return this.currentState;
+                }
+
+                stopVideo() {}
+
+                loadVideoById() {
+                    this.currentState = window.YT.PlayerState.ENDED;
+                }
+
+                destroy() {}
+            }
+        };
+
+        const card = document.createElement("div");
+        card.className = "song-card";
+        card.dataset.songKey = "song:pending";
+        const thumb = document.createElement("div");
+        card.appendChild(thumb);
+        document.body.append(card);
+
+        controller.updateThumbnail(thumb, { videoId: "video1", startSeconds: 5, endSeconds: 25 });
+        thumb.onclick();
+        await Promise.resolve();
+
+        playerInstance.currentState = window.YT.PlayerState.PLAYING;
+        stateChangeHandler({
+            data: window.YT.PlayerState.PLAYING,
+            target: playerInstance
+        });
+
+        const close = thumb.querySelector("button");
+        invokeListener(close, "click", {
+            stopPropagation() {}
+        });
+        await Promise.resolve();
+
+        const replayPromise = controller.playThumbnail(thumb, {
+            videoId: "video1",
+            startSeconds: 5,
+            endSeconds: 25
+        });
+        await Promise.resolve();
+
+        stateChangeHandler({
+            data: window.YT.PlayerState.ENDED,
+            target: playerInstance
+        });
+        await Promise.resolve();
+
+        assert.ok(thumb.querySelector("iframe"));
+        assert.equal(ui.playback.activeThumb, thumb);
+
+        playerInstance.currentState = window.YT.PlayerState.PLAYING;
+        stateChangeHandler({
+            data: window.YT.PlayerState.PLAYING,
+            target: playerInstance
+        });
+
+        assert.equal(await replayPromise, true);
+        assert.ok(thumb.querySelector("iframe"));
+        assert.equal(ui.playback.activeThumb, thumb);
+    } finally {
+        cleanup();
+    }
+});
+
+test("youtube: playback start timeout restores the thumbnail", async () => {
+    const cleanup = installFakeDom();
+    const previousSetTimeout = globalThis.setTimeout;
+    const previousClearTimeout = globalThis.clearTimeout;
+    let timeoutCallback = null;
+    setGlobalValue("setTimeout", (cb) => {
+        timeoutCallback = cb;
+        return 1;
+    });
+    setGlobalValue("clearTimeout", () => {});
+    try {
+        const ui = createYoutubeUiState({});
+        const youtube = {
+            apiPromise: null,
+            players: new WeakMap()
+        };
+        const controller = createYoutubeController({
+            ui,
+            youtube,
+            constants: {
+                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
+                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
+                YT_IFRAME_READY_POLL_MS: 50,
+                STOP_PLAYBACK_ON_SCROLL_OUT: false
+            }
+        });
+        window.YT = {
+            PlayerState: {
+                ENDED: 0,
+                PLAYING: 1,
+                PAUSED: 2
+            },
+            Player: class {
+                constructor(host) {
+                    this.iframe = attachMockPlayerIframe(host);
+                }
+
+                getIframe() {
+                    return this.iframe;
+                }
+
+                destroy() {}
+            }
+        };
+
+        const thumb = document.createElement("div");
+        document.body.appendChild(thumb);
+        const playbackPromise = controller.playThumbnail(thumb, {
+            videoId: "video-timeout",
+            startSeconds: 0
+        });
+        await Promise.resolve();
+
+        assert.ok(thumb.querySelector("iframe"));
+        assert.equal(typeof timeoutCallback, "function");
+
+        timeoutCallback();
+        await Promise.resolve();
+
+        assert.equal(await playbackPromise, false);
+        assert.ok(thumb.querySelector("img"));
+        assert.equal(thumb.querySelector("iframe"), null);
+        assert.equal(ui.playback.activeThumb, null);
+    } finally {
+        setGlobalValue("setTimeout", previousSetTimeout);
+        setGlobalValue("clearTimeout", previousClearTimeout);
+        cleanup();
+    }
+});
+
+test("youtube: iframe playback stays mounted when iframe api loading fails", async () => {
+    const cleanup = installFakeDom();
+    const previousSetTimeout = globalThis.setTimeout;
+    const previousClearTimeout = globalThis.clearTimeout;
+    let timeoutCallback = null;
+    setGlobalValue("setTimeout", (cb) => {
+        timeoutCallback = cb;
+        return {
+            unref() {}
+        };
+    });
+    setGlobalValue("clearTimeout", () => {});
+    try {
+        const ui = createYoutubeUiState({});
+        const youtube = {
+            apiPromise: null,
+            players: new WeakMap()
+        };
+        const controller = createYoutubeController({
+            ui,
+            youtube,
+            constants: {
+                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
+                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
+                YT_IFRAME_READY_POLL_MS: 50,
+                STOP_PLAYBACK_ON_SCROLL_OUT: false
+            }
+        });
+
+        const thumb = document.createElement("div");
+        document.body.appendChild(thumb);
+        const playbackPromise = controller.playThumbnail(thumb, {
+            videoId: "video-fallback",
+            startSeconds: 12
+        });
+        await Promise.resolve();
+
+        const apiScript = document.head.children[0];
+        assert.equal(apiScript.tagName, "SCRIPT");
+        assert.equal(typeof apiScript.onerror, "function");
+        apiScript.onerror();
+        await youtube.apiPromise.catch(() => {});
+        await Promise.resolve();
+
+        assert.ok(thumb.querySelector("iframe"));
+        assert.equal(typeof timeoutCallback, "function");
+
+        timeoutCallback();
+        await Promise.resolve();
+
+        assert.equal(await playbackPromise, true);
+        assert.ok(thumb.querySelector("iframe"));
+        assert.equal(thumb.querySelector("img"), null);
+        assert.equal(ui.playback.activeThumb, thumb);
+    } finally {
+        setGlobalValue("setTimeout", previousSetTimeout);
+        setGlobalValue("clearTimeout", previousClearTimeout);
+        cleanup();
+    }
+});
+
+test("youtube: embed url includes end time when stopAtEndTime is enabled", async () => {
+    const cleanup = installFakeDom();
+    try {
+        const ui = createYoutubeUiState({
+            stopAtEndTime: true
+        });
+        const youtube = {
+            apiPromise: null,
+            players: new WeakMap()
+        };
+        const controller = createYoutubeController({
+            ui,
+            youtube,
+            constants: {
+                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
+                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
+                YT_IFRAME_READY_POLL_MS: 50,
+                STOP_PLAYBACK_ON_SCROLL_OUT: false
+            }
+        });
+        globalThis.window.YT = {
+            PlayerState: {
+                PAUSED: 2,
+                ENDED: 0,
+                PLAYING: 1
+            },
+            Player: class {
+                constructor(host, options) {
+                    this.iframe = attachMockPlayerIframe(host, options);
+                }
+
+                getIframe() {
+                    return this.iframe;
+                }
+
+                destroy() {}
+            }
+        };
+
+        const thumb = document.createElement("div");
+        document.body.appendChild(thumb);
+        controller.updateThumbnail(thumb, { videoId: "video1", startSeconds: 45, endSeconds: 75 });
+        thumb.onclick();
+        await Promise.resolve();
+
+        assert.match(thumb.querySelector("iframe").src, /^https:\/\/www\.youtube\.com\/embed\/video1\?/);
+        assert.match(thumb.querySelector("iframe").src, /start=45/);
+        assert.match(thumb.querySelector("iframe").src, /end=75/);
+        assert.equal(thumb.dataset.playbackKey, "video1:45:75");
+    } finally {
+        cleanup();
+    }
+});
+
+test("youtube: embed url omits end time when stopAtEndTime is disabled", async () => {
+    const cleanup = installFakeDom();
+    try {
+        const ui = createYoutubeUiState({
+            stopAtEndTime: false
+        });
+        const youtube = {
+            apiPromise: null,
+            players: new WeakMap()
+        };
+        const controller = createYoutubeController({
+            ui,
+            youtube,
+            constants: {
+                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
+                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
+                YT_IFRAME_READY_POLL_MS: 50,
+                STOP_PLAYBACK_ON_SCROLL_OUT: false
+            }
+        });
+        globalThis.window.YT = {
+            PlayerState: {
+                PAUSED: 2,
+                ENDED: 0,
+                PLAYING: 1
+            },
+            Player: class {
+                constructor(host, options) {
+                    this.iframe = attachMockPlayerIframe(host, options);
+                }
+
+                getIframe() {
+                    return this.iframe;
+                }
+
+                destroy() {}
+            }
+        };
+
+        const thumb = document.createElement("div");
+        document.body.appendChild(thumb);
+        controller.updateThumbnail(thumb, { videoId: "video1", startSeconds: 45, endSeconds: 75 });
+        thumb.onclick();
+        await Promise.resolve();
+
+        assert.match(thumb.querySelector("iframe").src, /^https:\/\/www\.youtube\.com\/embed\/video1\?/);
+        assert.match(thumb.querySelector("iframe").src, /start=45/);
+        assert.equal(/(?:\?|&)end=/.test(thumb.querySelector("iframe").src), false);
+        assert.equal(thumb.dataset.playbackKey, "video1:45:");
+    } finally {
+        cleanup();
+    }
+});
+
+test("youtube: ended playback restores thumbnail while paused playback keeps iframe", async () => {
+    const cleanup = installFakeDom();
+    try {
+        const ui = createYoutubeUiState({});
+        const youtube = {
+            apiPromise: null,
+            players: new WeakMap()
+        };
+        const controller = createYoutubeController({
+            ui,
+            youtube,
+            constants: {
+                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
+                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
+                YT_IFRAME_READY_POLL_MS: 50,
+                STOP_PLAYBACK_ON_SCROLL_OUT: false
+            }
+        });
+
+        let playerInstance = null;
+        let stateChangeHandler = null;
+        globalThis.window.YT = {
+            PlayerState: {
+                PAUSED: 2,
+                ENDED: 0,
+                PLAYING: 1
+            },
+            Player: class {
+                constructor(host, options) {
+                    this.iframe = attachMockPlayerIframe(host, options);
+                    this.stopCallCount = 0;
+                    stateChangeHandler = options.events.onStateChange;
+                    playerInstance = this;
+                }
+
+                getIframe() {
+                    return this.iframe;
+                }
+
+                stopVideo() {
+                    this.stopCallCount += 1;
+                }
+
+                destroy() {}
+            }
+        };
+
+        const thumb = document.createElement("div");
+        document.body.appendChild(thumb);
+        controller.updateThumbnail(thumb, { videoId: "video1", startSeconds: 45 });
+        thumb.onclick();
+        await Promise.resolve();
+
+        assert.ok(thumb.querySelector("iframe"));
+        assert.equal(thumb.classList.contains("playing"), true);
+        assert.equal(typeof stateChangeHandler, "function");
+
+        stateChangeHandler({ data: globalThis.window.YT.PlayerState.PAUSED });
+        assert.ok(thumb.querySelector("iframe"));
+        assert.equal(thumb.classList.contains("playing"), false);
+
+        thumb.classList.add("playing");
+        stateChangeHandler({ data: globalThis.window.YT.PlayerState.ENDED });
+        await Promise.resolve();
+        assert.equal(thumb.querySelector("iframe"), null);
+        assert.ok(thumb.querySelector("img"));
+        assert.equal(thumb.classList.contains("playing"), false);
+        assert.equal(ui.playback.activeThumb, null);
+        assert.equal(playerInstance.stopCallCount, 1);
+    } finally {
+        cleanup();
+    }
+});
+
+test("youtube: ended playback notifies song key for playback continuation", async () => {
+    const cleanup = installFakeDom();
+    try {
+        const ui = createYoutubeUiState({});
+        const youtube = {
+            apiPromise: null,
+            players: new WeakMap()
+        };
+        const controller = createYoutubeController({
+            ui,
+            youtube,
+            constants: {
+                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
+                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
+                YT_IFRAME_READY_POLL_MS: 50,
+                STOP_PLAYBACK_ON_SCROLL_OUT: false
+            }
+        });
+        let endedSongKey = "";
+        let stateChangeHandler = null;
+        controller.setPlaybackEndedHook(({ songKey }) => {
+            endedSongKey = songKey;
+        });
+        globalThis.window.YT = {
+            PlayerState: {
+                PAUSED: 2,
+                ENDED: 0,
+                PLAYING: 1
+            },
+            Player: class {
+                constructor(_, options) {
+                    stateChangeHandler = options.events.onStateChange;
+                }
+
+                destroy() {}
+            }
+        };
+
+        const card = document.createElement("div");
+        card.className = "song-card";
+        card.dataset.songKey = "song:2";
+        document.body.appendChild(card);
+        const thumb = document.createElement("div");
+        card.appendChild(thumb);
+        controller.updateThumbnail(thumb, { videoId: "video2", startSeconds: 0 });
+        thumb.onclick();
+        await Promise.resolve();
+
+        stateChangeHandler({ data: globalThis.window.YT.PlayerState.ENDED });
+        await Promise.resolve();
+
+        assert.equal(endedSongKey, "song:2");
+        assert.equal(ui.playback.activeThumb, null);
+        assert.ok(thumb.querySelector("img"));
+    } finally {
+        cleanup();
+    }
+});
+
+test("youtube: stale ended event from a closed player does not notify playback continuation", async () => {
+    const cleanup = installFakeDom();
+    try {
+        const ui = createYoutubeUiState({});
+        const youtube = {
+            apiPromise: null,
+            players: new WeakMap()
+        };
+        const controller = createYoutubeController({
+            ui,
+            youtube,
+            constants: {
+                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
+                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
+                YT_IFRAME_READY_POLL_MS: 50,
+                STOP_PLAYBACK_ON_SCROLL_OUT: false
+            }
+        });
+        const endedCalls = [];
+        let stateChangeHandler = null;
+        controller.setPlaybackEndedHook(({ songKey }) => {
+            endedCalls.push(songKey);
+        });
+        globalThis.window.YT = {
+            PlayerState: {
+                PAUSED: 2,
+                ENDED: 0,
+                PLAYING: 1
+            },
+            Player: class {
+                constructor(_, options) {
+                    stateChangeHandler = options.events.onStateChange;
+                }
+
+                destroy() {}
+            }
+        };
+
+        const card = document.createElement("div");
+        card.className = "song-card";
+        card.dataset.songKey = "song:stale";
+        document.body.appendChild(card);
+        const thumb = document.createElement("div");
+        card.appendChild(thumb);
+        controller.updateThumbnail(thumb, { videoId: "video-stale", startSeconds: 0 });
+        thumb.onclick();
+        await Promise.resolve();
+
+        const close = thumb.querySelector("button");
+        invokeListener(close, "click", {
+            stopPropagation() {}
+        });
+        await Promise.resolve();
+
+        stateChangeHandler({ data: globalThis.window.YT.PlayerState.ENDED });
+        await Promise.resolve();
+
+        assert.deepEqual(endedCalls, []);
+        assert.equal(ui.playback.activeThumb, null);
+    } finally {
+        cleanup();
+    }
+});
+
+test("youtube: ended playback waits for layout refresh before notifying", async () => {
+    const cleanup = installFakeDom();
+    const previousRaf = globalThis.requestAnimationFrame;
+    const rafQueue = [];
+    setGlobalValue("requestAnimationFrame", (cb) => {
+        rafQueue.push(cb);
+        return rafQueue.length;
+    });
+    try {
+        const ui = createYoutubeUiState({});
+        const youtube = {
+            apiPromise: null,
+            players: new WeakMap()
+        };
+        const controller = createYoutubeController({
+            ui,
+            youtube,
+            constants: {
+                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
+                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
+                YT_IFRAME_READY_POLL_MS: 50,
+                STOP_PLAYBACK_ON_SCROLL_OUT: false
+            }
+        });
+        const order = [];
+        let stateChangeHandler = null;
+        controller.setLayoutHook(() => {
+            order.push("layout");
+        });
+        controller.setPlaybackEndedHook(({ songKey }) => {
+            order.push(`ended:${songKey}`);
+        });
+        globalThis.window.YT = {
+            PlayerState: {
+                PAUSED: 2,
+                ENDED: 0,
+                PLAYING: 1
+            },
+            Player: class {
+                constructor(_, options) {
+                    stateChangeHandler = options.events.onStateChange;
+                }
+
+                destroy() {}
+            }
+        };
+
+        const card = document.createElement("div");
+        card.className = "song-card";
+        card.dataset.songKey = "song:wait";
+        document.body.appendChild(card);
+        const thumb = document.createElement("div");
+        card.appendChild(thumb);
+        controller.playThumbnail(thumb, { videoId: "video-wait", startSeconds: 0 });
+        await Promise.resolve();
+
+        stateChangeHandler({ data: globalThis.window.YT.PlayerState.ENDED });
+        assert.deepEqual(order, []);
+
+        const firstFrame = rafQueue.shift();
+        firstFrame();
+        assert.deepEqual(order, ["layout"]);
+
+        const secondFrame = rafQueue.shift();
+        secondFrame();
+        await Promise.resolve();
+
+        assert.deepEqual(order, ["layout", "ended:song:wait"]);
+    } finally {
+        setGlobalValue("requestAnimationFrame", previousRaf);
+        cleanup();
+    }
+});
+
+test("youtube: ended playback does not continue after a newer playback starts", async () => {
+    const cleanup = installFakeDom();
+    const previousRaf = globalThis.requestAnimationFrame;
+    const rafQueue = [];
+    setGlobalValue("requestAnimationFrame", (cb) => {
+        rafQueue.push(cb);
+        return rafQueue.length;
+    });
+    try {
+        const ui = createYoutubeUiState({});
+        const youtube = {
+            apiPromise: null,
+            players: new WeakMap()
+        };
+        const controller = createYoutubeController({
+            ui,
+            youtube,
+            constants: {
+                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
+                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
+                YT_IFRAME_READY_POLL_MS: 50,
+                STOP_PLAYBACK_ON_SCROLL_OUT: false
+            }
+        });
+        const endedCalls = [];
+        const stateChangeHandlers = [];
+        controller.setPlaybackEndedHook(({ songKey }) => {
+            endedCalls.push(songKey);
+        });
+        globalThis.window.YT = {
+            PlayerState: {
+                PAUSED: 2,
+                ENDED: 0,
+                PLAYING: 1
+            },
+            Player: class {
+                constructor(_, options) {
+                    stateChangeHandlers.push(options.events.onStateChange);
+                }
+
+                destroy() {}
+            }
+        };
+
+        const firstCard = document.createElement("div");
+        firstCard.className = "song-card";
+        firstCard.dataset.songKey = "song:first";
+        document.body.appendChild(firstCard);
+        const firstThumb = document.createElement("div");
+        firstCard.appendChild(firstThumb);
+        controller.updateThumbnail(firstThumb, { videoId: "video-first", startSeconds: 0 });
+        firstThumb.onclick();
+        await Promise.resolve();
+
+        const secondCard = document.createElement("div");
+        secondCard.className = "song-card";
+        secondCard.dataset.songKey = "song:second";
+        document.body.appendChild(secondCard);
+        const secondThumb = document.createElement("div");
+        secondCard.appendChild(secondThumb);
+
+        stateChangeHandlers[0]({ data: globalThis.window.YT.PlayerState.ENDED });
+        controller.playThumbnail(secondThumb, { videoId: "video-second", startSeconds: 0 });
+        await Promise.resolve();
+
+        while (rafQueue.length > 0) {
+            const callback = rafQueue.shift();
+            if (typeof callback === "function") callback();
+        }
+        await Promise.resolve();
+
+        assert.deepEqual(endedCalls, []);
+        assert.equal(ui.playback.activeThumb, secondThumb);
+    } finally {
+        setGlobalValue("requestAnimationFrame", previousRaf);
+        cleanup();
+    }
+});
+
+test("youtube: playThumbnail resolves true after the player enters PLAYING", async () => {
+    const cleanup = installFakeDom();
+    try {
+        const ui = createYoutubeUiState({});
+        const youtube = {
+            apiPromise: null,
+            players: new WeakMap()
+        };
+        const controller = createYoutubeController({
+            ui,
+            youtube,
+            constants: {
+                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
+                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
+                YT_IFRAME_READY_POLL_MS: 50,
+                STOP_PLAYBACK_ON_SCROLL_OUT: false
+            }
+        });
+        let stateChangeHandler = null;
+        globalThis.window.YT = {
+            PlayerState: {
+                PAUSED: 2,
+                ENDED: 0,
+                PLAYING: 1
+            },
+            Player: class {
+                constructor(host, options) {
+                    this.iframe = attachMockPlayerIframe(host, options);
+                    stateChangeHandler = options.events.onStateChange;
+                }
+
+                getIframe() {
+                    return this.iframe;
+                }
+
+                destroy() {}
+            }
+        };
+
+        const thumb = document.createElement("div");
+        document.body.appendChild(thumb);
+        const playbackPromise = controller.playThumbnail(thumb, { videoId: "video-play", startSeconds: 0 });
+        await Promise.resolve();
+
+        stateChangeHandler({ data: globalThis.window.YT.PlayerState.PLAYING });
+
+        assert.equal(await playbackPromise, true);
+    } finally {
+        cleanup();
+    }
+});
+
+test("youtube: playThumbnail resolves false and restores the thumbnail after a player error", async () => {
+    const cleanup = installFakeDom();
+    try {
+        const ui = createYoutubeUiState({});
+        const youtube = {
+            apiPromise: null,
+            players: new WeakMap()
+        };
+        const controller = createYoutubeController({
+            ui,
+            youtube,
+            constants: {
+                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
+                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
+                YT_IFRAME_READY_POLL_MS: 50,
+                STOP_PLAYBACK_ON_SCROLL_OUT: false
+            }
+        });
+        let errorHandler = null;
+        globalThis.window.YT = {
+            PlayerState: {
+                PAUSED: 2,
+                ENDED: 0,
+                PLAYING: 1
+            },
+            Player: class {
+                constructor(host, options) {
+                    this.iframe = attachMockPlayerIframe(host, options);
+                    errorHandler = options.events.onError;
+                }
+
+                getIframe() {
+                    return this.iframe;
+                }
+
+                stopVideo() {}
+
+                destroy() {}
+            }
+        };
+
+        const thumb = document.createElement("div");
+        document.body.appendChild(thumb);
+        thumb.dataset.videoId = "video-error";
+        const playbackPromise = controller.playThumbnail(thumb, { videoId: "video-error", startSeconds: 0 });
+        await Promise.resolve();
+
+        errorHandler({ data: 150 });
+
+        assert.equal(await playbackPromise, false);
+        assert.ok(thumb.querySelector("img"));
+        assert.equal(thumb.classList.contains("playing"), false);
+    } finally {
+        cleanup();
+    }
+});
+
+test("youtube: recreating the shared player does not fail the newer playback attempt early", async () => {
+    const cleanup = installFakeDom();
+    try {
+        const ui = createYoutubeUiState({});
+        const youtube = {
+            apiPromise: null,
+            players: new WeakMap()
+        };
+        const controller = createYoutubeController({
+            ui,
+            youtube,
+            constants: {
+                YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
+                YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
+                YT_IFRAME_READY_POLL_MS: 50,
+                STOP_PLAYBACK_ON_SCROLL_OUT: false
+            }
+        });
+        const stateChangeHandlers = [];
+        globalThis.window.YT = {
+            PlayerState: {
+                PAUSED: 2,
+                ENDED: 0,
+                PLAYING: 1
+            },
+            Player: class {
+                constructor(host, options) {
+                    this.iframe = attachMockPlayerIframe(host, options);
+                    stateChangeHandlers.push(options.events.onStateChange);
+                }
+
+                getIframe() {
+                    return this.iframe;
+                }
+
+                destroy() {}
+            }
+        };
+
+        const firstCard = document.createElement("div");
+        const secondCard = document.createElement("div");
+        firstCard.className = "song-card";
+        secondCard.className = "song-card";
+        const firstThumb = document.createElement("div");
+        const secondThumb = document.createElement("div");
+        firstCard.appendChild(firstThumb);
+        secondCard.appendChild(secondThumb);
+        document.body.append(firstCard, secondCard);
+
+        const firstPromise = controller.playThumbnail(firstThumb, { videoId: "video-first", startSeconds: 0 });
+        await Promise.resolve();
+
+        let secondResult = "pending";
+        const secondPromise = controller.playThumbnail(secondThumb, { videoId: "video-second", startSeconds: 0 });
+        secondPromise.then((didStart) => {
+            secondResult = didStart;
+        });
+        await Promise.resolve();
+
+        assert.equal(await firstPromise, false);
+        assert.equal(secondResult, "pending");
+
+        stateChangeHandlers[1]({ data: globalThis.window.YT.PlayerState.PLAYING });
+
+        assert.equal(await secondPromise, true);
+        assert.equal(secondResult, true);
     } finally {
         cleanup();
     }

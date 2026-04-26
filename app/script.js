@@ -22,6 +22,8 @@ import {
 } from "./state.mjs?v=11";
 import { createSearchController } from "./controllers/search.mjs?v=11";
 import { createRenderController } from "./controllers/render.mjs?v=11";
+import { createPlaybackSessionController } from "./controllers/playback-session.mjs?v=11";
+import { createPlaybackSettingsController } from "./controllers/playback-settings.mjs?v=11";
 import { createYoutubeController, extractYoutubeInfo } from "./controllers/youtube.mjs?v=11";
 import { createStorageController } from "./controllers/storage.mjs?v=11";
 import { createBookmarkUiController } from "./ui/bookmark/ui.mjs?v=11";
@@ -58,6 +60,7 @@ import { getDateUiState, getSearchUiState } from "./lib/ui-slices.mjs?v=11";
  * @property {string} titleYomi
  * @property {string} artistYomi
  * @property {string} url
+ * @property {number | null} endSeconds
  * @property {string} titleNorm
  * @property {string} artistNorm
  * @property {string} titleYomiNorm
@@ -73,13 +76,49 @@ const searchController = createSearchController({
         INCREMENT_COUNT,
         SEARCH_DEBOUNCE_MS,
         DEFAULT_FORMATS
+    },
+    callbacks: {
+        updateDisplay: () => renderController.updateDisplay(),
+        scrollResultsPaneToTop: () => scrollResultListToTop(ui.el.resultList)
     }
 });
 
 const renderController = createRenderController({
     data,
     ui,
-    isAllFormatsSelected: () => searchController.areAllFormatsSelected()
+    isAllFormatsSelected: () => searchController.areAllFormatsSelected(),
+    incrementCount: INCREMENT_COUNT,
+    callbacks: {
+        getSearchState: () => searchController.getSearchState(),
+        isRecommendedMode: (state) => searchController.isRecommendedMode(state),
+        updateThumbnail: (thumbDiv, yt) => youtubeController.updateThumbnail(thumbDiv, yt),
+        extractYoutubeInfo,
+        playThumbnail: (thumbDiv, yt) => youtubeController.playThumbnail(thumbDiv, yt),
+        restoreActivePlayback: () => youtubeController.restoreActivePlayback(),
+        openBookmarkModal: (songKey) => sidebarController.openBookmarkModal(songKey),
+        setupScrollObserver: () => youtubeController.setupScrollObserver(),
+        removeSongFromActiveBookmark: (songKey) => sidebarController.removeSongFromActiveBookmark(songKey),
+        saveBookmarks: () => storageController.saveBookmarks()
+    }
+});
+
+const playbackSessionController = createPlaybackSessionController({
+    data,
+    ui,
+    callbacks: {
+        playSongByKey: (songKey) => renderController.playSongByKey(songKey),
+        scrollSongIntoView: (songKey) => renderController.scrollSongIntoView(songKey)
+    }
+});
+
+const playbackSettingsController = createPlaybackSettingsController({
+    ui,
+    callbacks: {
+        ensureThumbnailPlaybackReady: () => youtubeController.ensureThumbnailPlaybackReady(),
+        restoreActivePlayback: () => youtubeController.restoreActivePlayback(),
+        updateDisplay: () => renderController.updateDisplay(),
+        setupScrollObserver: () => youtubeController.setupScrollObserver()
+    }
 });
 
 const youtubeController = createYoutubeController({
@@ -162,7 +201,7 @@ const uiSyncController = createUiSyncController({
     uiSyncPasses: UI_SYNC_PASSES,
     syncSearchUI,
     applyThemeFromStorage: () => applyThemeFromStorage({ ui }),
-    applyThumbnailFromStorage: () => youtubeController.applyThumbnailFromStorage()
+    applyPlaybackSettingsFromStorage: () => playbackSettingsController.applyPlaybackSettingsFromStorage()
 });
 
 const dataLoader = createDataLoader({
@@ -179,25 +218,10 @@ const dataLoader = createDataLoader({
     }
 });
 
-renderController.setDependencies({
-    getSearchState: () => searchController.getSearchState(),
-    isRecommendedMode: (state) => searchController.isRecommendedMode(state),
-    updateThumbnail: (thumbDiv, yt) => youtubeController.updateThumbnail(thumbDiv, yt),
-    extractYoutubeInfo,
-    restoreActivePlayback: () => youtubeController.restoreActivePlayback(),
-    openBookmarkModal: (songKey) => sidebarController.openBookmarkModal(songKey),
-    setupScrollObserver: () => youtubeController.setupScrollObserver(),
-    removeSongFromActiveBookmark: (songKey) => sidebarController.removeSongFromActiveBookmark(songKey),
-    saveBookmarks: () => storageController.saveBookmarks()
-});
-
-searchController.setRenderHooks({
-    updateDisplay: () => renderController.updateDisplay(),
-    scrollResultsPaneToTop: () => scrollResultListToTop(ui.el.resultList)
-});
-
-youtubeController.setDisplayHook(() => renderController.updateDisplay());
 youtubeController.setLayoutHook(() => renderController.refreshLayout());
+youtubeController.setPlaybackEndedHook(({ songKey }) => {
+    playbackSessionController.continuePlayback(songKey);
+});
 
 /**
  * DOM 参照の初期化と UI 各機能のセットアップを行う。
@@ -218,7 +242,7 @@ async function initUI() {
     });
     storageController.loadBookmarks();
     setupTheme({ ui });
-    youtubeController.setupThumbnailToggle();
+    playbackSettingsController.setupPlaybackSettings();
     youtubeController.setupScrollObserver();
     uiSyncController.setupSyncEvents();
     window.addEventListener("resize", () => {

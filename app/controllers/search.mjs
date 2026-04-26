@@ -19,9 +19,9 @@ export {
 
 /**
  * 検索条件の収集・結果解決・推薦選曲を管理するコントローラーを作成する。
- * @param {*} ui
+ * @param {{ data: *, ui: *, constants: *, callbacks: { updateDisplay: Function, scrollResultsPaneToTop: Function } }} input
  */
-export function createSearchController({ data, ui, constants }) {
+export function createSearchController({ data, ui, constants, callbacks }) {
     const {
         RANDOM_DISPLAY_COUNT,
         MIN_PERFORMANCE_FOR_RANDOM,
@@ -32,21 +32,8 @@ export function createSearchController({ data, ui, constants }) {
     const searchUi = getSearchUiState(ui);
     const lookupUi = getLookupUiState(ui);
     const dateFilterController = createDateFilterController({ ui });
-    let updateDisplay = () => {};
-    let scrollResultsPaneToTop = () => {};
-
-    /**
-     * 検索後に呼び出す描画フックを登録する。
-     * @param {*} hooks
-     */
-    function setRenderHooks(hooks) {
-        if (hooks && typeof hooks.updateDisplay === "function") {
-            updateDisplay = hooks.updateDisplay;
-        }
-        if (hooks && typeof hooks.scrollResultsPaneToTop === "function") {
-            scrollResultsPaneToTop = hooks.scrollResultsPaneToTop;
-        }
-    }
+    const updateDisplay = callbacks.updateDisplay;
+    const scrollResultsPaneToTop = callbacks.scrollResultsPaneToTop;
 
     /**
      * デバウンス付きで検索実行を予約し、必要時は即時実行する。
@@ -250,7 +237,6 @@ export function createSearchController({ data, ui, constants }) {
     }
 
     return {
-        setRenderHooks,
         scheduleSearch,
         search,
         getSearchState,

@@ -85,6 +85,19 @@ function makeRow(input) {
     };
 }
 
+/**
+ * 検索コントローラー用の描画コールバックを作る。
+ * @param {*} input
+ * @returns {*}
+ */
+function createSearchCallbacks(input) {
+    const callbacks = input || {};
+    return {
+        updateDisplay: callbacks.updateDisplay || (() => {}),
+        scrollResultsPaneToTop: callbacks.scrollResultsPaneToTop || (() => {})
+    };
+}
+
 test("parseDateKey: valid and invalid dates", () => {
     assert.equal(parseDateKey("2024-02-29"), 20240229);
     assert.equal(parseDateKey("2024/2/9"), 20240209);
@@ -338,7 +351,12 @@ test("createSearchController: active bookmark also applies search criteria", () 
         DEFAULT_FORMATS: ["配信", "歌みた", "ショート"]
     };
 
-    const controller = createSearchController({ data, ui, constants });
+    const controller = createSearchController({
+        data,
+        ui,
+        constants,
+        callbacks: createSearchCallbacks()
+    });
     controller.search();
 
     assert.equal(data.currentResults.length, 0);
@@ -387,7 +405,12 @@ test("createSearchController: active bookmark resolves rows by bookmarkSongKey",
         DEFAULT_FORMATS: ["配信", "歌みた", "ショート"]
     };
 
-    const controller = createSearchController({ data, ui, constants });
+    const controller = createSearchController({
+        data,
+        ui,
+        constants,
+        callbacks: createSearchCallbacks()
+    });
     controller.search();
 
     assert.deepEqual(data.currentResults.map((row) => row.songKey), ["arch2::2", "arch1::1"]);
@@ -439,7 +462,12 @@ test("createSearchController: active bookmark uses incremental display limit", (
         DEFAULT_FORMATS: ["配信", "歌みた", "ショート"]
     };
 
-    const controller = createSearchController({ data, ui, constants });
+    const controller = createSearchController({
+        data,
+        ui,
+        constants,
+        callbacks: createSearchCallbacks()
+    });
     controller.search();
 
     assert.equal(data.currentResults.length, 5);
@@ -484,7 +512,12 @@ test("createSearchController: recommendation mode counts オリ曲 as 歌みた"
         DEFAULT_FORMATS: ["配信", "歌みた", "ショート", "切り抜き"]
     };
 
-    const controller = createSearchController({ data, ui, constants });
+    const controller = createSearchController({
+        data,
+        ui,
+        constants,
+        callbacks: createSearchCallbacks()
+    });
     controller.search();
 
     assert.equal(data.currentResults.length, 1);
@@ -535,7 +568,12 @@ test("createSearchController: single オリ曲 performance is eligible for recom
         DEFAULT_FORMATS: ["配信", "歌みた", "ショート", "切り抜き"]
     };
 
-    const controller = createSearchController({ data, ui, constants });
+    const controller = createSearchController({
+        data,
+        ui,
+        constants,
+        callbacks: createSearchCallbacks()
+    });
     controller.search();
 
     assert.equal(data.currentResults.length, 1);

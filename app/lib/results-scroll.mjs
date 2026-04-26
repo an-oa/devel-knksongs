@@ -1,4 +1,5 @@
-import { findScrollableAncestor } from "./layout-anchor.mjs?v=11";
+import { isHtmlElement } from "./dom-utils.mjs?v=11";
+import { afterLayoutSettled, findScrollableAncestor } from "./layout-anchor.mjs?v=11";
 
 /**
  * 結果リストを含むスクロール領域を先頭へ戻す。
@@ -17,34 +18,12 @@ export function scrollResultListToTop(resultList) {
 }
 
 /**
- * 指定フレーム数ぶん待機してから処理を実行する。
- * @param {number} frameCount
- * @param {Function | undefined} callback
- * @returns {Promise<*>}
- */
-function afterAnimationFrames(frameCount, callback) {
-    const remaining = Number.isFinite(frameCount) ? Math.max(0, Math.floor(frameCount)) : 0;
-    return new Promise((resolve) => {
-        function step(count) {
-            if (count <= 0) {
-                resolve(typeof callback === "function" ? callback() : undefined);
-                return;
-            }
-            requestAnimationFrame(() => {
-                step(count - 1);
-            });
-        }
-        step(remaining);
-    });
-}
-
-/**
  * 指定要素が見える位置まで、必要なときだけスクロールする。
  * @param {*} element
  * @param {{ topOffset?: number, behavior?: "auto" | "smooth" } | undefined} options
  */
 export function scrollElementIntoView(element, options) {
-    if (!(element instanceof HTMLElement) || !element.isConnected) return;
+    if (!isHtmlElement(element) || !element.isConnected) return;
     const scrollContainer = findScrollableAncestor(element);
     if (!scrollContainer) return;
     const topOffset = Number.isFinite(options && options.topOffset) ? options.topOffset : 0;
@@ -79,7 +58,7 @@ export function scrollElementIntoView(element, options) {
  * @returns {Promise<*>}
  */
 export function scheduleScrollElementIntoView(element, options) {
-    return afterAnimationFrames(2, () => {
+    return afterLayoutSettled(() => {
         scrollElementIntoView(element, options);
     });
 }
