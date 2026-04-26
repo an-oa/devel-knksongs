@@ -41,6 +41,7 @@
   - `tests/youtube-player-adapter.test.mjs`
   - `tests/youtube-shared-playback.test.mjs`
   - `tests/youtube-thumbnail.test.mjs`
+  - `tests/youtube-unconfirmed-playback-start.test.mjs`
   - `tests/layout-anchor.test.mjs`
   - `tests/results-scroll.test.mjs`
   - `tests/e2e/youtube-smoke.spec.mjs`
@@ -71,7 +72,7 @@
     - サムネイル表示
     - ダークモード切替
     - 実験的な機能を表示
-  - 再生（実験的な機能を表示した場合のみ表示・有効化）
+  - 再生（サムネイル表示ONかつ実験的な機能を表示した場合のみ表示・有効化）
     - 曲の終わりで停止する
     - 終了後、次の曲を再生
     - リピート再生
@@ -236,7 +237,7 @@ flowchart LR
 - サムネ表示
 - 実験的な機能の表示状態
 - 再生設定（曲の終わりで停止する / 終了後、次の曲を再生 / リピート再生）
-  - 実験的な機能が非表示の間は、保存値を保持しつつ実効値はOFFとして扱う
+  - サムネイル表示OFFまたは実験的な機能が非表示の間は、保存値を保持しつつ実効値はOFFとして扱う
 - CSVキャッシュ
 - 検索条件（キーワード・日付・形態など）
 - ブックマーク情報（ブックマーク名・曲参照/順序・作成日時）

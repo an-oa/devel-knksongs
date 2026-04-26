@@ -23,14 +23,14 @@
   - サムネイル表示をONにした場合、サムネイルをクリックしてページ内で埋め込み再生できます(×で閉じてサムネに戻ります)。
   - 埋め込み再生は標準の `youtube.com` 埋め込みを使用します(曲名リンクは通常の `youtube.com` / `youtu.be` を開きます)。
     - 一部のモバイル環境では、再生開始時刻が反映されない場合があります(端末/ブラウザ/YouTube側の挙動差によります)。
-  - 設定パネルで「実験的な機能を表示」をONにすると、次の再生設定を切り替えられます。
+  - サムネイル表示をONにしたうえで、設定パネルの「実験的な機能を表示」をONにすると、次の再生設定を切り替えられます。
     - 曲の終わりで停止する: CSVの終了時刻がある曲は、その時刻で再生を止めます。
     - 終了後、次の曲を再生: 現在の一覧順で、次の曲へ順に進みます。
     - リピート再生: 「終了後、次の曲を再生」がOFFなら現在の曲、ONなら一覧全体を繰り返します。
 - 段階表示(追加読み込み)に対応します。
   - 検索結果/ブックマーク結果ともに、最初に一定件数を表示し、画面下の「つづきを表示」で追加表示します(負荷対策)。
 - ブックマーク機能があります。
-  - ブックマークを作成し、名称変更できます。
+  - ブックマークを作成し、名称変更/削除できます。
   - 各曲を追加/削除できます。
   - 曲の追加先ブックマーク選択や新規作成は、サイドバー内のブックマークパネルで行います。
   - ブックマークを選択すると、その中で通常の検索/絞り込みができます。
@@ -47,7 +47,7 @@
   - ダークモード切替に対応します(設定はブラウザに保存されます)。
 - 設定パネルで表示設定と実験的な再生設定を切り替えられます。
   - 表示: サムネイル表示 / ダークモード
-  - 実験的な機能を表示: ONにすると再生設定を表示します。
+  - 実験的な機能を表示: サムネイル表示ON時にONにすると再生設定を表示します。
   - 再生: 曲の終わりで停止する / 終了後、次の曲を再生 / リピート再生
 
 ---
@@ -96,7 +96,7 @@ flowchart TD
 - 配布物はHTML/CSS/JavaScriptのみで、実行時にnpm等の同梱依存はありません。
 - サムネイル表示/埋め込み再生まわりでは YouTube Iframe API を動的に利用します。
 - 開発時テストは Node.js 標準の `node:test` を利用します。
-- ブラウザ回帰確認として Playwright による Chromium スモークテストを追加できます。
+- ブラウザ回帰確認として Playwright による Chromium スモークテストを用意しています。
 
 ## テスト(開発者向け)
 
@@ -122,7 +122,7 @@ flowchart TD
   - YouTubeサムネイル/埋め込み再生まわりの統合テスト (`tests/youtube-controller.test.mjs`)
   - YouTube埋め込みURL/API loader のテスト (`tests/youtube-embed.test.mjs`)
   - YouTube playback state / start attempt / player adapter の単体テスト (`tests/youtube-playback-state.test.mjs`, `tests/youtube-playback-start-attempt.test.mjs`, `tests/youtube-player-adapter.test.mjs`)
-  - YouTube shared playback / thumbnail helper の単体テスト (`tests/youtube-shared-playback.test.mjs`, `tests/youtube-thumbnail.test.mjs`)
+  - YouTube shared playback / thumbnail helper / unconfirmed playback start の単体テスト (`tests/youtube-shared-playback.test.mjs`, `tests/youtube-thumbnail.test.mjs`, `tests/youtube-unconfirmed-playback-start.test.mjs`)
   - Chromium 上での YouTube 再生スモークテスト (`tests/e2e/youtube-smoke.spec.mjs`)
 - 実行コマンド:
   - `node --test tests/*.mjs`
@@ -144,8 +144,9 @@ flowchart TD
 - テーマ(ダーク/ライト)。
 - サムネイル表示ON/OFF。
 - 実験的な機能の表示ON/OFF。
+  - 実験的な再生設定は、サムネイル表示ONかつ実験的な機能の表示ONのときだけ有効になります。
 - 再生設定(曲の終わりで停止する / 終了後、次の曲を再生 / リピート再生)。
-  - 実験的な機能がOFFの間は、保存済みの再生設定は保持されますが実効値としては無効になります。
+  - サムネイル表示OFFまたは実験的な機能がOFFの間は、保存済みの再生設定は保持されますが実効値としては無効になります。
 - 検索状態(検索語・絞り込み条件・日付条件)。
 - ブックマーク情報(ブックマーク名・曲の対応/順序・作成日時)。
   - 保存形式は version 付き payload で管理し、旧形式は読み込み後に現行形式へ保存し直します。
