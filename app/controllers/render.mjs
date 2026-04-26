@@ -4,6 +4,10 @@ import { scheduleScrollElementIntoView } from "../lib/results-scroll.mjs?v=11";
 import { createBookmarkDragReorderController } from "../lib/render/drag-reorder.mjs?v=11";
 import { applyMasonryLayout } from "../lib/render/masonry-layout.mjs?v=11";
 import { getPlaybackUiState, getRenderUiState, getSearchUiState } from "../lib/ui-slices.mjs?v=11";
+import {
+    createYoutubePlaybackStartResult,
+    YOUTUBE_PLAYBACK_START_STATUS
+} from "../lib/youtube/playback-start-attempt.mjs?v=11";
 
 /**
  * 検索結果カードの生成・差分反映・表示更新を担うレンダーコントローラーを作成する。
@@ -257,18 +261,22 @@ export function createRenderController({ data, ui, isAllFormatsSelected, increme
     /**
      * 曲キーに対応するカードを必要に応じて描画し、再生開始する。
      * @param {string} songKey
-     * @returns {Promise<boolean | string>}
+     * @returns {Promise<{status: string}>}
      */
     function playSongByKey(songKey) {
         const index = data.currentResults.findIndex((row) => row && row.songKey === songKey);
-        if (index === -1) return Promise.resolve(false);
+        if (index === -1) {
+            return Promise.resolve(createYoutubePlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.FAILED));
+        }
         ensureResultVisible(index);
         let entry = getCardEntryBySongKey(songKey);
         if (!entry) {
             updateDisplay();
             entry = getCardEntryBySongKey(songKey);
         }
-        if (!entry) return Promise.resolve(false);
+        if (!entry) {
+            return Promise.resolve(createYoutubePlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.FAILED));
+        }
         return Promise.resolve(playThumbnail(entry.thumbDiv, buildYoutubeTarget(data.currentResults[index]), {
             playbackMode: "autoplay"
         }))

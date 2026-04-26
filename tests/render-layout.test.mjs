@@ -4,11 +4,24 @@ import { createRenderController } from "../app/controllers/render.mjs";
 import { createSearchController } from "../app/controllers/search.mjs";
 import { extractYoutubeInfo } from "../app/controllers/youtube.mjs";
 import {
+    createYoutubePlaybackStartResult,
+    YOUTUBE_PLAYBACK_START_STATUS
+} from "../app/lib/youtube/playback-start-attempt.mjs";
+import {
     installFakeDom,
     makeRenderRow,
     createDataTransferMock,
     invokeListener
 } from "./test-helpers.mjs";
+
+/**
+ * 再生開始結果の期待値を返す。
+ * @param {string} status
+ * @returns {{ status: string }}
+ */
+function playbackStartResult(status) {
+    return createYoutubePlaybackStartResult(status);
+}
 
 /**
  * render 系テスト用の UI 状態を作る。
@@ -68,7 +81,7 @@ function createRenderCallbacks(input) {
         isRecommendedMode: callbacks.isRecommendedMode || (() => false),
         updateThumbnail: callbacks.updateThumbnail || (() => {}),
         extractYoutubeInfo: callbacks.extractYoutubeInfo || (() => ({ videoId: "", startSeconds: 0 })),
-        playThumbnail: callbacks.playThumbnail || (() => false),
+        playThumbnail: callbacks.playThumbnail || (() => playbackStartResult(YOUTUBE_PLAYBACK_START_STATUS.FAILED)),
         restoreActivePlayback: callbacks.restoreActivePlayback || (() => {}),
         openBookmarkModal: callbacks.openBookmarkModal || (() => {}),
         setupScrollObserver: callbacks.setupScrollObserver || (() => {}),
@@ -420,7 +433,7 @@ test("render: playSongByKey expands display limit and starts playback for hidden
                 extractYoutubeInfo,
                 playThumbnail: (thumbDiv, yt, options) => {
                     playCalls.push({ thumbDiv, yt, options });
-                    return true;
+                    return playbackStartResult(YOUTUBE_PLAYBACK_START_STATUS.STARTED);
                 }
             })
         });
@@ -428,7 +441,7 @@ test("render: playSongByKey expands display limit and starts playback for hidden
         controller.updateDisplay();
         const started = await controller.playSongByKey("song:3");
 
-        assert.equal(started, true);
+        assert.deepEqual(started, playbackStartResult(YOUTUBE_PLAYBACK_START_STATUS.STARTED));
         assert.equal(data.displayLimit, 3);
         assert.equal(playCalls.length, 1);
         assert.equal(playCalls[0].yt.videoId, "video3");
@@ -473,7 +486,7 @@ test("render: playSongByKey expands display limit in increment-sized chunks", as
             callbacks: createRenderCallbacks({
                 getSearchState: () => ({ queryRaw: "" }),
                 extractYoutubeInfo,
-                playThumbnail: () => true
+                playThumbnail: () => playbackStartResult(YOUTUBE_PLAYBACK_START_STATUS.STARTED)
             })
         });
 

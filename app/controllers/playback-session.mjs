@@ -1,7 +1,10 @@
 import { getPlaybackContinuationCandidates } from "../lib/playback-sequence.mjs?v=11";
 import { debugPlayback } from "../lib/playback-debug.mjs?v=11";
 import { getPlaybackUiState } from "../lib/ui-slices.mjs?v=11";
-import { YOUTUBE_PLAYBACK_START_UNCONFIRMED } from "../lib/youtube/playback-start-attempt.mjs?v=11";
+import {
+    isYoutubePlaybackStarted,
+    isYoutubePlaybackStartUnconfirmed
+} from "../lib/youtube/playback-start-attempt.mjs?v=11";
 
 /**
  * 再生終了後の継続再生と追従スクロールを制御する。
@@ -40,7 +43,7 @@ export function createPlaybackSessionController({ data, ui, callbacks }) {
                 playbackResult,
                 hasActiveThumb: Boolean(playbackUi.activeThumb)
             });
-            if (playbackResult === true) {
+            if (isYoutubePlaybackStarted(playbackResult)) {
                 scrollSongIntoView(songKey);
                 debugPlayback("playback-session", "continuePlayback advanced", {
                     finishedSongKey,
@@ -48,7 +51,7 @@ export function createPlaybackSessionController({ data, ui, callbacks }) {
                 });
                 return true;
             }
-            if (playbackResult === YOUTUBE_PLAYBACK_START_UNCONFIRMED) {
+            if (isYoutubePlaybackStartUnconfirmed(playbackResult)) {
                 debugPlayback("playback-session", "continuePlayback stopped because playback start is unconfirmed", {
                     finishedSongKey,
                     candidateSongKey: songKey

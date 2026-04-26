@@ -226,13 +226,16 @@ youtubeController.setPlaybackEndedHook(({ songKey }) => {
     });
     playbackSessionController.continuePlayback(songKey);
 });
-youtubeController.setPlaybackStartFailedHook(({ songKey, playbackMode }) => {
+youtubeController.setPlaybackStartFailedHook(({ songKey, playbackMode, wasPlaybackStartUnconfirmed }) => {
     debugPlayback("script", "playback start failed hook received", {
         songKey,
-        playbackMode
+        playbackMode,
+        wasPlaybackStartUnconfirmed: Boolean(wasPlaybackStartUnconfirmed)
     });
-    if (playbackMode !== "manual") return;
-    debugPlayback("script", "continuePlayback requested from manual playback start failure", {
+    if (playbackMode !== "manual" && !wasPlaybackStartUnconfirmed) return;
+    debugPlayback("script", wasPlaybackStartUnconfirmed
+        ? "continuePlayback requested from unconfirmed playback start failure"
+        : "continuePlayback requested from manual playback start failure", {
         songKey
     });
     playbackSessionController.continuePlayback(songKey);

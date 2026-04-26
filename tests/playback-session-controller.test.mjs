@@ -1,7 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createPlaybackSessionController } from "../app/controllers/playback-session.mjs";
-import { YOUTUBE_PLAYBACK_START_UNCONFIRMED } from "../app/lib/youtube/playback-start-attempt.mjs";
+import {
+    createYoutubePlaybackStartResult,
+    YOUTUBE_PLAYBACK_START_STATUS
+} from "../app/lib/youtube/playback-start-attempt.mjs";
 
 /**
  * 再生セッション制御テスト用の UI 状態を作る。
@@ -31,6 +34,30 @@ function createPlaybackSessionCallbacks(input) {
     };
 }
 
+/**
+ * 再生開始結果テスト用の started 結果を返す。
+ * @returns {{ status: string }}
+ */
+function playbackStarted() {
+    return createYoutubePlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.STARTED);
+}
+
+/**
+ * 再生開始結果テスト用の failed 結果を返す。
+ * @returns {{ status: string }}
+ */
+function playbackFailed() {
+    return createYoutubePlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.FAILED);
+}
+
+/**
+ * 再生開始結果テスト用の unconfirmed 結果を返す。
+ * @returns {{ status: string }}
+ */
+function playbackUnconfirmed() {
+    return createYoutubePlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.UNCONFIRMED);
+}
+
 test("playback session: advances to next song and scrolls it into view", async () => {
     const data = {
         currentResults: [
@@ -47,7 +74,7 @@ test("playback session: advances to next song and scrolls it into view", async (
         callbacks: createPlaybackSessionCallbacks({
         playSongByKey: (songKey) => {
             calls.push(`play:${songKey}`);
-            return true;
+            return playbackStarted();
         },
         scrollSongIntoView: (songKey) => {
             calls.push(`scroll:${songKey}`);
@@ -77,7 +104,7 @@ test("playback session: tries later candidates when the next song cannot start",
         callbacks: createPlaybackSessionCallbacks({
         playSongByKey: (songKey) => {
             calls.push(`play:${songKey}`);
-            return songKey === "song:3";
+            return songKey === "song:3" ? playbackStarted() : playbackFailed();
         },
         scrollSongIntoView: (songKey) => {
             calls.push(`scroll:${songKey}`);
@@ -106,7 +133,7 @@ test("playback session: repeats current song when loop-only mode is enabled", as
         callbacks: createPlaybackSessionCallbacks({
         playSongByKey: (songKey) => {
             calls.push(`play:${songKey}`);
-            return true;
+            return playbackStarted();
         },
         scrollSongIntoView: (songKey) => {
             calls.push(`scroll:${songKey}`);
@@ -136,7 +163,7 @@ test("playback session: awaits async playback failure before trying the next can
         callbacks: createPlaybackSessionCallbacks({
         playSongByKey: (songKey) => {
             calls.push(`play:${songKey}`);
-            return Promise.resolve(songKey === "song:3");
+            return Promise.resolve(songKey === "song:3" ? playbackStarted() : playbackFailed());
         },
         scrollSongIntoView: (songKey) => {
             calls.push(`scroll:${songKey}`);
@@ -166,7 +193,7 @@ test("playback session: stops trying later candidates when playback start is unc
         callbacks: createPlaybackSessionCallbacks({
         playSongByKey: (songKey) => {
             calls.push(`play:${songKey}`);
-            return YOUTUBE_PLAYBACK_START_UNCONFIRMED;
+            return playbackUnconfirmed();
         },
         scrollSongIntoView: (songKey) => {
             calls.push(`scroll:${songKey}`);
@@ -202,9 +229,9 @@ test("playback session: stops trying later candidates after manual playback take
                         songKey: "song:manual"
                     }
                 };
-                return false;
+                return playbackFailed();
             }
-            return true;
+            return playbackStarted();
         },
         scrollSongIntoView: (songKey) => {
             calls.push(`scroll:${songKey}`);

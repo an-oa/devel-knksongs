@@ -2,9 +2,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
     DEFAULT_PLAYBACK_START_TIMEOUT_MS,
-    YOUTUBE_PLAYBACK_START_UNCONFIRMED,
+    createYoutubePlaybackStartResult,
+    YOUTUBE_PLAYBACK_START_STATUS,
     createYoutubePlaybackStartAttemptManager
 } from "../app/lib/youtube/playback-start-attempt.mjs";
+import { createYoutubeUnconfirmedPlaybackStartManager } from "../app/lib/youtube/unconfirmed-playback-start.mjs";
 import { installFakeDom, setGlobalValue } from "./test-helpers.mjs";
 
 /**
@@ -14,11 +16,15 @@ import { installFakeDom, setGlobalValue } from "./test-helpers.mjs";
  */
 function createAttemptHarness(options = {}) {
     const sharedPlayback = {
-        playbackStartAttempt: null
+        playbackStartAttempt: null,
+        unconfirmedPlaybackStartSessionId: 0
     };
     const thumb = document.createElement("div");
     thumb.dataset.playbackSessionId = "1";
     const failures = [];
+    const unconfirmedStarts = createYoutubeUnconfirmedPlaybackStartManager({
+        getSharedPlaybackState: () => sharedPlayback
+    });
     const manager = createYoutubePlaybackStartAttemptManager({
         getSharedPlaybackState: () => sharedPlayback,
         getThumbForSession: () => thumb,
@@ -27,10 +33,21 @@ function createAttemptHarness(options = {}) {
         handleStartFailure: (target, details) => {
             failures.push({ target, details });
         },
+        markUnconfirmedStart: (sessionId) => unconfirmedStarts.mark(sessionId),
+        clearUnconfirmedStart: (sessionId) => unconfirmedStarts.clear(sessionId),
         timeoutMs: options.timeoutMs ?? 10,
         setupTimeoutMs: options.setupTimeoutMs ?? 10
     });
-    return { failures, manager, sharedPlayback, thumb };
+    return { failures, manager, sharedPlayback, thumb, unconfirmedStarts };
+}
+
+/**
+ * 再生開始結果の期待値を返す。
+ * @param {string} status
+ * @returns {{ status: string }}
+ */
+function playbackStartResult(status) {
+    return createYoutubePlaybackStartResult(status);
 }
 
 test("youtube playback start attempt: settle resolves current attempt and clears timeout", async () => {
@@ -47,10 +64,10 @@ test("youtube playback start attempt: settle resolves current attempt and clears
         const attemptPromise = manager.create(1, { thumbDiv: thumb, playbackMode: "manual" });
 
         assert.equal(sharedPlayback.playbackStartAttempt.sessionId, 1);
-        assert.equal(manager.settle(1, true), true);
+        assert.equal(manager.settle(1, playbackStartResult(YOUTUBE_PLAYBACK_START_STATUS.STARTED)), true);
         assert.equal(sharedPlayback.playbackStartAttempt, null);
         assert.equal(clearCalls.length, 1);
-        assert.equal(await attemptPromise, true);
+        assert.deepEqual(await attemptPromise, playbackStartResult(YOUTUBE_PLAYBACK_START_STATUS.STARTED));
     } finally {
         setGlobalValue("setTimeout", previousSetTimeout);
         setGlobalValue("clearTimeout", previousClearTimeout);
@@ -58,7 +75,7 @@ test("youtube playback start attempt: settle resolves current attempt and clears
     }
 });
 
-test("youtube playback start attempt: setup timeout resolves false and reports start failure", async () => {
+test("youtube playback start attempt: setup timeout resolves failed result and reports start failure", async () => {
     const cleanup = installFakeDom();
     const previousSetTimeout = globalThis.setTimeout;
     const previousClearTimeout = globalThis.clearTimeout;
@@ -77,7 +94,7 @@ test("youtube playback start attempt: setup timeout resolves false and reports s
         timeoutCallback();
 
         assert.equal(sharedPlayback.playbackStartAttempt, null);
-        assert.equal(await attemptPromise, false);
+        assert.deepEqual(await attemptPromise, playbackStartResult(YOUTUBE_PLAYBACK_START_STATUS.FAILED));
         assert.equal(failures.length, 1);
         assert.equal(failures[0].target, thumb);
         assert.deepEqual(failures[0].details, {
@@ -106,7 +123,7 @@ test("youtube playback start attempt: armStartTimeout switches from setup wait t
         clearCalls.push(timeoutId);
     });
     try {
-        const { failures, manager, thumb } = createAttemptHarness({
+        const { failures, manager, sharedPlayback, thumb } = createAttemptHarness({
             timeoutMs: 10,
             setupTimeoutMs: 50
         });
@@ -121,7 +138,10 @@ test("youtube playback start attempt: armStartTimeout switches from setup wait t
 
         timeoutCalls[1].callback();
 
-        assert.equal(await attemptPromise, YOUTUBE_PLAYBACK_START_UNCONFIRMED);
+        assert.deepEqual(await attemptPromise, playbackStartResult(YOUTUBE_PLAYBACK_START_STATUS.UNCONFIRMED));
+        assert.equal(sharedPlayback.unconfirmedPlaybackStartSessionId, 1);
+        assert.equal(manager.cancelForThumb(thumb), true);
+        assert.equal(sharedPlayback.unconfirmedPlaybackStartSessionId, 0);
         assert.equal(failures.length, 0);
     } finally {
         setGlobalValue("setTimeout", previousSetTimeout);
@@ -143,15 +163,21 @@ test("youtube playback start attempt: default start timeout is five seconds", ()
     setGlobalValue("clearTimeout", () => {});
     try {
         const sharedPlayback = {
-            playbackStartAttempt: null
+            playbackStartAttempt: null,
+            unconfirmedPlaybackStartSessionId: 0
         };
         const thumb = document.createElement("div");
+        const unconfirmedStarts = createYoutubeUnconfirmedPlaybackStartManager({
+            getSharedPlaybackState: () => sharedPlayback
+        });
         const manager = createYoutubePlaybackStartAttemptManager({
             getSharedPlaybackState: () => sharedPlayback,
             getThumbForSession: () => thumb,
             getSessionIdForThumb: () => 1,
             isCurrentSession: () => true,
             handleStartFailure: () => {},
+            markUnconfirmedStart: (sessionId) => unconfirmedStarts.mark(sessionId),
+            clearUnconfirmedStart: (sessionId) => unconfirmedStarts.clear(sessionId),
             setupTimeoutMs: 10
         });
 
@@ -160,7 +186,7 @@ test("youtube playback start attempt: default start timeout is five seconds", ()
 
         assert.equal(timeoutCalls[1].delay, DEFAULT_PLAYBACK_START_TIMEOUT_MS);
         assert.equal(DEFAULT_PLAYBACK_START_TIMEOUT_MS, 5000);
-        manager.settle(1, false);
+        manager.settle(1, playbackStartResult(YOUTUBE_PLAYBACK_START_STATUS.FAILED));
     } finally {
         setGlobalValue("setTimeout", previousSetTimeout);
         setGlobalValue("clearTimeout", previousClearTimeout);
@@ -178,10 +204,10 @@ test("youtube playback start attempt: stale session settle is ignored", async ()
         const { manager, sharedPlayback, thumb } = createAttemptHarness();
         const attemptPromise = manager.create(1, { thumbDiv: thumb });
 
-        assert.equal(manager.settle(2, true), false);
+        assert.equal(manager.settle(2, playbackStartResult(YOUTUBE_PLAYBACK_START_STATUS.STARTED)), false);
         assert.equal(sharedPlayback.playbackStartAttempt.sessionId, 1);
-        assert.equal(manager.settle(1, false), true);
-        assert.equal(await attemptPromise, false);
+        assert.equal(manager.settle(1, playbackStartResult(YOUTUBE_PLAYBACK_START_STATUS.FAILED)), true);
+        assert.deepEqual(await attemptPromise, playbackStartResult(YOUTUBE_PLAYBACK_START_STATUS.FAILED));
     } finally {
         setGlobalValue("setTimeout", previousSetTimeout);
         setGlobalValue("clearTimeout", previousClearTimeout);
@@ -189,7 +215,7 @@ test("youtube playback start attempt: stale session settle is ignored", async ()
     }
 });
 
-test("youtube playback start attempt: cancelForThumb resolves the thumb session as false", async () => {
+test("youtube playback start attempt: cancelForThumb resolves the thumb session as failed result", async () => {
     const cleanup = installFakeDom();
     const previousSetTimeout = globalThis.setTimeout;
     const previousClearTimeout = globalThis.clearTimeout;
@@ -200,7 +226,7 @@ test("youtube playback start attempt: cancelForThumb resolves the thumb session 
         const attemptPromise = manager.create(1, { thumbDiv: thumb });
 
         assert.equal(manager.cancelForThumb(thumb), true);
-        assert.equal(await attemptPromise, false);
+        assert.deepEqual(await attemptPromise, playbackStartResult(YOUTUBE_PLAYBACK_START_STATUS.FAILED));
     } finally {
         setGlobalValue("setTimeout", previousSetTimeout);
         setGlobalValue("clearTimeout", previousClearTimeout);

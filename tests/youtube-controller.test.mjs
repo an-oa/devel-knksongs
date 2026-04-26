@@ -2,6 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { extractYoutubeInfo } from "../app/controllers/youtube.mjs";
 import {
+    createYoutubePlaybackStartResult,
+    YOUTUBE_PLAYBACK_START_STATUS
+} from "../app/lib/youtube/playback-start-attempt.mjs";
+import {
     installFakeDom,
     invokeListener,
     setGlobalValue
@@ -13,6 +17,41 @@ import {
     createYoutubeUiState,
     installYoutubePlayerConstructor
 } from "./youtube-harness.mjs";
+
+/**
+ * Promise microtask queue を指定回数だけ進める。
+ * @param {number} count
+ */
+async function flushMicrotasks(count = 1) {
+    for (let index = 0; index < count; index += 1) {
+        await Promise.resolve();
+    }
+}
+
+/**
+ * YouTube プレイヤー接続 Promise が解決し、開始タイムアウトが arm されるまで待つ。
+ */
+async function flushYoutubePlaybackSetup() {
+    await flushMicrotasks(7);
+}
+
+/**
+ * 再生開始結果の期待値を返す。
+ * @param {string} status
+ * @returns {{ status: string }}
+ */
+function playbackStartResult(status) {
+    return createYoutubePlaybackStartResult(status);
+}
+
+/**
+ * 再生開始結果の status を検証する。
+ * @param {*} actual
+ * @param {string} status
+ */
+function assertPlaybackStartStatus(actual, status) {
+    assert.deepEqual(actual, playbackStartResult(status));
+}
 
 test("youtube: disconnected active thumb is cleared without restore work", () => {
     const cleanup = installFakeDom();
@@ -100,7 +139,7 @@ test("youtube: player init uses prebuilt iframe src and binds YT.Player to it", 
         controller.updateThumbnail(thumb, { videoId: "video1", startSeconds: 45 });
 
         thumb.onclick();
-        await Promise.resolve();
+        await flushMicrotasks();
 
         assert.equal(playerCalls.length, 1);
         assert.equal(playerCalls[0].host.tagName, "IFRAME");
@@ -277,14 +316,14 @@ test("youtube: switching to another thumbnail recreates the shared player", asyn
         controller.updateThumbnail(thumbB, { videoId: "video2", startSeconds: 15, endSeconds: 45 });
 
         thumbA.onclick();
-        await Promise.resolve();
+        await flushMicrotasks();
 
         const firstIframe = thumbA.querySelector("iframe");
         assert.ok(firstIframe);
         assert.equal(playerInstances.length, 1);
 
         thumbB.onclick();
-        await Promise.resolve();
+        await flushMicrotasks();
 
         const secondIframe = thumbB.querySelector("iframe");
         assert.equal(thumbA.querySelector("iframe"), null);
@@ -344,7 +383,7 @@ test("youtube: pending shared player init uses the latest clicked thumbnail", as
 
         thumbA.onclick();
         thumbB.onclick();
-        await Promise.resolve();
+        await flushMicrotasks();
 
         assert.equal(playerCalls.length, 1);
         assert.equal(playerCalls[0].host.tagName, "IFRAME");
@@ -402,7 +441,7 @@ test("youtube: same thumbnail recreates a fresh player after restore", async () 
 
         controller.updateThumbnail(thumb, { videoId: "video1", startSeconds: 5, endSeconds: 25 });
         thumb.onclick();
-        await Promise.resolve();
+        await flushMicrotasks();
 
         const firstIframe = thumb.querySelector("iframe");
         assert.ok(firstIframe);
@@ -417,7 +456,7 @@ test("youtube: same thumbnail recreates a fresh player after restore", async () 
         assert.ok(thumb.querySelector("img"));
 
         thumb.onclick();
-        await Promise.resolve();
+        await flushMicrotasks();
 
         const secondIframe = thumb.querySelector("iframe");
         assert.notEqual(secondIframe, firstIframe);
@@ -478,7 +517,7 @@ test("youtube: stale ended event from a previous same-thumb playback does not te
 
         controller.updateThumbnail(thumb, { videoId: "video1", startSeconds: 5, endSeconds: 25 });
         thumb.onclick();
-        await Promise.resolve();
+        await flushMicrotasks();
 
         playerInstance.currentState = window.YT.PlayerState.PLAYING;
         stateChangeHandler({
@@ -490,21 +529,21 @@ test("youtube: stale ended event from a previous same-thumb playback does not te
         invokeListener(close, "click", {
             stopPropagation() {}
         });
-        await Promise.resolve();
+        await flushMicrotasks();
 
         const replayPromise = controller.playThumbnail(thumb, {
             videoId: "video1",
             startSeconds: 5,
             endSeconds: 25
         });
-        await Promise.resolve();
+        await flushMicrotasks();
 
         playerInstance.currentState = window.YT.PlayerState.PLAYING;
         stateChangeHandler({
             data: window.YT.PlayerState.ENDED,
             target: playerInstance
         });
-        await Promise.resolve();
+        await flushMicrotasks();
 
         assert.ok(thumb.querySelector("iframe"));
         assert.equal(ui.playback.activeThumb, thumb);
@@ -514,7 +553,7 @@ test("youtube: stale ended event from a previous same-thumb playback does not te
             target: playerInstance
         });
 
-        assert.equal(await replayPromise, true);
+        assertPlaybackStartStatus(await replayPromise, YOUTUBE_PLAYBACK_START_STATUS.STARTED);
         assert.ok(thumb.querySelector("iframe"));
         assert.equal(ui.playback.activeThumb, thumb);
     } finally {
@@ -572,7 +611,7 @@ test("youtube: replay ignores ended event while the next same-thumb start is sti
 
         controller.updateThumbnail(thumb, { videoId: "video1", startSeconds: 5, endSeconds: 25 });
         thumb.onclick();
-        await Promise.resolve();
+        await flushMicrotasks();
 
         playerInstance.currentState = window.YT.PlayerState.PLAYING;
         stateChangeHandler({
@@ -584,20 +623,20 @@ test("youtube: replay ignores ended event while the next same-thumb start is sti
         invokeListener(close, "click", {
             stopPropagation() {}
         });
-        await Promise.resolve();
+        await flushMicrotasks();
 
         const replayPromise = controller.playThumbnail(thumb, {
             videoId: "video1",
             startSeconds: 5,
             endSeconds: 25
         });
-        await Promise.resolve();
+        await flushMicrotasks();
 
         stateChangeHandler({
             data: window.YT.PlayerState.ENDED,
             target: playerInstance
         });
-        await Promise.resolve();
+        await flushMicrotasks();
 
         assert.ok(thumb.querySelector("iframe"));
         assert.equal(ui.playback.activeThumb, thumb);
@@ -608,7 +647,7 @@ test("youtube: replay ignores ended event while the next same-thumb start is sti
             target: playerInstance
         });
 
-        assert.equal(await replayPromise, true);
+        assertPlaybackStartStatus(await replayPromise, YOUTUBE_PLAYBACK_START_STATUS.STARTED);
         assert.ok(thumb.querySelector("iframe"));
         assert.equal(ui.playback.activeThumb, thumb);
     } finally {
@@ -654,22 +693,16 @@ test("youtube: playback start timeout leaves the iframe mounted as unconfirmed",
             videoId: "video-timeout",
             startSeconds: 0
         });
-        await Promise.resolve();
-        await Promise.resolve();
-        await Promise.resolve();
-        await Promise.resolve();
-        await Promise.resolve();
-        await Promise.resolve();
-        await Promise.resolve();
+        await flushYoutubePlaybackSetup();
 
         assert.ok(thumb.querySelector("iframe"));
         const startTimeout = timeoutCalls.find((call) => call.delay === 5000);
         assert.equal(typeof startTimeout?.cb, "function");
 
         startTimeout.cb();
-        await Promise.resolve();
+        await flushMicrotasks();
 
-        assert.equal(await playbackPromise, "unconfirmed");
+        assertPlaybackStartStatus(await playbackPromise, YOUTUBE_PLAYBACK_START_STATUS.UNCONFIRMED);
         assert.ok(thumb.querySelector("iframe"));
         assert.equal(thumb.querySelector("img"), null);
         assert.equal(ui.playback.activeThumb, thumb);
@@ -725,24 +758,98 @@ test("youtube: autoplay timeout leaves the iframe mounted as unconfirmed", async
         }, {
             playbackMode: "autoplay"
         });
-        await Promise.resolve();
-        await Promise.resolve();
-        await Promise.resolve();
-        await Promise.resolve();
-        await Promise.resolve();
-        await Promise.resolve();
-        await Promise.resolve();
+        await flushYoutubePlaybackSetup();
 
         const startTimeout = timeoutCalls.find((call) => call.delay === 5000);
         assert.equal(typeof startTimeout?.cb, "function");
 
         startTimeout.cb();
-        await Promise.resolve();
+        await flushMicrotasks();
 
-        assert.equal(await playbackPromise, "unconfirmed");
+        assertPlaybackStartStatus(await playbackPromise, YOUTUBE_PLAYBACK_START_STATUS.UNCONFIRMED);
         assert.ok(thumb.querySelector("iframe"));
         assert.equal(thumb.querySelector("img"), null);
         assert.equal(ui.playback.activeThumb, thumb);
+    } finally {
+        setGlobalValue("setTimeout", previousSetTimeout);
+        setGlobalValue("clearTimeout", previousClearTimeout);
+        cleanup();
+    }
+});
+
+test("youtube: delayed autoplay error after unconfirmed timeout notifies continuation", async () => {
+    const cleanup = installFakeDom();
+    const previousSetTimeout = globalThis.setTimeout;
+    const previousClearTimeout = globalThis.clearTimeout;
+    const timeoutCalls = [];
+    setGlobalValue("setTimeout", (cb, delay) => {
+        timeoutCalls.push({ cb, delay });
+        return {
+            unref() {}
+        };
+    });
+    setGlobalValue("clearTimeout", () => {});
+    try {
+        const ui = createYoutubeUiState({});
+        const { controller } = createYoutubeControllerHarness({ ui });
+        const failedCalls = [];
+        let errorHandler = null;
+        controller.setPlaybackStartFailedHook((payload) => {
+            failedCalls.push(payload);
+        });
+        window.YT = {
+            PlayerState: {
+                ENDED: 0,
+                PLAYING: 1,
+                PAUSED: 2
+            },
+            Player: class {
+                constructor(host, options) {
+                    this.iframe = attachMockPlayerIframe(host);
+                    errorHandler = options.events.onError;
+                }
+
+                getIframe() {
+                    return this.iframe;
+                }
+
+                stopVideo() {}
+
+                destroy() {}
+            }
+        };
+
+        const card = document.createElement("div");
+        card.className = "song-card";
+        card.dataset.songKey = "song:delayed-autoplay-error";
+        document.body.appendChild(card);
+        const thumb = document.createElement("div");
+        card.appendChild(thumb);
+        const playbackPromise = controller.playThumbnail(thumb, {
+            videoId: "video-delayed-autoplay-error",
+            startSeconds: 0
+        }, {
+            playbackMode: "autoplay"
+        });
+        await flushYoutubePlaybackSetup();
+
+        const startTimeout = timeoutCalls.find((call) => call.delay === 5000);
+        assert.equal(typeof startTimeout?.cb, "function");
+        startTimeout.cb();
+        assertPlaybackStartStatus(await playbackPromise, YOUTUBE_PLAYBACK_START_STATUS.UNCONFIRMED);
+
+        errorHandler({ data: 150 });
+        await flushMicrotasks(2);
+
+        assert.ok(thumb.querySelector("img"));
+        assert.equal(ui.playback.activeThumb, null);
+        assert.deepEqual(failedCalls, [
+            {
+                songKey: "song:delayed-autoplay-error",
+                playbackMode: "autoplay",
+                wasPlaybackStartUnconfirmed: true
+            }
+        ]);
     } finally {
         setGlobalValue("setTimeout", previousSetTimeout);
         setGlobalValue("clearTimeout", previousClearTimeout);
@@ -772,22 +879,22 @@ test("youtube: iframe playback stays mounted when iframe api loading fails", asy
             videoId: "video-fallback",
             startSeconds: 12
         });
-        await Promise.resolve();
+        await flushMicrotasks();
 
         const apiScript = document.head.children[0];
         assert.equal(apiScript.tagName, "SCRIPT");
         assert.equal(typeof apiScript.onerror, "function");
         apiScript.onerror();
         await youtube.apiPromise.catch(() => {});
-        await Promise.resolve();
+        await flushMicrotasks();
 
         assert.ok(thumb.querySelector("iframe"));
         assert.equal(typeof timeoutCallback, "function");
 
         timeoutCallback();
-        await Promise.resolve();
+        await flushMicrotasks();
 
-        assert.equal(await playbackPromise, true);
+        assertPlaybackStartStatus(await playbackPromise, YOUTUBE_PLAYBACK_START_STATUS.STARTED);
         assert.ok(thumb.querySelector("iframe"));
         assert.equal(thumb.querySelector("img"), null);
         assert.equal(ui.playback.activeThumb, thumb);
@@ -823,16 +930,16 @@ test("youtube: autoplay playback is restored when iframe api loading fails", asy
         }, {
             playbackMode: "autoplay"
         });
-        await Promise.resolve();
+        await flushMicrotasks();
 
         const apiScript = document.head.children[0];
         assert.equal(apiScript.tagName, "SCRIPT");
         assert.equal(typeof apiScript.onerror, "function");
         apiScript.onerror();
         await youtube.apiPromise.catch(() => {});
-        await Promise.resolve();
+        await flushMicrotasks();
 
-        assert.equal(await playbackPromise, false);
+        assertPlaybackStartStatus(await playbackPromise, YOUTUBE_PLAYBACK_START_STATUS.FAILED);
         assert.ok(thumb.querySelector("img"));
         assert.equal(thumb.querySelector("iframe"), null);
         assert.equal(ui.playback.activeThumb, null);
@@ -874,7 +981,7 @@ test("youtube: embed url includes end time when stopAtEndTime is enabled", async
         document.body.appendChild(thumb);
         controller.updateThumbnail(thumb, { videoId: "video1", startSeconds: 45, endSeconds: 75 });
         thumb.onclick();
-        await Promise.resolve();
+        await flushMicrotasks();
 
         assert.match(thumb.querySelector("iframe").src, /^https:\/\/www\.youtube\.com\/embed\/video1\?/);
         assert.match(thumb.querySelector("iframe").src, /start=45/);
@@ -915,7 +1022,7 @@ test("youtube: embed url omits end time when stopAtEndTime is disabled", async (
         document.body.appendChild(thumb);
         controller.updateThumbnail(thumb, { videoId: "video1", startSeconds: 45, endSeconds: 75 });
         thumb.onclick();
-        await Promise.resolve();
+        await flushMicrotasks();
 
         assert.match(thumb.querySelector("iframe").src, /^https:\/\/www\.youtube\.com\/embed\/video1\?/);
         assert.match(thumb.querySelector("iframe").src, /start=45/);
@@ -964,7 +1071,7 @@ test("youtube: ended playback restores thumbnail while paused playback keeps ifr
         document.body.appendChild(thumb);
         controller.updateThumbnail(thumb, { videoId: "video1", startSeconds: 45 });
         thumb.onclick();
-        await Promise.resolve();
+        await flushMicrotasks();
 
         assert.ok(thumb.querySelector("iframe"));
         assert.equal(thumb.classList.contains("playing"), true);
@@ -976,7 +1083,7 @@ test("youtube: ended playback restores thumbnail while paused playback keeps ifr
 
         thumb.classList.add("playing");
         stateChangeHandler({ data: globalThis.window.YT.PlayerState.ENDED });
-        await Promise.resolve();
+        await flushMicrotasks();
         assert.equal(thumb.querySelector("iframe"), null);
         assert.ok(thumb.querySelector("img"));
         assert.equal(thumb.classList.contains("playing"), false);
@@ -1020,11 +1127,11 @@ test("youtube: ended playback notifies song key for playback continuation", asyn
         card.appendChild(thumb);
         controller.updateThumbnail(thumb, { videoId: "video2", startSeconds: 0 });
         thumb.onclick();
-        await Promise.resolve();
+        await flushMicrotasks();
 
         stateChangeHandler({ data: globalThis.window.YT.PlayerState.PLAYING });
         stateChangeHandler({ data: globalThis.window.YT.PlayerState.ENDED });
-        await Promise.resolve();
+        await flushMicrotasks();
 
         assert.equal(endedSongKey, "song:2");
         assert.equal(ui.playback.activeThumb, null);
@@ -1071,16 +1178,16 @@ test("youtube: stale ended event from a closed player does not notify playback c
         card.appendChild(thumb);
         controller.updateThumbnail(thumb, { videoId: "video-stale", startSeconds: 0 });
         thumb.onclick();
-        await Promise.resolve();
+        await flushMicrotasks();
 
         const close = thumb.querySelector("button");
         invokeListener(close, "click", {
             stopPropagation() {}
         });
-        await Promise.resolve();
+        await flushMicrotasks();
 
         stateChangeHandler({ data: globalThis.window.YT.PlayerState.ENDED });
-        await Promise.resolve();
+        await flushMicrotasks();
 
         assert.deepEqual(endedCalls, []);
         assert.equal(ui.playback.activeThumb, null);
@@ -1130,7 +1237,7 @@ test("youtube: ended playback waits for layout refresh before notifying", async 
         const thumb = document.createElement("div");
         card.appendChild(thumb);
         controller.playThumbnail(thumb, { videoId: "video-wait", startSeconds: 0 });
-        await Promise.resolve();
+        await flushMicrotasks();
 
         stateChangeHandler({ data: globalThis.window.YT.PlayerState.PLAYING });
         stateChangeHandler({ data: globalThis.window.YT.PlayerState.ENDED });
@@ -1142,7 +1249,7 @@ test("youtube: ended playback waits for layout refresh before notifying", async 
 
         const secondFrame = rafQueue.shift();
         secondFrame();
-        await Promise.resolve();
+        await flushMicrotasks();
 
         assert.deepEqual(order, ["layout", "ended:song:wait"]);
     } finally {
@@ -1190,7 +1297,7 @@ test("youtube: ended playback does not continue after a newer playback starts", 
         firstCard.appendChild(firstThumb);
         controller.updateThumbnail(firstThumb, { videoId: "video-first", startSeconds: 0 });
         firstThumb.onclick();
-        await Promise.resolve();
+        await flushMicrotasks();
         stateChangeHandlers[0]({ data: globalThis.window.YT.PlayerState.PLAYING });
 
         const secondCard = document.createElement("div");
@@ -1202,13 +1309,13 @@ test("youtube: ended playback does not continue after a newer playback starts", 
 
         stateChangeHandlers[0]({ data: globalThis.window.YT.PlayerState.ENDED });
         controller.playThumbnail(secondThumb, { videoId: "video-second", startSeconds: 0 });
-        await Promise.resolve();
+        await flushMicrotasks();
 
         while (rafQueue.length > 0) {
             const callback = rafQueue.shift();
             if (typeof callback === "function") callback();
         }
-        await Promise.resolve();
+        await flushMicrotasks();
 
         assert.deepEqual(endedCalls, []);
         assert.equal(ui.playback.activeThumb, secondThumb);
@@ -1254,12 +1361,12 @@ test("youtube: ended before playback starts restores thumbnail without notifying
         const thumb = document.createElement("div");
         card.appendChild(thumb);
         const playbackPromise = controller.playThumbnail(thumb, { videoId: "video-instant-end", startSeconds: 0 });
-        await Promise.resolve();
+        await flushMicrotasks();
 
         stateChangeHandler({ data: globalThis.window.YT.PlayerState.ENDED });
-        await Promise.resolve();
+        await flushMicrotasks();
 
-        assert.equal(await playbackPromise, false);
+        assertPlaybackStartStatus(await playbackPromise, YOUTUBE_PLAYBACK_START_STATUS.FAILED);
         assert.deepEqual(endedCalls, []);
         assert.deepEqual(failedCalls, [
             {
@@ -1274,7 +1381,7 @@ test("youtube: ended before playback starts restores thumbnail without notifying
     }
 });
 
-test("youtube: playThumbnail resolves true after the player enters PLAYING", async () => {
+test("youtube: playThumbnail resolves started result after the player enters PLAYING", async () => {
     const cleanup = installFakeDom();
     try {
         const ui = createYoutubeUiState({});
@@ -1303,17 +1410,17 @@ test("youtube: playThumbnail resolves true after the player enters PLAYING", asy
         const thumb = document.createElement("div");
         document.body.appendChild(thumb);
         const playbackPromise = controller.playThumbnail(thumb, { videoId: "video-play", startSeconds: 0 });
-        await Promise.resolve();
+        await flushMicrotasks();
 
         stateChangeHandler({ data: globalThis.window.YT.PlayerState.PLAYING });
 
-        assert.equal(await playbackPromise, true);
+        assertPlaybackStartStatus(await playbackPromise, YOUTUBE_PLAYBACK_START_STATUS.STARTED);
     } finally {
         cleanup();
     }
 });
 
-test("youtube: playThumbnail resolves true when attached player is already playing", async () => {
+test("youtube: playThumbnail resolves started result when attached player is already playing", async () => {
     const cleanup = installFakeDom();
     try {
         const ui = createYoutubeUiState({});
@@ -1344,15 +1451,15 @@ test("youtube: playThumbnail resolves true when attached player is already playi
         const thumb = document.createElement("div");
         document.body.appendChild(thumb);
         const playbackPromise = controller.playThumbnail(thumb, { videoId: "video-already-playing", startSeconds: 0 });
-        await Promise.resolve();
+        await flushMicrotasks();
 
-        assert.equal(await playbackPromise, true);
+        assertPlaybackStartStatus(await playbackPromise, YOUTUBE_PLAYBACK_START_STATUS.STARTED);
     } finally {
         cleanup();
     }
 });
 
-test("youtube: playThumbnail resolves false and restores the thumbnail after a player error", async () => {
+test("youtube: playThumbnail resolves failed result and restores the thumbnail after a player error", async () => {
     const cleanup = installFakeDom();
     try {
         const ui = createYoutubeUiState({});
@@ -1392,11 +1499,11 @@ test("youtube: playThumbnail resolves false and restores the thumbnail after a p
         card.appendChild(thumb);
         thumb.dataset.videoId = "video-error";
         const playbackPromise = controller.playThumbnail(thumb, { videoId: "video-error", startSeconds: 0 });
-        await Promise.resolve();
+        await flushMicrotasks();
 
         errorHandler({ data: 150 });
 
-        assert.equal(await playbackPromise, false);
+        assertPlaybackStartStatus(await playbackPromise, YOUTUBE_PLAYBACK_START_STATUS.FAILED);
         assert.ok(thumb.querySelector("img"));
         assert.equal(thumb.classList.contains("playing"), false);
         assert.deepEqual(failedCalls, [
@@ -1441,11 +1548,11 @@ test("youtube: autoplay timeout emits debug logs only when debug mode is enabled
         }, {
             playbackMode: "autoplay"
         });
-        await Promise.resolve();
+        await flushMicrotasks();
 
         timeoutCallback();
-        await Promise.resolve();
-        assert.equal(await playbackPromise, false);
+        await flushMicrotasks();
+        assertPlaybackStartStatus(await playbackPromise, YOUTUBE_PLAYBACK_START_STATUS.FAILED);
         assert.deepEqual(debugCalls, []);
 
         globalThis.localStorage.setItem("debugYoutubePlayer", "true");
@@ -1456,11 +1563,11 @@ test("youtube: autoplay timeout emits debug logs only when debug mode is enabled
         }, {
             playbackMode: "autoplay"
         });
-        await Promise.resolve();
+        await flushMicrotasks();
 
         timeoutCallback();
-        await Promise.resolve();
-        assert.equal(await secondPlaybackPromise, false);
+        await flushMicrotasks();
+        assertPlaybackStartStatus(await secondPlaybackPromise, YOUTUBE_PLAYBACK_START_STATUS.FAILED);
         assert.equal(
             debugCalls.some((args) => JSON.stringify(args) === JSON.stringify([
                 "[youtube]",
@@ -1519,22 +1626,22 @@ test("youtube: recreating the shared player does not fail the newer playback att
         document.body.append(firstCard, secondCard);
 
         const firstPromise = controller.playThumbnail(firstThumb, { videoId: "video-first", startSeconds: 0 });
-        await Promise.resolve();
+        await flushMicrotasks();
 
         let secondResult = "pending";
         const secondPromise = controller.playThumbnail(secondThumb, { videoId: "video-second", startSeconds: 0 });
         secondPromise.then((didStart) => {
             secondResult = didStart;
         });
-        await Promise.resolve();
+        await flushMicrotasks();
 
-        assert.equal(await firstPromise, false);
+        assertPlaybackStartStatus(await firstPromise, YOUTUBE_PLAYBACK_START_STATUS.FAILED);
         assert.equal(secondResult, "pending");
 
         stateChangeHandlers[1]({ data: globalThis.window.YT.PlayerState.PLAYING });
 
-        assert.equal(await secondPromise, true);
-        assert.equal(secondResult, true);
+        assertPlaybackStartStatus(await secondPromise, YOUTUBE_PLAYBACK_START_STATUS.STARTED);
+        assertPlaybackStartStatus(secondResult, YOUTUBE_PLAYBACK_START_STATUS.STARTED);
     } finally {
         cleanup();
     }

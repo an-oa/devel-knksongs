@@ -16,7 +16,8 @@ export function getYoutubeSharedPlaybackState(youtube) {
             parkingNode: null,
             hostThumb: null,
             sessionId: 0,
-            playbackStartAttempt: null
+            playbackStartAttempt: null,
+            unconfirmedPlaybackStartSessionId: 0
         };
     }
     return youtube.sharedPlayback;
