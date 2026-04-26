@@ -130,6 +130,17 @@ export function createYoutubeController({ ui, youtube, constants }) {
     }
 
     /**
+     * YouTube デバッグログに呼び出し元 stack trace を追加する。
+     * @param {string} message
+     * @param {*} details
+     */
+    function traceYoutubeDebug(message, details) {
+        if (!isYoutubeDebugEnabled()) return;
+        debugYoutube(message, details);
+        console.trace("[youtube trace]", message);
+    }
+
+    /**
      * 再生開始方法を返す。
      * @param {*} thumbDiv
      * @returns {string}
@@ -560,6 +571,12 @@ export function createYoutubeController({ ui, youtube, constants }) {
             if (!restored) return;
             if (expectedGeneration !== playbackState.transitionGeneration) return;
             if (!shouldNotifyStartFailure) return;
+            debugYoutube("playback start failed hook", {
+                songKey: failedSongKey,
+                playbackMode,
+                reason: options && options.reason ? options.reason : "unknown",
+                errorCode: options && options.errorCode
+            });
             handlePlaybackStartFailed({
                 songKey: failedSongKey,
                 playbackMode
@@ -632,7 +649,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
         }
         const iframe = syncSharedPlaybackIframe();
         const shouldStopPlayback = !(options && options.stopPlayback === false);
-        debugYoutube("detachSharedPlayback", {
+        traceYoutubeDebug("detachSharedPlayback", {
             songKey: getSongKeyFromYoutubeThumb(thumbDiv),
             shouldStopPlayback
         });
@@ -863,6 +880,12 @@ export function createYoutubeController({ ui, youtube, constants }) {
      * @param {*} videoId
      */
     function restoreThumbnail(thumbDiv, videoId, options) {
+        traceYoutubeDebug("restoreThumbnail", {
+            songKey: getSongKeyFromYoutubeThumb(thumbDiv),
+            videoId,
+            playbackMode: getPlaybackMode(thumbDiv),
+            sessionId: getPlaybackSessionId(thumbDiv)
+        });
         applyPlaybackStateEvent({
             type: "RESTORE_PLAYBACK",
             sessionId: getPlaybackSessionId(thumbDiv),
@@ -897,6 +920,12 @@ export function createYoutubeController({ ui, youtube, constants }) {
             applyPlaybackStateEvent({ type: "CLEAR_PLAYBACK" });
             return;
         }
+        traceYoutubeDebug("restoreActivePlayback", {
+            songKey: getSongKeyFromYoutubeThumb(activeThumb),
+            videoId: activeThumb.dataset.videoId || "",
+            playbackMode: getPlaybackMode(activeThumb),
+            sessionId: getPlaybackSessionId(activeThumb)
+        });
         restoreThumbnail(activeThumb, activeThumb.dataset.videoId || "");
     }
 
