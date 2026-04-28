@@ -2,8 +2,10 @@ import {
     RANDOM_DISPLAY_COUNT,
     MIN_PERFORMANCE_FOR_RANDOM,
     INCREMENT_COUNT,
+    PUBLIC_SONGS_JSON_URL,
     PUBLIC_CSV_URL,
     DEFAULT_FORMATS,
+    SONGS_JSON_CACHE_KEY,
     CSV_CACHE_KEY,
     SEARCH_STATE_KEY,
     BOOKMARK_STORAGE_KEY,
@@ -208,7 +210,9 @@ const uiSyncController = createUiSyncController({
 const dataLoader = createDataLoader({
     data,
     ui,
+    publicSongsJsonUrl: PUBLIC_SONGS_JSON_URL,
     publicCsvUrl: PUBLIC_CSV_URL,
+    songsJsonCacheKey: SONGS_JSON_CACHE_KEY,
     csvCacheKey: CSV_CACHE_KEY,
     callbacks: {
         migrateLegacyBookmarkSongRefs: () => storageController.migrateLegacyBookmarkSongRefs(),
