@@ -3,13 +3,14 @@ const DEFAULT_STORE_NAME = "songsJsonCache";
 
 /**
  * localStorage から文字列を安全に読み込む。
+ * @param {{ getItem: (key: string) => string | null } | null | undefined} storage
  * @param {string | undefined} key
  * @returns {string | null}
  */
-function getLegacyCachedText(key) {
-    if (!key) return null;
+function getLegacyCachedText(storage, key) {
+    if (!storage || !key) return null;
     try {
-        return localStorage.getItem(key);
+        return storage.getItem(key);
     } catch (error) {
         console.warn(`localStorageを読み込めませんでした: ${key}`, error);
         return null;
@@ -18,12 +19,13 @@ function getLegacyCachedText(key) {
 
 /**
  * localStorage のキャッシュを安全に削除する。
+ * @param {{ removeItem: (key: string) => void } | null | undefined} storage
  * @param {string | undefined} key
  */
-function removeLegacyCachedText(key) {
-    if (!key) return;
+function removeLegacyCachedText(storage, key) {
+    if (!storage || !key) return;
     try {
-        localStorage.removeItem(key);
+        storage.removeItem(key);
     } catch (error) {
         console.warn(`localStorageから削除できませんでした: ${key}`, error);
     }
@@ -172,22 +174,34 @@ export function createIndexedDbSongsJsonCacheStore(options) {
  *     setText: (value: string) => Promise<boolean>,
  *     removeText: () => Promise<void>
  *   },
- *   legacyKey?: string
+ *   legacyKey?: string,
+ *   storage?: {
+ *     getItem: (key: string) => string | null,
+ *     removeItem: (key: string) => void
+ *   } | null
  * }} options
  * @returns {{ getText: () => Promise<string | null>, setText: (value: string) => Promise<boolean>, removeText: () => Promise<void> }}
  */
 export function createLegacyLocalStorageSongsJsonCacheAdapter(options) {
-    const { cache, legacyKey } = options;
+    const {
+        cache,
+        legacyKey,
+        storage = null
+    } = options;
 
     /**
      * 旧localStorageキャッシュがあれば読み込み、非同期キャッシュへ移す。
      * @returns {Promise<string | null>}
      */
     async function getMigratedLegacyText() {
-        const legacyCachedJson = getLegacyCachedText(legacyKey);
+        const legacyCachedJson = getLegacyCachedText(storage, legacyKey);
         if (!legacyCachedJson) return null;
-        if (await setText(legacyCachedJson)) {
-            removeLegacyCachedText(legacyKey);
+        try {
+            if (await cache.setText(legacyCachedJson)) {
+                removeLegacyCachedText(storage, legacyKey);
+            }
+        } catch (error) {
+            console.warn("曲データJSONキャッシュを保存できませんでした", error);
         }
         return legacyCachedJson;
     }
@@ -202,8 +216,8 @@ export function createLegacyLocalStorageSongsJsonCacheAdapter(options) {
             return await cache.setText(value);
         } catch (error) {
             console.warn("曲データJSONキャッシュを保存できませんでした", error);
-            if (getLegacyCachedText(legacyKey)) {
-                removeLegacyCachedText(legacyKey);
+            if (getLegacyCachedText(storage, legacyKey)) {
+                removeLegacyCachedText(storage, legacyKey);
                 try {
                     return await cache.setText(value);
                 } catch (retryError) {
@@ -231,7 +245,7 @@ export function createLegacyLocalStorageSongsJsonCacheAdapter(options) {
             } catch (error) {
                 console.warn("曲データJSONキャッシュを削除できませんでした", error);
             }
-            removeLegacyCachedText(legacyKey);
+            removeLegacyCachedText(storage, legacyKey);
         }
     };
 }

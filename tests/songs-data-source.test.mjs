@@ -109,10 +109,9 @@ function waitForAsyncWork() {
 }
 
 test("songs data source: csv fetch success stores csv and emits network songs", async () => {
-    const previousLocalStorage = globalThis.localStorage;
     const previousFetch = globalThis.fetch;
-    globalThis.localStorage = createFakeLocalStorage();
     try {
+        const storage = createFakeLocalStorage();
         const csv = createValidCsv();
         globalThis.fetch = async (url, options) => {
             assert.equal(url, "https://example.test/songs.csv");
@@ -127,26 +126,25 @@ test("songs data source: csv fetch success stores csv and emits network songs", 
         const results = [];
         const dataSource = createSongsDataSource({
             publicCsvUrl: "https://example.test/songs.csv",
+            storage,
             csvCacheKey: "cachedCsv"
         });
 
         assert.equal(await dataSource.loadInitialSongs({ onSongsLoaded: (result) => results.push(result) }), true);
 
-        assert.equal(globalThis.localStorage.getItem("cachedCsv"), csv);
+        assert.equal(storage.getItem("cachedCsv"), csv);
         assert.equal(results.length, 1);
         assert.equal(results[0].source, "network");
         assert.equal(results[0].songs[0].songKey, "archive-1::1");
     } finally {
-        globalThis.localStorage = previousLocalStorage;
         globalThis.fetch = previousFetch;
     }
 });
 
 test("songs data source: json fetch success stores songs json and skips csv fetch", async () => {
-    const previousLocalStorage = globalThis.localStorage;
     const previousFetch = globalThis.fetch;
-    globalThis.localStorage = createFakeLocalStorage();
     try {
+        const storage = createFakeLocalStorage();
         const songsJson = createSongsJson("json-archive::1");
         const songsJsonCache = createFakeSongsJsonCacheStore();
         globalThis.fetch = async (url, options) => {
@@ -164,27 +162,26 @@ test("songs data source: json fetch success stores songs json and skips csv fetc
             publicSongsJsonUrl: "data/songs.json",
             publicCsvUrl: "https://example.test/songs.csv",
             songsJsonCache,
+            storage,
             csvCacheKey: "cachedCsv"
         });
 
         assert.equal(await dataSource.loadInitialSongs({ onSongsLoaded: (result) => results.push(result) }), true);
 
         assert.equal(songsJsonCache.peek(), songsJson);
-        assert.equal(globalThis.localStorage.getItem("cachedCsv"), null);
+        assert.equal(storage.getItem("cachedCsv"), null);
         assert.equal(results.length, 1);
         assert.equal(results[0].source, "network");
         assert.equal(results[0].songs[0].songKey, "json-archive::1");
     } finally {
-        globalThis.localStorage = previousLocalStorage;
         globalThis.fetch = previousFetch;
     }
 });
 
 test("songs data source: cached json is emitted immediately and refreshed in the background", async () => {
-    const previousLocalStorage = globalThis.localStorage;
     const previousFetch = globalThis.fetch;
-    globalThis.localStorage = createFakeLocalStorage();
     try {
+        const storage = createFakeLocalStorage();
         const cachedJson = createSongsJson("cached-archive::1", "sha256:cached");
         const freshJson = createSongsJson("fresh-archive::1", "sha256:fresh");
         const freshMetaJson = createSongsMetaJson("sha256:fresh");
@@ -220,6 +217,7 @@ test("songs data source: cached json is emitted immediately and refreshed in the
             publicSongsMetaUrl: "data/songs-meta.json",
             publicCsvUrl: "https://example.test/songs.csv",
             songsJsonCache,
+            storage,
             csvCacheKey: "cachedCsv"
         });
 
@@ -244,16 +242,14 @@ test("songs data source: cached json is emitted immediately and refreshed in the
         assert.equal(results[1].resetConditions, false);
         assert.equal(results[1].songs[0].songKey, "fresh-archive::1");
     } finally {
-        globalThis.localStorage = previousLocalStorage;
         globalThis.fetch = previousFetch;
     }
 });
 
 test("songs data source: cached json skips full refresh when meta hash matches", async () => {
-    const previousLocalStorage = globalThis.localStorage;
     const previousFetch = globalThis.fetch;
-    globalThis.localStorage = createFakeLocalStorage();
     try {
+        const storage = createFakeLocalStorage();
         const cachedJson = createSongsJson("cached-archive::1", "sha256:cached");
         const songsJsonCache = createFakeSongsJsonCacheStore(cachedJson);
         const fetchUrls = [];
@@ -274,6 +270,7 @@ test("songs data source: cached json skips full refresh when meta hash matches",
             publicSongsMetaUrl: "data/songs-meta.json",
             publicCsvUrl: "https://example.test/songs.csv",
             songsJsonCache,
+            storage,
             csvCacheKey: "cachedCsv"
         });
 
@@ -287,23 +284,22 @@ test("songs data source: cached json skips full refresh when meta hash matches",
         assert.equal(results.length, 1);
         assert.equal(results[0].songs[0].songKey, "cached-archive::1");
     } finally {
-        globalThis.localStorage = previousLocalStorage;
         globalThis.fetch = previousFetch;
     }
 });
 
 test("songs data source: legacy localStorage json is migrated into songs json cache", async () => {
-    const previousLocalStorage = globalThis.localStorage;
     const previousFetch = globalThis.fetch;
-    globalThis.localStorage = createFakeLocalStorage();
     try {
+        const storage = createFakeLocalStorage();
         const cachedJson = createSongsJson("legacy-archive::1", "sha256:legacy");
         const primarySongsJsonCache = createFakeSongsJsonCacheStore();
         const songsJsonCache = createLegacyLocalStorageSongsJsonCacheAdapter({
             cache: primarySongsJsonCache,
-            legacyKey: "cachedSongsJson"
+            legacyKey: "cachedSongsJson",
+            storage
         });
-        globalThis.localStorage.setItem("cachedSongsJson", cachedJson);
+        storage.setItem("cachedSongsJson", cachedJson);
         const fetchUrls = [];
         globalThis.fetch = async (url, options) => {
             fetchUrls.push([url, options]);
@@ -322,6 +318,7 @@ test("songs data source: legacy localStorage json is migrated into songs json ca
             publicSongsMetaUrl: "data/songs-meta.json",
             publicCsvUrl: "https://example.test/songs.csv",
             songsJsonCache,
+            storage,
             csvCacheKey: "cachedCsv"
         });
 
@@ -329,7 +326,7 @@ test("songs data source: legacy localStorage json is migrated into songs json ca
         await waitForAsyncWork();
 
         assert.equal(primarySongsJsonCache.peek(), cachedJson);
-        assert.equal(globalThis.localStorage.getItem("cachedSongsJson"), null);
+        assert.equal(storage.getItem("cachedSongsJson"), null);
         assert.deepEqual(fetchUrls, [
             ["data/songs-meta.json", { cache: "no-cache" }]
         ]);
@@ -337,17 +334,15 @@ test("songs data source: legacy localStorage json is migrated into songs json ca
         assert.equal(results[0].source, "cache");
         assert.equal(results[0].songs[0].songKey, "legacy-archive::1");
     } finally {
-        globalThis.localStorage = previousLocalStorage;
         globalThis.fetch = previousFetch;
     }
 });
 
 test("songs data source: cached json falls back to full refresh when meta fetch fails", async () => {
-    const previousLocalStorage = globalThis.localStorage;
     const previousFetch = globalThis.fetch;
     const previousConsoleWarn = console.warn;
-    globalThis.localStorage = createFakeLocalStorage();
     try {
+        const storage = createFakeLocalStorage();
         const cachedJson = createSongsJson("cached-archive::1", "sha256:cached");
         const freshJson = createSongsJson("fresh-archive::1", "sha256:fresh");
         const songsJsonCache = createFakeSongsJsonCacheStore(cachedJson);
@@ -381,6 +376,7 @@ test("songs data source: cached json falls back to full refresh when meta fetch 
             publicSongsMetaUrl: "data/songs-meta.json",
             publicCsvUrl: "https://example.test/songs.csv",
             songsJsonCache,
+            storage,
             csvCacheKey: "cachedCsv"
         });
 
@@ -398,17 +394,15 @@ test("songs data source: cached json falls back to full refresh when meta fetch 
         assert.equal(results[1].resetConditions, false);
         assert.match(String(warnings[0]?.[0]), /曲データJSONメタ情報の確認に失敗しました/);
     } finally {
-        globalThis.localStorage = previousLocalStorage;
         globalThis.fetch = previousFetch;
         console.warn = previousConsoleWarn;
     }
 });
 
 test("songs data source: json fetch failure falls back to csv fetch", async () => {
-    const previousLocalStorage = globalThis.localStorage;
     const previousFetch = globalThis.fetch;
-    globalThis.localStorage = createFakeLocalStorage();
     try {
+        const storage = createFakeLocalStorage();
         const csv = createValidCsv();
         const songsJsonCache = createFakeSongsJsonCacheStore();
         const fetchUrls = [];
@@ -436,6 +430,7 @@ test("songs data source: json fetch failure falls back to csv fetch", async () =
             publicSongsJsonUrl: "data/songs.json",
             publicCsvUrl: "https://example.test/songs.csv",
             songsJsonCache,
+            storage,
             csvCacheKey: "cachedCsv"
         });
 
@@ -445,29 +440,28 @@ test("songs data source: json fetch failure falls back to csv fetch", async () =
             ["data/songs.json", { cache: "no-cache" }],
             ["https://example.test/songs.csv", { cache: "no-store" }]
         ]);
-        assert.equal(globalThis.localStorage.getItem("cachedCsv"), csv);
+        assert.equal(storage.getItem("cachedCsv"), csv);
         assert.equal(results.length, 1);
         assert.equal(results[0].source, "network");
         assert.equal(results[0].songs[0].songKey, "archive-1::1");
     } finally {
-        globalThis.localStorage = previousLocalStorage;
         globalThis.fetch = previousFetch;
     }
 });
 
 test("songs data source: failed csv fetch falls back to cached csv", async () => {
-    const previousLocalStorage = globalThis.localStorage;
     const previousFetch = globalThis.fetch;
-    globalThis.localStorage = createFakeLocalStorage();
     try {
+        const storage = createFakeLocalStorage();
         const cachedCsv = createValidCsv();
-        globalThis.localStorage.setItem("cachedCsv", cachedCsv);
+        storage.setItem("cachedCsv", cachedCsv);
         globalThis.fetch = async () => {
             throw new Error("network failed");
         };
         const results = [];
         const dataSource = createSongsDataSource({
             publicCsvUrl: "https://example.test/songs.csv",
+            storage,
             csvCacheKey: "cachedCsv"
         });
 
@@ -477,16 +471,14 @@ test("songs data source: failed csv fetch falls back to cached csv", async () =>
         assert.equal(results[0].source, "cache");
         assert.equal(results[0].songs[0].songKey, "archive-1::1");
     } finally {
-        globalThis.localStorage = previousLocalStorage;
         globalThis.fetch = previousFetch;
     }
 });
 
 test("songs data source: failed fetch without cache returns false", async () => {
-    const previousLocalStorage = globalThis.localStorage;
     const previousFetch = globalThis.fetch;
-    globalThis.localStorage = createFakeLocalStorage();
     try {
+        const storage = createFakeLocalStorage();
         globalThis.fetch = async () => ({
             ok: false,
             async text() {
@@ -496,13 +488,13 @@ test("songs data source: failed fetch without cache returns false", async () => 
         const results = [];
         const dataSource = createSongsDataSource({
             publicCsvUrl: "https://example.test/songs.csv",
+            storage,
             csvCacheKey: "cachedCsv"
         });
 
         assert.equal(await dataSource.loadInitialSongs({ onSongsLoaded: (result) => results.push(result) }), false);
         assert.deepEqual(results, []);
     } finally {
-        globalThis.localStorage = previousLocalStorage;
         globalThis.fetch = previousFetch;
     }
 });

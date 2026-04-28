@@ -22,42 +22,37 @@ function createFakeLocalStorage() {
 }
 
 test("songs json cache adapter: migrates legacy localStorage text into primary cache", async () => {
-    const previousLocalStorage = globalThis.localStorage;
-    globalThis.localStorage = createFakeLocalStorage();
-    try {
-        let primaryValue = null;
-        const cache = {
-            async getText() {
-                return primaryValue;
-            },
-            async setText(value) {
-                primaryValue = value;
-                return true;
-            },
-            async removeText() {
-                primaryValue = null;
-            }
-        };
-        const adapter = createLegacyLocalStorageSongsJsonCacheAdapter({
-            cache,
-            legacyKey: "cachedSongsJson"
-        });
+    const storage = createFakeLocalStorage();
+    let primaryValue = null;
+    const cache = {
+        async getText() {
+            return primaryValue;
+        },
+        async setText(value) {
+            primaryValue = value;
+            return true;
+        },
+        async removeText() {
+            primaryValue = null;
+        }
+    };
+    const adapter = createLegacyLocalStorageSongsJsonCacheAdapter({
+        cache,
+        legacyKey: "cachedSongsJson",
+        storage
+    });
 
-        globalThis.localStorage.setItem("cachedSongsJson", "{\"songs\":[]}");
+    storage.setItem("cachedSongsJson", "{\"songs\":[]}");
 
-        assert.equal(await adapter.getText(), "{\"songs\":[]}");
-        assert.equal(primaryValue, "{\"songs\":[]}");
-        assert.equal(globalThis.localStorage.getItem("cachedSongsJson"), null);
-    } finally {
-        globalThis.localStorage = previousLocalStorage;
-    }
+    assert.equal(await adapter.getText(), "{\"songs\":[]}");
+    assert.equal(primaryValue, "{\"songs\":[]}");
+    assert.equal(storage.getItem("cachedSongsJson"), null);
 });
 
 test("songs json cache adapter: removes legacy localStorage text before retrying failed save", async () => {
-    const previousLocalStorage = globalThis.localStorage;
     const previousConsoleWarn = console.warn;
-    globalThis.localStorage = createFakeLocalStorage();
     try {
+        const storage = createFakeLocalStorage();
         let primaryValue = null;
         let setCalls = 0;
         const warnings = [];
@@ -82,18 +77,52 @@ test("songs json cache adapter: removes legacy localStorage text before retrying
         };
         const adapter = createLegacyLocalStorageSongsJsonCacheAdapter({
             cache,
-            legacyKey: "cachedSongsJson"
+            legacyKey: "cachedSongsJson",
+            storage
         });
 
-        globalThis.localStorage.setItem("cachedSongsJson", "{\"songs\":[\"old\"]}");
+        storage.setItem("cachedSongsJson", "{\"songs\":[\"old\"]}");
 
         assert.equal(await adapter.setText("{\"songs\":[\"fresh\"]}"), true);
         assert.equal(setCalls, 2);
         assert.equal(primaryValue, "{\"songs\":[\"fresh\"]}");
-        assert.equal(globalThis.localStorage.getItem("cachedSongsJson"), null);
+        assert.equal(storage.getItem("cachedSongsJson"), null);
         assert.match(String(warnings[0]?.[0]), /曲データJSONキャッシュを保存できませんでした/);
     } finally {
-        globalThis.localStorage = previousLocalStorage;
+        console.warn = previousConsoleWarn;
+    }
+});
+
+test("songs json cache adapter: keeps legacy localStorage text when migration save fails", async () => {
+    const previousConsoleWarn = console.warn;
+    try {
+        const storage = createFakeLocalStorage();
+        const warnings = [];
+        console.warn = (...args) => {
+            warnings.push(args);
+        };
+        const cache = {
+            async getText() {
+                throw new Error("IndexedDB is not available");
+            },
+            async setText() {
+                throw new Error("IndexedDB is not available");
+            },
+            async removeText() {}
+        };
+        const adapter = createLegacyLocalStorageSongsJsonCacheAdapter({
+            cache,
+            legacyKey: "cachedSongsJson",
+            storage
+        });
+
+        storage.setItem("cachedSongsJson", "{\"songs\":[\"legacy\"]}");
+
+        assert.equal(await adapter.getText(), "{\"songs\":[\"legacy\"]}");
+        assert.equal(storage.getItem("cachedSongsJson"), "{\"songs\":[\"legacy\"]}");
+        assert.match(String(warnings[0]?.[0]), /曲データJSONキャッシュを読み込めませんでした/);
+        assert.match(String(warnings[1]?.[0]), /曲データJSONキャッシュを保存できませんでした/);
+    } finally {
         console.warn = previousConsoleWarn;
     }
 });

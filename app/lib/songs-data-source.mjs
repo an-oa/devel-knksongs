@@ -3,13 +3,14 @@ import { parseSongsJsonMetaPayload, parseSongsJsonPayload } from "./songs-json.m
 
 /**
  * localStorage から文字列を安全に読み込む。
+ * @param {{ getItem: (key: string) => string | null } | null | undefined} storage
  * @param {string | undefined} key
  * @returns {string | null}
  */
-function getCachedText(key) {
-    if (!key) return null;
+function getCachedText(storage, key) {
+    if (!storage || !key) return null;
     try {
-        return localStorage.getItem(key);
+        return storage.getItem(key);
     } catch (error) {
         console.warn(`localStorageを読み込めませんでした: ${key}`, error);
         return null;
@@ -18,14 +19,15 @@ function getCachedText(key) {
 
 /**
  * localStorage へ文字列を安全に保存する。
+ * @param {{ setItem: (key: string, value: string) => void } | null | undefined} storage
  * @param {string | undefined} key
  * @param {string} value
  * @returns {boolean}
  */
-function setCachedText(key, value) {
-    if (!key) return false;
+function setCachedText(storage, key, value) {
+    if (!storage || !key) return false;
     try {
-        localStorage.setItem(key, value);
+        storage.setItem(key, value);
         return true;
     } catch (error) {
         console.warn(`localStorageへ保存できませんでした: ${key}`, error);
@@ -35,12 +37,13 @@ function setCachedText(key, value) {
 
 /**
  * localStorage のキャッシュを安全に削除する。
+ * @param {{ removeItem: (key: string) => void } | null | undefined} storage
  * @param {string | undefined} key
  */
-function removeCachedText(key) {
-    if (!key) return;
+function removeCachedText(storage, key) {
+    if (!storage || !key) return;
     try {
-        localStorage.removeItem(key);
+        storage.removeItem(key);
     } catch (error) {
         console.warn(`localStorageから削除できませんでした: ${key}`, error);
     }
@@ -57,6 +60,11 @@ function removeCachedText(key) {
  *     setText: (value: string) => Promise<boolean>,
  *     removeText: () => Promise<void>
  *   },
+ *   storage?: {
+ *     getItem: (key: string) => string | null,
+ *     setItem: (key: string, value: string) => void,
+ *     removeItem: (key: string) => void
+ *   } | null,
  *   csvCacheKey: string
  * }} input
  */
@@ -66,6 +74,7 @@ export function createSongsDataSource(input) {
         publicSongsMetaUrl,
         publicCsvUrl,
         songsJsonCache,
+        storage = null,
         csvCacheKey
     } = input;
 
@@ -149,11 +158,11 @@ export function createSongsDataSource(input) {
     async function loadCsvFallback(onSongsLoaded) {
         try {
             const csvText = await fetchCsvText();
-            setCachedText(csvCacheKey, csvText);
+            setCachedText(storage, csvCacheKey, csvText);
             onSongsLoaded({ songs: parseCsvToSongs(csvText), source: "network" });
             return true;
         } catch (error) {
-            const cached = getCachedText(csvCacheKey);
+            const cached = getCachedText(storage, csvCacheKey);
             if (cached) {
                 onSongsLoaded({ songs: parseCsvToSongs(cached), source: "cache" });
                 return true;
@@ -181,7 +190,7 @@ export function createSongsDataSource(input) {
             const payload = parseSongsJsonPayload(jsonText);
             if (payload.contentHash === cachedPayload.contentHash) return;
             if (await setCachedSongsJsonText(jsonText)) {
-                removeCachedText(csvCacheKey);
+                removeCachedText(storage, csvCacheKey);
             }
             onSongsLoaded({ songs: payload.songs, source: "network", resetConditions: false });
         } catch (error) {
@@ -212,7 +221,7 @@ export function createSongsDataSource(input) {
             const jsonText = await fetchSongsJsonText();
             const payload = parseSongsJsonPayload(jsonText);
             if (await setCachedSongsJsonText(jsonText)) {
-                removeCachedText(csvCacheKey);
+                removeCachedText(storage, csvCacheKey);
             }
             onSongsLoaded({ songs: payload.songs, source: "network" });
             return true;
