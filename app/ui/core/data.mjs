@@ -10,7 +10,12 @@ import { getDateUiState, getSearchUiState } from "../../lib/ui-slices.mjs?v=13";
  *   publicSongsJsonUrl?: string,
  *   publicSongsMetaUrl?: string,
  *   publicCsvUrl: string,
- *   songsJsonCacheKey?: string,
+ *   songsJsonCache?: {
+ *     getText: () => Promise<string | null>,
+ *     setText: (value: string) => Promise<boolean>,
+ *     removeText: () => Promise<void>
+ *   },
+ *   legacySongsJsonCacheKey?: string,
  *   csvCacheKey: string,
  *   callbacks: {
  *     migrateLegacyBookmarkSongRefs: () => void,
@@ -28,7 +33,8 @@ export function createDataLoader(input) {
         publicSongsJsonUrl,
         publicSongsMetaUrl,
         publicCsvUrl,
-        songsJsonCacheKey,
+        songsJsonCache,
+        legacySongsJsonCacheKey,
         csvCacheKey,
         callbacks
     } = input;
@@ -85,6 +91,63 @@ export function createDataLoader(input) {
         } catch (error) {
             console.warn(`localStorageから削除できませんでした: ${key}`, error);
         }
+    }
+
+    /**
+     * IndexedDB などの非同期ストアから曲データJSONキャッシュを読み込む。
+     * @returns {Promise<string | null>}
+     */
+    async function getCachedSongsJsonText() {
+        if (!songsJsonCache) return null;
+        try {
+            const cachedJson = await songsJsonCache.getText();
+            if (cachedJson) return cachedJson;
+        } catch (error) {
+            console.warn("曲データJSONキャッシュを読み込めませんでした", error);
+        }
+        const legacyCachedJson = getCachedText(legacySongsJsonCacheKey);
+        if (!legacyCachedJson) return null;
+        if (await setCachedSongsJsonText(legacyCachedJson)) {
+            removeCachedText(legacySongsJsonCacheKey);
+        }
+        return legacyCachedJson;
+    }
+
+    /**
+     * IndexedDB などの非同期ストアへ曲データJSONキャッシュを保存する。
+     * @param {string} jsonText
+     * @returns {Promise<boolean>}
+     */
+    async function setCachedSongsJsonText(jsonText) {
+        if (!songsJsonCache) return false;
+        try {
+            return await songsJsonCache.setText(jsonText);
+        } catch (error) {
+            console.warn("曲データJSONキャッシュを保存できませんでした", error);
+            if (getCachedText(legacySongsJsonCacheKey)) {
+                removeCachedText(legacySongsJsonCacheKey);
+                try {
+                    return await songsJsonCache.setText(jsonText);
+                } catch (retryError) {
+                    console.warn("曲データJSONキャッシュの再保存に失敗しました", retryError);
+                }
+            }
+            return false;
+        }
+    }
+
+    /**
+     * IndexedDB などの非同期ストアから曲データJSONキャッシュを削除する。
+     * @returns {Promise<void>}
+     */
+    async function removeCachedSongsJsonText() {
+        if (!songsJsonCache) return;
+        try {
+            await songsJsonCache.removeText();
+        } catch (error) {
+            console.warn("曲データJSONキャッシュを削除できませんでした", error);
+        }
+        removeCachedText(legacySongsJsonCacheKey);
     }
 
     /**
@@ -189,7 +252,7 @@ export function createDataLoader(input) {
             const jsonText = await fetchSongsJsonText();
             const payload = parseSongsJsonPayload(jsonText);
             if (payload.contentHash === cachedPayload.contentHash) return;
-            if (setCachedText(songsJsonCacheKey, jsonText)) {
+            if (await setCachedSongsJsonText(jsonText)) {
                 removeCachedText(csvCacheKey);
             }
             applyLoadedSongs(payload.songs, null, { resetConditions: false });
@@ -202,7 +265,7 @@ export function createDataLoader(input) {
      * JSONを優先して読み込み、失敗時はCSV経路へフォールバックする。
      */
     async function loadJsonOrCsvData() {
-        const cachedJson = getCachedText(songsJsonCacheKey);
+        const cachedJson = await getCachedSongsJsonText();
         if (cachedJson) {
             try {
                 const cachedPayload = parseSongsJsonPayload(cachedJson);
@@ -211,14 +274,14 @@ export function createDataLoader(input) {
                 return;
             } catch (error) {
                 console.warn("曲データJSONキャッシュを読み込めませんでした", error);
-                removeCachedText(songsJsonCacheKey);
+                await removeCachedSongsJsonText();
             }
         }
 
         try {
             const jsonText = await fetchSongsJsonText();
             const payload = parseSongsJsonPayload(jsonText);
-            if (setCachedText(songsJsonCacheKey, jsonText)) {
+            if (await setCachedSongsJsonText(jsonText)) {
                 removeCachedText(csvCacheKey);
             }
             applyLoadedSongs(payload.songs, null);
@@ -232,7 +295,7 @@ export function createDataLoader(input) {
      */
     async function loadInitialData() {
         if (ui.el.resultCount) ui.el.resultCount.innerText = "データを読み込み中...";
-        if (publicSongsJsonUrl && songsJsonCacheKey) {
+        if (publicSongsJsonUrl && songsJsonCache) {
             await loadJsonOrCsvData();
             return;
         }

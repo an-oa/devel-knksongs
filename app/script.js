@@ -43,6 +43,7 @@ import { createDataLoader } from "./ui/core/data.mjs?v=13";
 import { createSidebarController } from "./ui/sidebar/ui.mjs?v=13";
 import { getDateUiState, getSearchUiState } from "./lib/ui-slices.mjs?v=13";
 import { debugPlayback } from "./lib/playback-debug.mjs?v=13";
+import { createIndexedDbSongsJsonCacheStore } from "./lib/storage/songs-json-cache.mjs?v=13";
 
 /**
  * @typedef {Object} SongRow
@@ -214,7 +215,8 @@ const dataLoader = createDataLoader({
     publicSongsJsonUrl: PUBLIC_SONGS_JSON_URL,
     publicSongsMetaUrl: PUBLIC_SONGS_META_URL,
     publicCsvUrl: PUBLIC_CSV_URL,
-    songsJsonCacheKey: SONGS_JSON_CACHE_KEY,
+    songsJsonCache: createIndexedDbSongsJsonCacheStore({ cacheKey: SONGS_JSON_CACHE_KEY }),
+    legacySongsJsonCacheKey: SONGS_JSON_CACHE_KEY,
     csvCacheKey: CSV_CACHE_KEY,
     callbacks: {
         migrateLegacyBookmarkSongRefs: () => storageController.migrateLegacyBookmarkSongRefs(),
