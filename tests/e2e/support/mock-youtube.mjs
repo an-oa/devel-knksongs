@@ -2,14 +2,21 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { readFile } from "node:fs/promises";
 import { parseCsvToSongs } from "../../../app/lib/csv-parser.mjs";
-import { buildSongsJsonPayload } from "../../../app/lib/songs-json.mjs";
+import { buildSongsJsonMetaPayload, buildSongsJsonPayload } from "../../../app/lib/songs-json.mjs";
+import { createSongsContentHash } from "../../../scripts/songs-content-hash.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const fixtureCsvPath = path.join(__dirname, "..", "fixtures", "smoke-songs.csv");
 const csvFixturePromise = readFile(fixtureCsvPath, "utf8");
-const songsJsonFixturePromise = csvFixturePromise.then((csvFixture) =>
-    JSON.stringify(buildSongsJsonPayload(parseCsvToSongs(csvFixture)))
-);
+
+const songsJsonFixturePromise = csvFixturePromise.then((csvFixture) => {
+    const songs = parseCsvToSongs(csvFixture);
+    const contentHash = createSongsContentHash(songs);
+    return {
+        json: JSON.stringify(buildSongsJsonPayload(songs, contentHash)),
+        meta: JSON.stringify(buildSongsJsonMetaPayload(contentHash))
+    };
+});
 
 export const YOUTUBE_IFRAME_API_MOCK = `
 (() => {
@@ -131,11 +138,18 @@ export const YOUTUBE_IFRAME_API_MOCK = `
 export async function installNetworkMocks(page) {
     const csvFixture = await csvFixturePromise;
     const songsJsonFixture = await songsJsonFixturePromise;
+    await page.route("**/data/songs-meta.json*", async (route) => {
+        await route.fulfill({
+            status: 200,
+            contentType: "application/json; charset=utf-8",
+            body: songsJsonFixture.meta
+        });
+    });
     await page.route("**/data/songs.json*", async (route) => {
         await route.fulfill({
             status: 200,
             contentType: "application/json; charset=utf-8",
-            body: songsJsonFixture
+            body: songsJsonFixture.json
         });
     });
     await page.route("https://docs.google.com/**", async (route) => {

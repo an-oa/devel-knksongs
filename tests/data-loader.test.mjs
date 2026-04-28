@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createDataLoader } from "../app/ui/core/data.mjs";
-import { buildSongsJsonPayload } from "../app/lib/songs-json.mjs";
+import { buildSongsJsonMetaPayload, buildSongsJsonPayload } from "../app/lib/songs-json.mjs";
 import { installFakeDom } from "./test-helpers.mjs";
 
 function createFakeLocalStorage() {
@@ -36,9 +36,10 @@ function createValidCsv() {
 /**
  * data loader テスト用のJSON文字列を返す。
  * @param {string} songKey
+ * @param {string} [contentHash]
  * @returns {string}
  */
-function createSongsJson(songKey) {
+function createSongsJson(songKey, contentHash = `sha256:${songKey}`) {
     const archiveId = songKey.split("::")[0] || "json-archive";
     return JSON.stringify(buildSongsJsonPayload([
         {
@@ -66,7 +67,16 @@ function createSongsJson(songKey) {
             titleYomiNorm: "キング",
             artistYomiNorm: "カナリアフィーチャリンググミ"
         }
-    ]));
+    ], contentHash));
+}
+
+/**
+ * data loader テスト用のJSONメタ情報を返す。
+ * @param {string} contentHash
+ * @returns {string}
+ */
+function createSongsMetaJson(contentHash) {
+    return JSON.stringify(buildSongsJsonMetaPayload(contentHash));
 }
 
 /**
@@ -239,15 +249,24 @@ test("data loader: cached json is shown immediately and refreshed in the backgro
     const previousFetch = globalThis.fetch;
     globalThis.localStorage = createFakeLocalStorage();
     try {
-        const cachedJson = createSongsJson("cached-archive::1");
-        const freshJson = createSongsJson("fresh-archive::1");
+        const cachedJson = createSongsJson("cached-archive::1", "sha256:cached");
+        const freshJson = createSongsJson("fresh-archive::1", "sha256:fresh");
+        const freshMetaJson = createSongsMetaJson("sha256:fresh");
         globalThis.localStorage.setItem("cachedSongsJson", cachedJson);
         let resolveFetch;
-        let fetchCalls = 0;
+        const fetchUrls = [];
         globalThis.fetch = async (url, options) => {
-            fetchCalls += 1;
-            assert.equal(url, "data/songs.json");
+            fetchUrls.push([url, options]);
             assert.deepEqual(options, { cache: "no-cache" });
+            if (url === "data/songs-meta.json") {
+                return {
+                    ok: true,
+                    async text() {
+                        return freshMetaJson;
+                    }
+                };
+            }
+            assert.equal(url, "data/songs.json");
             return new Promise((resolve) => {
                 resolveFetch = () => {
                     resolve({
@@ -264,6 +283,7 @@ test("data loader: cached json is shown immediately and refreshed in the backgro
             data,
             ui,
             publicSongsJsonUrl: "data/songs.json",
+            publicSongsMetaUrl: "data/songs-meta.json",
             publicCsvUrl: "https://example.test/songs.csv",
             songsJsonCacheKey: "cachedSongsJson",
             csvCacheKey: "cachedCsv",
@@ -271,10 +291,14 @@ test("data loader: cached json is shown immediately and refreshed in the backgro
         });
 
         await loader.loadInitialData();
+        await waitForAsyncWork();
 
         assert.equal(data.allSongsRaw[0].songKey, "cached-archive::1");
         assert.equal(ui.el.resultCount.innerText, "キャッシュを表示中");
-        assert.equal(fetchCalls, 1);
+        assert.deepEqual(fetchUrls, [
+            ["data/songs-meta.json", { cache: "no-cache" }],
+            ["data/songs.json", { cache: "no-cache" }]
+        ]);
         assert.deepEqual(calls.resetSearchConditionsArgs, [false]);
         assert.deepEqual(calls.scheduleSearchArgs, [{ immediate: true }]);
 
@@ -289,6 +313,123 @@ test("data loader: cached json is shown immediately and refreshed in the backgro
     } finally {
         globalThis.localStorage = previousLocalStorage;
         globalThis.fetch = previousFetch;
+        restoreDom();
+    }
+});
+
+test("data loader: cached json skips full refresh when meta hash matches", async () => {
+    const restoreDom = installFakeDom();
+    const previousLocalStorage = globalThis.localStorage;
+    const previousFetch = globalThis.fetch;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        const cachedJson = createSongsJson("cached-archive::1", "sha256:cached");
+        globalThis.localStorage.setItem("cachedSongsJson", cachedJson);
+        const fetchUrls = [];
+        globalThis.fetch = async (url, options) => {
+            fetchUrls.push([url, options]);
+            assert.equal(url, "data/songs-meta.json");
+            assert.deepEqual(options, { cache: "no-cache" });
+            return {
+                ok: true,
+                async text() {
+                    return createSongsMetaJson("sha256:cached");
+                }
+            };
+        };
+        const { data, ui, calls, callbacks } = createDataLoaderHarness();
+        const loader = createDataLoader({
+            data,
+            ui,
+            publicSongsJsonUrl: "data/songs.json",
+            publicSongsMetaUrl: "data/songs-meta.json",
+            publicCsvUrl: "https://example.test/songs.csv",
+            songsJsonCacheKey: "cachedSongsJson",
+            csvCacheKey: "cachedCsv",
+            callbacks
+        });
+
+        await loader.loadInitialData();
+        await waitForAsyncWork();
+
+        assert.deepEqual(fetchUrls, [
+            ["data/songs-meta.json", { cache: "no-cache" }]
+        ]);
+        assert.equal(globalThis.localStorage.getItem("cachedSongsJson"), cachedJson);
+        assert.equal(data.allSongsRaw[0].songKey, "cached-archive::1");
+        assert.deepEqual(calls.resetSearchConditionsArgs, [false]);
+        assert.deepEqual(calls.scheduleSearchArgs, [{ immediate: true }]);
+    } finally {
+        globalThis.localStorage = previousLocalStorage;
+        globalThis.fetch = previousFetch;
+        restoreDom();
+    }
+});
+
+test("data loader: cached json falls back to full refresh when meta fetch fails", async () => {
+    const restoreDom = installFakeDom();
+    const previousLocalStorage = globalThis.localStorage;
+    const previousFetch = globalThis.fetch;
+    const previousConsoleWarn = console.warn;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        const cachedJson = createSongsJson("cached-archive::1", "sha256:cached");
+        const freshJson = createSongsJson("fresh-archive::1", "sha256:fresh");
+        globalThis.localStorage.setItem("cachedSongsJson", cachedJson);
+        const fetchUrls = [];
+        const warnings = [];
+        console.warn = (...args) => {
+            warnings.push(args);
+        };
+        globalThis.fetch = async (url, options) => {
+            fetchUrls.push([url, options]);
+            assert.deepEqual(options, { cache: "no-cache" });
+            if (url === "data/songs-meta.json") {
+                return {
+                    ok: false,
+                    async text() {
+                        throw new Error("should not read meta body");
+                    }
+                };
+            }
+            assert.equal(url, "data/songs.json");
+            return {
+                ok: true,
+                async text() {
+                    return freshJson;
+                }
+            };
+        };
+        const { data, ui, calls, callbacks } = createDataLoaderHarness();
+        const loader = createDataLoader({
+            data,
+            ui,
+            publicSongsJsonUrl: "data/songs.json",
+            publicSongsMetaUrl: "data/songs-meta.json",
+            publicCsvUrl: "https://example.test/songs.csv",
+            songsJsonCacheKey: "cachedSongsJson",
+            csvCacheKey: "cachedCsv",
+            callbacks
+        });
+
+        await loader.loadInitialData();
+        await waitForAsyncWork();
+        await waitForAsyncWork();
+
+        assert.deepEqual(fetchUrls, [
+            ["data/songs-meta.json", { cache: "no-cache" }],
+            ["data/songs.json", { cache: "no-cache" }]
+        ]);
+        assert.equal(globalThis.localStorage.getItem("cachedSongsJson"), freshJson);
+        assert.equal(data.allSongsRaw[0].songKey, "fresh-archive::1");
+        assert.deepEqual(calls.resetSearchConditionsArgs, [false]);
+        assert.deepEqual(calls.scheduleSearchArgs, [{ immediate: true }, { immediate: true }]);
+        assert.equal(ui.search.dataReady, true);
+        assert.match(String(warnings[0]?.[0]), /曲データJSONメタ情報の確認に失敗しました/);
+    } finally {
+        globalThis.localStorage = previousLocalStorage;
+        globalThis.fetch = previousFetch;
+        console.warn = previousConsoleWarn;
         restoreDom();
     }
 });

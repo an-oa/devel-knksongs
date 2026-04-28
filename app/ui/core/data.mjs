@@ -1,5 +1,5 @@
 import { parseCsvToSongs } from "../../lib/csv-parser.mjs?v=13";
-import { parseSongsJsonPayload } from "../../lib/songs-json.mjs?v=13";
+import { parseSongsJsonMetaPayload, parseSongsJsonPayload } from "../../lib/songs-json.mjs?v=13";
 import { getDateUiState, getSearchUiState } from "../../lib/ui-slices.mjs?v=13";
 
 /**
@@ -8,6 +8,7 @@ import { getDateUiState, getSearchUiState } from "../../lib/ui-slices.mjs?v=13";
  *   data: { allSongsRaw: unknown[] },
  *   ui: { el: Record<string, HTMLElement | null>, recommendedCache: unknown, dataReady: boolean, hasRestoredSearchState: boolean },
  *   publicSongsJsonUrl?: string,
+ *   publicSongsMetaUrl?: string,
  *   publicCsvUrl: string,
  *   songsJsonCacheKey?: string,
  *   csvCacheKey: string,
@@ -25,6 +26,7 @@ export function createDataLoader(input) {
         data,
         ui,
         publicSongsJsonUrl,
+        publicSongsMetaUrl,
         publicCsvUrl,
         songsJsonCacheKey,
         csvCacheKey,
@@ -96,6 +98,16 @@ export function createDataLoader(input) {
     }
 
     /**
+     * 曲データJSONのメタ情報を取得する。
+     * @returns {Promise<string>}
+     */
+    async function fetchSongsMetaText() {
+        const response = await fetch(publicSongsMetaUrl, { cache: "no-cache" });
+        if (!response.ok) throw new Error("json meta fetch failed");
+        return response.text();
+    }
+
+    /**
      * CSV を取得する。
      * @returns {Promise<string>}
      */
@@ -162,17 +174,25 @@ export function createDataLoader(input) {
 
     /**
      * キャッシュ表示後にバックグラウンドでJSONを更新する。
-     * @param {string} cachedJson
+     * @param {{ contentHash: string, songs: unknown[] }} cachedPayload
      */
-    async function refreshSongsJsonCache(cachedJson) {
+    async function refreshSongsJsonCache(cachedPayload) {
         try {
+            if (publicSongsMetaUrl) {
+                try {
+                    const meta = parseSongsJsonMetaPayload(await fetchSongsMetaText());
+                    if (meta.contentHash === cachedPayload.contentHash) return;
+                } catch (error) {
+                    console.warn("曲データJSONメタ情報の確認に失敗しました", error);
+                }
+            }
             const jsonText = await fetchSongsJsonText();
-            if (jsonText === cachedJson) return;
-            const songs = parseSongsJsonPayload(jsonText);
+            const payload = parseSongsJsonPayload(jsonText);
+            if (payload.contentHash === cachedPayload.contentHash) return;
             if (setCachedText(songsJsonCacheKey, jsonText)) {
                 removeCachedText(csvCacheKey);
             }
-            applyLoadedSongs(songs, null, { resetConditions: false });
+            applyLoadedSongs(payload.songs, null, { resetConditions: false });
         } catch (error) {
             console.warn("曲データJSONの更新に失敗しました", error);
         }
@@ -185,8 +205,9 @@ export function createDataLoader(input) {
         const cachedJson = getCachedText(songsJsonCacheKey);
         if (cachedJson) {
             try {
-                applyLoadedSongs(parseSongsJsonPayload(cachedJson), "キャッシュを表示中");
-                refreshSongsJsonCache(cachedJson);
+                const cachedPayload = parseSongsJsonPayload(cachedJson);
+                applyLoadedSongs(cachedPayload.songs, "キャッシュを表示中");
+                refreshSongsJsonCache(cachedPayload);
                 return;
             } catch (error) {
                 console.warn("曲データJSONキャッシュを読み込めませんでした", error);
@@ -196,11 +217,11 @@ export function createDataLoader(input) {
 
         try {
             const jsonText = await fetchSongsJsonText();
-            const songs = parseSongsJsonPayload(jsonText);
+            const payload = parseSongsJsonPayload(jsonText);
             if (setCachedText(songsJsonCacheKey, jsonText)) {
                 removeCachedText(csvCacheKey);
             }
-            applyLoadedSongs(songs, null);
+            applyLoadedSongs(payload.songs, null);
         } catch (error) {
             await loadCsvFallback();
         }
