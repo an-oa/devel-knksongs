@@ -2,12 +2,7 @@ import {
     RANDOM_DISPLAY_COUNT,
     MIN_PERFORMANCE_FOR_RANDOM,
     INCREMENT_COUNT,
-    PUBLIC_SONGS_JSON_URL,
-    PUBLIC_SONGS_META_URL,
-    PUBLIC_CSV_URL,
     DEFAULT_FORMATS,
-    SONGS_JSON_CACHE_KEY,
-    CSV_CACHE_KEY,
     SEARCH_STATE_KEY,
     BOOKMARK_STORAGE_KEY,
     BOOKMARK_STORAGE_VERSION,
@@ -23,6 +18,13 @@ import {
     ui,
     youtube
 } from "./state.mjs?v=13";
+import {
+    PUBLIC_SONGS_JSON_URL,
+    PUBLIC_SONGS_META_URL,
+    PUBLIC_CSV_URL,
+    SONGS_JSON_CACHE_KEY,
+    CSV_CACHE_KEY
+} from "./config.mjs?v=13";
 import { createSearchController } from "./controllers/search.mjs?v=13";
 import { createRenderController } from "./controllers/render.mjs?v=13";
 import { createPlaybackSessionController } from "./controllers/playback-session.mjs?v=13";

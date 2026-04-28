@@ -4,12 +4,7 @@
 export const RANDOM_DISPLAY_COUNT = 48;
 export const MIN_PERFORMANCE_FOR_RANDOM = 3;
 export const INCREMENT_COUNT = 48;
-export const PUBLIC_SONGS_JSON_URL = "data/songs.json?v=13";
-export const PUBLIC_SONGS_META_URL = "data/songs-meta.json?v=13";
-export const PUBLIC_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR-cSDIsEc3sqIOkmiuuSeaUKmNb2gBvM_NoH8-Se5ZrosaSOdMhPo3RuvxhZirUPJ_ll8PGnbRnJeF/pub?gid=457223586&single=true&output=csv";
 export const DEFAULT_FORMATS = ["配信", "歌みた", "ショート", "切り抜き"];
-export const SONGS_JSON_CACHE_KEY = "cachedSongsJson";
-export const CSV_CACHE_KEY = "cachedCsv";
 export const SEARCH_STATE_KEY = "searchStateV1";
 export const BOOKMARK_STORAGE_KEY = "bookmarksV1";
 export const BOOKMARK_STORAGE_VERSION = 2;

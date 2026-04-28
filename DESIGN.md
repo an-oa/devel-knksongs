@@ -88,7 +88,7 @@
   - YouTubeリンク
 
 ## データフロー
-1. CSVを取得（`PUBLIC_CSV_URL`）
+1. CSVを取得（`app/config.mjs` の `PUBLIC_CSV_URL`）
 2. CSVをパースし、`SongRow` に正規化
 3. （ブックマーク選択中なら）ブックマーク内の曲集合を解決
 4. 条件未指定ならおすすめ結果を解決し、通常時は検索条件を取得してフィルタ

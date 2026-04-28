@@ -91,7 +91,7 @@ flowchart TD
 
 ## データソース(開発者向けメモ)
 
-- 公開スプレッドシートをCSVとして参照します(`app/state.mjs` の `PUBLIC_CSV_URL` で指定します)。
+- 公開スプレッドシートをCSVとして参照します(`app/config.mjs` の `PUBLIC_CSV_URL` で指定します)。
 - フロントエンドのみで動作します(静的ホスティング想定)。
 - 配布物はHTML/CSS/JavaScriptのみで、実行時にnpm等の同梱依存はありません。
 - サムネイル表示/埋め込み再生まわりでは YouTube Iframe API を動的に利用します。
