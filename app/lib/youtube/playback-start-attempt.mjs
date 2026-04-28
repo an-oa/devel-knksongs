@@ -1,4 +1,8 @@
 import { isHtmlElement } from "../dom-utils.mjs?v=11";
+import {
+    debugPlayback,
+    isAutoplayStartFallbackEnabled
+} from "../playback-debug.mjs?v=11";
 
 export const DEFAULT_PLAYBACK_START_TIMEOUT_MS = 5000;
 export const DEFAULT_PLAYBACK_SETUP_TIMEOUT_MS = 10000;
@@ -113,7 +117,11 @@ export function createYoutubePlaybackStartAttemptManager(input) {
      */
     function startTimeout(attempt, timeoutDurationMs, reason) {
         const timeoutId = setTimeout(() => {
-            const timeoutResult = reason === "start-timeout"
+            const shouldUseAutoplayStartFallback =
+                reason === "start-timeout" &&
+                attempt.context.playbackMode === "autoplay" &&
+                isAutoplayStartFallbackEnabled();
+            const timeoutResult = reason === "start-timeout" && !shouldUseAutoplayStartFallback
                 ? createYoutubePlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.UNCONFIRMED)
                 : createYoutubePlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.FAILED);
             const didSettle = settle(attempt.sessionId, timeoutResult);
@@ -124,10 +132,20 @@ export function createYoutubePlaybackStartAttemptManager(input) {
                 : getThumbForSession(attempt.sessionId);
             if (!isHtmlElement(thumbDiv)) return;
             if (!isCurrentSession(thumbDiv, attempt.sessionId)) return;
-            handleStartFailure(thumbDiv, {
+            if (shouldUseAutoplayStartFallback) {
+                debugPlayback("youtube", "debug autoplay start fallback", {
+                    reason,
+                    playbackMode: attempt.context.playbackMode
+                });
+            }
+            const failureOptions = {
                 playbackMode: attempt.context.playbackMode,
-                reason
-            });
+                reason: shouldUseAutoplayStartFallback ? "debug-autoplay-start-fallback" : reason
+            };
+            if (shouldUseAutoplayStartFallback) {
+                failureOptions.wasPlaybackStartUnconfirmed = true;
+            }
+            handleStartFailure(thumbDiv, failureOptions);
         }, timeoutDurationMs);
         if (timeoutId && typeof timeoutId.unref === "function") {
             timeoutId.unref();

@@ -777,6 +777,84 @@ test("youtube: autoplay timeout leaves the iframe mounted as unconfirmed", async
     }
 });
 
+test("youtube: debug autoplay fallback restores thumbnail and notifies continuation", async () => {
+    const cleanup = installFakeDom();
+    const previousSetTimeout = globalThis.setTimeout;
+    const previousClearTimeout = globalThis.clearTimeout;
+    const timeoutCalls = [];
+    setGlobalValue("setTimeout", (cb, delay) => {
+        timeoutCalls.push({ cb, delay });
+        return {
+            unref() {}
+        };
+    });
+    setGlobalValue("clearTimeout", () => {});
+    try {
+        window.__KNK_AUTOPLAY_START_FALLBACK__ = true;
+        const ui = createYoutubeUiState({});
+        const { controller } = createYoutubeControllerHarness({ ui });
+        const failedCalls = [];
+        controller.setPlaybackStartFailedHook((payload) => {
+            failedCalls.push(payload);
+        });
+        window.YT = {
+            PlayerState: {
+                ENDED: 0,
+                PLAYING: 1,
+                PAUSED: 2
+            },
+            Player: class {
+                constructor(host) {
+                    this.iframe = attachMockPlayerIframe(host);
+                }
+
+                getIframe() {
+                    return this.iframe;
+                }
+
+                stopVideo() {}
+
+                destroy() {}
+            }
+        };
+
+        const card = document.createElement("div");
+        card.className = "song-card";
+        card.dataset.songKey = "song:debug-autoplay-fallback";
+        document.body.appendChild(card);
+        const thumb = document.createElement("div");
+        card.appendChild(thumb);
+        const playbackPromise = controller.playThumbnail(thumb, {
+            videoId: "video-debug-autoplay-fallback",
+            startSeconds: 0
+        }, {
+            playbackMode: "autoplay"
+        });
+        await flushYoutubePlaybackSetup();
+
+        const startTimeout = timeoutCalls.find((call) => call.delay === 5000);
+        assert.equal(typeof startTimeout?.cb, "function");
+        startTimeout.cb();
+        await flushMicrotasks(2);
+
+        assertPlaybackStartStatus(await playbackPromise, YOUTUBE_PLAYBACK_START_STATUS.FAILED);
+        assert.ok(thumb.querySelector("img"));
+        assert.equal(thumb.querySelector("iframe"), null);
+        assert.equal(ui.playback.activeThumb, null);
+        assert.deepEqual(failedCalls, [
+            {
+                songKey: "song:debug-autoplay-fallback",
+                playbackMode: "autoplay",
+                wasPlaybackStartUnconfirmed: true
+            }
+        ]);
+    } finally {
+        setGlobalValue("setTimeout", previousSetTimeout);
+        setGlobalValue("clearTimeout", previousClearTimeout);
+        cleanup();
+    }
+});
+
 test("youtube: delayed autoplay error after unconfirmed timeout notifies continuation", async () => {
     const cleanup = installFakeDom();
     const previousSetTimeout = globalThis.setTimeout;

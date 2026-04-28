@@ -150,6 +150,44 @@ test("youtube playback start attempt: armStartTimeout switches from setup wait t
     }
 });
 
+test("youtube playback start attempt: debug fallback treats delayed autoplay start as failed", async () => {
+    const cleanup = installFakeDom();
+    const previousSetTimeout = globalThis.setTimeout;
+    const previousClearTimeout = globalThis.clearTimeout;
+    const timeoutCalls = [];
+    setGlobalValue("setTimeout", (callback, delay) => {
+        const timeoutId = { delay };
+        timeoutCalls.push({ callback, delay, timeoutId });
+        return timeoutId;
+    });
+    setGlobalValue("clearTimeout", () => {});
+    try {
+        window.__KNK_AUTOPLAY_START_FALLBACK__ = true;
+        const { failures, manager, sharedPlayback, thumb } = createAttemptHarness({
+            timeoutMs: 10,
+            setupTimeoutMs: 50
+        });
+        const attemptPromise = manager.create(1, { thumbDiv: thumb, playbackMode: "autoplay" });
+
+        assert.equal(manager.armStartTimeout(1), true);
+        timeoutCalls[1].callback();
+
+        assert.deepEqual(await attemptPromise, playbackStartResult(YOUTUBE_PLAYBACK_START_STATUS.FAILED));
+        assert.equal(sharedPlayback.unconfirmedPlaybackStartSessionId, 0);
+        assert.equal(failures.length, 1);
+        assert.equal(failures[0].target, thumb);
+        assert.deepEqual(failures[0].details, {
+            playbackMode: "autoplay",
+            reason: "debug-autoplay-start-fallback",
+            wasPlaybackStartUnconfirmed: true
+        });
+    } finally {
+        setGlobalValue("setTimeout", previousSetTimeout);
+        setGlobalValue("clearTimeout", previousClearTimeout);
+        cleanup();
+    }
+});
+
 test("youtube playback start attempt: default start timeout is five seconds", () => {
     const cleanup = installFakeDom();
     const previousSetTimeout = globalThis.setTimeout;
