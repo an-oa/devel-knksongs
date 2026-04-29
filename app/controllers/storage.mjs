@@ -4,6 +4,10 @@ import {
     migrateLegacyBookmarkSongRefsToCurrent,
     parseStoredBookmarksPayload
 } from "../lib/storage/bookmark-schema.mjs?v=14";
+import {
+    exportBookmarksAsJsonText as buildBookmarkExportJsonText,
+    parseBookmarkImportText as parseBookmarkImportJsonText
+} from "../lib/storage/bookmark-transfer.mjs?v=14";
 
 /**
  * ブックマークと検索状態の保存・復元を扱うストレージコントローラーを作成する。
@@ -108,6 +112,27 @@ export function createStorageController({ data, ui, constants, callbacks }) {
     }
 
     /**
+     * インポート候補の JSON 文字列を解析し、全置き換え可能なブックマーク情報に整える。
+     * @param {*} text
+     * @returns {{ ok: boolean, reason?: string, bookmarks?: Record<string, *>, bookmarkCount?: number, songCount?: number, limit?: number, bookmarkName?: string }}
+     */
+    function parseBookmarkImportText(text) {
+        return parseBookmarkImportJsonText(text, {
+            songRows: data.allSongsRaw,
+            maxBookmarkCount: MAX_BOOKMARK_COUNT,
+            maxSongsPerBookmark: MAX_SONGS_PER_BOOKMARK
+        });
+    }
+
+    /**
+     * 現在のブックマークを JSON エクスポート用文字列へ変換する。
+     * @returns {{ ok: boolean, text: string, bookmarkCount: number, songCount: number }}
+     */
+    function exportBookmarksAsJsonText() {
+        return buildBookmarkExportJsonText(data.bookmarks, BOOKMARK_STORAGE_VERSION);
+    }
+
+    /**
      * ブックマーク情報をローカルストレージへ保存する。
      */
     function saveBookmarks() {
@@ -142,6 +167,31 @@ export function createStorageController({ data, ui, constants, callbacks }) {
             data.bookmarks = {};
         }
         renderBookmarks();
+    }
+
+    /**
+     * JSON 文字列からブックマークを全置き換えでインポートする。
+     * @param {*} text
+     * @returns {{ ok: boolean, reason?: string, bookmarkCount?: number, songCount?: number }}
+     */
+    function importBookmarksFromJsonText(text) {
+        const parsed = parseBookmarkImportText(text);
+        if (!parsed.ok) return parsed;
+
+        const hadActiveBookmark = Boolean(data.activeBookmark);
+        data.bookmarks = parsed.bookmarks;
+        if (data.activeBookmark && !data.bookmarks[data.activeBookmark]) {
+            data.activeBookmark = null;
+        }
+        saveBookmarks();
+        renderBookmarks();
+        if (hadActiveBookmark || data.activeBookmark) {
+            scheduleSearch({ immediate: true });
+        }
+        return buildActionOk({
+            bookmarkCount: parsed.bookmarkCount,
+            songCount: parsed.songCount
+        });
     }
 
     /**
@@ -365,6 +415,9 @@ export function createStorageController({ data, ui, constants, callbacks }) {
         applySelectedFormatsFromRaw,
         loadBookmarks,
         saveBookmarks,
+        exportBookmarksAsJsonText,
+        parseBookmarkImportText,
+        importBookmarksFromJsonText,
         migrateLegacyBookmarkSongRefs,
         addSongToBookmark,
         createBookmark,

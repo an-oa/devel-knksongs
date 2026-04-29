@@ -230,6 +230,60 @@ test("migrateLegacyBookmarkSongRefs: preserves current bookmarkSongKey refs and 
     }
 });
 
+test("importBookmarksFromJsonText: replaces current bookmarks and clears missing active bookmark", () => {
+    const prevLocalStorage = globalThis.localStorage;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        const { controller, data, getRenderCount, getScheduleCount } = setupStorageController({
+            bookmarks: {
+                old: { name: "Old", songs: ["old-song"], createdAt: 1 }
+            },
+            activeBookmark: "old",
+            maxBookmarkCount: 20,
+            maxSongsPerBookmark: 120
+        });
+        data.allSongsRaw = [
+            {
+                sourceIndex: 0,
+                songKey: "arch1::1",
+                bookmarkSongKey: "videoA::1",
+                legacySongKey: "arch1::1::https://youtu.be/videoA"
+            }
+        ];
+
+        const result = controller.importBookmarksFromJsonText(JSON.stringify({
+            version: 1,
+            bookmarks: {
+                imported: {
+                    name: " Imported ",
+                    songs: ["arch1::1", "arch1::1"],
+                    createdAt: 2
+                }
+            }
+        }));
+
+        assert.equal(result.ok, true);
+        assert.equal(result.bookmarkCount, 1);
+        assert.equal(result.songCount, 1);
+        assert.deepEqual(data.bookmarks, {
+            imported: {
+                name: "Imported",
+                songs: ["videoA::1"],
+                createdAt: 2
+            }
+        });
+        assert.equal(data.activeBookmark, null);
+        assert.equal(getRenderCount(), 1);
+        assert.equal(getScheduleCount(), 1);
+        assert.deepEqual(JSON.parse(globalThis.localStorage.getItem("bookmarksTest")), {
+            version: 2,
+            bookmarks: data.bookmarks
+        });
+    } finally {
+        globalThis.localStorage = prevLocalStorage;
+    }
+});
+
 test("migrateLegacyBookmarkSongRefs: emits opt-in debug logs when migration runs", () => {
     const restoreDom = installFakeDom();
     const prevLocalStorage = globalThis.localStorage;

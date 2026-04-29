@@ -45,6 +45,9 @@ export function collectUiElements() {
         bookmarkPanelNewName: document.getElementById("bookmark-panel-new-name"),
         bookmarkPanelError: document.getElementById("bookmark-panel-error"),
         bookmarkPanelCreateBtn: document.getElementById("bookmark-panel-create-btn"),
+        bookmarkPanelExportBtn: document.getElementById("bookmark-panel-export-btn"),
+        bookmarkPanelImportBtn: document.getElementById("bookmark-panel-import-btn"),
+        bookmarkPanelImportInput: document.getElementById("bookmark-panel-import-input"),
         bookmarkList: document.getElementById("bookmark-list")
     };
 }

@@ -1,4 +1,11 @@
 import { getBookmarkPanelUiState } from "../../lib/ui-slices.mjs?v=14";
+import {
+    buildBookmarkExportFileName,
+    buildBookmarkImportConfirmMessage,
+    getBookmarkImportErrorMessage,
+    readFileText,
+    saveTextFile
+} from "./import-export.mjs?v=14";
 
 /**
  * ブックマークUIのイベント処理・描画・選択状態管理をまとめたコントローラーを作成する。
@@ -17,7 +24,11 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
         onDeleteBookmark,
         onRenameBookmark,
         onRemoveSongFromBookmark,
-        onRequestCloseSidebar
+        onRequestCloseSidebar,
+        onExportBookmarks,
+        onPreviewBookmarkImport,
+        onImportBookmarksText,
+        saveTextFile: saveTextFileCallback = saveTextFile
     } = callbacks;
 
     /**
@@ -225,6 +236,72 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
     }
 
     /**
+     * ブックマークを JSON ファイルとしてエクスポートする。
+     */
+    async function exportBookmarksFromPanel() {
+        if (typeof onExportBookmarks !== "function") return;
+        clearBookmarkPanelError();
+        try {
+            const result = normalizeActionResult(onExportBookmarks());
+            if (!result.ok || typeof result.text !== "string") {
+                showBookmarkPanelError("ブックマークをエクスポートできませんでした。");
+                return;
+            }
+            const fileName = typeof result.fileName === "string" && result.fileName.trim()
+                ? result.fileName.trim()
+                : buildBookmarkExportFileName(new Date());
+            await saveTextFileCallback(result.text, fileName, "application/json");
+        } catch (error) {
+            if (error && error.name === "AbortError") return;
+            showBookmarkPanelError("ブックマークをエクスポートできませんでした。");
+        }
+    }
+
+    /**
+     * ファイル選択ダイアログを開く。
+     */
+    function requestBookmarkImportFile() {
+        const input = ui.el.bookmarkPanelImportInput;
+        if (!input) return;
+        clearBookmarkPanelError();
+        input.value = "";
+        input.click();
+    }
+
+    /**
+     * 選択された JSON ファイルを読み込み、全置き換えでインポートする。
+     */
+    async function importBookmarksFromSelectedFile() {
+        const input = ui.el.bookmarkPanelImportInput;
+        const file = input && input.files && input.files[0] ? input.files[0] : null;
+        if (!file || typeof onPreviewBookmarkImport !== "function" || typeof onImportBookmarksText !== "function") {
+            return;
+        }
+
+        clearBookmarkPanelError();
+        try {
+            const text = await readFileText(file);
+            const preview = normalizeActionResult(onPreviewBookmarkImport(text));
+            if (!preview.ok) {
+                showBookmarkPanelError(getBookmarkImportErrorMessage(preview));
+                return;
+            }
+            if (!confirm(buildBookmarkImportConfirmMessage(preview))) return;
+
+            const result = normalizeActionResult(onImportBookmarksText(text));
+            if (!result.ok) {
+                showBookmarkPanelError(getBookmarkImportErrorMessage(result));
+                return;
+            }
+            alert(`ブックマークを${result.bookmarkCount || 0}件インポートしました。`);
+        } catch {
+            showBookmarkPanelError("ブックマークファイルを読み込めませんでした。");
+        } finally {
+            input.value = "";
+        }
+    }
+
+    /**
      * ブックマークを追加モード/閲覧モードに応じて描画する。
      */
     function renderBookmarks() {
@@ -357,6 +434,9 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
     function setupBookmarkHandlers() {
         const createBtn = ui.el.bookmarkPanelCreateBtn;
         const nameInput = ui.el.bookmarkPanelNewName;
+        const exportBtn = ui.el.bookmarkPanelExportBtn;
+        const importBtn = ui.el.bookmarkPanelImportBtn;
+        const importInput = ui.el.bookmarkPanelImportInput;
         if (createBtn) {
             createBtn.addEventListener("click", createBookmarkFromPanel);
         }
@@ -368,6 +448,15 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
                     createBookmarkFromPanel();
                 }
             });
+        }
+        if (exportBtn) {
+            exportBtn.addEventListener("click", exportBookmarksFromPanel);
+        }
+        if (importBtn) {
+            importBtn.addEventListener("click", requestBookmarkImportFile);
+        }
+        if (importInput) {
+            importInput.addEventListener("change", importBookmarksFromSelectedFile);
         }
     }
 

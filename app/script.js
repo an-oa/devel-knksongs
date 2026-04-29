@@ -194,6 +194,9 @@ bookmarkUiController = createBookmarkUiController({
         onDeleteBookmark: (bookmarkId) => storageController.deleteBookmark(bookmarkId),
         onRenameBookmark: (bookmarkId, newName) => storageController.renameBookmark(bookmarkId, newName),
         onRemoveSongFromBookmark: (bookmarkId, songKey) => storageController.removeSongFromBookmark(bookmarkId, songKey),
+        onExportBookmarks: () => storageController.exportBookmarksAsJsonText(),
+        onPreviewBookmarkImport: (text) => storageController.parseBookmarkImportText(text),
+        onImportBookmarksText: (text) => storageController.importBookmarksFromJsonText(text),
         onRequestCloseSidebar: () => {
             if (sidebarController) {
                 sidebarController.closeSidebarMenu();

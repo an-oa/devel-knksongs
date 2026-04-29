@@ -18,11 +18,15 @@ function createBookmarkUiState() {
     const bookmarkPanelNewName = document.createElement("input");
     const bookmarkPanelError = document.createElement("div");
     const bookmarkPanelCreateBtn = document.createElement("button");
+    const bookmarkPanelExportBtn = document.createElement("button");
+    const bookmarkPanelImportBtn = document.createElement("button");
+    const bookmarkPanelImportInput = document.createElement("input");
     const bookmarkList = document.createElement("div");
 
     openBookmarkPanelBtn.setAttribute("id", "open-bookmark-panel");
     bookmarkSidebarPanel.hidden = true;
     bookmarkPanelError.hidden = true;
+    bookmarkPanelImportInput.type = "file";
 
     sidebar.append(
         sidebarHeader,
@@ -39,6 +43,11 @@ function createBookmarkUiState() {
         bookmarkPanelError,
         bookmarkPanelCreateBtn
     );
+    bookmarkSidebarPanel.append(
+        bookmarkPanelExportBtn,
+        bookmarkPanelImportBtn,
+        bookmarkPanelImportInput
+    );
     bookmarkSidebarPanel.append(bookmarkList);
     document.body.appendChild(sidebar);
 
@@ -54,6 +63,9 @@ function createBookmarkUiState() {
             bookmarkPanelNewName,
             bookmarkPanelError,
             bookmarkPanelCreateBtn,
+            bookmarkPanelExportBtn,
+            bookmarkPanelImportBtn,
+            bookmarkPanelImportInput,
             bookmarkList
         },
         bookmarkPanel: {
@@ -98,7 +110,11 @@ function createBookmarkHarness(input) {
         deleteBookmarkArgs: [],
         renameBookmarkArgs: [],
         removeSongArgs: [],
-        requestCloseSidebar: 0
+        requestCloseSidebar: 0,
+        exportBookmarkCount: 0,
+        previewImportArgs: [],
+        importTextArgs: [],
+        savedFiles: []
     };
     const callbacks = {
         clearSearchDebounce() {
@@ -140,8 +156,34 @@ function createBookmarkHarness(input) {
         onRemoveSongFromBookmark(bookmarkId, songKey) {
             calls.removeSongArgs.push([bookmarkId, songKey]);
         },
+        onExportBookmarks() {
+            calls.exportBookmarkCount += 1;
+            return options.onExportBookmarksResult || {
+                ok: true,
+                text: "{\"version\":2,\"bookmarks\":{}}\n"
+            };
+        },
+        onPreviewBookmarkImport(text) {
+            calls.previewImportArgs.push(text);
+            return options.onPreviewBookmarkImportResult || {
+                ok: true,
+                bookmarkCount: 1,
+                songCount: 2
+            };
+        },
+        onImportBookmarksText(text) {
+            calls.importTextArgs.push(text);
+            return options.onImportBookmarksTextResult || {
+                ok: true,
+                bookmarkCount: 1,
+                songCount: 2
+            };
+        },
         onRequestCloseSidebar() {
             calls.requestCloseSidebar += 1;
+        },
+        async saveTextFile(text, fileName, mimeType) {
+            calls.savedFiles.push({ text, fileName, mimeType });
         }
     };
 
@@ -241,6 +283,115 @@ test("bookmark ui: create form shows inline error, clears it on input, and creat
         assert.ok(data.bookmarks["bookmark-new"]);
         assert.equal(findBookmarkItem(ui, "bookmark-new").querySelector(".bookmark-item-name").textContent, "Focus Songs");
     } finally {
+        restoreDom();
+    }
+});
+
+test("bookmark ui: export button saves the JSON payload with a default filename", async () => {
+    const restoreDom = installFakeDom();
+    try {
+        const { ui, calls, controller } = createBookmarkHarness();
+        controller.setupBookmarkHandlers();
+
+        const listener = ui.el.bookmarkPanelExportBtn._events.get("click");
+        assert.equal(typeof listener, "function");
+        await listener({});
+
+        assert.equal(calls.exportBookmarkCount, 1);
+        assert.equal(calls.savedFiles.length, 1);
+        assert.equal(calls.savedFiles[0].text, "{\"version\":2,\"bookmarks\":{}}\n");
+        assert.match(calls.savedFiles[0].fileName, /^knksongs-bookmarks-\d{8}\.json$/);
+        assert.equal(calls.savedFiles[0].mimeType, "application/json");
+        assert.equal(ui.el.bookmarkPanelError.hidden, true);
+    } finally {
+        restoreDom();
+    }
+});
+
+test("bookmark ui: import button reads JSON and confirms full replacement", async () => {
+    const restoreDom = installFakeDom();
+    const previousConfirm = globalThis.confirm;
+    const previousAlert = globalThis.alert;
+    const confirms = [];
+    const alerts = [];
+    globalThis.confirm = (message) => {
+        confirms.push(String(message));
+        return true;
+    };
+    globalThis.alert = (message) => {
+        alerts.push(String(message));
+    };
+    try {
+        const { ui, calls, controller } = createBookmarkHarness();
+        controller.setupBookmarkHandlers();
+
+        let filePickerOpened = false;
+        ui.el.bookmarkPanelImportInput.click = () => {
+            filePickerOpened = true;
+        };
+        invokeListener(ui.el.bookmarkPanelImportBtn, "click", {});
+        assert.equal(filePickerOpened, true);
+
+        const importText = "{\"version\":2,\"bookmarks\":{}}";
+        ui.el.bookmarkPanelImportInput.files = [
+            {
+                text: async () => importText
+            }
+        ];
+        const listener = ui.el.bookmarkPanelImportInput._events.get("change");
+        assert.equal(typeof listener, "function");
+        await listener({});
+
+        assert.deepEqual(calls.previewImportArgs, [importText]);
+        assert.deepEqual(calls.importTextArgs, [importText]);
+        assert.deepEqual(confirms, [
+            [
+                "現在のブックマークを置き換えます。",
+                "1件のブックマーク、2曲をインポートします。",
+                "よろしいですか？"
+            ].join("\n")
+        ]);
+        assert.deepEqual(alerts, ["ブックマークを1件インポートしました。"]);
+        assert.equal(ui.el.bookmarkPanelImportInput.value, "");
+        assert.equal(ui.el.bookmarkPanelError.hidden, true);
+    } finally {
+        globalThis.confirm = previousConfirm;
+        globalThis.alert = previousAlert;
+        restoreDom();
+    }
+});
+
+test("bookmark ui: import error is shown without replacing bookmarks", async () => {
+    const restoreDom = installFakeDom();
+    const previousConfirm = globalThis.confirm;
+    let confirmCount = 0;
+    globalThis.confirm = () => {
+        confirmCount += 1;
+        return true;
+    };
+    try {
+        const { ui, calls, controller } = createBookmarkHarness({
+            onPreviewBookmarkImportResult: { ok: false, reason: "invalid_json" }
+        });
+        controller.setupBookmarkHandlers();
+
+        const importText = "{";
+        ui.el.bookmarkPanelImportInput.files = [
+            {
+                text: async () => importText
+            }
+        ];
+        const listener = ui.el.bookmarkPanelImportInput._events.get("change");
+        assert.equal(typeof listener, "function");
+        await listener({});
+
+        assert.deepEqual(calls.previewImportArgs, [importText]);
+        assert.deepEqual(calls.importTextArgs, []);
+        assert.equal(confirmCount, 0);
+        assert.equal(ui.el.bookmarkPanelError.hidden, false);
+        assert.equal(ui.el.bookmarkPanelError.textContent, "JSONとして読み込めないファイルです。");
+    } finally {
+        globalThis.confirm = previousConfirm;
         restoreDom();
     }
 });
