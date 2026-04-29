@@ -1,4 +1,4 @@
-import { isHtmlElement } from "./dom-utils.mjs?v=14";
+import { isHtmlElement } from "./dom-utils.mjs?v=15";
 
 /**
  * 指定要素を含む最も近いスクロール可能祖先を返す。
