@@ -115,7 +115,7 @@ test("playback session: tries later candidates when the next song cannot start",
     const continued = await controller.continuePlayback("song:1");
 
     assert.equal(continued, true);
-    assert.deepEqual(calls, ["play:song:2", "play:song:3", "scroll:song:3"]);
+    assert.deepEqual(calls, ["play:song:2", "scroll:song:2", "play:song:3", "scroll:song:3"]);
 });
 
 test("playback session: repeats current song when loop-only mode is enabled", async () => {
@@ -174,7 +174,36 @@ test("playback session: awaits async playback failure before trying the next can
     const continued = await controller.continuePlayback("song:1");
 
     assert.equal(continued, true);
-    assert.deepEqual(calls, ["play:song:2", "play:song:3", "scroll:song:3"]);
+    assert.deepEqual(calls, ["play:song:2", "scroll:song:2", "play:song:3", "scroll:song:3"]);
+});
+
+test("playback session: scrolls wrapped loop candidate even when playback cannot start", async () => {
+    const data = {
+        currentResults: [
+            { songKey: "song:1" },
+            { songKey: "song:2" }
+        ]
+    };
+    const ui = createPlaybackUi({ continuousPlayback: true, loopPlayback: true });
+    const calls = [];
+    const controller = createPlaybackSessionController({
+        data,
+        ui,
+        callbacks: createPlaybackSessionCallbacks({
+        playSongByKey: (songKey) => {
+            calls.push(`play:${songKey}`);
+            return playbackFailed();
+        },
+        scrollSongIntoView: (songKey) => {
+            calls.push(`scroll:${songKey}`);
+        }
+        })
+    });
+
+    const continued = await controller.continuePlayback("song:2");
+
+    assert.equal(continued, false);
+    assert.deepEqual(calls, ["play:song:1", "scroll:song:1"]);
 });
 
 test("playback session: stops trying later candidates when playback start is unconfirmed", async () => {
@@ -204,7 +233,7 @@ test("playback session: stops trying later candidates when playback start is unc
     const continued = await controller.continuePlayback("song:1");
 
     assert.equal(continued, false);
-    assert.deepEqual(calls, ["play:song:2"]);
+    assert.deepEqual(calls, ["play:song:2", "scroll:song:2"]);
 });
 
 test("playback session: stops trying later candidates after manual playback takes over", async () => {

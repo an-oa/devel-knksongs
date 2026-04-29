@@ -292,7 +292,8 @@ export function createRenderController({ data, ui, isAllFormatsSelected, increme
         if (!entry) return;
         scheduleScrollElementIntoView(entry.card, {
             topOffset: getHeaderHeight(),
-            behavior: "smooth"
+            behavior: "smooth",
+            force: true
         });
     }
 

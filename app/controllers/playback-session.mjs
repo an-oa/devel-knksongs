@@ -37,28 +37,37 @@ export function createPlaybackSessionController({ data, ui, callbacks }) {
         });
         for (const songKey of candidates) {
             const playbackResult = await Promise.resolve(playSongByKey(songKey));
+            const didStartPlayback = isYoutubePlaybackStarted(playbackResult);
+            const isStartUnconfirmed = isYoutubePlaybackStartUnconfirmed(playbackResult);
+            const wasPlaybackTakenOver = Boolean(playbackUi.activeThumb);
             debugPlayback("playback-session", "continuePlayback playSongByKey result", {
                 finishedSongKey,
                 candidateSongKey: songKey,
                 playbackResult,
-                hasActiveThumb: Boolean(playbackUi.activeThumb)
+                hasActiveThumb: wasPlaybackTakenOver
             });
-            if (isYoutubePlaybackStarted(playbackResult)) {
+            if (
+                didStartPlayback ||
+                isStartUnconfirmed ||
+                !wasPlaybackTakenOver
+            ) {
                 scrollSongIntoView(songKey);
+            }
+            if (didStartPlayback) {
                 debugPlayback("playback-session", "continuePlayback advanced", {
                     finishedSongKey,
                     nextSongKey: songKey
                 });
                 return true;
             }
-            if (isYoutubePlaybackStartUnconfirmed(playbackResult)) {
+            if (isStartUnconfirmed) {
                 debugPlayback("playback-session", "continuePlayback stopped because playback start is unconfirmed", {
                     finishedSongKey,
                     candidateSongKey: songKey
                 });
                 return false;
             }
-            if (playbackUi.activeThumb) {
+            if (wasPlaybackTakenOver) {
                 debugPlayback("playback-session", "continuePlayback stopped because playback was taken over", {
                     finishedSongKey,
                     candidateSongKey: songKey
