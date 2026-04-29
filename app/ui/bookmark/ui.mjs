@@ -1,4 +1,4 @@
-import { getBookmarkPanelUiState } from "../../lib/ui-slices.mjs?v=13";
+import { getBookmarkPanelUiState } from "../../lib/ui-slices.mjs?v=14";
 
 /**
  * ブックマークUIのイベント処理・描画・選択状態管理をまとめたコントローラーを作成する。

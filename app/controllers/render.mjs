@@ -1,13 +1,13 @@
-import { getHeaderHeight } from "../lib/dom-utils.mjs?v=13";
-import { tracePlayback } from "../lib/playback-debug.mjs?v=13";
-import { scheduleScrollElementIntoView } from "../lib/results-scroll.mjs?v=13";
-import { createBookmarkDragReorderController } from "../lib/render/drag-reorder.mjs?v=13";
-import { applyMasonryLayout } from "../lib/render/masonry-layout.mjs?v=13";
-import { getPlaybackUiState, getRenderUiState, getSearchUiState } from "../lib/ui-slices.mjs?v=13";
+import { getHeaderHeight } from "../lib/dom-utils.mjs?v=14";
+import { tracePlayback } from "../lib/playback-debug.mjs?v=14";
+import { scheduleScrollElementIntoView } from "../lib/results-scroll.mjs?v=14";
+import { createBookmarkDragReorderController } from "../lib/render/drag-reorder.mjs?v=14";
+import { applyMasonryLayout } from "../lib/render/masonry-layout.mjs?v=14";
+import { getPlaybackUiState, getRenderUiState, getSearchUiState } from "../lib/ui-slices.mjs?v=14";
 import {
     createYoutubePlaybackStartResult,
     YOUTUBE_PLAYBACK_START_STATUS
-} from "../lib/youtube/playback-start-attempt.mjs?v=13";
+} from "../lib/youtube/playback-start-attempt.mjs?v=14";
 
 /**
  * 検索結果カードの生成・差分反映・表示更新を担うレンダーコントローラーを作成する。

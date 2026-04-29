@@ -1,4 +1,4 @@
-import { getPlaybackUiState, getSearchUiState } from "../lib/ui-slices.mjs?v=13";
+import { getPlaybackUiState, getSearchUiState } from "../lib/ui-slices.mjs?v=14";
 
 const THUMBNAIL_STORAGE_KEY = "showThumbnails";
 const EXPERIMENTAL_PLAYBACK_SETTINGS_STORAGE_KEY = "showExperimentalPlaybackSettings";
