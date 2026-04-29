@@ -82,11 +82,14 @@ feat: move settings into dedicated sidebar panel
 - `index.html` の `styles.css?v=...` と `app/script.js?v=...` は必ず同じ値に揃える。
 - `app/script.js` から読む ES Modules や、module 間の import / export に `?v=...` が付いている箇所も同じ値へ揃える。
 - `v=...` を更新するときは、関連有無を自己判断せず、更新前の古い値を `rg -n "v=<old>|\\?v=<old>" -S .` で全検索して一斉に統一する。
+- `songs.json` / `songs-meta.json` の内容更新だけでは `v=...` を更新しない。
+  曲データの鮮度確認は `songs-meta.json` の content hash で行う。
 - 更新後は `node --test tests/*.mjs` を実行し、pass/fail 件数を共有する。
 
 ## Encoding And Line Endings
 
 - 2026-04-25 時点で確認した `.js` `.mjs` `.html` `.css` `.md` は、すべて `UTF-8 BOMなし` かつ `LF`。
+- 2026-04-29 時点で確認した `.github/workflows/*.yml` は、`UTF-8 BOMなし` かつ `LF`。
 - リポジトリ直下に `.gitattributes` と `.editorconfig` は現状存在しない。
 
 | Path | Encoding | Line Ending |
@@ -99,4 +102,5 @@ feat: move settings into dedicated sidebar panel
 | `styles.css` | UTF-8 BOMなし | LF |
 | `app/**/*.js` / `app/**/*.mjs` | UTF-8 BOMなし | LF |
 | `tests/**/*.mjs` | UTF-8 BOMなし | LF |
+| `.github/workflows/*.yml` | UTF-8 BOMなし | LF |
 | `playwright.config.mjs` | UTF-8 BOMなし | LF |

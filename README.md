@@ -4,7 +4,7 @@
 
 - 公開スプレッドシート由来の歌データを、曲名・アーティスト名(読み含む)で検索できるシンプルなWebサイトです。
 - PC / スマホ両対応です。本サイト運営者のサーバへ個人情報を送信したり、独自の解析用トラッキングを行いません(設定保持のためにローカルストレージを使用します)。
-- データ取得や表示のために Google(スプレッドシートのCSV取得)や YouTube(youtube.com、サムネイル配信元など)への通信は発生します。
+- 通常の曲データ表示では GitHub Pages 上の生成済みJSONを取得します。JSON生成やフォールバック時には Google(スプレッドシートのCSV取得)、YouTube表示では youtube.com やサムネイル配信元などへの通信が発生します。
 
 ---
 
@@ -42,7 +42,7 @@
 - 初期表示(おすすめ)があります。
   - 通常表示で検索条件が未指定のときは、一定回数以上歌われた曲からおすすめ表示します。
   - ただしオリ曲は、1回(1動画)でもおすすめ候補に含みます。
-  - おすすめ一覧は条件変更でおすすめ表示を離れて戻っても維持され、CSVの再読み込み時に再抽出されます。
+  - おすすめ一覧は条件変更でおすすめ表示を離れて戻っても維持され、曲データの再読み込み時に再抽出されます。
 - 表示テーマを切り替えられます。
   - ダークモード切替に対応します(設定はブラウザに保存されます)。
 - 設定パネルで表示設定と実験的な再生設定を切り替えられます。
@@ -91,7 +91,10 @@ flowchart TD
 
 ## データソース(開発者向けメモ)
 
-- 公開スプレッドシートをCSVとして参照します(`app/config.mjs` の `PUBLIC_CSV_URL` で指定します)。
+- 通常の起動時は、事前生成された `data/songs.json` と `data/songs-meta.json` を優先して読み込みます。
+- `songs-meta.json` の `contentHash` で手元のJSONキャッシュが最新かを確認し、変化がなければ大きい `songs.json` の再取得を避けます。
+- 公開スプレッドシートのCSVは、事前生成JSONの元データかつJSON取得失敗時のフォールバックとして参照します(`app/config.mjs` の `PUBLIC_CSV_URL` で指定します)。
+- `.github/workflows/update-songs-json-and-deploy.yml` は GitHub Actions 上で `npm run build:songs-json` を実行し、`data/songs.json` / `data/songs-meta.json` を更新して Pages へ deploy します。
 - フロントエンドのみで動作します(静的ホスティング想定)。
 - 配布物はHTML/CSS/JavaScriptのみで、実行時にnpm等の同梱依存はありません。
 - サムネイル表示/埋め込み再生まわりでは YouTube Iframe API を動的に利用します。
@@ -104,7 +107,7 @@ flowchart TD
   - ブックマーク保存スキーマ/移行のテスト (`tests/bookmark-storage-schema.test.mjs`)
   - ブックマークUIのテスト (`tests/bookmark-ui.test.mjs`)
   - CSVパースのテスト (`tests/csv-parser.test.mjs`)
-  - 初期データ読み込みとCSVキャッシュのテスト (`tests/data-loader.test.mjs`)
+  - 初期データ読み込み後の状態反映テスト (`tests/data-loader.test.mjs`)
   - DOM補助関数のテスト (`tests/dom-utils.test.mjs`)
   - 検索/日付フィルタ/ブックマーク検索のロジック (`tests/search-date.test.mjs`)
   - フォーマット表示ラベルのテスト (`tests/format-filter.test.mjs`)
@@ -116,6 +119,10 @@ flowchart TD
   - レイアウト補正待機のテスト (`tests/layout-anchor.test.mjs`)
   - 結果一覧スクロール制御のテスト (`tests/results-scroll.test.mjs`)
   - サイドバーUIのテスト (`tests/sidebar-ui.test.mjs`)
+  - 曲データJSONのcontent hash算出テスト (`tests/songs-content-hash.test.mjs`)
+  - 曲データソースのJSON優先読み込み/CSVフォールバック/キャッシュ更新テスト (`tests/songs-data-source.test.mjs`)
+  - 曲データJSONキャッシュのIndexedDB/旧localStorage移行テスト (`tests/songs-json-cache.test.mjs`)
+  - 曲データJSONスキーマのテスト (`tests/songs-json.test.mjs`)
   - ストレージ(ブックマーク上限/リネーム)の単体テスト (`tests/storage-bookmark-limit.test.mjs`)
   - UI設定/ストレージ互換のテスト (`tests/ui-storage-compat.test.mjs`)
   - UI同期のテスト (`tests/ui-sync.test.mjs`)
@@ -139,7 +146,7 @@ flowchart TD
 
 ## 設定の保存について
 
-このツールはサーバへ設定を送信しません。ただし、使い勝手のため以下をブラウザのローカルストレージに保存します。
+このツールはサーバへ設定を送信しません。ただし、使い勝手のため以下をブラウザのローカルストレージまたは IndexedDB に保存します。
 
 - テーマ(ダーク/ライト)。
 - サムネイル表示ON/OFF。
@@ -150,7 +157,8 @@ flowchart TD
 - 検索状態(検索語・絞り込み条件・日付条件)。
 - ブックマーク情報(ブックマーク名・曲の対応/順序・作成日時)。
   - 保存形式は version 付き payload で管理し、旧形式は読み込み後に現行形式へ保存し直します。
-- CSVのキャッシュ(取得失敗時に前回のデータを表示するため)。
+- 曲データJSONのキャッシュ(IndexedDB。旧localStorageキャッシュは読み込み時に移行します)。
+- CSVのキャッシュ(JSON取得失敗時のフォールバックで前回のデータを表示するため)。
 - テーマはローカルストレージを優先し、未設定時のみOSの配色設定に従います。
 
 ブラウザのデータ削除を行うと、これらの保存内容はリセットされます。

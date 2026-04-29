@@ -9,7 +9,8 @@
 
 ## 全体構成
 - 静的フロントエンドのみ（HTML/CSS/JS, ES Modules）
-- データ取得：公開スプレッドシートのCSV
+- データ取得：事前生成JSON（`data/songs.json` / `data/songs-meta.json`）を優先し、公開スプレッドシートのCSVは生成元とフォールバックに使う
+- データ生成/公開：GitHub Actions でCSVからJSONを生成し、Pages artifact を deploy する
 - 実行時の同梱外部ライブラリ依存：なし
 - 埋め込み再生まわりでは YouTube Iframe API を動的に利用
 - 開発時テスト：Node.js 標準 `node:test` と Playwright Chromium smoke を利用
@@ -45,6 +46,10 @@
   - `tests/layout-anchor.test.mjs`
   - `tests/results-scroll.test.mjs`
   - `tests/e2e/youtube-smoke.spec.mjs`
+  - `tests/songs-content-hash.test.mjs`
+  - `tests/songs-data-source.test.mjs`
+  - `tests/songs-json-cache.test.mjs`
+  - `tests/songs-json.test.mjs`
 - 実行コマンド:
   - `node --test tests/*.mjs`
   - `npm run test:e2e`
@@ -88,26 +93,29 @@
   - YouTubeリンク
 
 ## データフロー
-1. CSVを取得（`app/config.mjs` の `PUBLIC_CSV_URL`）
-2. CSVをパースし、`SongRow` に正規化
-3. （ブックマーク選択中なら）ブックマーク内の曲集合を解決
-4. 条件未指定ならおすすめ結果を解決し、通常時は検索条件を取得してフィルタ
-5. 結果一覧を描画し、通常検索/ブックマーク検索時のみ段階表示を有効化
+1. IndexedDB の曲データJSONキャッシュを確認する。
+2. キャッシュがあれば即時表示し、バックグラウンドで `songs-meta.json` の `contentHash` を確認する。
+3. キャッシュがない、または `contentHash` が変わっている場合は `songs.json` を取得し、schema と曲データを検証して保存する。
+4. JSON取得に失敗した場合は、公開CSVまたはCSVキャッシュを取得し、`SongRow` に正規化する。
+5. （ブックマーク選択中なら）ブックマーク内の曲集合を解決する。
+6. 条件未指定ならおすすめ結果を解決し、通常時は検索条件を取得してフィルタする。
+7. 結果一覧を描画し、通常検索/ブックマーク検索時のみ段階表示を有効化する。
 
 ```mermaid
 flowchart TD
-    A[公開CSVを取得] --> B[CSVをパース]
-    B --> C[SongRowへ正規化]
-    C --> D{ブックマーク選択中?}
-    D -- Yes --> E[ブックマーク内の曲集合を解決]
-    D -- No --> F[全曲を対象にする]
-    E --> G{条件未指定?}
-    F --> G
-    G -- Yes --> H[おすすめ結果を解決]
-    G -- No --> I[検索条件でフィルタ]
-    H --> J[結果一覧を描画]
-    I --> J
-    J --> K[段階表示を有効化]
+    A[IndexedDBの曲データJSONキャッシュ確認] --> B{キャッシュあり?}
+    B -- Yes --> C[キャッシュを即時表示]
+    C --> D[songs-meta.jsonのcontentHash確認]
+    B -- No --> E[songs.json取得]
+    D --> F{hash変更あり?}
+    F -- No --> G[表示維持]
+    F -- Yes --> E
+    E --> H{JSON取得成功?}
+    H -- Yes --> I[JSONを検証してSongRow配列を適用しIndexedDB更新]
+    H -- No --> J[公開CSVまたはCSVキャッシュを取得]
+    J --> K[CSVをパースしてSongRowへ正規化]
+    I --> L[検索/ブックマーク/おすすめ/描画]
+    K --> L
 ```
 
 ## データモデル（概要）
@@ -132,7 +140,7 @@ flowchart TD
 
 ## おすすめ表示の方針
 - 条件未指定時におすすめ表示
-- おすすめは CSV を再読み込みするまで固定し、条件変更でおすすめ表示を離脱して戻っても同じ並びを再利用する
+- おすすめは曲データを再読み込みするまで固定し、条件変更でおすすめ表示を離脱して戻っても同じ並びを再利用する
 
 ## おすすめの状態遷移
 
@@ -159,7 +167,7 @@ flowchart TD
 ### 並びの扱い
 - **Recommended 状態は同条件なら固定**
 - **条件を変えて元に戻しても並びは維持**
-- **CSV再読み込み時のみおすすめが再抽出される**
+- **曲データ再読み込み時のみおすすめが再抽出される**
 
 ### 表示の扱い
 - Recommended では「おすすめを表示中」の状態テキストを表示
@@ -177,12 +185,12 @@ stateDiagram-v2
 
 - 図中の「条件変更」は、キーワード入力・日付指定・形態の絞り込み・リレー/ハモリONをまとめた表記。
 - 図中の「条件解除」は、上記の条件をすべて外して未指定に戻すことを指す。
-- CSV再読み込み時はおすすめキャッシュを破棄し、おすすめ一覧を再抽出する。
+- 曲データ再読み込み時はおすすめキャッシュを破棄し、おすすめ一覧を再抽出する。
 
 ## おすすめ抽出の具体ロジック
 
 ### 対象母集団
-- CSVから読み込んだ全曲データ（`data.allSongsRaw`）
+- JSONまたはCSVから読み込んだ全曲データ（`data.allSongsRaw`）
 - ブックマーク未選択かつ、形態/リレー/ハモリ/日付/キーワードの条件がすべて未指定のときのみ「おすすめモード」
 
 ### 除外条件
@@ -193,20 +201,22 @@ stateDiagram-v2
 - 同一曲・同一アーカイブの重複候補は、`archiveOrder` と `sourceIndex` を用いて代表行へ集約する
 
 ### シャッフルタイミング
-- CSVを再読み込みしたタイミングでおすすめを再抽出・再シャッフル
+- 曲データを再読み込みしたタイミングでおすすめを再抽出・再シャッフル
 - 条件を変更しておすすめから離脱→条件を元に戻す場合は、同じおすすめ並びを維持
 
 ### キャッシュの扱い
 - おすすめ一覧は `ui.search.recommendedCache` に保持
 - 条件変更ではキャッシュを破棄しない
-- CSV再読み込み時のみキャッシュを破棄
+- 曲データ再読み込み時のみキャッシュを破棄
 
 ## 関連関数の責務一覧（おすすめ）
+- `createSongsDataSource()`：生成済みJSON、JSONキャッシュ、meta hash、CSVフォールバックをまとめた曲データ取得の入口
+- `createDataLoader()`：取得した曲データを状態へ反映し、検索更新をスケジュールする
+- `applyLoadedSongs()`：曲データ読込後の初期化（おすすめキャッシュのリセット含む）
 - `pickRecommended()`：おすすめ候補の抽出とシャッフル、キャッシュ利用の中心
 - `scheduleSearch()`：検索/絞り込みの実行をデバウンスして呼び出す
 - `search()`：条件取得→フィルタ→表示までの入口
 - `updateDisplay()`：結果のカード表示と「おすすめ/ヒット件数」表示の切替
-- `applyLoadedCsv()`：CSV読込後の初期化（おすすめキャッシュのリセット含む）
 ## 状態管理
 `state`
 - `data`：全曲/結果/表示件数/ブックマーク情報/選択中ブックマーク
@@ -238,15 +248,21 @@ flowchart LR
 - 実験的な機能の表示状態
 - 再生設定（曲の終わりで停止する / 終了後、次の曲を再生 / リピート再生）
   - サムネイル表示OFFまたは実験的な機能が非表示の間は、保存値を保持しつつ実効値はOFFとして扱う
-- CSVキャッシュ
+- CSVキャッシュ（JSON取得失敗時のフォールバック用）
 - 検索条件（キーワード・日付・形態など）
 - ブックマーク情報（ブックマーク名・曲参照/順序・作成日時）
-- ブックマーク保存 payload は `version` を持ち、旧参照形式は CSV 読み込み後に現行の `bookmarkSongKey` へ保存し直す
+- ブックマーク保存 payload は `version` を持ち、旧参照形式は曲データ読み込み後に現行の `bookmarkSongKey` へ保存し直す
+
+IndexedDB保存：
+- 曲データJSONキャッシュ
+  - DB名は `knksongs`、object store は `songsJsonCache`
+  - `songs-meta.json` の `contentHash` と突き合わせ、変化がなければ `songs.json` の再取得を避ける
+  - 旧localStorageの曲データJSONキャッシュは読み込み時に移行し、移行成功後に旧キャッシュを削除する
 
 ## YouTube埋め込み
 - `youtube.com` の標準埋め込みを使用
 - サムネイル表示ON時にクリックで埋め込み再生し、`×` でサムネイルへ戻す
-- `曲の終わりで停止する` がONの場合は CSV の `endSeconds` を埋め込み条件へ反映する
+- `曲の終わりで停止する` がONの場合は曲データの `endSeconds` を埋め込み条件へ反映する
 - 手動再生でカード上端がヘッダー下に隠れる場合は、再生開始後に見える位置まで補正スクロールする
 - 曲名リンクは元の `row.url` を別タブで開く
 - 縦動画はサムネイル時は横レイアウトのまま表示し、埋め込み再生時のみ縦向き表示へ切り替える
@@ -260,7 +276,9 @@ flowchart LR
 - `aria-label` / `aria-modal` / `aria-hidden`
 
 ## パフォーマンス
-- CSVのキャッシュ
+- 曲データJSONをIndexedDBにキャッシュし、初期表示に利用する
+- `songs-meta.json` の content hash で鮮度を確認し、大きい `songs.json` の取得頻度を抑える
+- JSON取得に失敗した場合に備え、CSVもフォールバック用にキャッシュする
 - 段階表示（追加読み込み）
   - 通常検索・ブックマーク検索ともに `INCREMENT_COUNT` 単位で追加表示
 - サムネ遅延読み込み（IntersectionObserver）
@@ -272,4 +290,5 @@ flowchart LR
   - UI/JS変更ごとには上げず、公開反映や配布反映の直前にまとめて値を上げる
 - `app/script.js` から読む ES Modules を更新した場合は、対応する import の `?v=...` も上げる
   - 変更途中は既存値へ揃え、公開時に全体を同じ値へ切り替える
+- `songs.json` / `songs-meta.json` の内容更新だけでは cache buster を上げず、`contentHash` による鮮度確認で反映する
 - 日付入力はセレクト方式（ブラウザ互換性優先）
