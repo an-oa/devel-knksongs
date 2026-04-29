@@ -1,0 +1,62 @@
+name: Update songs json and deploy Pages
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 0,6,12,18 * * *"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: update-songs-json-and-deploy-pages
+  cancel-in-progress: false
+
+jobs:
+  update-and-deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run build:songs-json
+
+      - name: Commit generated songs json
+        run: |
+          if git diff --quiet -- data/songs.json data/songs-meta.json; then
+            echo "No generated changes"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add data/songs.json data/songs-meta.json
+            git commit -m "chore: update generated songs json" -m "- 公開CSVから songs.json と songs-meta.json を再生成した。"
+            git push
+          fi
+
+      - name: Prepare Pages artifact
+        run: |
+          rm -rf _site
+          mkdir -p _site/data
+          cp index.html styles.css ogp.png _site/
+          cp -R app _site/
+          cp data/songs.json data/songs-meta.json _site/data/
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - uses: actions/deploy-pages@v4
