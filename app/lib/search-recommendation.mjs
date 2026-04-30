@@ -3,7 +3,7 @@ import {
     isShortFormat,
     isStreamFormat,
     isUtamitaEquivalentFormat
-} from "./search-filters.mjs?v=15";
+} from "./search-filters.mjs?v=16";
 
 /**
  * おすすめ表示に使う曲一覧を抽選して返す。

@@ -18,39 +18,39 @@ import {
     data,
     ui,
     youtube
-} from "./state.mjs?v=15";
+} from "./state.mjs?v=16";
 import {
     PUBLIC_SONGS_JSON_URL,
     PUBLIC_SONGS_META_URL,
     PUBLIC_CSV_URL,
     SONGS_JSON_CACHE_KEY,
     CSV_CACHE_KEY
-} from "./config.mjs?v=15";
-import { createSearchController } from "./controllers/search.mjs?v=15";
-import { createRenderController } from "./controllers/render.mjs?v=15";
-import { createPlaybackSessionController } from "./controllers/playback-session.mjs?v=15";
-import { createPlaybackSettingsController } from "./controllers/playback-settings.mjs?v=15";
-import { createYoutubeController, extractYoutubeInfo } from "./controllers/youtube.mjs?v=15";
-import { createStorageController } from "./controllers/storage.mjs?v=15";
-import { createBookmarkUiController } from "./ui/bookmark/ui.mjs?v=15";
-import { scrollResultListToTop } from "./lib/results-scroll.mjs?v=15";
-import { getFormatFilterLabel } from "./lib/format-filter.mjs?v=15";
+} from "./config.mjs?v=16";
+import { createSearchController } from "./controllers/search.mjs?v=16";
+import { createRenderController } from "./controllers/render.mjs?v=16";
+import { createPlaybackSessionController } from "./controllers/playback-session.mjs?v=16";
+import { createPlaybackSettingsController } from "./controllers/playback-settings.mjs?v=16";
+import { createYoutubeController, extractYoutubeInfo } from "./controllers/youtube.mjs?v=16";
+import { createStorageController } from "./controllers/storage.mjs?v=16";
+import { createBookmarkUiController } from "./ui/bookmark/ui.mjs?v=16";
+import { scrollResultListToTop } from "./lib/results-scroll.mjs?v=16";
+import { getFormatFilterLabel } from "./lib/format-filter.mjs?v=16";
 import {
     collectUiElements,
     applyThemeFromStorage,
     setupTheme,
     initFilterMenu
-} from "./ui/core/elements.mjs?v=15";
-import { createUiSyncController } from "./ui/core/sync.mjs?v=15";
-import { createDataLoader } from "./ui/core/data.mjs?v=15";
-import { createSidebarController } from "./ui/sidebar/ui.mjs?v=15";
-import { getDateUiState, getSearchUiState } from "./lib/ui-slices.mjs?v=15";
-import { debugPlayback } from "./lib/playback-debug.mjs?v=15";
+} from "./ui/core/elements.mjs?v=16";
+import { createUiSyncController } from "./ui/core/sync.mjs?v=16";
+import { createDataLoader } from "./ui/core/data.mjs?v=16";
+import { createSidebarController } from "./ui/sidebar/ui.mjs?v=16";
+import { getDateUiState, getSearchUiState } from "./lib/ui-slices.mjs?v=16";
+import { debugPlayback } from "./lib/playback-debug.mjs?v=16";
 import {
     createIndexedDbSongsJsonCacheStore,
     createLegacyLocalStorageSongsJsonCacheAdapter
-} from "./lib/storage/songs-json-cache.mjs?v=15";
-import { createSongsDataSource } from "./lib/songs-data-source.mjs?v=15";
+} from "./lib/storage/songs-json-cache.mjs?v=16";
+import { createSongsDataSource } from "./lib/songs-data-source.mjs?v=16";
 
 /**
  * @typedef {Object} SongRow
