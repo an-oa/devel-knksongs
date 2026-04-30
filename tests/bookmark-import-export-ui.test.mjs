@@ -23,6 +23,10 @@ test("bookmark import export ui: maps import results to user-facing messages", (
         "インポートできるブックマークは最大20件です。"
     );
     assert.equal(
+        getBookmarkImportErrorMessage({ ok: false, reason: "max_bookmark_name_length", limit: 64 }),
+        "ブックマーク名は最大64文字までです。"
+    );
+    assert.equal(
         getBookmarkImportErrorMessage({
             ok: false,
             reason: "max_songs_per_bookmark",

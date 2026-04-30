@@ -10,6 +10,7 @@ export const BOOKMARK_STORAGE_KEY = "bookmarksV1";
 export const BOOKMARK_STORAGE_VERSION = 2;
 export const MAX_BOOKMARK_COUNT = 20;
 export const MAX_SONGS_PER_BOOKMARK = 120;
+export const MAX_BOOKMARK_NAME_LENGTH = 64;
 // Paint preview/フォーム復元の後追い対策で複数回同期する。
 export const UI_SYNC_PASSES = 2;
 export const SEARCH_DEBOUNCE_MS = 200;

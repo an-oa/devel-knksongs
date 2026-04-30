@@ -23,7 +23,8 @@ export function createStorageController({ data, ui, constants, callbacks }) {
         BOOKMARK_STORAGE_KEY,
         BOOKMARK_STORAGE_VERSION = 1,
         MAX_BOOKMARK_COUNT = Number.POSITIVE_INFINITY,
-        MAX_SONGS_PER_BOOKMARK = Number.POSITIVE_INFINITY
+        MAX_SONGS_PER_BOOKMARK = Number.POSITIVE_INFINITY,
+        MAX_BOOKMARK_NAME_LENGTH = Number.POSITIVE_INFINITY
     } = constants;
     const {
         getDateSelectValue,
@@ -112,6 +113,21 @@ export function createStorageController({ data, ui, constants, callbacks }) {
     }
 
     /**
+     * ブックマーク名を検証し、保存用に前後空白を除いた文字列を返す。
+     * @param {*} bookmarkName
+     * @returns {{ ok: boolean, name?: string, reason?: string, limit?: number }}
+     */
+    function validateBookmarkName(bookmarkName) {
+        if (typeof bookmarkName !== "string") return buildActionFail("invalid_name_type");
+        const trimmedName = bookmarkName.trim();
+        if (!trimmedName) return buildActionFail("empty_name");
+        if (trimmedName.length > MAX_BOOKMARK_NAME_LENGTH) {
+            return buildActionFail("max_bookmark_name_length", { limit: MAX_BOOKMARK_NAME_LENGTH });
+        }
+        return buildActionOk({ name: trimmedName });
+    }
+
+    /**
      * インポート候補の JSON 文字列を解析し、全置き換え可能なブックマーク情報に整える。
      * @param {*} text
      * @returns {{ ok: boolean, reason?: string, bookmarks?: Record<string, *>, bookmarkCount?: number, songCount?: number, limit?: number, bookmarkName?: string }}
@@ -120,7 +136,8 @@ export function createStorageController({ data, ui, constants, callbacks }) {
         return parseBookmarkImportJsonText(text, {
             songRows: data.allSongsRaw,
             maxBookmarkCount: MAX_BOOKMARK_COUNT,
-            maxSongsPerBookmark: MAX_SONGS_PER_BOOKMARK
+            maxSongsPerBookmark: MAX_SONGS_PER_BOOKMARK,
+            maxBookmarkNameLength: MAX_BOOKMARK_NAME_LENGTH
         });
     }
 
@@ -275,13 +292,12 @@ export function createStorageController({ data, ui, constants, callbacks }) {
         if (Object.keys(data.bookmarks).length >= MAX_BOOKMARK_COUNT) {
             return buildActionFail("max_bookmark_count", { limit: MAX_BOOKMARK_COUNT });
         }
-        if (typeof bookmarkName !== "string") return buildActionFail("invalid_name_type");
-        const trimmedName = bookmarkName.trim();
-        if (!trimmedName) return buildActionFail("empty_name");
+        const nameValidation = validateBookmarkName(bookmarkName);
+        if (!nameValidation.ok) return nameValidation;
         const now = Date.now();
         const newId = `p_${now}`;
         data.bookmarks[newId] = {
-            name: trimmedName,
+            name: nameValidation.name,
             songs: Array.isArray(initialSongs) ? initialSongs.slice() : [],
             createdAt: now
         };
@@ -333,16 +349,14 @@ export function createStorageController({ data, ui, constants, callbacks }) {
     function renameBookmark(bookmarkId, newName) {
         const bookmark = data.bookmarks[bookmarkId];
         if (!bookmark) return buildActionFail("bookmark_not_found");
-        if (typeof newName !== "string") return buildActionFail("invalid_name_type");
+        const nameValidation = validateBookmarkName(newName);
+        if (!nameValidation.ok) return nameValidation;
 
-        const trimmedName = newName.trim();
-        if (!trimmedName) return buildActionFail("empty_name");
-
-        if (bookmark.name === trimmedName) {
+        if (bookmark.name === nameValidation.name) {
             return buildActionOk({ changed: false });
         }
 
-        bookmark.name = trimmedName;
+        bookmark.name = nameValidation.name;
         saveBookmarks();
         renderBookmarks();
         if (data.activeBookmark === bookmarkId) {

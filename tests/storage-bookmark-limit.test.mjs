@@ -21,7 +21,13 @@ function createFakeLocalStorage() {
     };
 }
 
-function setupStorageController({ bookmarks, activeBookmark, maxBookmarkCount, maxSongsPerBookmark }) {
+function setupStorageController({
+    bookmarks,
+    activeBookmark,
+    maxBookmarkCount,
+    maxSongsPerBookmark,
+    maxBookmarkNameLength
+}) {
     let renderCount = 0;
     let scheduleCount = 0;
     const data = {
@@ -42,7 +48,8 @@ function setupStorageController({ bookmarks, activeBookmark, maxBookmarkCount, m
             BOOKMARK_STORAGE_KEY: "bookmarksTest",
             BOOKMARK_STORAGE_VERSION: 2,
             MAX_BOOKMARK_COUNT: maxBookmarkCount,
-            MAX_SONGS_PER_BOOKMARK: maxSongsPerBookmark
+            MAX_SONGS_PER_BOOKMARK: maxSongsPerBookmark,
+            MAX_BOOKMARK_NAME_LENGTH: maxBookmarkNameLength
         },
         callbacks: {
             getDateSelectValue: () => "",
@@ -125,6 +132,38 @@ test("loadBookmarks: invalid bookmark payload is sanitized and deduplicated", ()
             }
         });
         assert.equal(getRenderCount(), 1);
+    } finally {
+        globalThis.localStorage = prevLocalStorage;
+        restoreDom();
+    }
+});
+
+test("loadBookmarks: existing long bookmark names are preserved", () => {
+    const restoreDom = installFakeDom();
+    const prevLocalStorage = globalThis.localStorage;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        const longName = "長".repeat(65);
+        const { controller, data } = setupStorageController({
+            bookmarks: {},
+            maxBookmarkCount: 20,
+            maxSongsPerBookmark: 120,
+            maxBookmarkNameLength: 64
+        });
+        globalThis.localStorage.setItem("bookmarksTest", JSON.stringify({
+            version: 2,
+            bookmarks: {
+                keep: {
+                    name: longName,
+                    songs: ["song-1"],
+                    createdAt: 1710000000000
+                }
+            }
+        }));
+
+        controller.loadBookmarks();
+
+        assert.equal(data.bookmarks.keep.name, longName);
     } finally {
         globalThis.localStorage = prevLocalStorage;
         restoreDom();
@@ -279,6 +318,44 @@ test("importBookmarksFromJsonText: replaces current bookmarks and clears missing
             version: 2,
             bookmarks: data.bookmarks
         });
+    } finally {
+        globalThis.localStorage = prevLocalStorage;
+    }
+});
+
+test("importBookmarksFromJsonText: rejects bookmark names over the configured limit", () => {
+    const prevLocalStorage = globalThis.localStorage;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        const { controller, data, getRenderCount, getScheduleCount } = setupStorageController({
+            bookmarks: {
+                old: { name: "Old", songs: ["old-song"], createdAt: 1 }
+            },
+            activeBookmark: "old",
+            maxBookmarkCount: 20,
+            maxSongsPerBookmark: 120,
+            maxBookmarkNameLength: 64
+        });
+
+        const result = controller.importBookmarksFromJsonText(JSON.stringify({
+            version: 2,
+            bookmarks: {
+                imported: {
+                    name: "A".repeat(65),
+                    songs: ["song-1"],
+                    createdAt: 2
+                }
+            }
+        }));
+
+        assert.equal(result.ok, false);
+        assert.equal(result.reason, "max_bookmark_name_length");
+        assert.equal(result.limit, 64);
+        assert.deepEqual(data.bookmarks, {
+            old: { name: "Old", songs: ["old-song"], createdAt: 1 }
+        });
+        assert.equal(getRenderCount(), 0);
+        assert.equal(getScheduleCount(), 0);
     } finally {
         globalThis.localStorage = prevLocalStorage;
     }
@@ -557,6 +634,30 @@ test("createBookmark: succeeds under limit and creates empty bookmark", () => {
     }
 });
 
+test("createBookmark: rejects names over the configured limit", () => {
+    const prevLocalStorage = globalThis.localStorage;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        const { controller, data, getRenderCount, getScheduleCount } = setupStorageController({
+            bookmarks: {},
+            maxBookmarkCount: 20,
+            maxSongsPerBookmark: 120,
+            maxBookmarkNameLength: 64
+        });
+
+        const result = controller.createBookmark("A".repeat(65));
+
+        assert.equal(result.ok, false);
+        assert.equal(result.reason, "max_bookmark_name_length");
+        assert.equal(result.limit, 64);
+        assert.deepEqual(data.bookmarks, {});
+        assert.equal(getRenderCount(), 0);
+        assert.equal(getScheduleCount(), 0);
+    } finally {
+        globalThis.localStorage = prevLocalStorage;
+    }
+});
+
 test("addSongToBookmark: rejects when per-bookmark song limit is reached", () => {
     const prevLocalStorage = globalThis.localStorage;
     globalThis.localStorage = createFakeLocalStorage();
@@ -626,6 +727,33 @@ test("renameBookmark: rejects invalid input and keeps state unchanged", () => {
         assert.equal(emptyNameResult.ok, false);
         assert.equal(emptyNameResult.reason, "empty_name");
 
+        assert.equal(data.bookmarks.b1.name, "A");
+        assert.equal(getRenderCount(), 0);
+        assert.equal(getScheduleCount(), 0);
+    } finally {
+        globalThis.localStorage = prevLocalStorage;
+    }
+});
+
+test("renameBookmark: rejects names over the configured limit", () => {
+    const prevLocalStorage = globalThis.localStorage;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        const { controller, data, getRenderCount, getScheduleCount } = setupStorageController({
+            bookmarks: {
+                b1: { name: "A", songs: ["s1"], createdAt: 1 }
+            },
+            activeBookmark: "b1",
+            maxBookmarkCount: 20,
+            maxSongsPerBookmark: 120,
+            maxBookmarkNameLength: 64
+        });
+
+        const result = controller.renameBookmark("b1", "B".repeat(65));
+
+        assert.equal(result.ok, false);
+        assert.equal(result.reason, "max_bookmark_name_length");
+        assert.equal(result.limit, 64);
         assert.equal(data.bookmarks.b1.name, "A");
         assert.equal(getRenderCount(), 0);
         assert.equal(getScheduleCount(), 0);

@@ -8,6 +8,7 @@ import {
     BOOKMARK_STORAGE_VERSION,
     MAX_BOOKMARK_COUNT,
     MAX_SONGS_PER_BOOKMARK,
+    MAX_BOOKMARK_NAME_LENGTH,
     UI_SYNC_PASSES,
     SEARCH_DEBOUNCE_MS,
     YT_IFRAME_API_SRC,
@@ -170,7 +171,8 @@ const storageController = createStorageController({
         BOOKMARK_STORAGE_KEY,
         BOOKMARK_STORAGE_VERSION,
         MAX_BOOKMARK_COUNT,
-        MAX_SONGS_PER_BOOKMARK
+        MAX_SONGS_PER_BOOKMARK,
+        MAX_BOOKMARK_NAME_LENGTH
     },
     callbacks: {
         getDateSelectValue: (kind) => searchController.getDateSelectValue(kind),

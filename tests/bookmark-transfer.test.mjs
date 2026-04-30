@@ -63,7 +63,8 @@ test("bookmark transfer: rejects invalid JSON and import files over limits", () 
             { songKey: "s2", bookmarkSongKey: "s2" }
         ],
         maxBookmarkCount: 1,
-        maxSongsPerBookmark: 1
+        maxSongsPerBookmark: 1,
+        maxBookmarkNameLength: 64
     };
 
     assert.deepEqual(parseBookmarkImportText("{", options), {
@@ -95,5 +96,15 @@ test("bookmark transfer: rejects invalid JSON and import files over limits", () 
         reason: "max_songs_per_bookmark",
         limit: 1,
         bookmarkName: "A"
+    });
+    assert.deepEqual(parseBookmarkImportText(JSON.stringify({
+        version: 2,
+        bookmarks: {
+            b1: { name: "A".repeat(65), songs: ["s1"], createdAt: 1 }
+        }
+    }), options), {
+        ok: false,
+        reason: "max_bookmark_name_length",
+        limit: 64
     });
 });

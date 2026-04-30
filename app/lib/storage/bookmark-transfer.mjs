@@ -35,9 +35,9 @@ function countBookmarkSongs(bookmarks) {
 }
 
 /**
- * ブックマーク数と各ブックマーク内の曲数が上限内かを確認する。
+ * ブックマーク数、名前の長さ、各ブックマーク内の曲数が上限内かを確認する。
  * @param {Record<string, { name: string, songs: Array<*> }>} bookmarks
- * @param {{ maxBookmarkCount?: number, maxSongsPerBookmark?: number }} limits
+ * @param {{ maxBookmarkCount?: number, maxSongsPerBookmark?: number, maxBookmarkNameLength?: number }} limits
  * @returns {{ ok: boolean, reason?: string, limit?: number, bookmarkName?: string }}
  */
 export function validateBookmarkImportLimits(bookmarks, limits) {
@@ -47,11 +47,17 @@ export function validateBookmarkImportLimits(bookmarks, limits) {
     const maxSongsPerBookmark = Number.isFinite(limits && limits.maxSongsPerBookmark)
         ? limits.maxSongsPerBookmark
         : Number.POSITIVE_INFINITY;
+    const maxBookmarkNameLength = Number.isFinite(limits && limits.maxBookmarkNameLength)
+        ? limits.maxBookmarkNameLength
+        : Number.POSITIVE_INFINITY;
     const bookmarkEntries = Object.entries(bookmarks);
     if (bookmarkEntries.length > maxBookmarkCount) {
         return buildActionFail("max_bookmark_count", { limit: maxBookmarkCount });
     }
     for (const [, bookmark] of bookmarkEntries) {
+        if (typeof bookmark.name === "string" && bookmark.name.length > maxBookmarkNameLength) {
+            return buildActionFail("max_bookmark_name_length", { limit: maxBookmarkNameLength });
+        }
         const songs = Array.isArray(bookmark.songs) ? bookmark.songs : [];
         if (songs.length > maxSongsPerBookmark) {
             return buildActionFail("max_songs_per_bookmark", {
@@ -69,7 +75,8 @@ export function validateBookmarkImportLimits(bookmarks, limits) {
  * @param {{
  *   songRows?: Array<*>,
  *   maxBookmarkCount?: number,
- *   maxSongsPerBookmark?: number
+ *   maxSongsPerBookmark?: number,
+ *   maxBookmarkNameLength?: number
  * }} options
  * @returns {{ ok: boolean, reason?: string, bookmarks?: Record<string, *>, bookmarkCount?: number, songCount?: number, limit?: number, bookmarkName?: string }}
  */

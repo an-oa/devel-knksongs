@@ -82,6 +82,13 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
             alert("ブックマーク名を入力してください。");
             return true;
         }
+        if (result.reason === "max_bookmark_name_length") {
+            const limit = Number.isFinite(result.limit) ? result.limit : null;
+            alert(limit === null
+                ? "ブックマーク名の文字数上限を超えています。"
+                : `ブックマーク名は最大${limit}文字までです。`);
+            return true;
+        }
         if (result.reason === "bookmark_not_found") {
             alert("ブックマークが見つかりません。画面を更新して再度お試しください。");
             return true;
@@ -338,7 +345,9 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
                 `;
             }
 
-            item.querySelector(".bookmark-item-name").textContent = bookmark.name;
+            const nameEl = item.querySelector(".bookmark-item-name");
+            nameEl.textContent = bookmark.name;
+            nameEl.title = bookmark.name;
 
             if (!addingMode && data.activeBookmark === id) {
                 item.classList.add("active");
@@ -422,6 +431,14 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
         }
         if (result.reason === "empty_name") {
             showBookmarkPanelError("ブックマーク名を入力してください。");
+            nameInput.focus();
+            return;
+        }
+        if (result.reason === "max_bookmark_name_length") {
+            const limit = Number.isFinite(result.limit) ? result.limit : null;
+            showBookmarkPanelError(limit === null
+                ? "ブックマーク名の文字数上限を超えています。"
+                : `ブックマーク名は最大${limit}文字までです。`);
             nameInput.focus();
             return;
         }

@@ -100,6 +100,12 @@ export function getBookmarkImportErrorMessage(result) {
             ? "インポートできるブックマーク数の上限を超えています。"
             : `インポートできるブックマークは最大${limit}件です。`;
     }
+    if (result.reason === "max_bookmark_name_length") {
+        const limit = Number.isFinite(result.limit) ? result.limit : null;
+        return limit === null
+            ? "インポートできるブックマーク名の文字数上限を超えています。"
+            : `ブックマーク名は最大${limit}文字までです。`;
+    }
     if (result.reason === "max_songs_per_bookmark") {
         const limit = Number.isFinite(result.limit) ? result.limit : null;
         const name = typeof result.bookmarkName === "string" && result.bookmarkName
