@@ -22,29 +22,48 @@ test.beforeEach(async ({ page }) => {
     await waitForInitialLoad(page);
 });
 
-test("settings shows experimental playback toggle only when thumbnails are enabled", async ({ page }) => {
+test("settings keeps experimental playback toggle hidden while console state remains available", async ({ page }) => {
     await openSettingsPanel(page);
 
     const thumbnailSwitch = page.locator("#thumbnail-toggle").locator("xpath=ancestor::label[1]");
     const experimentalToggleSection = page.locator("#experimental-playback-toggle-section");
     const experimentalToggle = page.locator("#experimental-playback-toggle");
+    const playbackSettingsGroup = page.locator("#playback-settings-group");
     const themeSwitch = page.locator("#theme-toggle").locator("xpath=ancestor::label[1]");
 
     await expect(themeSwitch).toBeVisible();
     await expect(experimentalToggleSection).toBeHidden();
     await expect(experimentalToggle).toBeDisabled();
-
-    await thumbnailSwitch.click();
-
-    await expect(themeSwitch).toBeVisible();
-    await expect(experimentalToggleSection).toBeVisible();
-    await expect(experimentalToggle).toBeEnabled();
+    await expect(playbackSettingsGroup).toBeHidden();
 
     await thumbnailSwitch.click();
 
     await expect(themeSwitch).toBeVisible();
     await expect(experimentalToggleSection).toBeHidden();
     await expect(experimentalToggle).toBeDisabled();
+
+    await page.evaluate(() => {
+        window.knkPlaybackSettings.showExperimentalPlaybackSettings = true;
+    });
+
+    await expect(experimentalToggleSection).toBeHidden();
+    await expect(experimentalToggle).toBeDisabled();
+    await expect(playbackSettingsGroup).toBeVisible();
+
+    await page.evaluate(() => {
+        window.dispatchEvent(new Event("focus"));
+    });
+
+    await expect(playbackSettingsGroup).toBeVisible();
+    await expect(experimentalToggleSection).toBeHidden();
+    await expect(experimentalToggle).toBeDisabled();
+
+    await thumbnailSwitch.click();
+
+    await expect(themeSwitch).toBeVisible();
+    await expect(experimentalToggleSection).toBeHidden();
+    await expect(experimentalToggle).toBeDisabled();
+    await expect(playbackSettingsGroup).toBeHidden();
 });
 
 test("manual playback mounts an iframe from the thumbnail", async ({ page }) => {

@@ -2,9 +2,30 @@ import { getPlaybackUiState, getSearchUiState } from "../lib/ui-slices.mjs?v=16"
 
 const THUMBNAIL_STORAGE_KEY = "showThumbnails";
 const EXPERIMENTAL_PLAYBACK_SETTINGS_STORAGE_KEY = "showExperimentalPlaybackSettings";
+const EXPERIMENTAL_PLAYBACK_SETTINGS_HIDDEN_RESET_STORAGE_KEY = "showExperimentalPlaybackSettingsHiddenResetV1";
 const STOP_AT_END_TIME_STORAGE_KEY = "stopAtEndTime";
 const CONTINUOUS_PLAYBACK_STORAGE_KEY = "continuousPlayback";
 const LOOP_PLAYBACK_STORAGE_KEY = "loopPlayback";
+const LEGACY_PLAYBACK_SETTINGS_STORAGE_KEYS = [
+    EXPERIMENTAL_PLAYBACK_SETTINGS_STORAGE_KEY,
+    EXPERIMENTAL_PLAYBACK_SETTINGS_HIDDEN_RESET_STORAGE_KEY,
+    STOP_AT_END_TIME_STORAGE_KEY,
+    CONTINUOUS_PLAYBACK_STORAGE_KEY,
+    LOOP_PLAYBACK_STORAGE_KEY
+];
+const PLAYBACK_SETTING_SCOPES = {
+    PERSISTED: "persisted",
+    PAGE: "page"
+};
+const PLAYBACK_SETTING_KINDS = {
+    VISIBILITY: "visibility",
+    BEHAVIOR: "behavior"
+};
+const INITIAL_PLAYBACK_SETTING_VALUES = {
+    stopAtEndTime: true,
+    continuousPlayback: false,
+    loopPlayback: false
+};
 
 /**
  * 再生設定の保存値反映とトグル配線を扱うコントローラーを作成する。
@@ -17,19 +38,20 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
     const restoreActivePlayback = callbacks.restoreActivePlayback;
     const updateDisplay = callbacks.updateDisplay;
     const setupScrollObserver = callbacks.setupScrollObserver;
+    let didApplyInitialPlaybackSettingValues = false;
+    const playbackBehaviorPageValues = new Map();
 
     /**
-     * 実験的な機能トグルの表示状態を切り替える。
-     * @param {boolean} value
+     * 実験的な機能トグルを通常 UI から隠す。
      */
-    function syncExperimentalPlaybackToggleVisibility(value) {
+    function hideExperimentalPlaybackToggle() {
         const experimentalToggleSection = ui.el.experimentalPlaybackToggleSection;
         if (experimentalToggleSection) {
-            experimentalToggleSection.hidden = !value;
-            experimentalToggleSection.setAttribute("aria-hidden", value ? "false" : "true");
+            experimentalToggleSection.hidden = true;
+            experimentalToggleSection.setAttribute("aria-hidden", "true");
         }
         const experimentalToggle = ui.el.experimentalPlaybackToggle;
-        if (experimentalToggle) experimentalToggle.disabled = !value;
+        if (experimentalToggle) experimentalToggle.disabled = true;
     }
 
     /**
@@ -41,12 +63,24 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
     }
 
     /**
+     * 非表示にする再生設定内にフォーカスがある場合は設定パネルの戻るボタンへ移す。
+     * @param {HTMLElement | null} playbackSettingsGroup
+     */
+    function moveFocusBeforeHidingPlaybackSettings(playbackSettingsGroup) {
+        if (!playbackSettingsGroup || playbackSettingsGroup.hidden) return;
+        if (!playbackSettingsGroup.contains(document.activeElement)) return;
+        const closeSettingsPanelBtn = ui.el.closeSettingsPanelBtn;
+        if (closeSettingsPanelBtn) closeSettingsPanelBtn.focus();
+    }
+
+    /**
      * 実験的な再生セクションの表示状態を切り替える。
      */
     function syncExperimentalPlaybackVisibility() {
         const value = isExperimentalPlaybackSettingsEffective();
         const playbackSettingsGroup = ui.el.playbackSettingsGroup;
         if (!playbackSettingsGroup) return;
+        if (!value) moveFocusBeforeHidingPlaybackSettings(playbackSettingsGroup);
         playbackSettingsGroup.hidden = !value;
         playbackSettingsGroup.setAttribute("aria-hidden", value ? "false" : "true");
     }
@@ -60,6 +94,31 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
     function loadStoredBoolean(key, defaultValue) {
         const savedSetting = localStorage.getItem(key);
         return savedSetting !== null ? (savedSetting === "true") : Boolean(defaultValue);
+    }
+
+    /**
+     * 旧バージョンで保存していた再生設定を削除する。
+     */
+    function removeLegacyPlaybackSettingsStorage() {
+        for (const key of LEGACY_PLAYBACK_SETTINGS_STORAGE_KEYS) {
+            localStorage.removeItem(key);
+        }
+    }
+
+    /**
+     * ページロード直後の再生設定をページ内だけの固定値で初期化する。
+     */
+    function applyInitialPlaybackSettingValuesIfNeeded() {
+        if (didApplyInitialPlaybackSettingValues) return;
+        didApplyInitialPlaybackSettingValues = true;
+        for (const definition of playbackBehaviorDefinitions) {
+            playbackBehaviorPageValues.set(definition.stateKey, Boolean(definition.defaultValue));
+            const nextValue = getPlaybackBehaviorEffectiveValue(
+                definition,
+                isExperimentalPlaybackSettingsEffective()
+            );
+            applyPlaybackDefinitionValue(definition, nextValue, "afterStorageApply");
+        }
     }
 
     /**
@@ -90,12 +149,24 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
         }
     }
 
-    const experimentalDefinitions = [
+    /**
+     * ページ内だけで保持する再生挙動設定かを返す。
+     * @param {*} definition
+     * @returns {boolean}
+     */
+    function isPagePlaybackBehaviorDefinition(definition) {
+        return definition.scope === PLAYBACK_SETTING_SCOPES.PAGE
+            && definition.kind === PLAYBACK_SETTING_KINDS.BEHAVIOR;
+    }
+
+    const playbackBehaviorDefinitions = [
         {
+            scope: PLAYBACK_SETTING_SCOPES.PAGE,
+            kind: PLAYBACK_SETTING_KINDS.BEHAVIOR,
             stateKey: "stopAtEndTime",
             elementKey: "endTimeToggle",
-            storageKey: STOP_AT_END_TIME_STORAGE_KEY,
-            defaultValue: false,
+            defaultValue: INITIAL_PLAYBACK_SETTING_VALUES.stopAtEndTime,
+            effectiveWhenHidden: true,
             afterStorageApply(previousValue, nextValue) {
                 if (previousValue !== nextValue) restoreActivePlayback();
             },
@@ -104,18 +175,35 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
             }
         },
         {
+            scope: PLAYBACK_SETTING_SCOPES.PAGE,
+            kind: PLAYBACK_SETTING_KINDS.BEHAVIOR,
             stateKey: "continuousPlayback",
             elementKey: "continuousPlaybackToggle",
-            storageKey: CONTINUOUS_PLAYBACK_STORAGE_KEY,
-            defaultValue: false
+            defaultValue: INITIAL_PLAYBACK_SETTING_VALUES.continuousPlayback,
+            hiddenValue: false
         },
         {
+            scope: PLAYBACK_SETTING_SCOPES.PAGE,
+            kind: PLAYBACK_SETTING_KINDS.BEHAVIOR,
             stateKey: "loopPlayback",
             elementKey: "loopPlaybackToggle",
-            storageKey: LOOP_PLAYBACK_STORAGE_KEY,
-            defaultValue: false
+            defaultValue: INITIAL_PLAYBACK_SETTING_VALUES.loopPlayback,
+            hiddenValue: false
         }
     ];
+
+    /**
+     * 表示状態に応じた再生設定の実効値を返す。
+     * @param {*} definition
+     * @param {boolean} experimentalEnabled
+     * @returns {boolean}
+     */
+    function getPlaybackBehaviorEffectiveValue(definition, experimentalEnabled) {
+        if (experimentalEnabled || definition.effectiveWhenHidden) {
+            return Boolean(playbackBehaviorPageValues.get(definition.stateKey));
+        }
+        return Boolean(definition.hiddenValue);
+    }
 
     /**
      * 実験設定の表示状態に応じて、隠し設定の実効値を反映する。
@@ -123,54 +211,68 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
      */
     function applyExperimentalPlaybackSettingValues(hookName) {
         const experimentalEnabled = isExperimentalPlaybackSettingsEffective();
-        for (const definition of experimentalDefinitions) {
-            const nextValue = experimentalEnabled
-                ? loadStoredBoolean(definition.storageKey, definition.defaultValue)
-                : false;
+        for (const definition of playbackBehaviorDefinitions) {
+            const nextValue = getPlaybackBehaviorEffectiveValue(definition, experimentalEnabled);
             applyPlaybackDefinitionValue(definition, nextValue, hookName);
         }
     }
 
-    const definitions = [
-        {
-            stateKey: "showThumbnails",
-            elementKey: "thumbToggle",
-            storageKey: THUMBNAIL_STORAGE_KEY,
-            defaultValue: false,
-            syncValue(value) {
-                document.body.classList.toggle("hide-thumbs", !value);
-                syncExperimentalPlaybackToggleVisibility(value);
-                syncExperimentalPlaybackVisibility();
-                ensureThumbnailPlaybackReady();
-            },
-            afterStorageApply(previousValue, nextValue) {
-                if (previousValue === nextValue || !searchUi.dataReady) return;
-                updateDisplay();
-                setupScrollObserver();
-            },
-            afterToggleChange() {
-                updateDisplay();
-                setupScrollObserver();
-                applyExperimentalPlaybackSettingValues("afterToggleChange");
-            }
+    const experimentalPlaybackVisibilityDefinition = {
+        scope: PLAYBACK_SETTING_SCOPES.PAGE,
+        kind: PLAYBACK_SETTING_KINDS.VISIBILITY,
+        stateKey: "showExperimentalPlaybackSettings",
+        elementKey: "experimentalPlaybackToggle",
+        defaultValue: false,
+        syncValue() {
+            syncExperimentalPlaybackVisibility();
         },
-        {
-            stateKey: "showExperimentalPlaybackSettings",
-            elementKey: "experimentalPlaybackToggle",
-            storageKey: EXPERIMENTAL_PLAYBACK_SETTINGS_STORAGE_KEY,
-            defaultValue: false,
-            syncValue(value) {
-                syncExperimentalPlaybackVisibility();
-            },
-            afterStorageApply() {
-                applyExperimentalPlaybackSettingValues("afterStorageApply");
-            },
-            afterToggleChange() {
-                applyExperimentalPlaybackSettingValues("afterToggleChange");
-            }
+        afterStorageApply() {
+            applyExperimentalPlaybackSettingValues("afterStorageApply");
         },
-        ...experimentalDefinitions
+        afterToggleChange() {
+            applyExperimentalPlaybackSettingValues("afterToggleChange");
+        }
+    };
+
+    const thumbnailVisibilityDefinition = {
+        scope: PLAYBACK_SETTING_SCOPES.PERSISTED,
+        kind: PLAYBACK_SETTING_KINDS.VISIBILITY,
+        interactive: true,
+        stateKey: "showThumbnails",
+        elementKey: "thumbToggle",
+        storageKey: THUMBNAIL_STORAGE_KEY,
+        defaultValue: false,
+        syncValue(value) {
+            document.body.classList.toggle("hide-thumbs", !value);
+            hideExperimentalPlaybackToggle();
+            syncExperimentalPlaybackVisibility();
+            ensureThumbnailPlaybackReady();
+        },
+        afterStorageApply(previousValue, nextValue) {
+            if (previousValue === nextValue || !searchUi.dataReady) return;
+            updateDisplay();
+            setupScrollObserver();
+        },
+        afterToggleChange() {
+            updateDisplay();
+            setupScrollObserver();
+            applyExperimentalPlaybackSettingValues("afterToggleChange");
+        }
+    };
+
+    const playbackSettingDefinitions = [
+        thumbnailVisibilityDefinition,
+        experimentalPlaybackVisibilityDefinition,
+        ...playbackBehaviorDefinitions
     ];
+
+    const persistedDefinitions = playbackSettingDefinitions.filter((definition) => (
+        definition.scope === PLAYBACK_SETTING_SCOPES.PERSISTED
+    ));
+
+    const interactiveToggleDefinitions = playbackSettingDefinitions.filter((definition) => (
+        definition.interactive || isPagePlaybackBehaviorDefinition(definition)
+    ));
 
     /**
      * 保存領域から全再生設定の値を読み出す。
@@ -185,34 +287,63 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
     }
 
     /**
-     * トグル変更時の設定更新と副作用実行を行う。
+     * 設定更新と副作用実行を行う。
      * @param {*} definition
      * @param {boolean} nextValue
+     * @param {{ persist?: boolean } | undefined} options
      */
-    function handlePlaybackSettingChange(definition, nextValue) {
-        if (experimentalDefinitions.includes(definition) && !isExperimentalPlaybackSettingsEffective()) {
-            applyPlaybackSettingValue(definition, false);
+    function applyPlaybackSettingChange(definition, nextValue, options) {
+        const shouldPersist = options?.persist !== false;
+        if (isPagePlaybackBehaviorDefinition(definition)) {
+            if (isExperimentalPlaybackSettingsEffective()) {
+                playbackBehaviorPageValues.set(definition.stateKey, Boolean(nextValue));
+            }
+            const effectiveValue = getPlaybackBehaviorEffectiveValue(
+                definition,
+                isExperimentalPlaybackSettingsEffective()
+            );
+            const previousValue = Boolean(playbackUi[definition.stateKey]);
+            if (previousValue === effectiveValue) return;
+            applyPlaybackSettingValue(definition, effectiveValue);
+            if (typeof definition.afterToggleChange === "function") {
+                definition.afterToggleChange(previousValue, effectiveValue);
+            }
             return;
         }
         const previousValue = Boolean(playbackUi[definition.stateKey]);
         if (previousValue === nextValue) return;
         applyPlaybackSettingValue(definition, nextValue);
-        localStorage.setItem(definition.storageKey, nextValue);
+        if (shouldPersist && definition.storageKey) localStorage.setItem(definition.storageKey, nextValue);
         if (typeof definition.afterToggleChange === "function") {
             definition.afterToggleChange(previousValue, nextValue);
         }
     }
 
     /**
+     * トグル変更時の設定更新と副作用実行を行う。
+     * @param {*} definition
+     * @param {boolean} nextValue
+     */
+    function handlePlaybackSettingChange(definition, nextValue) {
+        applyPlaybackSettingChange(definition, nextValue);
+    }
+
+    /**
      * 現在の再生設定を UI 状態とトグルへ反映する。
      */
     function applyPlaybackSettingsFromStorage() {
-        const nextValues = readPlaybackSettingValues(definitions);
-        for (const definition of definitions) {
+        removeLegacyPlaybackSettingsStorage();
+        applyInitialPlaybackSettingValuesIfNeeded();
+        const nextValues = readPlaybackSettingValues(persistedDefinitions);
+        for (const definition of persistedDefinitions) {
             const nextValue = Boolean(nextValues.get(definition.stateKey));
-            if (experimentalDefinitions.includes(definition)) continue;
             applyPlaybackDefinitionValue(definition, nextValue, "afterStorageApply");
         }
+        applyPlaybackDefinitionValue(
+            experimentalPlaybackVisibilityDefinition,
+            Boolean(playbackUi.showExperimentalPlaybackSettings),
+            "afterStorageApply"
+        );
     }
 
     /**
@@ -220,7 +351,7 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
      */
     function setupPlaybackSettings() {
         applyPlaybackSettingsFromStorage();
-        for (const definition of definitions) {
+        for (const definition of interactiveToggleDefinitions) {
             const toggle = ui.el[definition.elementKey];
             if (!toggle) continue;
             toggle.addEventListener("change", () => {
@@ -229,8 +360,63 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
         }
     }
 
+    /**
+     * 実験的な機能の表示状態をページ内だけで更新する。
+     * @param {boolean} value
+     * @returns {boolean}
+     */
+    function setExperimentalPlaybackSettings(value) {
+        applyPlaybackSettingChange(experimentalPlaybackVisibilityDefinition, Boolean(value), { persist: false });
+        hideExperimentalPlaybackToggle();
+        return Boolean(playbackUi.showExperimentalPlaybackSettings);
+    }
+
+    /**
+     * console から確認しやすい再生設定の現在値を返す。
+     * @returns {*}
+     */
+    function getPlaybackSettingsSnapshot() {
+        return {
+            showThumbnails: Boolean(playbackUi.showThumbnails),
+            showExperimentalPlaybackSettings: Boolean(playbackUi.showExperimentalPlaybackSettings),
+            stopAtEndTime: Boolean(playbackUi.stopAtEndTime),
+            continuousPlayback: Boolean(playbackUi.continuousPlayback),
+            loopPlayback: Boolean(playbackUi.loopPlayback)
+        };
+    }
+
+    /**
+     * Inspect の console へ公開する再生設定 API を作る。
+     * @returns {*}
+     */
+    function createConsoleApi() {
+        const api = {};
+        Object.defineProperties(api, {
+            showExperimentalPlaybackSettings: {
+                enumerable: true,
+                get() {
+                    return getPlaybackSettingsSnapshot().showExperimentalPlaybackSettings;
+                },
+                set(value) {
+                    setExperimentalPlaybackSettings(Boolean(value));
+                }
+            },
+            state: {
+                enumerable: true,
+                get() {
+                    return getPlaybackSettingsSnapshot();
+                }
+            }
+        });
+        api.setExperimentalPlaybackSettings = (value) => setExperimentalPlaybackSettings(Boolean(value));
+        return api;
+    }
+
     return {
         setupPlaybackSettings,
-        applyPlaybackSettingsFromStorage
+        applyPlaybackSettingsFromStorage,
+        setExperimentalPlaybackSettings,
+        getPlaybackSettingsSnapshot,
+        createConsoleApi
     };
 }

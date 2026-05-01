@@ -47,7 +47,7 @@ export const state = {
             scrollObserver: null,
             showThumbnails: false,
             showExperimentalPlaybackSettings: false,
-            stopAtEndTime: false,
+            stopAtEndTime: true,
             continuousPlayback: false,
             loopPlayback: false,
             activeThumb: null

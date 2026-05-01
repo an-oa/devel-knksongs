@@ -301,6 +301,7 @@ async function initUI() {
     storageController.loadBookmarks();
     setupTheme({ ui });
     playbackSettingsController.setupPlaybackSettings();
+    exposePlaybackSettingsConsoleApi();
     youtubeController.setupScrollObserver();
     uiSyncController.setupSyncEvents();
     window.addEventListener("resize", () => {
@@ -321,6 +322,13 @@ function boot() {
 }
 
 document.addEventListener("DOMContentLoaded", boot);
+
+/**
+ * Inspect の console から隠し再生設定をページ内だけで操作できる API を公開する。
+ */
+function exposePlaybackSettingsConsoleApi() {
+    window.knkPlaybackSettings = playbackSettingsController.createConsoleApi();
+}
 
 /**
  * 指定側の日付セレクトをクリアして候補を同期する。
