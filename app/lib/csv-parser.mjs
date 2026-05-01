@@ -1,5 +1,5 @@
-import { normalizeForSearch, parseDateKey } from "../controllers/search.mjs?v=16";
-import { extractYoutubeInfo } from "./youtube-url.mjs?v=16";
+import { normalizeForSearch, parseDateKey } from "../controllers/search.mjs?v=17";
+import { extractYoutubeInfo } from "./youtube-url.mjs?v=17";
 
 /**
  * 現在仕様の曲キー（archiveId + archiveOrder）を生成する。

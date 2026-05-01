@@ -1,4 +1,4 @@
-import { isHtmlElement } from "../dom-utils.mjs?v=16";
+import { isHtmlElement } from "../dom-utils.mjs?v=17";
 
 export const DEFAULT_MASONRY_GAP_PX = 12;
 

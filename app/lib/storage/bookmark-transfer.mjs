@@ -2,7 +2,7 @@ import {
     buildStoredBookmarksPayload,
     migrateLegacyBookmarkSongRefsToCurrent,
     parseStoredBookmarksPayload
-} from "./bookmark-schema.mjs?v=16";
+} from "./bookmark-schema.mjs?v=17";
 
 /**
  * 成功時の共通レスポンスを組み立てる。
