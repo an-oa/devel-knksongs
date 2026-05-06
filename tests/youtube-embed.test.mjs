@@ -14,7 +14,7 @@ test("youtube embed: buildYoutubeEmbedUrl includes playback params and optional 
             { videoId: "abc123", startSeconds: 45 },
             { endSeconds: 75 }
         );
-        assert.match(url, /^https:\/\/www\.youtube\.com\/embed\/abc123\?/);
+        assert.match(url, /^https:\/\/www\.youtube-nocookie\.com\/embed\/abc123\?/);
         assert.match(url, /(?:\?|&)autoplay=1(?:&|$)/);
         assert.match(url, /(?:\?|&)start=45(?:&|$)/);
         assert.match(url, /(?:\?|&)end=75(?:&|$)/);

@@ -166,7 +166,7 @@ export async function installNetworkMocks(page) {
             body: YOUTUBE_IFRAME_API_MOCK
         });
     });
-    await page.route("https://www.youtube.com/embed/**", async (route) => {
+    await page.route("https://www.youtube-nocookie.com/embed/**", async (route) => {
         await route.fulfill({
             status: 200,
             contentType: "text/html; charset=utf-8",
