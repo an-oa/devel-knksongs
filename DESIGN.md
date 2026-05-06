@@ -253,7 +253,7 @@ IndexedDB保存：
   - 旧localStorageの曲データJSONキャッシュは読み込み時に移行し、移行成功後に旧キャッシュを削除する
 
 ## YouTube埋め込み
-- `youtube.com` の標準埋め込みを使用
+- `youtube-nocookie.com` の Privacy Enhanced Mode 埋め込みを使用
 - サムネイル表示ON時にクリックで埋め込み再生し、`×` でサムネイルへ戻す
 - 曲データの `endSeconds` がある場合は埋め込み再生の終了秒数として反映する
 - 手動再生でカード上端がヘッダー下に隠れる場合は、再生開始後に見える位置まで補正スクロールする

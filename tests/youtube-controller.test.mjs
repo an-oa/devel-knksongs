@@ -93,7 +93,7 @@ test("youtube: vertical videos stay landscape in thumbnail mode and switch on if
 
         assert.equal(typeof thumb.onclick, "function");
         thumb.onclick();
-        assert.match(thumb.querySelector("iframe").src, /^https:\/\/www\.youtube\.com\/embed\/short1\?/);
+        assert.match(thumb.querySelector("iframe").src, /^https:\/\/www\.youtube-nocookie\.com\/embed\/short1\?/);
         assert.equal(thumb.dataset.videoOrientation, "vertical");
         assert.equal(card.classList.contains("song-card-expanded"), true);
         assert.equal(layoutRefreshCount, 1);
@@ -145,13 +145,13 @@ test("youtube: player init uses prebuilt iframe src and binds YT.Player to it", 
         assert.equal(playerCalls[0].host.tagName, "IFRAME");
         assert.match(
             playerCalls[0].host.src,
-            /^https:\/\/www\.youtube\.com\/embed\/video1\?/
+            /^https:\/\/www\.youtube-nocookie\.com\/embed\/video1\?/
         );
         assert.equal(playerCalls[0].options.videoId, undefined);
         assert.equal(playerCalls[0].options.playerVars, undefined);
         const iframe = thumb.querySelector("iframe");
         assert.ok(iframe);
-        assert.match(iframe.src, /^https:\/\/www\.youtube\.com\/embed\/video1\?/);
+        assert.match(iframe.src, /^https:\/\/www\.youtube-nocookie\.com\/embed\/video1\?/);
         assert.match(iframe.src, /autoplay=1/);
         assert.match(iframe.src, /start=45/);
         assert.match(iframe.src, /enablejsapi=1/);
@@ -387,7 +387,7 @@ test("youtube: pending shared player init uses the latest clicked thumbnail", as
 
         assert.equal(playerCalls.length, 1);
         assert.equal(playerCalls[0].host.tagName, "IFRAME");
-        assert.match(playerCalls[0].host.src, /^https:\/\/www\.youtube\.com\/embed\/video-b\?/);
+        assert.match(playerCalls[0].host.src, /^https:\/\/www\.youtube-nocookie\.com\/embed\/video-b\?/);
         assert.equal(thumbA.querySelector("iframe"), null);
         assert.ok(thumbB.querySelector("iframe"));
     } finally {
@@ -1061,7 +1061,7 @@ test("youtube: embed url includes end time when stopAtEndTime is enabled", async
         thumb.onclick();
         await flushMicrotasks();
 
-        assert.match(thumb.querySelector("iframe").src, /^https:\/\/www\.youtube\.com\/embed\/video1\?/);
+        assert.match(thumb.querySelector("iframe").src, /^https:\/\/www\.youtube-nocookie\.com\/embed\/video1\?/);
         assert.match(thumb.querySelector("iframe").src, /start=45/);
         assert.match(thumb.querySelector("iframe").src, /end=75/);
         assert.equal(thumb.dataset.playbackKey, "video1:45:75");
@@ -1102,7 +1102,7 @@ test("youtube: embed url omits end time when stopAtEndTime is disabled", async (
         thumb.onclick();
         await flushMicrotasks();
 
-        assert.match(thumb.querySelector("iframe").src, /^https:\/\/www\.youtube\.com\/embed\/video1\?/);
+        assert.match(thumb.querySelector("iframe").src, /^https:\/\/www\.youtube-nocookie\.com\/embed\/video1\?/);
         assert.match(thumb.querySelector("iframe").src, /start=45/);
         assert.equal(/(?:\?|&)end=/.test(thumb.querySelector("iframe").src), false);
         assert.equal(thumb.dataset.playbackKey, "video1:45:");

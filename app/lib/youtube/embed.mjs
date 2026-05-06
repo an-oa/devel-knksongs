@@ -1,6 +1,6 @@
 import { isHtmlElement } from "../dom-utils.mjs?v=17";
 
-const YT_EMBED_HOST = "https://www.youtube.com";
+const YT_EMBED_HOST = "https://www.youtube-nocookie.com";
 
 /**
  * YouTube Iframe API の読み込み完了を扱うローダーを作成する。
@@ -104,7 +104,7 @@ export function createYoutubeIframeApiLoader({
 }
 
 /**
- * 埋め込み再生用の標準 YouTube URL を生成する。
+ * 埋め込み再生用の YouTube Privacy Enhanced Mode URL を生成する。
  * @param {*} yt
  * @param {{ endSeconds?: number | null } | undefined} options
  * @returns {string}
