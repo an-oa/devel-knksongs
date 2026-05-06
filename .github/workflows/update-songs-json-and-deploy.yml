@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   update-and-deploy:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/rc/youtube-nocookie-embed'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
