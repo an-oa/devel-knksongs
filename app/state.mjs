@@ -19,7 +19,7 @@ export const YT_IFRAME_API_SELECTOR = 'script[data-yt-iframe-api="true"]';
 export const YT_IFRAME_READY_POLL_MS = 50;
 export const STOP_PLAYBACK_ON_SCROLL_OUT = false;
 
-export const state = {
+export const appState = {
     data: {
         allSongsRaw: [],
         currentResults: [],
@@ -75,7 +75,3 @@ export const state = {
         sharedPlayback: null
     }
 };
-
-export const data = state.data;
-export const ui = state.ui;
-export const youtube = state.youtube;

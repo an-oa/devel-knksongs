@@ -15,9 +15,7 @@ import {
     YT_IFRAME_API_SELECTOR,
     YT_IFRAME_READY_POLL_MS,
     STOP_PLAYBACK_ON_SCROLL_OUT,
-    data,
-    ui,
-    youtube
+    appState
 } from "./state.mjs?v=17";
 import {
     PUBLIC_SONGS_JSON_URL,
@@ -52,6 +50,10 @@ import {
 } from "./lib/storage/songs-json-cache.mjs?v=17";
 import { createSongsDataSource } from "./lib/songs-data-source.mjs?v=17";
 
+const appDataState = appState.data;
+const appUiState = appState.ui;
+const youtubeRuntimeState = appState.youtube;
+
 /**
  * ブラウザの localStorage を安全に取得する。
  * @returns {Storage | null}
@@ -66,8 +68,8 @@ function getBrowserLocalStorage() {
 }
 
 const searchController = createSearchController({
-    data,
-    ui,
+    data: appDataState,
+    ui: appUiState,
     constants: {
         RANDOM_DISPLAY_COUNT,
         MIN_PERFORMANCE_FOR_RANDOM,
@@ -77,13 +79,13 @@ const searchController = createSearchController({
     },
     callbacks: {
         updateDisplay: () => renderController.updateDisplay(),
-        scrollResultsPaneToTop: () => scrollResultListToTop(ui.el.resultList)
+        scrollResultsPaneToTop: () => scrollResultListToTop(appUiState.el.resultList)
     }
 });
 
 const renderController = createRenderController({
-    data,
-    ui,
+    data: appDataState,
+    ui: appUiState,
     isAllFormatsSelected: () => searchController.areAllFormatsSelected(),
     resultDisplayBatchSize: RESULT_DISPLAY_BATCH_SIZE,
     callbacks: {
@@ -101,8 +103,8 @@ const renderController = createRenderController({
 });
 
 const playbackSessionController = createPlaybackSessionController({
-    data,
-    ui,
+    data: appDataState,
+    ui: appUiState,
     callbacks: {
         playSongByKey: (songKey) => renderController.playSongByKey(songKey),
         scrollSongIntoView: (songKey) => renderController.scrollSongIntoView(songKey)
@@ -110,7 +112,7 @@ const playbackSessionController = createPlaybackSessionController({
 });
 
 const playbackSettingsController = createPlaybackSettingsController({
-    ui,
+    ui: appUiState,
     callbacks: {
         ensureThumbnailPlaybackReady: () => youtubeController.ensureThumbnailPlaybackReady(),
         restoreActivePlayback: () => youtubeController.restoreActivePlayback(),
@@ -120,8 +122,8 @@ const playbackSettingsController = createPlaybackSettingsController({
 });
 
 const youtubeController = createYoutubeController({
-    ui,
-    youtube,
+    ui: appUiState,
+    youtube: youtubeRuntimeState,
     constants: {
         YT_IFRAME_API_SRC,
         YT_IFRAME_API_SELECTOR,
@@ -132,12 +134,12 @@ const youtubeController = createYoutubeController({
 
 let bookmarkUiController = null;
 let sidebarController = null;
-const searchUi = getSearchUiState(ui);
-const dateUi = getDateUiState(ui);
+const searchUi = getSearchUiState(appUiState);
+const dateUi = getDateUiState(appUiState);
 
 const storageController = createStorageController({
-    data,
-    ui,
+    data: appDataState,
+    ui: appUiState,
     constants: {
         DEFAULT_FORMATS,
         SEARCH_STATE_KEY,
@@ -158,8 +160,8 @@ const storageController = createStorageController({
 });
 
 bookmarkUiController = createBookmarkUiController({
-    data,
-    ui,
+    data: appDataState,
+    ui: appUiState,
     callbacks: {
         clearSearchDebounce,
         scheduleSearch: (options) => searchController.scheduleSearch(options),
@@ -181,8 +183,8 @@ bookmarkUiController = createBookmarkUiController({
 });
 
 sidebarController = createSidebarController({
-    data,
-    ui,
+    data: appDataState,
+    ui: appUiState,
     constants: {
         resultDisplayBatchSize: RESULT_DISPLAY_BATCH_SIZE
     },
@@ -202,15 +204,15 @@ sidebarController = createSidebarController({
 const uiSyncController = createUiSyncController({
     uiSyncPasses: UI_SYNC_PASSES,
     syncSearchUI,
-    applyThemeFromStorage: () => applyThemeFromStorage({ ui }),
+    applyThemeFromStorage: () => applyThemeFromStorage({ ui: appUiState }),
     applyPlaybackSettingsFromStorage: () => playbackSettingsController.applyPlaybackSettingsFromStorage()
 });
 
 const browserStorage = getBrowserLocalStorage();
 
 const dataLoader = createDataLoader({
-    data,
-    ui,
+    data: appDataState,
+    ui: appUiState,
     dataSource: createSongsDataSource({
         publicSongsJsonUrl: PUBLIC_SONGS_JSON_URL,
         publicSongsMetaUrl: PUBLIC_SONGS_META_URL,
@@ -258,12 +260,12 @@ youtubeController.setPlaybackStartFailedHook(({ songKey, playbackMode, wasPlayba
  * DOM 参照の初期化と UI 各機能のセットアップを行う。
  */
 async function initUI() {
-    ui.el = collectUiElements();
+    appUiState.el = collectUiElements();
     if (youtubeController.isIOSWebKit()) document.documentElement.classList.add("ios");
 
     sidebarController.setupUIHandlers();
     initFilterMenu({
-        ui,
+        ui: appUiState,
         defaultFormats: DEFAULT_FORMATS,
         getFormatFilterLabel,
         setSelectedFormatsToDefault: () => storageController.setSelectedFormatsToDefault(),
@@ -272,7 +274,7 @@ async function initUI() {
         saveSearchState: () => storageController.saveSearchState()
     });
     storageController.loadBookmarks();
-    setupTheme({ ui });
+    setupTheme({ ui: appUiState });
     playbackSettingsController.setupPlaybackSettings();
     exposePlaybackSettingsConsoleApi();
     youtubeController.setupScrollObserver();
@@ -309,9 +311,9 @@ function exposePlaybackSettingsConsoleApi() {
  */
 function resetDateSelectGroup(kind) {
     const isFrom = kind === "from";
-    const year = isFrom ? ui.el.dateFromYear : ui.el.dateToYear;
-    const month = isFrom ? ui.el.dateFromMonth : ui.el.dateToMonth;
-    const day = isFrom ? ui.el.dateFromDay : ui.el.dateToDay;
+    const year = isFrom ? appUiState.el.dateFromYear : appUiState.el.dateToYear;
+    const month = isFrom ? appUiState.el.dateFromMonth : appUiState.el.dateToMonth;
+    const day = isFrom ? appUiState.el.dateFromDay : appUiState.el.dateToDay;
     if (year) year.value = "";
     if (month) month.value = "";
     if (day) day.value = "";
@@ -360,7 +362,7 @@ function clearSearchDebounce() {
  * 検索語入力を初期化する。
  */
 function resetSearchQuery() {
-    if (ui.el.searchBox) ui.el.searchBox.value = "";
+    if (appUiState.el.searchBox) appUiState.el.searchBox.value = "";
     searchUi.userTouchedQuery = false;
 }
 
@@ -368,8 +370,8 @@ function resetSearchQuery() {
  * フィルタ条件を既定状態へ戻す。
  */
 function resetSearchFilters() {
-    const relayOnly = ui.el.relayOnly;
-    const harmonyOnly = ui.el.harmonyOnly;
+    const relayOnly = appUiState.el.relayOnly;
+    const harmonyOnly = appUiState.el.harmonyOnly;
 
     if (relayOnly) relayOnly.checked = false;
     if (harmonyOnly) harmonyOnly.checked = false;
@@ -399,8 +401,8 @@ function resetSearchConditions(shouldSearch) {
  * @returns {boolean}
  */
 function needsFilterReset() {
-    const relayOnly = ui.el.relayOnly;
-    const harmonyOnly = ui.el.harmonyOnly;
+    const relayOnly = appUiState.el.relayOnly;
+    const harmonyOnly = appUiState.el.harmonyOnly;
     if (relayOnly && relayOnly.checked) return true;
     if (harmonyOnly && harmonyOnly.checked) return true;
     if (searchController.hasDateSelection()) return true;
@@ -413,7 +415,7 @@ function needsFilterReset() {
  */
 function syncSearchQueryIfNeeded() {
     if (searchUi.userTouchedQuery) return false;
-    const searchBox = ui.el.searchBox;
+    const searchBox = appUiState.el.searchBox;
     if (!searchBox || searchBox.value === "") return false;
     resetSearchQuery();
     return true;
