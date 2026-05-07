@@ -26,8 +26,6 @@ export function collectUiElements() {
         clearDateToBtn: document.getElementById("clearDateToBtn"),
         themeToggle: document.getElementById("theme-toggle"),
         thumbToggle: document.getElementById("thumbnail-toggle"),
-        experimentalPlaybackToggleSection: document.getElementById("experimental-playback-toggle-section"),
-        experimentalPlaybackToggle: document.getElementById("experimental-playback-toggle"),
         endTimeToggle: document.getElementById("end-time-toggle"),
         continuousPlaybackToggle: document.getElementById("continuous-playback-toggle"),
         loopPlaybackToggle: document.getElementById("loop-playback-toggle"),

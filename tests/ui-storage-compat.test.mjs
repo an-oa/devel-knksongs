@@ -39,8 +39,6 @@ function createPlaybackSettingsUiState(input) {
     return {
         el: {
             thumbToggle: input.thumbToggle ?? null,
-            experimentalPlaybackToggleSection: input.experimentalPlaybackToggleSection ?? null,
-            experimentalPlaybackToggle: input.experimentalPlaybackToggle ?? null,
             endTimeToggle: input.endTimeToggle ?? null,
             continuousPlaybackToggle: input.continuousPlaybackToggle ?? null,
             loopPlaybackToggle: input.loopPlaybackToggle ?? null,
@@ -86,8 +84,6 @@ function createPlaybackSettingsFixture(input) {
     const fixture = input || {};
     const ui = createPlaybackSettingsUiState({
         thumbToggle: document.createElement("input"),
-        experimentalPlaybackToggleSection: document.createElement("div"),
-        experimentalPlaybackToggle: document.createElement("input"),
         endTimeToggle: document.createElement("input"),
         continuousPlaybackToggle: document.createElement("input"),
         loopPlaybackToggle: document.createElement("input"),
@@ -164,10 +160,6 @@ test("setupPlaybackSettings: playback settings are reset to load defaults on boo
         assert.equal(ui.playback.continuousPlayback, false);
         assert.equal(ui.playback.loopPlayback, false);
         assert.equal(ui.el.thumbToggle.checked, false);
-        assert.equal(ui.el.experimentalPlaybackToggle.checked, false);
-        assert.equal(ui.el.experimentalPlaybackToggle.disabled, true);
-        assert.equal(ui.el.experimentalPlaybackToggleSection.hidden, true);
-        assert.equal(ui.el.experimentalPlaybackToggleSection.getAttribute("aria-hidden"), "true");
         assert.equal(ui.el.endTimeToggle.checked, true);
         assert.equal(ui.el.continuousPlaybackToggle.checked, false);
         assert.equal(ui.el.loopPlaybackToggle.checked, false);
@@ -215,10 +207,6 @@ test("applyPlaybackSettingsFromStorage: ui sync reapplies stored playback settin
         assert.equal(ui.playback.continuousPlayback, false);
         assert.equal(ui.playback.loopPlayback, false);
         assert.equal(ui.el.thumbToggle.checked, true);
-        assert.equal(ui.el.experimentalPlaybackToggle.checked, false);
-        assert.equal(ui.el.experimentalPlaybackToggle.disabled, true);
-        assert.equal(ui.el.experimentalPlaybackToggleSection.hidden, true);
-        assert.equal(ui.el.experimentalPlaybackToggleSection.getAttribute("aria-hidden"), "true");
         assert.equal(ui.el.endTimeToggle.checked, true);
         assert.equal(ui.el.continuousPlaybackToggle.checked, false);
         assert.equal(ui.el.loopPlaybackToggle.checked, false);
@@ -253,10 +241,6 @@ test("applyPlaybackSettingsFromStorage: hidden playback settings keep load defau
         assert.equal(ui.playback.stopAtEndTime, true);
         assert.equal(ui.playback.continuousPlayback, false);
         assert.equal(ui.playback.loopPlayback, false);
-        assert.equal(ui.el.experimentalPlaybackToggle.checked, false);
-        assert.equal(ui.el.experimentalPlaybackToggle.disabled, true);
-        assert.equal(ui.el.experimentalPlaybackToggleSection.hidden, true);
-        assert.equal(ui.el.experimentalPlaybackToggleSection.getAttribute("aria-hidden"), "true");
         assert.equal(ui.el.endTimeToggle.checked, true);
         assert.equal(ui.el.continuousPlaybackToggle.checked, false);
         assert.equal(ui.el.loopPlaybackToggle.checked, false);
@@ -286,9 +270,6 @@ test("applyPlaybackSettingsFromStorage: ui sync keeps page-only experimental pla
         controller.applyPlaybackSettingsFromStorage();
 
         assert.equal(ui.playback.showExperimentalPlaybackSettings, true);
-        assert.equal(ui.el.experimentalPlaybackToggle.checked, true);
-        assert.equal(ui.el.experimentalPlaybackToggle.disabled, true);
-        assert.equal(ui.el.experimentalPlaybackToggleSection.hidden, true);
         assert.equal(ui.el.playbackSettingsGroup.hidden, false);
         assert.equal(ui.el.playbackSettingsGroup.getAttribute("aria-hidden"), "false");
         assert.equal(ui.playback.continuousPlayback, false);
@@ -378,9 +359,6 @@ test("setupPlaybackSettings: hidden experimental playback setting shows and hide
 
         controller.setupPlaybackSettings();
         assert.equal(ui.playback.showExperimentalPlaybackSettings, false);
-        assert.equal(ui.el.experimentalPlaybackToggleSection.hidden, true);
-        assert.equal(ui.el.experimentalPlaybackToggleSection.getAttribute("aria-hidden"), "true");
-        assert.equal(ui.el.experimentalPlaybackToggle.disabled, true);
         assert.equal(ui.el.playbackSettingsGroup.hidden, true);
         assert.equal(ui.el.playbackSettingsGroup.getAttribute("aria-hidden"), "true");
 
@@ -388,9 +366,6 @@ test("setupPlaybackSettings: hidden experimental playback setting shows and hide
 
         assert.equal(ui.playback.showExperimentalPlaybackSettings, true);
         assertLegacyPlaybackSettingsStorageCleared();
-        assert.equal(ui.el.experimentalPlaybackToggleSection.hidden, true);
-        assert.equal(ui.el.experimentalPlaybackToggleSection.getAttribute("aria-hidden"), "true");
-        assert.equal(ui.el.experimentalPlaybackToggle.disabled, true);
         assert.equal(ui.el.playbackSettingsGroup.hidden, false);
         assert.equal(ui.el.playbackSettingsGroup.getAttribute("aria-hidden"), "false");
     } finally {
@@ -548,9 +523,6 @@ test("setupPlaybackSettings: thumbnail toggle controls experimental playback ent
         assertLegacyPlaybackSettingsStorageCleared();
 
         controller.setExperimentalPlaybackSettings(true);
-        assert.equal(ui.el.experimentalPlaybackToggleSection.hidden, true);
-        assert.equal(ui.el.experimentalPlaybackToggleSection.getAttribute("aria-hidden"), "true");
-        assert.equal(ui.el.experimentalPlaybackToggle.disabled, true);
         assert.equal(ui.el.playbackSettingsGroup.hidden, false);
         assert.equal(ui.playback.stopAtEndTime, true);
         assert.equal(ui.playback.continuousPlayback, false);
@@ -558,10 +530,6 @@ test("setupPlaybackSettings: thumbnail toggle controls experimental playback ent
         ui.el.thumbToggle.checked = false;
         invokeListener(ui.el.thumbToggle, "change", {});
 
-        assert.equal(ui.el.experimentalPlaybackToggleSection.hidden, true);
-        assert.equal(ui.el.experimentalPlaybackToggleSection.getAttribute("aria-hidden"), "true");
-        assert.equal(ui.el.experimentalPlaybackToggle.disabled, true);
-        assert.equal(ui.el.experimentalPlaybackToggle.checked, true);
         assert.equal(ui.el.playbackSettingsGroup.hidden, true);
         assert.equal(ui.playback.showExperimentalPlaybackSettings, true);
         assert.equal(ui.playback.stopAtEndTime, true);
@@ -570,9 +538,6 @@ test("setupPlaybackSettings: thumbnail toggle controls experimental playback ent
         ui.el.thumbToggle.checked = true;
         invokeListener(ui.el.thumbToggle, "change", {});
 
-        assert.equal(ui.el.experimentalPlaybackToggleSection.hidden, true);
-        assert.equal(ui.el.experimentalPlaybackToggleSection.getAttribute("aria-hidden"), "true");
-        assert.equal(ui.el.experimentalPlaybackToggle.disabled, true);
         assert.equal(ui.el.playbackSettingsGroup.hidden, false);
         assert.equal(ui.playback.stopAtEndTime, true);
         assert.equal(ui.playback.continuousPlayback, false);

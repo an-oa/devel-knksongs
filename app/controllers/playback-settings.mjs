@@ -42,19 +42,6 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
     const playbackBehaviorPageValues = new Map();
 
     /**
-     * 実験的な機能トグルを通常 UI から隠す。
-     */
-    function hideExperimentalPlaybackToggle() {
-        const experimentalToggleSection = ui.el.experimentalPlaybackToggleSection;
-        if (experimentalToggleSection) {
-            experimentalToggleSection.hidden = true;
-            experimentalToggleSection.setAttribute("aria-hidden", "true");
-        }
-        const experimentalToggle = ui.el.experimentalPlaybackToggle;
-        if (experimentalToggle) experimentalToggle.disabled = true;
-    }
-
-    /**
      * 実験的な再生設定が有効かを返す。
      * @returns {boolean}
      */
@@ -128,7 +115,7 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
      */
     function applyPlaybackSettingValue(definition, value) {
         playbackUi[definition.stateKey] = value;
-        const toggle = ui.el[definition.elementKey];
+        const toggle = definition.elementKey ? ui.el[definition.elementKey] : null;
         if (toggle) toggle.checked = value;
         if (typeof definition.syncValue === "function") {
             definition.syncValue(value);
@@ -221,7 +208,6 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
         scope: PLAYBACK_SETTING_SCOPES.PAGE,
         kind: PLAYBACK_SETTING_KINDS.VISIBILITY,
         stateKey: "showExperimentalPlaybackSettings",
-        elementKey: "experimentalPlaybackToggle",
         defaultValue: false,
         syncValue() {
             syncExperimentalPlaybackVisibility();
@@ -244,7 +230,6 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
         defaultValue: false,
         syncValue(value) {
             document.body.classList.toggle("hide-thumbs", !value);
-            hideExperimentalPlaybackToggle();
             syncExperimentalPlaybackVisibility();
             ensureThumbnailPlaybackReady();
         },
@@ -367,7 +352,6 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
      */
     function setExperimentalPlaybackSettings(value) {
         applyPlaybackSettingChange(experimentalPlaybackVisibilityDefinition, Boolean(value), { persist: false });
-        hideExperimentalPlaybackToggle();
         return Boolean(playbackUi.showExperimentalPlaybackSettings);
     }
 

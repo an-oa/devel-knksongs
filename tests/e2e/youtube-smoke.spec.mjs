@@ -22,32 +22,24 @@ test.beforeEach(async ({ page }) => {
     await waitForInitialLoad(page);
 });
 
-test("settings keeps experimental playback toggle hidden while console state remains available", async ({ page }) => {
+test("settings exposes playback settings through console state", async ({ page }) => {
     await openSettingsPanel(page);
 
     const thumbnailSwitch = page.locator("#thumbnail-toggle").locator("xpath=ancestor::label[1]");
-    const experimentalToggleSection = page.locator("#experimental-playback-toggle-section");
-    const experimentalToggle = page.locator("#experimental-playback-toggle");
     const playbackSettingsGroup = page.locator("#playback-settings-group");
     const themeSwitch = page.locator("#theme-toggle").locator("xpath=ancestor::label[1]");
 
     await expect(themeSwitch).toBeVisible();
-    await expect(experimentalToggleSection).toBeHidden();
-    await expect(experimentalToggle).toBeDisabled();
     await expect(playbackSettingsGroup).toBeHidden();
 
     await thumbnailSwitch.click();
 
     await expect(themeSwitch).toBeVisible();
-    await expect(experimentalToggleSection).toBeHidden();
-    await expect(experimentalToggle).toBeDisabled();
 
     await page.evaluate(() => {
         window.knkPlaybackSettings.showExperimentalPlaybackSettings = true;
     });
 
-    await expect(experimentalToggleSection).toBeHidden();
-    await expect(experimentalToggle).toBeDisabled();
     await expect(playbackSettingsGroup).toBeVisible();
 
     await page.evaluate(() => {
@@ -55,14 +47,10 @@ test("settings keeps experimental playback toggle hidden while console state rem
     });
 
     await expect(playbackSettingsGroup).toBeVisible();
-    await expect(experimentalToggleSection).toBeHidden();
-    await expect(experimentalToggle).toBeDisabled();
 
     await thumbnailSwitch.click();
 
     await expect(themeSwitch).toBeVisible();
-    await expect(experimentalToggleSection).toBeHidden();
-    await expect(experimentalToggle).toBeDisabled();
     await expect(playbackSettingsGroup).toBeHidden();
 });
 
