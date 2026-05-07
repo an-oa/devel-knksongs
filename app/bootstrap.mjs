@@ -53,33 +53,6 @@ import {
 import { createSongsDataSource } from "./lib/songs-data-source.mjs?v=17";
 
 /**
- * @typedef {Object} SongRow
- * @property {string} date
- * @property {number | null} dateKey
- * @property {string} archiveId
- * @property {number | null} archiveOrder
- * @property {number} sourceIndex
- * @property {string} videoId
- * @property {string} songKey
- * @property {string} bookmarkSongKey
- * @property {string} legacySongKey
- * @property {string} format
- * @property {string} videoOrientation
- * @property {boolean} isRelay
- * @property {boolean} isHarmony
- * @property {string} title
- * @property {string} artist
- * @property {string} titleYomi
- * @property {string} artistYomi
- * @property {string} url
- * @property {number | null} endSeconds
- * @property {string} titleNorm
- * @property {string} artistNorm
- * @property {string} titleYomiNorm
- * @property {string} artistYomiNorm
- */
-
-/**
  * ブラウザの localStorage を安全に取得する。
  * @returns {Storage | null}
  */
