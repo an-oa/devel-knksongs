@@ -25,7 +25,7 @@ export function createSearchController({ data, ui, constants, callbacks }) {
     const {
         RANDOM_DISPLAY_COUNT,
         MIN_PERFORMANCE_FOR_RANDOM,
-        INCREMENT_COUNT,
+        RESULT_DISPLAY_BATCH_SIZE,
         SEARCH_DEBOUNCE_MS,
         DEFAULT_FORMATS
     } = constants;
@@ -211,7 +211,7 @@ export function createSearchController({ data, ui, constants, callbacks }) {
     function buildIncrementalSearchOutcome(results, label) {
         return {
             results,
-            displayLimit: Math.min(results.length, INCREMENT_COUNT),
+            displayLimit: Math.min(results.length, RESULT_DISPLAY_BATCH_SIZE),
             label
         };
     }

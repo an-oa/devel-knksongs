@@ -270,7 +270,7 @@ IndexedDB保存：
 - `songs-meta.json` の content hash で鮮度を確認し、大きい `songs.json` の取得頻度を抑える
 - JSON取得に失敗した場合に備え、CSVもフォールバック用にキャッシュする
 - 段階表示（追加読み込み）
-  - 通常検索・ブックマーク検索ともに `INCREMENT_COUNT` 単位で追加表示
+  - 通常検索・ブックマーク検索ともに `RESULT_DISPLAY_BATCH_SIZE` 単位で追加表示
 - サムネ遅延読み込み（IntersectionObserver）
 
 ## 制約・注意点

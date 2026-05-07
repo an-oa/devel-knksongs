@@ -427,7 +427,7 @@ test("render: playSongByKey expands display limit and starts playback for hidden
             data,
             ui,
             isAllFormatsSelected: () => true,
-            incrementCount: 2,
+            resultDisplayBatchSize: 2,
             callbacks: createRenderCallbacks({
                 getSearchState: () => ({ queryRaw: "" }),
                 extractYoutubeInfo,
@@ -482,7 +482,7 @@ test("render: playSongByKey expands display limit in increment-sized chunks", as
             data,
             ui,
             isAllFormatsSelected: () => true,
-            incrementCount: 2,
+            resultDisplayBatchSize: 2,
             callbacks: createRenderCallbacks({
                 getSearchState: () => ({ queryRaw: "" }),
                 extractYoutubeInfo,
@@ -499,7 +499,7 @@ test("render: playSongByKey expands display limit in increment-sized chunks", as
     }
 });
 
-test("bookmark: shows load-more and increases by INCREMENT_COUNT (48)", () => {
+test("bookmark: shows load-more and increases by RESULT_DISPLAY_BATCH_SIZE (48)", () => {
     const cleanup = installFakeDom();
     try {
         const rows = Array.from({ length: 100 }, (_, index) => ({
@@ -573,7 +573,7 @@ test("bookmark: shows load-more and increases by INCREMENT_COUNT (48)", () => {
             constants: {
                 RANDOM_DISPLAY_COUNT: 48,
                 MIN_PERFORMANCE_FOR_RANDOM: 3,
-                INCREMENT_COUNT: 48,
+                RESULT_DISPLAY_BATCH_SIZE: 48,
                 SEARCH_DEBOUNCE_MS: 0,
                 DEFAULT_FORMATS: ["配信", "歌みた", "ショート", "切り抜き"]
             },

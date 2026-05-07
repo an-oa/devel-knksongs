@@ -1,7 +1,7 @@
 import {
     RANDOM_DISPLAY_COUNT,
     MIN_PERFORMANCE_FOR_RANDOM,
-    INCREMENT_COUNT,
+    RESULT_DISPLAY_BATCH_SIZE,
     DEFAULT_FORMATS,
     SEARCH_STATE_KEY,
     BOOKMARK_STORAGE_KEY,
@@ -98,7 +98,7 @@ const searchController = createSearchController({
     constants: {
         RANDOM_DISPLAY_COUNT,
         MIN_PERFORMANCE_FOR_RANDOM,
-        INCREMENT_COUNT,
+        RESULT_DISPLAY_BATCH_SIZE,
         SEARCH_DEBOUNCE_MS,
         DEFAULT_FORMATS
     },
@@ -112,7 +112,7 @@ const renderController = createRenderController({
     data,
     ui,
     isAllFormatsSelected: () => searchController.areAllFormatsSelected(),
-    incrementCount: INCREMENT_COUNT,
+    resultDisplayBatchSize: RESULT_DISPLAY_BATCH_SIZE,
     callbacks: {
         getSearchState: () => searchController.getSearchState(),
         isRecommendedMode: (state) => searchController.isRecommendedMode(state),
@@ -211,7 +211,7 @@ sidebarController = createSidebarController({
     data,
     ui,
     constants: {
-        incrementCount: INCREMENT_COUNT
+        resultDisplayBatchSize: RESULT_DISPLAY_BATCH_SIZE
     },
     callbacks: {
         getBookmarkUiController: () => bookmarkUiController,

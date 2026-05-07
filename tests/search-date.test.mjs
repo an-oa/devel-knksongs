@@ -346,7 +346,7 @@ test("createSearchController: active bookmark also applies search criteria", () 
     const constants = {
         RANDOM_DISPLAY_COUNT: 10,
         MIN_PERFORMANCE_FOR_RANDOM: 1,
-        INCREMENT_COUNT: 30,
+        RESULT_DISPLAY_BATCH_SIZE: 30,
         SEARCH_DEBOUNCE_MS: 0,
         DEFAULT_FORMATS: ["配信", "歌みた", "ショート"]
     };
@@ -400,7 +400,7 @@ test("createSearchController: active bookmark resolves rows by bookmarkSongKey",
     const constants = {
         RANDOM_DISPLAY_COUNT: 10,
         MIN_PERFORMANCE_FOR_RANDOM: 1,
-        INCREMENT_COUNT: 30,
+        RESULT_DISPLAY_BATCH_SIZE: 30,
         SEARCH_DEBOUNCE_MS: 0,
         DEFAULT_FORMATS: ["配信", "歌みた", "ショート"]
     };
@@ -457,7 +457,7 @@ test("createSearchController: active bookmark uses incremental display limit", (
     const constants = {
         RANDOM_DISPLAY_COUNT: 10,
         MIN_PERFORMANCE_FOR_RANDOM: 1,
-        INCREMENT_COUNT: 2,
+        RESULT_DISPLAY_BATCH_SIZE: 2,
         SEARCH_DEBOUNCE_MS: 0,
         DEFAULT_FORMATS: ["配信", "歌みた", "ショート"]
     };
@@ -507,7 +507,7 @@ test("createSearchController: recommendation mode counts オリ曲 as 歌みた"
     const constants = {
         RANDOM_DISPLAY_COUNT: 10,
         MIN_PERFORMANCE_FOR_RANDOM: 3,
-        INCREMENT_COUNT: 30,
+        RESULT_DISPLAY_BATCH_SIZE: 30,
         SEARCH_DEBOUNCE_MS: 0,
         DEFAULT_FORMATS: ["配信", "歌みた", "ショート", "切り抜き"]
     };
@@ -563,7 +563,7 @@ test("createSearchController: single オリ曲 performance is eligible for recom
     const constants = {
         RANDOM_DISPLAY_COUNT: 10,
         MIN_PERFORMANCE_FOR_RANDOM: 3,
-        INCREMENT_COUNT: 30,
+        RESULT_DISPLAY_BATCH_SIZE: 30,
         SEARCH_DEBOUNCE_MS: 0,
         DEFAULT_FORMATS: ["配信", "歌みた", "ショート", "切り抜き"]
     };

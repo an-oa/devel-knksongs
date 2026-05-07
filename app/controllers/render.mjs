@@ -11,9 +11,9 @@ import {
 
 /**
  * 検索結果カードの生成・差分反映・表示更新を担うレンダーコントローラーを作成する。
- * @param {{ data: *, ui: *, isAllFormatsSelected: Function, incrementCount?: number, callbacks: * }} input
+ * @param {{ data: *, ui: *, isAllFormatsSelected: Function, resultDisplayBatchSize?: number, callbacks: * }} input
  */
-export function createRenderController({ data, ui, isAllFormatsSelected, incrementCount = 48, callbacks }) {
+export function createRenderController({ data, ui, isAllFormatsSelected, resultDisplayBatchSize = 48, callbacks }) {
     const searchUi = getSearchUiState(ui);
     const playbackUi = getPlaybackUiState(ui);
     const renderUi = getRenderUiState(ui);
@@ -253,7 +253,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected, increme
     function ensureResultVisible(index) {
         if (!Number.isFinite(index) || index < 0) return;
         if (index < data.displayLimit) return;
-        const nextLimit = Math.ceil((index + 1) / incrementCount) * incrementCount;
+        const nextLimit = Math.ceil((index + 1) / resultDisplayBatchSize) * resultDisplayBatchSize;
         data.displayLimit = Math.min(data.currentResults.length, nextLimit);
         updateDisplay();
     }

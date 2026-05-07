@@ -5,7 +5,7 @@ import { getSettingsPanelUiState } from "../../lib/ui-slices.mjs?v=17";
  * @param {{
  *   data: { displayLimit: number },
  *   ui: { el: Record<string, HTMLElement | null>, settingsPanelReturnFocusEl: HTMLElement | null },
- *   constants: { incrementCount: number },
+ *   constants: { resultDisplayBatchSize: number },
  *   callbacks: {
  *     getBookmarkUiController: () => {
  *       closeBookmarkModal: (options?: { restoreFocus?: boolean }) => void,
@@ -29,7 +29,7 @@ import { getSettingsPanelUiState } from "../../lib/ui-slices.mjs?v=17";
 export function createSidebarController(input) {
     const { data, ui, constants, callbacks } = input;
     const settingsPanelUi = getSettingsPanelUiState(ui);
-    const { incrementCount } = constants;
+    const { resultDisplayBatchSize } = constants;
     const {
         getBookmarkUiController,
         isIOSWebKit,
@@ -310,7 +310,7 @@ export function createSidebarController(input) {
         });
 
         loadMoreBtn.addEventListener("click", () => {
-            data.displayLimit += incrementCount;
+            data.displayLimit += resultDisplayBatchSize;
             updateDisplay();
         });
 

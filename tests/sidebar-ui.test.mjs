@@ -157,7 +157,7 @@ test("sidebar: opening settings panel makes background inert and focuses back bu
         const controller = createSidebarController({
             data: { displayLimit: 48 },
             ui,
-            constants: { incrementCount: 48 },
+            constants: { resultDisplayBatchSize: 48 },
             callbacks: createSidebarCallbacks({
                 bookmarkUiController: {
                     closeBookmarkModal() {
@@ -194,7 +194,7 @@ test("sidebar: escape closes settings panel, removes inert, and restores focus",
         const controller = createSidebarController({
             data: { displayLimit: 48 },
             ui,
-            constants: { incrementCount: 48 },
+            constants: { resultDisplayBatchSize: 48 },
             callbacks: createSidebarCallbacks()
         });
 
@@ -234,7 +234,7 @@ test("sidebar: openBookmarkModal opens sidebar first when closed and passes clos
         const controller = createSidebarController({
             data: { displayLimit: 48 },
             ui,
-            constants: { incrementCount: 48 },
+            constants: { resultDisplayBatchSize: 48 },
             callbacks: createSidebarCallbacks({
                 bookmarkUiController: {
                     closeBookmarkModal() {},
@@ -271,7 +271,7 @@ test("sidebar: escape prioritizes settings panel over bookmark panel", () => {
         const controller = createSidebarController({
             data: { displayLimit: 48 },
             ui,
-            constants: { incrementCount: 48 },
+            constants: { resultDisplayBatchSize: 48 },
             callbacks: createSidebarCallbacks({
                 bookmarkUiController: {
                     closeBookmarkModal() {
@@ -334,7 +334,7 @@ test("sidebar: ios year change clears lower date selects and removes updating cl
         const controller = createSidebarController({
             data: { displayLimit: 48 },
             ui,
-            constants: { incrementCount: 48 },
+            constants: { resultDisplayBatchSize: 48 },
             callbacks: {
                 ...createSidebarCallbacks(),
                 isIOSWebKit: () => true,
@@ -377,7 +377,7 @@ test("sidebar: tab focus is trapped within the active sidebar in both directions
         const controller = createSidebarController({
             data: { displayLimit: 48 },
             ui,
-            constants: { incrementCount: 48 },
+            constants: { resultDisplayBatchSize: 48 },
             callbacks: createSidebarCallbacks()
         });
 
