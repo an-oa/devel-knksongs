@@ -276,9 +276,9 @@ IndexedDB保存：
 ## 制約・注意点
 - iOSでは埋め込み再生に制約あり
 - Safari等でCSSキャッシュが残ることがあるため更新時はバスター推奨
-- `index.html` の `styles.css?v=...` と `app/script.js?v=...` は同じ値で運用する
+- `index.html` の `styles.css?v=...` と `app/bootstrap.mjs?v=...` は同じ値で運用する
   - UI/JS変更ごとには上げず、公開反映や配布反映の直前にまとめて値を上げる
-- `app/script.js` から読む ES Modules を更新した場合は、対応する import の `?v=...` も上げる
+- `app/bootstrap.mjs` から読む ES Modules を更新した場合は、対応する import の `?v=...` も上げる
   - 変更途中は既存値へ揃え、公開時に全体を同じ値へ切り替える
 - `songs.json` / `songs-meta.json` の内容更新だけでは cache buster を上げず、`contentHash` による鮮度確認で反映する
 - 日付入力はセレクト方式（ブラウザ互換性優先）

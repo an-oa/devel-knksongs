@@ -84,7 +84,7 @@ flowchart TD
 - 置換後は、壊れやすいファイルを優先して目視確認する。
   例:
   `index.html`
-  エントリーポイントの `app/script.js`
+  エントリーポイントの `app/bootstrap.mjs`
   import を多く持つコントローラー
   テストの先頭 import 群
 

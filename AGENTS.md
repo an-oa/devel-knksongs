@@ -40,7 +40,7 @@ feat: move settings into dedicated sidebar panel
 ## JavaScript Function Docs
 
 - 実装側の `.js` / `.mjs` では、関数の直前に `/** ... */` の JSDoc を置いて機能を説明する書き方が広く使われている。
-- 特に `app/script.js` `app/ui/bookmark/ui.mjs` `app/controllers/search.mjs`
+- 特に `app/bootstrap.mjs` `app/ui/bookmark/ui.mjs` `app/controllers/search.mjs`
   `app/controllers/storage.mjs` `app/controllers/render.mjs`
   `app/controllers/youtube.mjs` では、この形式が主流になっている。
 - 短い委譲関数や一部テスト補助関数では省略されている箇所もあるが、新しく JavaScript の関数を追加するときは、関数の先頭に JSDoc を付けて機能を説明する。
@@ -78,9 +78,9 @@ feat: move settings into dedicated sidebar panel
 - キャッシュバスターの `v=...` は、UI / JavaScript に変更を加えるたびには更新しない。
 - 公開反映や配布反映のためにブラウザキャッシュを切り替える必要があるタイミングで、`v=...` をまとめて更新する。
 - 未公開の UI / JavaScript 変更が継続している間は、既存の `v=...` を維持する。
-- 変更途中で `app/script.js` から読む ES Modules や、module 間の import / export に `?v=...` 付きの参照を追加・更新するときは、その時点の既存値へ揃え、新しい値にはしない。
-- `index.html` の `styles.css?v=...` と `app/script.js?v=...` は必ず同じ値に揃える。
-- `app/script.js` から読む ES Modules や、module 間の import / export に `?v=...` が付いている箇所も同じ値へ揃える。
+- 変更途中で `app/bootstrap.mjs` から読む ES Modules や、module 間の import / export に `?v=...` 付きの参照を追加・更新するときは、その時点の既存値へ揃え、新しい値にはしない。
+- `index.html` の `styles.css?v=...` と `app/bootstrap.mjs?v=...` は必ず同じ値に揃える。
+- `app/bootstrap.mjs` から読む ES Modules や、module 間の import / export に `?v=...` が付いている箇所も同じ値へ揃える。
 - `v=...` を更新するときは、関連有無を自己判断せず、更新前の古い値を `rg -n "v=<old>|\\?v=<old>" -S .` で全検索して一斉に統一する。
 - `songs.json` / `songs-meta.json` の内容更新だけでは `v=...` を更新しない。
   曲データの鮮度確認は `songs-meta.json` の content hash で行う。
