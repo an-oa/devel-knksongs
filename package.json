@@ -4,12 +4,16 @@
   "type": "module",
   "scripts": {
     "build:songs-json": "node scripts/build-songs-json.mjs",
+    "lint": "eslint .",
     "test:unit": "node --test tests/*.mjs",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:debug": "playwright test --debug"
   },
   "devDependencies": {
-    "@playwright/test": "^1.53.0"
+    "@eslint/js": "^9.39.4",
+    "@playwright/test": "^1.53.0",
+    "eslint": "^9.39.4",
+    "globals": "^17.6.0"
   }
 }
