@@ -10,7 +10,6 @@ import {
 import {
     destroyYoutubeSharedPlayback,
     ensureYoutubeSharedPlaybackElements,
-    ensureYoutubeSharedPlaybackParkingNode,
     getYoutubeSharedPlaybackState,
     getYoutubeSharedPlaybackThumb,
     setPendingYoutubeSharedPlaybackAttach,
@@ -531,14 +530,6 @@ export function createYoutubeController({ ui, youtube, constants }) {
             createFrame: () => createSharedPlaybackFrame(),
             createCloseButton: () => createSharedPlaybackCloseButton()
         });
-    }
-
-    /**
-     * 共有プレーヤーの退避先ノードを返す。
-     * @returns {*}
-     */
-    function ensureSharedPlaybackParkingNode() {
-        return ensureYoutubeSharedPlaybackParkingNode(youtube);
     }
 
     /**

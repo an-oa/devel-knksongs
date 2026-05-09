@@ -23,7 +23,7 @@ export default [
         },
         rules: {
             "no-unused-vars": [
-                "warn",
+                "error",
                 {
                     args: "after-used",
                     caughtErrors: "none",
