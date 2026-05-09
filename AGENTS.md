@@ -48,13 +48,14 @@ feat: move settings into dedicated sidebar panel
 
 ## Verification
 
-- `tests/` 配下に Node のテストがあるため、JavaScript を変更したときは `node --test tests/*.mjs` を基本の確認手順として実行する。
+- JavaScript を変更したときは、静的解析として `npm run lint` を基本の確認手順として実行する。
+- `tests/` 配下に Node のテストがあるため、JavaScript を変更したときは `node --test tests/*.mjs` も基本の確認手順として実行する。
 - YouTube 再生やサイドバー操作などブラウザ上の回帰に関わる変更では、
   `npm run test:e2e` も実行する。
 - 構文だけを素早く確認したいときは `node --check <file>` を使い、その結果だけでテスト完了とは扱わない。
-- コミット前後に確認結果を共有するときは、実行コマンドと pass/fail の件数を簡潔に残す。
+- コミット前後に確認結果を共有するときは、実行コマンドと lint/test の pass/fail 件数を簡潔に残す。
 - ファイル移動や import の一括更新を含む変更では、移動直後に `node --check` を対象ファイルへ段階的に実行し、
-  最後に `node --test tests/*.mjs` を回してから完了扱いにする。
+  最後に `npm run lint` と `node --test tests/*.mjs` を回してから完了扱いにする。
 
 ## Branch Diff Review
 
@@ -84,7 +85,7 @@ feat: move settings into dedicated sidebar panel
 - `v=...` を更新するときは、関連有無を自己判断せず、更新前の古い値を `rg -n "v=<old>|\\?v=<old>" -S .` で全検索して一斉に統一する。
 - `songs.json` / `songs-meta.json` の内容更新だけでは `v=...` を更新しない。
   曲データの鮮度確認は `songs-meta.json` の content hash で行う。
-- 更新後は `node --test tests/*.mjs` を実行し、pass/fail 件数を共有する。
+- 更新後は `npm run lint` と `node --test tests/*.mjs` を実行し、pass/fail 件数を共有する。
 
 ## Encoding And Line Endings
 

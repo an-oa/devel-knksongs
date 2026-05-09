@@ -13,7 +13,7 @@
 - データ生成/公開：GitHub Actions でCSVからJSONを生成し、Pages artifact を deploy する
 - 実行時の同梱外部ライブラリ依存：なし
 - 埋め込み再生まわりでは YouTube Iframe API を動的に利用
-- 開発時テスト：Node.js 標準 `node:test` と Playwright Chromium smoke を利用
+- 開発時確認：ESLint、Node.js 標準 `node:test`、Playwright Chromium smoke を利用
 
 ## テスト方針（現状）
 - 対象: 検索ロジック、日付フィルタ、ブックマーク検索、描画/再生/保存/サイドバーまわりの回帰
@@ -51,6 +51,7 @@
   - `tests/songs-json-cache.test.mjs`
   - `tests/songs-json.test.mjs`
 - 実行コマンド:
+  - `npm run lint`
   - `node --test tests/*.mjs`
   - `npm run test:e2e`
 

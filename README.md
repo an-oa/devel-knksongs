@@ -94,10 +94,11 @@ flowchart TD
 - フロントエンドのみで動作します(静的ホスティング想定)。
 - 配布物はHTML/CSS/JavaScriptのみで、実行時にnpm等の同梱依存はありません。
 - サムネイル表示/埋め込み再生まわりでは YouTube Iframe API を動的に利用します。
+- 開発時の静的解析は ESLint を利用します。
 - 開発時テストは Node.js 標準の `node:test` を利用します。
 - ブラウザ回帰確認として Playwright による Chromium スモークテストを用意しています。
 
-## テスト(開発者向け)
+## テスト/静的解析(開発者向け)
 
 - 現在は以下のテストを用意しています。
   - ブックマーク保存スキーマ/移行のテスト (`tests/bookmark-storage-schema.test.mjs`)
@@ -126,6 +127,7 @@ flowchart TD
   - YouTube shared playback / thumbnail helper / unconfirmed playback start の単体テスト (`tests/youtube-shared-playback.test.mjs`, `tests/youtube-thumbnail.test.mjs`, `tests/youtube-unconfirmed-playback-start.test.mjs`)
   - Chromium 上での YouTube 再生スモークテスト (`tests/e2e/youtube-smoke.spec.mjs`)
 - 実行コマンド:
+  - `npm run lint`
   - `node --test tests/*.mjs`
   - `npm run test:e2e`
 - Playwright のスモークテストを初回実行する前に、以下を準備してください。

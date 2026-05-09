@@ -16,7 +16,9 @@
 4. **テスト実行**
    - 変更影響に応じたテストを実行
    - 既存テストを回すだけでなく、バグ修正や仕様追加に対応する回帰テストを必要に応じて追加
-   - 現在の基本コマンド: `node --test tests/*.mjs`
+   - JavaScript 変更時の基本コマンド:
+     - `npm run lint`
+     - `node --test tests/*.mjs`
    - YouTube 再生やサイドバー操作などブラウザ上の回帰に関わる変更では、
      `npm run test:e2e` も実行する。
 5. **必要なら DESIGN.md / README.md / AGENTS.md 等へ反映**
@@ -73,7 +75,7 @@ flowchart TD
 3. **段階的に検証**
    - 変更したファイル群へ `node --check <file>` を段階的に実行
    - 残存参照は `rg` で確認
-   - 最後に `node --test tests/*.mjs`
+   - 最後に `npm run lint` と `node --test tests/*.mjs`
    - ブラウザ操作や YouTube smoke に影響する場合は `npm run test:e2e`
 
 ### 置換作業の注意
