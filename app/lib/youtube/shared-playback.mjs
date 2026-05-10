@@ -105,8 +105,9 @@ export function ensureYoutubeSharedPlaybackElements({
 
 /**
  * 共有プレーヤーの退避先ノードを返す。
+ * DOM 退避先の生成と再利用を単体テストするため export している。
  * @param {*} youtube
- * @returns {*}
+ * @returns {HTMLElement | null}
  */
 export function ensureYoutubeSharedPlaybackParkingNode(youtube) {
     if (!canUseDom()) return null;

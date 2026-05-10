@@ -1,6 +1,7 @@
 /**
  * 現在の結果順から、次に再生候補となる曲キー列を返す。
- * @param {*} results
+ * 再生継続候補の境界条件を単体テストするため export している。
+ * @param {Array<{ songKey?: string }> | undefined} results
  * @param {string} currentSongKey
  * @param {boolean} shouldLoop
  * @returns {string[]}

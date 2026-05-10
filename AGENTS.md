@@ -49,6 +49,9 @@ feat: move settings into dedicated sidebar panel
   例: `Element | null | undefined`、`string`、`number`、`Record<string, *>`。
 - DOM 要素を受け取る関数では、呼び出し元だけに依存せず、
   必要に応じて `isHtmlElement` などの実行時チェックで境界を守る。
+- module 内 helper を単体テストで直接検証するために export する場合は、`__test__` へ分けず通常の named export のままにしてよい。
+  その場合は JSDoc に、本番コードでは同じ module 内または上位 API 経由で使う helper であり、
+  境界条件を単体テストするために export していることを簡潔に残す。
 
 ## Verification
 

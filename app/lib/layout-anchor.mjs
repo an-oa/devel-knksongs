@@ -53,9 +53,11 @@ function restoreViewportAnchor(anchor) {
 }
 
 /**
- * スクロール位置を維持しながらレイアウト再計算するスケジューラーを作る。
- * 最新リクエストだけが有効になる。
- * @param {*} getRefreshLayout
+ * 指定回数の animation frame を待ってから処理を実行する。
+ * レイアウト待ちの境界条件を単体テストするため export している。
+ * @param {number} frameCount
+ * @param {Function | undefined} callback
+ * @returns {Promise<*>}
  */
 export function afterAnimationFrames(frameCount, callback) {
     const remaining = Number.isFinite(frameCount) ? Math.max(0, Math.floor(frameCount)) : 0;

@@ -9,6 +9,7 @@
 
 /**
  * 保存済みブックマーク構造を検証し、利用可能な形へ整形する。
+ * 保存 payload の正規化境界を単体テストするため export している。
  * @param {*} raw
  * @returns {Record<string, { name: string, createdAt: number, songs: Array<string | number> }>}
  */
@@ -92,7 +93,8 @@ function getBookmarkSongRefFromRow(row) {
 
 /**
  * 旧形式の曲参照キーを現行の songKey 互換形式へ正規化する。
- * @param {*} ref
+ * 旧形式参照の変換境界を単体テストするため export している。
+ * @param {string | null | undefined} ref
  * @returns {string | null}
  */
 export function normalizeLegacySongRefToCurrent(ref) {

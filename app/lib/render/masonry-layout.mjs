@@ -10,6 +10,7 @@ export const DEFAULT_MASONRY_BREAKPOINTS = [
 
 /**
  * コンテナ幅に対応する masonry の列数を返す。
+ * レイアウト breakpoint の境界条件を単体テストするため export している。
  * @param {number} containerWidth
  * @param {Array<{ minWidth: number, columns: number }>} breakpoints
  * @returns {number}
