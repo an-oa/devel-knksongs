@@ -5,6 +5,18 @@ import {
 } from "./bookmark-schema.mjs?v=17";
 
 /**
+ * @typedef {{ name?: string, songs?: Array<string | number> }} BookmarkImportEntry
+ */
+
+/**
+ * @typedef {{
+ *   maxBookmarkCount?: number,
+ *   maxSongsPerBookmark?: number,
+ *   maxBookmarkNameLength?: number
+ * }} BookmarkImportLimits
+ */
+
+/**
  * 成功時の共通レスポンスを組み立てる。
  * @param {*} extra
  * @returns {{ ok: true }}
@@ -36,11 +48,11 @@ function countBookmarkSongs(bookmarks) {
 
 /**
  * ブックマーク数、名前の長さ、各ブックマーク内の曲数が上限内かを確認する。
- * @param {Record<string, { name: string, songs: Array<*> }>} bookmarks
- * @param {{ maxBookmarkCount?: number, maxSongsPerBookmark?: number, maxBookmarkNameLength?: number }} limits
+ * @param {Record<string, BookmarkImportEntry>} bookmarks
+ * @param {BookmarkImportLimits | undefined} limits
  * @returns {{ ok: boolean, reason?: string, limit?: number, bookmarkName?: string }}
  */
-export function validateBookmarkImportLimits(bookmarks, limits) {
+function validateBookmarkImportLimits(bookmarks, limits) {
     const maxBookmarkCount = Number.isFinite(limits && limits.maxBookmarkCount)
         ? limits.maxBookmarkCount
         : Number.POSITIVE_INFINITY;

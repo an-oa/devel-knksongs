@@ -1,6 +1,10 @@
 import { isHtmlElement } from "./dom-utils.mjs?v=17";
 
 /**
+ * @typedef {{ element: HTMLElement, container: HTMLElement, top: number }} ViewportAnchor
+ */
+
+/**
  * 指定要素を含む最も近いスクロール可能祖先を返す。
  * @param {*} element
  */
@@ -18,9 +22,10 @@ export function findScrollableAncestor(element) {
 
 /**
  * レイアウト更新後に元の見えていた位置へ戻すためのアンカー情報を作る。
- * @param {*} element
+ * @param {Element | null | undefined} element
+ * @returns {ViewportAnchor | null}
  */
-export function createViewportAnchor(element) {
+function createViewportAnchor(element) {
     if (!isHtmlElement(element) || !element.isConnected) return null;
     return {
         element,
@@ -31,9 +36,10 @@ export function createViewportAnchor(element) {
 
 /**
  * アンカー要素の見えていた位置を維持するようスクロール位置を補正する。
- * @param {*} anchor
+ * @param {ViewportAnchor | null | undefined} anchor
+ * @returns {void}
  */
-export function restoreViewportAnchor(anchor) {
+function restoreViewportAnchor(anchor) {
     if (!anchor || !isHtmlElement(anchor.element) || !anchor.element.isConnected) return;
     const nextTop = anchor.element.getBoundingClientRect().top;
     const delta = nextTop - anchor.top;

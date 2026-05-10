@@ -1,4 +1,13 @@
 /**
+ * @typedef {{
+ *   bookmarkSongKey?: string,
+ *   songKey?: string,
+ *   legacySongKey?: string,
+ *   sourceIndex?: number
+ * }} BookmarkSongRow
+ */
+
+/**
  * 保存済みブックマーク構造を検証し、利用可能な形へ整形する。
  * @param {*} raw
  * @returns {Record<string, { name: string, createdAt: number, songs: Array<string | number> }>}
@@ -67,10 +76,10 @@ export function buildStoredBookmarksPayload(bookmarks, version) {
 
 /**
  * 行データからブックマーク保存に使う参照キーを返す。
- * @param {*} row
+ * @param {BookmarkSongRow | null | undefined} row
  * @returns {string}
  */
-export function getBookmarkSongRefFromRow(row) {
+function getBookmarkSongRefFromRow(row) {
     if (!row || typeof row !== "object") return "";
     if (typeof row.bookmarkSongKey === "string" && row.bookmarkSongKey.trim()) {
         return row.bookmarkSongKey.trim();

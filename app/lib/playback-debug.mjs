@@ -2,7 +2,7 @@
  * 再生系デバッグログの有効状態を返す。
  * @returns {boolean}
  */
-export function isPlaybackDebugEnabled() {
+function isPlaybackDebugEnabled() {
     try {
         if (window.__KNK_DEBUG_YOUTUBE__ === true) return true;
         return localStorage.getItem("debugYoutubePlayer") === "true";

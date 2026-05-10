@@ -19,10 +19,11 @@ export function scrollResultListToTop(resultList) {
 
 /**
  * 指定要素が見える位置まで、必要時または強制指定時にスクロールする。
- * @param {Element | null | undefined} element
- * @param {{ topOffset?: number, behavior?: "auto" | "smooth", force?: boolean } | undefined} options
+ * @param {HTMLElement | null | undefined} element
+ * @param {{ topOffset?: number, behavior?: ScrollBehavior, force?: boolean } | undefined} options
+ * @returns {void}
  */
-export function scrollElementIntoView(element, options) {
+function scrollElementIntoView(element, options) {
     if (!isHtmlElement(element) || !element.isConnected) return;
     const scrollContainer = findScrollableAncestor(element);
     if (!scrollContainer) return;

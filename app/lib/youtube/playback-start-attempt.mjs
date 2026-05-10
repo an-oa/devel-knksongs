@@ -37,10 +37,10 @@ export function createYoutubePlaybackStartResult(status) {
 
 /**
  * 再生開始結果から status を返す。
- * @param {YoutubePlaybackStartResult | boolean | undefined} playbackResult
+ * @param {YoutubePlaybackStartResult | boolean | null | undefined} playbackResult
  * @returns {YoutubePlaybackStartStatus}
  */
-export function getYoutubePlaybackStartStatus(playbackResult) {
+function getYoutubePlaybackStartStatus(playbackResult) {
     if (playbackResult && typeof playbackResult === "object" && typeof playbackResult.status === "string") {
         return createYoutubePlaybackStartResult(playbackResult.status).status;
     }
@@ -51,10 +51,10 @@ export function getYoutubePlaybackStartStatus(playbackResult) {
 
 /**
  * 再生開始結果をオブジェクト形式へ正規化する。
- * @param {YoutubePlaybackStartResult | boolean | undefined} playbackResult
+ * @param {YoutubePlaybackStartResult | boolean | null | undefined} playbackResult
  * @returns {YoutubePlaybackStartResult}
  */
-export function normalizeYoutubePlaybackStartResult(playbackResult) {
+function normalizeYoutubePlaybackStartResult(playbackResult) {
     return createYoutubePlaybackStartResult(getYoutubePlaybackStartStatus(playbackResult));
 }
 
