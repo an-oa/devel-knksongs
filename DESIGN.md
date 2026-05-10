@@ -14,6 +14,8 @@
 - 実行時の同梱外部ライブラリ依存：なし
 - 埋め込み再生まわりでは YouTube Iframe API を動的に利用
 - 開発時確認：ESLint、Node.js 標準 `node:test`、Playwright Chromium smoke を利用
+- 型安全性は JavaScript + JSDoc + ESLint を基本に段階的に高める。
+  TypeScript 化は全面移行ではなく、必要性が高まった時点で別途検討する。
 
 ## テスト方針（現状）
 - 対象: 検索ロジック、日付フィルタ、ブックマーク検索、描画/再生/保存/サイドバーまわりの回帰

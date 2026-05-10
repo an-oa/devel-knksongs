@@ -45,6 +45,10 @@ feat: move settings into dedicated sidebar panel
   `app/controllers/youtube.mjs` では、この形式が主流になっている。
 - 短い委譲関数や一部テスト補助関数では省略されている箇所もあるが、新しく JavaScript の関数を追加するときは、関数の先頭に JSDoc を付けて機能を説明する。
 - 必要に応じて `@param` `@returns` を付け、既存コードの粒度に合わせて簡潔に書く。
+- JSDoc の `@param {*} ` は既存コードでは残っているが、新規関数や触った関数では可能な範囲で具体的な型へ寄せる。
+  例: `Element | null | undefined`、`string`、`number`、`Record<string, *>`。
+- DOM 要素を受け取る関数では、呼び出し元だけに依存せず、
+  必要に応じて `isHtmlElement` などの実行時チェックで境界を守る。
 
 ## Verification
 
