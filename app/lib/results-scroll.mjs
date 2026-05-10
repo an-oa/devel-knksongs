@@ -3,10 +3,10 @@ import { afterLayoutSettled, findScrollableAncestor } from "./layout-anchor.mjs?
 
 /**
  * 結果リストを含むスクロール領域を先頭へ戻す。
- * @param {*} resultList
+ * @param {Element | null | undefined} resultList
  */
 export function scrollResultListToTop(resultList) {
-    if (!resultList) return;
+    if (!isHtmlElement(resultList)) return;
     const scrollContainer = findScrollableAncestor(resultList);
     if (!scrollContainer) return;
 
@@ -19,7 +19,7 @@ export function scrollResultListToTop(resultList) {
 
 /**
  * 指定要素が見える位置まで、必要時または強制指定時にスクロールする。
- * @param {*} element
+ * @param {Element | null | undefined} element
  * @param {{ topOffset?: number, behavior?: "auto" | "smooth", force?: boolean } | undefined} options
  */
 export function scrollElementIntoView(element, options) {
@@ -54,9 +54,9 @@ export function scrollElementIntoView(element, options) {
 
 /**
  * レイアウト補正が落ち着いた後に、指定要素が見える位置までスクロールする。
- * @param {*} element
+ * @param {Element | null | undefined} element
  * @param {{ topOffset?: number, behavior?: "auto" | "smooth", force?: boolean } | undefined} options
- * @returns {Promise<*>}
+ * @returns {Promise<void>}
  */
 export function scheduleScrollElementIntoView(element, options) {
     return afterLayoutSettled(() => {
