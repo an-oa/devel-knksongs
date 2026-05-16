@@ -1,5 +1,5 @@
-import { canUseDom, getHeaderHeight, isHtmlElement } from "../dom-utils.mjs?v=17";
-import { scheduleScrollElementIntoView } from "../results-scroll.mjs?v=17";
+import { canUseDom, getHeaderHeight, isHtmlElement } from "../dom-utils.mjs?v=18";
+import { scheduleScrollElementIntoView } from "../results-scroll.mjs?v=18";
 
 /**
  * 遅延読み込み用のサムネイル画像要素を生成する。
