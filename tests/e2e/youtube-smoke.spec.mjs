@@ -91,6 +91,35 @@ test("same thumbnail can be replayed after returning from the embedded player", 
     }).toBe(2);
 });
 
+test("thumbnail images keep masonry layout stable after refresh", async ({ page }) => {
+    await enablePlaybackSettings(page);
+    await filterBySongTitle(page, "Artist");
+
+    const cards = page.locator(".song-card");
+    await expect(cards).toHaveCount(6);
+    await expect(cards.first().locator("img")).toBeVisible();
+
+    const before = await page.locator(".song-card").evaluateAll((nodes) => nodes.map((card) => ({
+        songKey: card.dataset.songKey || "",
+        top: card.style.top,
+        imageDisplay: window.getComputedStyle(card.querySelector("img")).display
+    })));
+
+    await expect(before.every((entry) => entry.imageDisplay === "block")).toBe(true);
+
+    await page.evaluate(async () => {
+        const { applyMasonryLayout } = await import("/app/lib/render/masonry-layout.mjs?v=17");
+        applyMasonryLayout(document.querySelector("#resultList"));
+    });
+
+    const after = await page.locator(".song-card").evaluateAll((nodes) => nodes.map((card) => ({
+        songKey: card.dataset.songKey || "",
+        top: card.style.top
+    })));
+
+    await expect(after).toEqual(before.map(({ songKey, top }) => ({ songKey, top })));
+});
+
 test("manual playback failure advances to the next result when continuous playback is enabled", async ({ page }) => {
     await enablePlaybackSettings(page, { continuousPlayback: true });
     await setMockVideoBehavior(page, "reject-alpha", "auto-error");
