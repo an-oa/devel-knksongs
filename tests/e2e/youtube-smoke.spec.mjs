@@ -72,14 +72,20 @@ test("manual playback mounts an iframe from the thumbnail", async ({ page }) => 
 test("frame scope filter switches between own and guest results", async ({ page }) => {
     await selectFrameScope(page, "guest");
 
-    await expect(getSongCard(page, "Chain Alpha")).toBeVisible();
+    const guestCard = getSongCard(page, "Chain Alpha");
+    await expect(guestCard).toBeVisible();
+    await expect(guestCard.locator(".tag-collab")).toHaveText("コラボ");
     await expect(getSongCard(page, "Manual Song")).toHaveCount(0);
     await expect(getSongCard(page, "Replay Song")).toHaveCount(0);
 
     await selectFrameScope(page, "own");
 
-    await expect(getSongCard(page, "Manual Song")).toBeVisible();
-    await expect(getSongCard(page, "Replay Song")).toBeVisible();
+    const manualCard = getSongCard(page, "Manual Song");
+    const hostCard = getSongCard(page, "Replay Song");
+    await expect(manualCard).toBeVisible();
+    await expect(manualCard.locator(".tag-collab")).toHaveCount(0);
+    await expect(hostCard).toBeVisible();
+    await expect(hostCard.locator(".tag-collab")).toHaveText("コラボ");
     await expect(getSongCard(page, "Chain Alpha")).toHaveCount(0);
 });
 

@@ -551,6 +551,7 @@ input[type="text"] {
   font-weight: bold;
   box-sizing: border-box;
 }
+.tag-collab { background: #e0f2f1; color: #00695c; }
 .tag-relay { background: #fff3e0; color: #e65100; }
 .tag-harmony { background: #f3e5f5; color: #7b1fa2; }
 

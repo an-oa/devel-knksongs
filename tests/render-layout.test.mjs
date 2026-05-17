@@ -361,6 +361,54 @@ test("render: refreshLayout shrinks container height after card height decreases
     }
 });
 
+test("render: adds a collaboration tag when stream role is present", () => {
+    const cleanup = installFakeDom();
+    try {
+        const collabRow = makeRenderRow({
+            songKey: "song:collab",
+            sourceIndex: 1,
+            streamRole: "ホスト"
+        });
+        const soloRow = makeRenderRow({
+            songKey: "song:solo",
+            sourceIndex: 2,
+            streamRole: ""
+        });
+        const data = {
+            currentResults: [collabRow, soloRow],
+            displayLimit: 10,
+            activeBookmark: null
+        };
+        const ui = createRenderUiState({
+            el: {
+                resultList: document.createElement("div"),
+                loadMoreContainer: document.createElement("div")
+            }
+        });
+        const controller = createRenderController({
+            data,
+            ui,
+            isAllFormatsSelected: () => true,
+            callbacks: createRenderCallbacks({
+                getSearchState: () => ({ queryRaw: "" })
+            })
+        });
+
+        controller.updateDisplay();
+
+        const collabEntry = ui.render.cardEntriesBySourceKey.get("song:song:collab");
+        const soloEntry = ui.render.cardEntriesBySourceKey.get("song:song:solo");
+        const collabTags = Array.from(collabEntry.card.querySelectorAll(".tag")).map((tag) => tag.textContent);
+        const soloTags = Array.from(soloEntry.card.querySelectorAll(".tag")).map((tag) => tag.textContent);
+
+        assert.deepEqual(collabTags, ["配信", "コラボ"]);
+        assert.deepEqual(soloTags, ["配信"]);
+        assert.equal(collabEntry.card.querySelector(".tag-collab").textContent, "コラボ");
+    } finally {
+        cleanup();
+    }
+});
+
 test("render: explicit video orientation overrides URL heuristic", () => {
     const cleanup = installFakeDom();
     try {

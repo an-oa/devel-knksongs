@@ -452,6 +452,7 @@ export function makeRenderRow(input) {
         artist: input.artist || "artist",
         date: input.date || "2024-01-01",
         format: input.format || "配信",
+        streamRole: input.streamRole ?? "",
         videoOrientation: input.videoOrientation || "",
         isRelay: false,
         isHarmony: false,

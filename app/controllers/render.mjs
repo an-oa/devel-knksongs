@@ -1,3 +1,4 @@
+import { hasStreamRole } from "../lib/stream-role.mjs?v=18";
 import { getHeaderHeight } from "../lib/dom-utils.mjs?v=18";
 import { tracePlayback } from "../lib/playback-debug.mjs?v=18";
 import { scheduleScrollElementIntoView } from "../lib/results-scroll.mjs?v=18";
@@ -176,9 +177,9 @@ export function createRenderController({ data, ui, isAllFormatsSelected, resultD
     }
 
     /**
-     * 形式・リレー・ハモリのタグ表示を更新する。
-     * @param {*} tags
-     * @param {*} row
+     * 形式・配信での立場・リレー・ハモリのタグ表示を更新する。
+     * @param {Element} tags
+     * @param {{ format?: string, streamRole?: string, isRelay?: boolean, isHarmony?: boolean }} row
      */
     function updateFooterTags(tags, row) {
         tags.replaceChildren();
@@ -187,6 +188,12 @@ export function createRenderController({ data, ui, isAllFormatsSelected, resultD
             fmt.className = "tag";
             fmt.textContent = row.format;
             tags.appendChild(fmt);
+        }
+        if (hasStreamRole(row.streamRole)) {
+            const collab = document.createElement("span");
+            collab.className = "tag tag-collab";
+            collab.textContent = "コラボ";
+            tags.appendChild(collab);
         }
         if (row.isRelay) {
             const relay = document.createElement("span");
