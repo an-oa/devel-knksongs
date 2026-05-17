@@ -4,7 +4,7 @@
 公開スプレッドシートの歌データを検索・絞り込みし、YouTube動画へアクセスしやすくする。
 
 ## 対象ユーザー
-- 配信/歌みた/ショート/切り抜きを探したい視聴者
+- 配信/歌みた/ショート/切り抜き/収録を探したい視聴者
 - PC/スマホの両方から利用するユーザー
 
 ## 全体構成
@@ -70,7 +70,7 @@
 - **サイドバー**：検索・絞り込み・設定
   - 検索入力
   - 日付選択（年/月/日セレクト、From/To）
-  - 形態フィルタ（配信/オリ曲/歌みた/ショート/切り抜き。UI上はオリ曲/歌みたを1項目として扱う）
+  - 形態フィルタ（配信/オリ曲/歌みた/ショート/切り抜き/収録。UI上はオリ曲/歌みたを1項目として扱う）
   - リレー/ハモリ
   - ブックマーク導線（専用パネルを開く）
   - 設定導線（専用パネルを開く）
@@ -119,7 +119,7 @@ flowchart TD
 ## データモデル（概要）
 `SongRow`
 - date / dateKey / archiveId / archiveOrder / sourceIndex
-- videoId / songKey / bookmarkSongKey / legacySongKey / format / videoOrientation / isRelay / isHarmony
+- videoId / songKey / bookmarkSongKey / legacySongKey / format / streamRole / videoOrientation / isRelay / isHarmony
 - title / artist / titleYomi / artistYomi
 - endSeconds
 - titleNorm / artistNorm / titleYomiNorm / artistYomiNorm
@@ -149,7 +149,7 @@ flowchart TD
 ### 条件判定（「未指定」の定義）
 - キーワードが空（検索ボックスが空）
 - 日付が未指定（From/To ともに年・月・日が未選択）
-- 形態フィルタ4項目がすべてON（配信 / オリ曲/歌みた / ショート / 切り抜き）
+- 形態フィルタ5項目がすべてON（配信 / オリ曲/歌みた / ショート / 切り抜き / 収録）
 - リレー/ハモリがOFF
 - ブックマークが未選択
 

@@ -14,7 +14,7 @@
   - ひらがな/カタカナ等の読みでも検索できます。
   - 複数キーワード(スペース区切り)に対応します(全角スペースも可)。
 - 絞り込みができます。
-  - 配信 / オリ曲/歌みた / ショート / 切り抜き。
+  - 配信 / オリ曲/歌みた / ショート / 切り抜き / 収録。
   - UI上では `オリ曲` を `歌みた` と同じ項目(「オリ曲/歌みた」)で扱います。
   - リレー / ハモリ。
   - 条件はサイドバー(検索メニュー)から操作できます。
@@ -90,6 +90,7 @@ flowchart TD
 - 通常の起動時は、事前生成された `data/songs.json` と `data/songs-meta.json` を優先して読み込みます。
 - `songs-meta.json` の `contentHash` で手元のJSONキャッシュが最新かを確認し、変化がなければ大きい `songs.json` の再取得を避けます。
 - 公開スプレッドシートのCSVは、事前生成JSONの元データかつJSON取得失敗時のフォールバックとして参照します(`app/config.mjs` の `PUBLIC_CSV_URL` で指定します)。
+- CSVの `配信での立場` は曲データの `streamRole` としてJSONへ保持します。
 - `.github/workflows/update-songs-json-and-deploy.yml` は GitHub Actions 上で `npm run build:songs-json` を実行し、`data/songs.json` / `data/songs-meta.json` を更新して Pages へ deploy します。
 - フロントエンドのみで動作します(静的ホスティング想定)。
 - 配布物はHTML/CSS/JavaScriptのみで、実行時にnpm等の同梱依存はありません。

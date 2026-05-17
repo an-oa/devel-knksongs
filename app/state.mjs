@@ -4,7 +4,7 @@
 export const RANDOM_DISPLAY_COUNT = 48;
 export const MIN_PERFORMANCE_FOR_RANDOM = 3;
 export const RESULT_DISPLAY_BATCH_SIZE = 48;
-export const DEFAULT_FORMATS = ["配信", "歌みた", "ショート", "切り抜き"];
+export const DEFAULT_FORMATS = ["配信", "歌みた", "ショート", "切り抜き", "収録"];
 export const SEARCH_STATE_KEY = "searchStateV1";
 export const BOOKMARK_STORAGE_KEY = "bookmarksV1";
 export const BOOKMARK_STORAGE_VERSION = 2;
