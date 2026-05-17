@@ -1,3 +1,5 @@
+import { isGuestStreamRole } from "./stream-role.mjs?v=18";
+
 /**
  * 検索比較しやすい形に文字列を正規化する。
  * @param {*} s
@@ -53,6 +55,33 @@ export function isWithinDateRange(row, fromKey, toKey) {
     return true;
 }
 
+export const FRAME_SCOPE_ALL = "all";
+export const FRAME_SCOPE_OWN = "own";
+export const FRAME_SCOPE_GUEST = "guest";
+export const DEFAULT_FRAME_SCOPE = FRAME_SCOPE_ALL;
+
+/**
+ * 配信での立場フィルタの値を既知の値へ正規化する。
+ * @param {*} value
+ */
+export function normalizeFrameScope(value) {
+    if (value === FRAME_SCOPE_OWN || value === FRAME_SCOPE_GUEST) return value;
+    return DEFAULT_FRAME_SCOPE;
+}
+
+/**
+ * 曲行が指定された配信での立場に一致するか判定する。
+ * `ゲスト` 以外はホスト側として扱う。
+ * @param {*} row
+ * @param {*} frameScope
+ */
+export function matchesFrameScope(row, frameScope) {
+    const normalizedScope = normalizeFrameScope(frameScope);
+    if (normalizedScope === FRAME_SCOPE_ALL) return true;
+    const isGuest = isGuestStreamRole(row && row.streamRole);
+    return normalizedScope === FRAME_SCOPE_GUEST ? isGuest : !isGuest;
+}
+
 /**
  * クエリ・日付・形式・フラグ条件で曲一覧を絞り込む。
  * @param {*} rows
@@ -73,6 +102,7 @@ export function filterSongsByCriteria(rows, searchState, selectedFormats) {
         return matchText &&
             matchDate &&
             matchesSelectedFormat(row.format, selectedFormats) &&
+            matchesFrameScope(row, searchState.frameScope) &&
             (!searchState.relayOnly || row.isRelay) &&
             (!searchState.harmonyOnly || row.isHarmony);
     });

@@ -261,6 +261,13 @@ export function createSidebarController(input) {
                 markFilterTouched();
             });
         }
+        if (ui.el.frameScopeOptions) {
+            ui.el.frameScopeOptions.querySelectorAll('input[name="frameScope"]').forEach((input) => {
+                input.addEventListener("change", () => {
+                    markFilterTouched();
+                });
+            });
+        }
         if (ui.el.searchBox) {
             ui.el.searchBox.addEventListener("input", () => {
                 markQueryTouched();

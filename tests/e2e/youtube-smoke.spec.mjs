@@ -9,6 +9,7 @@ import {
     filterBySongTitle,
     getSongCard,
     openSettingsPanel,
+    selectFrameScope,
     waitForInitialLoad
 } from "./support/ui-helpers.mjs";
 
@@ -66,6 +67,42 @@ test("manual playback mounts an iframe from the thumbnail", async ({ page }) => 
 
     await expect(manualCard.locator("iframe")).toBeVisible();
     await expect(manualCard.locator(".thumb-close-btn")).toBeVisible();
+});
+
+test("frame scope filter switches between own and guest results", async ({ page }) => {
+    await selectFrameScope(page, "guest");
+
+    await expect(getSongCard(page, "Chain Alpha")).toBeVisible();
+    await expect(getSongCard(page, "Manual Song")).toHaveCount(0);
+    await expect(getSongCard(page, "Replay Song")).toHaveCount(0);
+
+    await selectFrameScope(page, "own");
+
+    await expect(getSongCard(page, "Manual Song")).toBeVisible();
+    await expect(getSongCard(page, "Replay Song")).toBeVisible();
+    await expect(getSongCard(page, "Chain Alpha")).toHaveCount(0);
+});
+
+test("saved frame scope is restored after dynamic options render on boot", async ({ page }) => {
+    await page.evaluate(() => {
+        localStorage.setItem("searchStateV1", JSON.stringify({
+            version: 2,
+            query: "",
+            relayOnly: false,
+            harmonyOnly: false,
+            frameScope: "guest",
+            dateFrom: "",
+            dateTo: "",
+            formats: ["配信", "歌みた", "ショート", "切り抜き", "収録"]
+        }));
+    });
+    await page.reload();
+    await waitForInitialLoad(page);
+
+    await expect(page.locator("#frameScopeOptions input[value=\"guest\"]")).toBeChecked();
+    await expect(getSongCard(page, "Chain Alpha")).toBeVisible();
+    await expect(getSongCard(page, "Manual Song")).toHaveCount(0);
+    await expect(getSongCard(page, "Replay Song")).toHaveCount(0);
 });
 
 test("same thumbnail can be replayed after returning from the embedded player", async ({ page }) => {

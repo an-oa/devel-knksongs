@@ -35,6 +35,7 @@ export function collectUiElements() {
         closeSettingsPanelBtn: document.getElementById("close-settings-panel"),
         closeSettingsSidebarBtn: document.getElementById("close-settings-sidebar"),
         formatsList: document.getElementById("formatsList"),
+        frameScopeOptions: document.getElementById("frameScopeOptions"),
         openBookmarkPanelBtn: document.getElementById("open-bookmark-panel"),
         bookmarkSidebarPanel: document.getElementById("bookmark-sidebar-panel"),
         closeBookmarkPanelBtn: document.getElementById("close-bookmark-panel"),

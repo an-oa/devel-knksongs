@@ -380,6 +380,7 @@ function resetSearchFilters() {
 
     storageController.setSelectedFormatsToDefault();
     storageController.syncFormatCheckboxesFromState();
+    storageController.setFrameScopeToDefault();
     searchUi.userTouchedFilters = false;
 }
 
@@ -406,6 +407,7 @@ function needsFilterReset() {
     if (relayOnly && relayOnly.checked) return true;
     if (harmonyOnly && harmonyOnly.checked) return true;
     if (searchController.hasDateSelection()) return true;
+    if (!searchController.isFrameScopeDefault()) return true;
     return !searchController.areFormatsDefault();
 }
 

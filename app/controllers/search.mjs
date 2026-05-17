@@ -2,6 +2,8 @@ import { createDateFilterController } from "../ui/date/filter.mjs?v=18";
 import {
     dateKeyToParts,
     filterSongsByCriteria,
+    FRAME_SCOPE_ALL,
+    normalizeFrameScope,
     isWithinDateRange,
     normalizeForSearch,
     parseDateKey
@@ -92,6 +94,22 @@ export function createSearchController({ data, ui, constants, callbacks }) {
     }
 
     /**
+     * 現在選択中の配信での立場フィルタを返す。
+     */
+    function getSelectedFrameScope() {
+        const container = ui.el.frameScopeOptions;
+        const selected = container ? container.querySelector('input[name="frameScope"]:checked') : null;
+        return normalizeFrameScope(selected ? selected.value : "");
+    }
+
+    /**
+     * 配信での立場フィルタが既定状態か判定する。
+     */
+    function isFrameScopeDefault() {
+        return getSelectedFrameScope() === FRAME_SCOPE_ALL;
+    }
+
+    /**
      * 現在の UI 入力から検索条件オブジェクトを生成する。
      */
     function getSearchState() {
@@ -101,6 +119,7 @@ export function createSearchController({ data, ui, constants, callbacks }) {
             queryRaw: ui.el.searchBox.value.trim(),
             relayOnly: ui.el.relayOnly.checked,
             harmonyOnly: ui.el.harmonyOnly.checked,
+            frameScope: getSelectedFrameScope(),
             dateFromKey: fromRange ? fromRange.minKey : null,
             dateToKey: toRange ? toRange.maxKey : null,
             hasDateFilter: Boolean(fromRange || toRange)
@@ -131,6 +150,7 @@ export function createSearchController({ data, ui, constants, callbacks }) {
             searchState.queryRaw === "" &&
             !searchState.relayOnly &&
             !searchState.harmonyOnly &&
+            normalizeFrameScope(searchState.frameScope) === FRAME_SCOPE_ALL &&
             !searchState.hasDateFilter &&
             areAllFormatsSelected();
     }
@@ -243,6 +263,7 @@ export function createSearchController({ data, ui, constants, callbacks }) {
         isRecommendedMode,
         areAllFormatsSelected,
         areFormatsDefault,
+        isFrameScopeDefault,
         hasDateSelection: dateFilterController.hasDateSelection,
         getDateSelectValue: dateFilterController.getDateSelectValue,
         applyDateSelectValue: dateFilterController.applyDateSelectValue,

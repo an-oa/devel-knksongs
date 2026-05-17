@@ -1,3 +1,4 @@
+import { isGuestStreamRole } from "./stream-role.mjs?v=18";
 import {
     isOriginalSongFormat,
     isShortFormat,
@@ -40,6 +41,7 @@ function buildRecommendedGroups(songs, minPerformanceCount) {
 function collapseRecommendedRowsByArchive(songs) {
     const songRowsByArchive = new Map();
     for (const row of songs) {
+        if (isGuestStreamRole(row.streamRole)) continue;
         if (!isRecommendedCountFormat(row.format)) continue;
         const archiveKey = getRecommendedSongArchiveKey(row);
         const existing = songRowsByArchive.get(archiveKey);

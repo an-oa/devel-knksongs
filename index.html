@@ -11,7 +11,7 @@
   <!-- OGP -->
   <meta property="og:site_name" content="鐘輝かう 歌サーチ" />
   <meta property="og:title" content="鐘輝かう 歌サーチ" />
-  <meta property="og:description" content="曲名・アーティスト名・読みで検索。配信/歌みた/ショート/切り抜き、リレー/ハモリ、日付範囲で絞り込み。" />
+  <meta property="og:description" content="曲名・アーティスト名・読みで検索。配信/歌みた/ショート/切り抜き/収録、配信での立場、リレー/ハモリ、日付範囲で絞り込み。" />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://an-oa.github.io/knksongs/" />
   <meta property="og:image" content="https://an-oa.github.io/knksongs/ogp.png" />
@@ -21,7 +21,7 @@
   <!-- X (Twitter) -->
   <meta name="twitter:card" content="summary" />
   <meta name="twitter:title" content="鐘輝かう 歌サーチ" />
-  <meta name="twitter:description" content="曲名・アーティスト名・読みで検索。配信/歌みた/ショート/切り抜き、リレー/ハモリ、日付範囲で絞り込み。" />
+  <meta name="twitter:description" content="曲名・アーティスト名・読みで検索。配信/歌みた/ショート/切り抜き/収録、配信での立場、リレー/ハモリ、日付範囲で絞り込み。" />
   <meta name="twitter:image" content="https://an-oa.github.io/knksongs/ogp.png" />
 
   <script>
@@ -85,6 +85,17 @@
                 <select id="dateToDay" class="date-select day" aria-label="終了日"></select>
               </div>
               <button id="clearDateToBtn" class="date-clear-btn" aria-label="終了日をクリア">&times;</button>
+            </div>
+          </div>
+
+          <div class="sidebar-section">
+            <div class="section-header">
+              <label class="section-label" id="frameScopeLabel">配信での立場</label>
+            </div>
+            <div id="frameScopeOptions" class="segmented-control" role="radiogroup" aria-labelledby="frameScopeLabel">
+              <label class="segmented-control-item"><input type="radio" name="frameScope" value="all" checked><span>すべて</span></label>
+              <label class="segmented-control-item"><input type="radio" name="frameScope" value="own"><span>ホスト</span></label>
+              <label class="segmented-control-item"><input type="radio" name="frameScope" value="guest"><span>ゲスト</span></label>
             </div>
           </div>
 

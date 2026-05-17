@@ -296,6 +296,47 @@ input[type="text"] {
   white-space: nowrap;
 }
 .checkbox-item { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; margin-bottom: 8px; }
+
+.segmented-control {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-color);
+}
+.segmented-control-item {
+  position: relative;
+  min-width: 0;
+  cursor: pointer;
+}
+.segmented-control-item input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.segmented-control-item span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 0 8px;
+  border-radius: 6px;
+  color: var(--text-mute);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.segmented-control-item input:checked + span {
+  background: var(--primary-color);
+  color: #fff;
+}
+.segmented-control-item input:focus-visible + span {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
 .sidebar-flags .checkbox-item:last-child { margin-bottom: 0; }
 
 .date-row {

@@ -29,6 +29,19 @@ export async function closeSidebar(page) {
 }
 
 /**
+ * 配信での立場フィルタを選択する。
+ * @param {import("@playwright/test").Page} page
+ * @param {"all" | "own" | "guest"} value
+ */
+export async function selectFrameScope(page, value) {
+    await page.locator("#open-sidebar").click();
+    const option = page.locator(`#frameScopeOptions input[value="${value}"]`);
+    await option.locator("xpath=ancestor::label[1]").click();
+    await expect(option).toBeChecked();
+    await closeSidebar(page);
+}
+
+/**
  * 指定の設定トグルを必要時だけ ON にする。
  * @param {import("@playwright/test").Page} page
  * @param {string} selector
