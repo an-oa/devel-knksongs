@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createRenderController } from "../app/controllers/render.mjs";
 import { createSearchController } from "../app/controllers/search.mjs";
 import { extractYoutubeInfo } from "../app/controllers/youtube.mjs";
+import { createSearchFiltersController } from "../app/ui/search-filters/controller.mjs";
 import {
     createYoutubePlaybackStartResult,
     YOUTUBE_PLAYBACK_START_STATUS
@@ -618,6 +619,10 @@ test("bookmark: shows load-more and increases by RESULT_DISPLAY_BATCH_SIZE (48)"
         const searchController = createSearchController({
             data,
             ui,
+            searchFiltersController: createSearchFiltersController({
+                ui,
+                defaultFormats: ["配信", "歌みた", "ショート", "切り抜き"]
+            }),
             constants: {
                 RANDOM_DISPLAY_COUNT: 48,
                 MIN_PERFORMANCE_FOR_RANDOM: 3,

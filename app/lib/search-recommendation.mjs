@@ -4,7 +4,7 @@ import {
     isShortFormat,
     isStreamFormat,
     isUtamitaEquivalentFormat
-} from "./search-filters.mjs?v=18";
+} from "./song-format.mjs?v=18";
 
 /**
  * おすすめ表示に使う曲一覧を抽選して返す。

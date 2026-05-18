@@ -1,12 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createDateFilterController } from "../app/ui/date/filter.mjs";
+import { createSearchFiltersController } from "../app/ui/search-filters/controller.mjs";
 import { pickRecommendedSongs } from "../app/lib/search-recommendation.mjs";
+import { isWithinDateRange, parseDateKey } from "../app/lib/date-key.mjs";
+import { filterSongsByCriteria, normalizeForSearch } from "../app/lib/search-filters.mjs";
 import {
-    normalizeForSearch,
-    parseDateKey,
-    isWithinDateRange,
-    filterSongsByCriteria,
     createSearchController
 } from "../app/controllers/search.mjs";
 import { installFakeDom } from "./test-helpers.mjs";
@@ -60,6 +59,21 @@ function createSearchUiState(input) {
             songLookupSourceRef: null
         }
     };
+}
+
+/**
+ * 検索コントローラーへ検索条件 UI controller を注入して作る。
+ * @param {{ data: object, ui: object, constants: object, callbacks: object }} input
+ * @returns {object}
+ */
+function createSearchControllerForTest(input) {
+    return createSearchController({
+        ...input,
+        searchFiltersController: createSearchFiltersController({
+            ui: input.ui,
+            defaultFormats: input.constants.DEFAULT_FORMATS
+        })
+    });
 }
 
 function makeRow(input) {
@@ -389,7 +403,7 @@ test("createSearchController: active bookmark also applies search criteria", () 
         DEFAULT_FORMATS: ["配信", "歌みた", "ショート"]
     };
 
-    const controller = createSearchController({
+    const controller = createSearchControllerForTest({
         data,
         ui,
         constants,
@@ -443,7 +457,7 @@ test("createSearchController: active bookmark resolves rows by bookmarkSongKey",
         DEFAULT_FORMATS: ["配信", "歌みた", "ショート"]
     };
 
-    const controller = createSearchController({
+    const controller = createSearchControllerForTest({
         data,
         ui,
         constants,
@@ -500,7 +514,7 @@ test("createSearchController: active bookmark uses incremental display limit", (
         DEFAULT_FORMATS: ["配信", "歌みた", "ショート"]
     };
 
-    const controller = createSearchController({
+    const controller = createSearchControllerForTest({
         data,
         ui,
         constants,
@@ -550,7 +564,7 @@ test("createSearchController: recommendation mode counts オリ曲 as 歌みた"
         DEFAULT_FORMATS: ["配信", "歌みた", "ショート", "切り抜き"]
     };
 
-    const controller = createSearchController({
+    const controller = createSearchControllerForTest({
         data,
         ui,
         constants,
@@ -606,7 +620,7 @@ test("createSearchController: single オリ曲 performance is eligible for recom
         DEFAULT_FORMATS: ["配信", "歌みた", "ショート", "切り抜き"]
     };
 
-    const controller = createSearchController({
+    const controller = createSearchControllerForTest({
         data,
         ui,
         constants,

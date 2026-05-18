@@ -1,5 +1,4 @@
 import { getDateUiState, getSearchUiState } from "../lib/ui-slices.mjs?v=18";
-import { DEFAULT_FRAME_SCOPE, normalizeFrameScope } from "../lib/search-filters.mjs?v=18";
 import {
     buildStoredBookmarksPayload,
     migrateLegacyBookmarkSongRefsToCurrent,
@@ -9,22 +8,31 @@ import {
     exportBookmarksAsJsonText as buildBookmarkExportJsonText,
     parseBookmarkImportText as parseBookmarkImportJsonText
 } from "../lib/storage/bookmark-transfer.mjs?v=18";
-
-const SEARCH_STATE_CURRENT_VERSION = 2;
-const SEARCH_STATE_V1 = 1;
-const SEARCH_STATE_V1_DEFAULT_FORMATS = ["配信", "歌みた", "ショート", "切り抜き"];
+import {
+    buildStoredSearchStatePayload,
+    parseStoredSearchStatePayload
+} from "../lib/storage/search-state-schema.mjs?v=18";
 
 /**
  * ブックマークと検索状態の保存・復元を扱うストレージコントローラーを作成する。
- * @param {*} ui
- * @param {*} constants
+ * @param {{
+ *   data: object,
+ *   ui: object,
+ *   searchFiltersController: {
+ *     getSelectedFrameScopeValue: () => string,
+ *     getSelectedFormatValues: () => string[],
+ *     applyStoredFilterState: (payload: Record<string, unknown>) => void
+ *   },
+ *   constants: object,
+ *   callbacks: object
+ * }} input
  */
-export function createStorageController({ data, ui, constants, callbacks }) {
+export function createStorageController({ data, ui, searchFiltersController, constants, callbacks }) {
     const searchUi = getSearchUiState(ui);
     const dateUi = getDateUiState(ui);
     const {
-        DEFAULT_FORMATS,
         SEARCH_STATE_KEY,
+        DEFAULT_FORMATS = [],
         BOOKMARK_STORAGE_KEY,
         BOOKMARK_STORAGE_VERSION = 1,
         MAX_BOOKMARK_COUNT = Number.POSITIVE_INFINITY,
@@ -64,111 +72,6 @@ export function createStorageController({ data, ui, constants, callbacks }) {
             return;
         }
         console.debug("[bookmark-migration]", message, details);
-    }
-
-    /**
-     * 選択中フォーマットを既定値に戻す。
-     */
-    function setSelectedFormatsToDefault() {
-        searchUi.selectedFormats.clear();
-        DEFAULT_FORMATS.forEach((f) => searchUi.selectedFormats.add(f));
-    }
-
-    /**
-     * state上のフォーマット選択状態をチェックボックスへ同期する。
-     */
-    function syncFormatCheckboxesFromState() {
-        const formatCheckboxes = document.querySelectorAll('#formatsList input[type="checkbox"]');
-        formatCheckboxes.forEach((cb) => {
-            cb.checked = searchUi.selectedFormats.has(cb.value);
-        });
-    }
-
-    /**
-     * 配信での立場フィルタの radio input 一覧を返す。
-     * @returns {HTMLInputElement[]}
-     */
-    function getFrameScopeInputs() {
-        const container = ui.el.frameScopeOptions;
-        if (!container) return [];
-        return Array.from(container.querySelectorAll('input[name="frameScope"]'));
-    }
-
-    /**
-     * 現在選択中の配信での立場フィルタ値を返す。
-     * @returns {string}
-     */
-    function getSelectedFrameScopeValue() {
-        const selected = getFrameScopeInputs().find((input) => input.checked);
-        return normalizeFrameScope(selected ? selected.value : DEFAULT_FRAME_SCOPE);
-    }
-
-    /**
-     * 配信での立場フィルタを指定値へ同期する。
-     * @param {*} rawValue
-     */
-    function applyFrameScopeValue(rawValue) {
-        const frameScope = normalizeFrameScope(rawValue);
-        getFrameScopeInputs().forEach((input) => {
-            input.checked = input.value === frameScope;
-        });
-    }
-
-    /**
-     * 配信での立場フィルタを既定値へ戻す。
-     */
-    function setFrameScopeToDefault() {
-        applyFrameScopeValue(DEFAULT_FRAME_SCOPE);
-    }
-
-    /**
-     * 保存済み検索状態の schema version を返す。version 未定義の既存 payload は v1 とみなす。
-     * @param {Record<string, unknown> | null | undefined} payload
-     * @returns {number}
-     */
-    function getStoredSearchStateVersion(payload) {
-        const version = payload && payload.version;
-        if (Number.isInteger(version) && version >= SEARCH_STATE_V1) return version;
-        return SEARCH_STATE_V1;
-    }
-
-    /**
-     * 検索状態 v1 の既定フォーマット一式として保存された値か判定する。
-     * v1 payload migration 用で、v1 互換を打ち切るタイミングで削除可能。
-     * v1 での「すべてON」を、現行 version でも「すべてON」として復元するために使う。
-     * @param {unknown[]} formats
-     * @returns {boolean}
-     */
-    function isSearchStateV1DefaultFormats(formats) {
-        if (!DEFAULT_FORMATS.includes("収録")) return false;
-        if (formats.length !== SEARCH_STATE_V1_DEFAULT_FORMATS.length) return false;
-        const formatSet = new Set(formats);
-        if (formatSet.size !== SEARCH_STATE_V1_DEFAULT_FORMATS.length) return false;
-        return SEARCH_STATE_V1_DEFAULT_FORMATS.every((format) => formatSet.has(format));
-    }
-
-    /**
-     * 保存値からフォーマット選択を復元し、不正値を除外する。
-     * @param {unknown} rawFormats
-     * @param {{ searchStateVersion?: number }} [options]
-     */
-    function applySelectedFormatsFromRaw(rawFormats, options) {
-        const formats = Array.isArray(rawFormats) ? rawFormats : [];
-        const searchStateVersion = options && Number.isInteger(options.searchStateVersion)
-            ? options.searchStateVersion
-            : SEARCH_STATE_CURRENT_VERSION;
-        if (searchStateVersion === SEARCH_STATE_V1 && isSearchStateV1DefaultFormats(formats)) {
-            setSelectedFormatsToDefault();
-            return;
-        }
-        const allowed = new Set(DEFAULT_FORMATS);
-        searchUi.selectedFormats.clear();
-        formats.forEach((f) => {
-            if (allowed.has(f)) searchUi.selectedFormats.add(f);
-        });
-        if (searchUi.selectedFormats.size === 0) {
-            setSelectedFormatsToDefault();
-        }
     }
 
     /**
@@ -449,18 +352,15 @@ export function createStorageController({ data, ui, constants, callbacks }) {
             const searchBox = ui.el.searchBox;
             const relayOnly = ui.el.relayOnly;
             const harmonyOnly = ui.el.harmonyOnly;
-            const dateFrom = getDateSelectValue("from");
-            const dateTo = getDateSelectValue("to");
-            const payload = {
-                version: SEARCH_STATE_CURRENT_VERSION,
-                query: searchBox ? searchBox.value : "",
+            const payload = buildStoredSearchStatePayload({
+                query: searchBox && typeof searchBox.value === "string" ? searchBox.value : "",
                 relayOnly: relayOnly ? !!relayOnly.checked : false,
                 harmonyOnly: harmonyOnly ? !!harmonyOnly.checked : false,
-                frameScope: getSelectedFrameScopeValue(),
-                dateFrom,
-                dateTo,
-                formats: Array.from(searchUi.selectedFormats)
-            };
+                frameScope: searchFiltersController.getSelectedFrameScopeValue(),
+                dateFrom: getDateSelectValue("from"),
+                dateTo: getDateSelectValue("to"),
+                formats: searchFiltersController.getSelectedFormatValues()
+            });
             localStorage.setItem(SEARCH_STATE_KEY, JSON.stringify(payload));
         } catch (e) {
             console.warn("Failed to save search state", e);
@@ -474,24 +374,18 @@ export function createStorageController({ data, ui, constants, callbacks }) {
         try {
             const raw = localStorage.getItem(SEARCH_STATE_KEY);
             if (!raw) return;
-            const parsed = JSON.parse(raw);
+            const parsed = parseStoredSearchStatePayload(raw, {
+                defaultFormats: DEFAULT_FORMATS
+            });
             const searchBox = ui.el.searchBox;
-            const relayOnly = ui.el.relayOnly;
-            const harmonyOnly = ui.el.harmonyOnly;
-            const searchStateVersion = getStoredSearchStateVersion(parsed);
-            applySelectedFormatsFromRaw(parsed.formats, { searchStateVersion });
-            syncFormatCheckboxesFromState();
             if (searchBox && typeof parsed.query === "string") {
                 searchBox.value = parsed.query;
             }
-            if (relayOnly) relayOnly.checked = !!parsed.relayOnly;
-            if (harmonyOnly) harmonyOnly.checked = !!parsed.harmonyOnly;
-            applyFrameScopeValue(parsed.frameScope);
-            const pending = {
-                from: typeof parsed.dateFrom === "string" ? parsed.dateFrom : "",
-                to: typeof parsed.dateTo === "string" ? parsed.dateTo : ""
+            searchFiltersController.applyStoredFilterState(parsed);
+            dateUi.pendingValues = {
+                from: parsed.dateFrom,
+                to: parsed.dateTo
             };
-            dateUi.pendingValues = pending;
             if (dateUi.bounds) {
                 applyPendingDateValues();
             }
@@ -504,11 +398,6 @@ export function createStorageController({ data, ui, constants, callbacks }) {
     }
 
     return {
-        setSelectedFormatsToDefault,
-        syncFormatCheckboxesFromState,
-        getSelectedFrameScopeValue,
-        setFrameScopeToDefault,
-        applySelectedFormatsFromRaw,
         loadBookmarks,
         saveBookmarks,
         exportBookmarksAsJsonText,

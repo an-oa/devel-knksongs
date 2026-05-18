@@ -1,35 +1,30 @@
 import { createDateFilterController } from "../ui/date/filter.mjs?v=18";
-import {
-    dateKeyToParts,
-    filterSongsByCriteria,
-    FRAME_SCOPE_ALL,
-    normalizeFrameScope,
-    isWithinDateRange,
-    normalizeForSearch,
-    parseDateKey
-} from "../lib/search-filters.mjs?v=18";
+import { FRAME_SCOPE_ALL, normalizeFrameScope } from "../lib/frame-scope-filter.mjs?v=18";
+import { filterSongsByCriteria } from "../lib/search-filters.mjs?v=18";
 import { pickRecommendedSongs } from "../lib/search-recommendation.mjs?v=18";
 import { getLookupUiState, getSearchUiState } from "../lib/ui-slices.mjs?v=18";
 
-export {
-    dateKeyToParts,
-    filterSongsByCriteria,
-    isWithinDateRange,
-    normalizeForSearch,
-    parseDateKey
-};
-
 /**
  * 検索条件の収集・結果解決・推薦選曲を管理するコントローラーを作成する。
- * @param {{ data: *, ui: *, constants: *, callbacks: { updateDisplay: Function, scrollResultsPaneToTop: Function } }} input
+ * @param {{
+ *   data: object,
+ *   ui: object,
+ *   searchFiltersController: {
+ *     getSelectedFrameScopeValue: () => string,
+ *     areAllFormatsSelected: () => boolean,
+ *     areFormatsDefault: () => boolean,
+ *     isFrameScopeDefault: () => boolean
+ *   },
+ *   constants: object,
+ *   callbacks: { updateDisplay: Function, scrollResultsPaneToTop: Function }
+ * }} input
  */
-export function createSearchController({ data, ui, constants, callbacks }) {
+export function createSearchController({ data, ui, searchFiltersController, constants, callbacks }) {
     const {
         RANDOM_DISPLAY_COUNT,
         MIN_PERFORMANCE_FOR_RANDOM,
         RESULT_DISPLAY_BATCH_SIZE,
-        SEARCH_DEBOUNCE_MS,
-        DEFAULT_FORMATS
+        SEARCH_DEBOUNCE_MS
     } = constants;
     const searchUi = getSearchUiState(ui);
     const lookupUi = getLookupUiState(ui);
@@ -94,22 +89,6 @@ export function createSearchController({ data, ui, constants, callbacks }) {
     }
 
     /**
-     * 現在選択中の配信での立場フィルタを返す。
-     */
-    function getSelectedFrameScope() {
-        const container = ui.el.frameScopeOptions;
-        const selected = container ? container.querySelector('input[name="frameScope"]:checked') : null;
-        return normalizeFrameScope(selected ? selected.value : "");
-    }
-
-    /**
-     * 配信での立場フィルタが既定状態か判定する。
-     */
-    function isFrameScopeDefault() {
-        return getSelectedFrameScope() === FRAME_SCOPE_ALL;
-    }
-
-    /**
      * 現在の UI 入力から検索条件オブジェクトを生成する。
      */
     function getSearchState() {
@@ -119,26 +98,11 @@ export function createSearchController({ data, ui, constants, callbacks }) {
             queryRaw: ui.el.searchBox.value.trim(),
             relayOnly: ui.el.relayOnly.checked,
             harmonyOnly: ui.el.harmonyOnly.checked,
-            frameScope: getSelectedFrameScope(),
+            frameScope: searchFiltersController.getSelectedFrameScopeValue(),
             dateFromKey: fromRange ? fromRange.minKey : null,
             dateToKey: toRange ? toRange.maxKey : null,
             hasDateFilter: Boolean(fromRange || toRange)
         };
-    }
-
-    /**
-     * 既定フォーマットがすべて選択されているか判定する。
-     */
-    function areAllFormatsSelected() {
-        return DEFAULT_FORMATS.every((f) => searchUi.selectedFormats.has(f));
-    }
-
-    /**
-     * フォーマット選択が既定状態と一致するか判定する。
-     */
-    function areFormatsDefault() {
-        if (searchUi.selectedFormats.size !== DEFAULT_FORMATS.length) return false;
-        return areAllFormatsSelected();
     }
 
     /**
@@ -152,7 +116,7 @@ export function createSearchController({ data, ui, constants, callbacks }) {
             !searchState.harmonyOnly &&
             normalizeFrameScope(searchState.frameScope) === FRAME_SCOPE_ALL &&
             !searchState.hasDateFilter &&
-            areAllFormatsSelected();
+            searchFiltersController.areAllFormatsSelected();
     }
 
     /**
@@ -261,9 +225,9 @@ export function createSearchController({ data, ui, constants, callbacks }) {
         search,
         getSearchState,
         isRecommendedMode,
-        areAllFormatsSelected,
-        areFormatsDefault,
-        isFrameScopeDefault,
+        areAllFormatsSelected: searchFiltersController.areAllFormatsSelected,
+        areFormatsDefault: searchFiltersController.areFormatsDefault,
+        isFrameScopeDefault: searchFiltersController.isFrameScopeDefault,
         hasDateSelection: dateFilterController.hasDateSelection,
         getDateSelectValue: dateFilterController.getDateSelectValue,
         applyDateSelectValue: dateFilterController.applyDateSelectValue,

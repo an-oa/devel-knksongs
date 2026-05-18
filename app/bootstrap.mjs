@@ -32,17 +32,16 @@ import { createYoutubeController, extractYoutubeInfo } from "./controllers/youtu
 import { createStorageController } from "./controllers/storage.mjs?v=18";
 import { createBookmarkUiController } from "./ui/bookmark/ui.mjs?v=18";
 import { scrollResultListToTop } from "./lib/results-scroll.mjs?v=18";
-import { getFormatFilterLabel } from "./lib/format-filter.mjs?v=18";
 import {
     collectUiElements,
     applyThemeFromStorage,
-    setupTheme,
-    initFilterMenu
+    setupTheme
 } from "./ui/core/elements.mjs?v=18";
 import { createUiSyncController } from "./ui/core/sync.mjs?v=18";
 import { createDataLoader } from "./ui/core/data.mjs?v=18";
 import { createSidebarController } from "./ui/sidebar/ui.mjs?v=18";
-import { getDateUiState, getSearchUiState } from "./lib/ui-slices.mjs?v=18";
+import { createSearchFiltersController } from "./ui/search-filters/controller.mjs?v=18";
+import { getSearchUiState } from "./lib/ui-slices.mjs?v=18";
 import { debugPlayback } from "./lib/playback-debug.mjs?v=18";
 import {
     createIndexedDbSongsJsonCacheStore,
@@ -53,6 +52,10 @@ import { createSongsDataSource } from "./lib/songs-data-source.mjs?v=18";
 const appDataState = appState.data;
 const appUiState = appState.ui;
 const youtubeRuntimeState = appState.youtube;
+const searchFiltersController = createSearchFiltersController({
+    ui: appUiState,
+    defaultFormats: DEFAULT_FORMATS
+});
 
 /**
  * ブラウザの localStorage を安全に取得する。
@@ -70,6 +73,7 @@ function getBrowserLocalStorage() {
 const searchController = createSearchController({
     data: appDataState,
     ui: appUiState,
+    searchFiltersController,
     constants: {
         RANDOM_DISPLAY_COUNT,
         MIN_PERFORMANCE_FOR_RANDOM,
@@ -135,14 +139,14 @@ const youtubeController = createYoutubeController({
 let bookmarkUiController = null;
 let sidebarController = null;
 const searchUi = getSearchUiState(appUiState);
-const dateUi = getDateUiState(appUiState);
 
 const storageController = createStorageController({
     data: appDataState,
     ui: appUiState,
+    searchFiltersController,
     constants: {
-        DEFAULT_FORMATS,
         SEARCH_STATE_KEY,
+        DEFAULT_FORMATS,
         BOOKMARK_STORAGE_KEY,
         BOOKMARK_STORAGE_VERSION,
         MAX_BOOKMARK_COUNT,
@@ -263,16 +267,10 @@ async function initUI() {
     appUiState.el = collectUiElements();
     if (youtubeController.isIOSWebKit()) document.documentElement.classList.add("ios");
 
-    sidebarController.setupUIHandlers();
-    initFilterMenu({
-        ui: appUiState,
-        defaultFormats: DEFAULT_FORMATS,
-        getFormatFilterLabel,
-        setSelectedFormatsToDefault: () => storageController.setSelectedFormatsToDefault(),
-        syncFormatCheckboxesFromState: () => storageController.syncFormatCheckboxesFromState(),
-        scheduleSearch: (options) => searchController.scheduleSearch(options),
-        saveSearchState: () => storageController.saveSearchState()
+    searchFiltersController.setupFilterOptions({
+        onFilterChange: markFilterTouched
     });
+    sidebarController.setupUIHandlers();
     storageController.loadBookmarks();
     setupTheme({ ui: appUiState });
     playbackSettingsController.setupPlaybackSettings();
@@ -370,18 +368,9 @@ function resetSearchQuery() {
  * フィルタ条件を既定状態へ戻す。
  */
 function resetSearchFilters() {
-    const relayOnly = appUiState.el.relayOnly;
-    const harmonyOnly = appUiState.el.harmonyOnly;
-
-    if (relayOnly) relayOnly.checked = false;
-    if (harmonyOnly) harmonyOnly.checked = false;
-    searchController.resetDateSelects();
-    dateUi.pendingValues = null;
-
-    storageController.setSelectedFormatsToDefault();
-    storageController.syncFormatCheckboxesFromState();
-    storageController.setFrameScopeToDefault();
-    searchUi.userTouchedFilters = false;
+    searchFiltersController.resetFiltersToDefault({
+        resetDateSelects: () => searchController.resetDateSelects()
+    });
 }
 
 /**
@@ -395,20 +384,6 @@ function resetSearchConditions(shouldSearch) {
     if (shouldSearch && searchUi.dataReady) {
         searchController.scheduleSearch({ immediate: true });
     }
-}
-
-/**
- * フィルタが既定状態から外れているか判定する。
- * @returns {boolean}
- */
-function needsFilterReset() {
-    const relayOnly = appUiState.el.relayOnly;
-    const harmonyOnly = appUiState.el.harmonyOnly;
-    if (relayOnly && relayOnly.checked) return true;
-    if (harmonyOnly && harmonyOnly.checked) return true;
-    if (searchController.hasDateSelection()) return true;
-    if (!searchController.isFrameScopeDefault()) return true;
-    return !searchController.areFormatsDefault();
 }
 
 /**
@@ -428,9 +403,13 @@ function syncSearchQueryIfNeeded() {
  * @returns {boolean}
  */
 function syncSearchFiltersIfNeeded() {
-    storageController.syncFormatCheckboxesFromState();
+    searchFiltersController.syncFormatCheckboxesFromState();
     if (searchUi.userTouchedFilters) return false;
-    if (!needsFilterReset()) return false;
+    if (!searchFiltersController.needsFilterReset({
+        hasDateSelection: () => searchController.hasDateSelection()
+    })) {
+        return false;
+    }
     resetSearchFilters();
     return true;
 }
