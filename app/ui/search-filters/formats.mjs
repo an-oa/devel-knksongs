@@ -1,4 +1,4 @@
-import { getFormatFilterLabel } from "../../lib/format-filter.mjs?v=18";
+import { getFormatFilterLabel } from "../../lib/format-filter.mjs?v=19";
 
 const FORMAT_CHECKBOX_SELECTOR = 'input[type="checkbox"]';
 

@@ -4,7 +4,7 @@ import {
     FRAME_SCOPE_GUEST,
     FRAME_SCOPE_OWN,
     normalizeFrameScope
-} from "../../lib/frame-scope-filter.mjs?v=18";
+} from "../../lib/frame-scope-filter.mjs?v=19";
 
 const FRAME_SCOPE_INPUT_SELECTOR = 'input[name="frameScope"]';
 const FRAME_SCOPE_OPTIONS = [

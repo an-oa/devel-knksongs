@@ -1,8 +1,8 @@
-import { createDateFilterController } from "../ui/date/filter.mjs?v=18";
-import { FRAME_SCOPE_ALL, normalizeFrameScope } from "../lib/frame-scope-filter.mjs?v=18";
-import { filterSongsByCriteria } from "../lib/search-filters.mjs?v=18";
-import { pickRecommendedSongs } from "../lib/search-recommendation.mjs?v=18";
-import { getLookupUiState, getSearchUiState } from "../lib/ui-slices.mjs?v=18";
+import { createDateFilterController } from "../ui/date/filter.mjs?v=19";
+import { FRAME_SCOPE_ALL, normalizeFrameScope } from "../lib/frame-scope-filter.mjs?v=19";
+import { filterSongsByCriteria } from "../lib/search-filters.mjs?v=19";
+import { pickRecommendedSongs } from "../lib/search-recommendation.mjs?v=19";
+import { getLookupUiState, getSearchUiState } from "../lib/ui-slices.mjs?v=19";
 
 /**
  * 検索条件の収集・結果解決・推薦選曲を管理するコントローラーを作成する。

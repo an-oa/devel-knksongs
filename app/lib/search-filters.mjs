@@ -1,6 +1,6 @@
-import { isWithinDateRange } from "./date-key.mjs?v=18";
-import { matchesFrameScope } from "./frame-scope-filter.mjs?v=18";
-import { matchesSelectedFormat } from "./song-format.mjs?v=18";
+import { isWithinDateRange } from "./date-key.mjs?v=19";
+import { matchesFrameScope } from "./frame-scope-filter.mjs?v=19";
+import { matchesSelectedFormat } from "./song-format.mjs?v=19";
 
 /**
  * 検索比較しやすい形に文字列を正規化する。

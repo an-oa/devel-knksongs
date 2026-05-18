@@ -1,4 +1,4 @@
-import { isGuestStreamRole } from "./stream-role.mjs?v=18";
+import { isGuestStreamRole } from "./stream-role.mjs?v=19";
 
 export const FRAME_SCOPE_ALL = "all";
 export const FRAME_SCOPE_OWN = "own";

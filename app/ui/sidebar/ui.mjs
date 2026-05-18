@@ -1,4 +1,4 @@
-import { getSettingsPanelUiState } from "../../lib/ui-slices.mjs?v=18";
+import { getSettingsPanelUiState } from "../../lib/ui-slices.mjs?v=19";
 
 /**
  * サイドバー関連の UI 操作をまとめるコントローラーを作成する。

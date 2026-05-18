@@ -1,7 +1,7 @@
-import { createFrameScopeFilterController } from "../frame-scope/filter.mjs?v=18";
-import { FRAME_SCOPE_ALL } from "../../lib/frame-scope-filter.mjs?v=18";
-import { getDateUiState, getSearchUiState } from "../../lib/ui-slices.mjs?v=18";
-import { renderSearchFormatOptions, syncSearchFormatCheckboxes } from "./formats.mjs?v=18";
+import { createFrameScopeFilterController } from "../frame-scope/filter.mjs?v=19";
+import { FRAME_SCOPE_ALL } from "../../lib/frame-scope-filter.mjs?v=19";
+import { getDateUiState, getSearchUiState } from "../../lib/ui-slices.mjs?v=19";
+import { renderSearchFormatOptions, syncSearchFormatCheckboxes } from "./formats.mjs?v=19";
 
 /**
  * 検索条件 UI の個別 filter controller を束ねる facade を作成する。
