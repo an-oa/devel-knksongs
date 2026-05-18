@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "contentHash": "sha256:2bc9ebaa72782634ad0ec622a7ca4339d7ff66893428f81573770e3803d87c9f",
+  "contentHash": "sha256:964976ad70dd91891c5e4e9864fd9d3dafc2a738121eb705ceea28f24bbfae80",
   "songs": [
     {
       "date": "2026/05/18",
@@ -211,7 +211,7 @@
       "videoId": "7fOw-4QeB7M",
       "songKey": "197::9",
       "bookmarkSongKey": "7fOw-4QeB7M::9",
-      "legacySongKey": "197::9::https://www.youtube.com/watch?v=7fOw-4QeB7M&t=3430s",
+      "legacySongKey": "197::9::https://www.youtube.com/watch?v=7fOw-4QeB7M&t=3432s",
       "format": "配信",
       "videoOrientation": "vertical",
       "isRelay": false,
@@ -220,7 +220,7 @@
       "artist": "YOASOBI",
       "titleYomi": "アイドル",
       "artistYomi": "ヨアソビ",
-      "url": "https://www.youtube.com/watch?v=7fOw-4QeB7M&t=3430s",
+      "url": "https://www.youtube.com/watch?v=7fOw-4QeB7M&t=3432s",
       "endSeconds": 3647,
       "titleNorm": "アイドル",
       "artistNorm": "yoasobi",
