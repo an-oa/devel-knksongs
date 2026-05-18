@@ -144,8 +144,12 @@ flowchart TD
   - `npm run lint`
   - `node --test tests/*.mjs`
   - `npm run test:e2e`
+- 初回または `node_modules` がない環境では、検証コマンドの前に
+  `npm install` を実行してください。
+- `npm run lint` は `package.json` の devDependencies にある ESLint を
+  使う前提です。`node_modules` がない場合、環境側の古い ESLint が
+  実行されることがあります。
 - Playwright のスモークテストを初回実行する前に、以下を準備してください。
-  - `npm install`
   - `npx playwright install chromium`
   - `python3` が PATH 上で利用できること
 - Playwright のスモークテストでは、静的サイトはローカル配信し、CSV と YouTube Iframe API は mock / fixture に差し替えて回帰確認します。

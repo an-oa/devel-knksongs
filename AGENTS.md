@@ -55,6 +55,8 @@ feat: move settings into dedicated sidebar panel
 
 ## Verification
 
+- 初回または `node_modules` がない環境では、README.md の開発者向け準備に従い
+  `npm install` を実行してから検証する。
 - JavaScript を変更したときは、静的解析として `npm run lint` を基本の確認手順として実行する。
 - `tests/` 配下に Node のテストがあるため、JavaScript を変更したときは `node --test tests/*.mjs` も基本の確認手順として実行する。
 - YouTube 再生やサイドバー操作などブラウザ上の回帰に関わる変更では、
