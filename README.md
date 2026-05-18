@@ -105,24 +105,34 @@ flowchart TD
 ## テスト/静的解析(開発者向け)
 
 - 現在は以下のテストを用意しています。
+  - ブックマークのインポート/エクスポートUIのテスト (`tests/bookmark-import-export-ui.test.mjs`)
   - ブックマーク保存スキーマ/移行のテスト (`tests/bookmark-storage-schema.test.mjs`)
+  - ブックマークJSON転送のテスト (`tests/bookmark-transfer.test.mjs`)
   - ブックマークUIのテスト (`tests/bookmark-ui.test.mjs`)
+  - 配信での立場の正規化/判定テスト (`tests/stream-role.test.mjs`)
   - CSVパースのテスト (`tests/csv-parser.test.mjs`)
   - 初期データ読み込み後の状態反映テスト (`tests/data-loader.test.mjs`)
   - DOM補助関数のテスト (`tests/dom-utils.test.mjs`)
   - 検索/日付フィルタ/ブックマーク検索のロジック (`tests/search-date.test.mjs`)
   - フォーマット表示ラベルのテスト (`tests/format-filter.test.mjs`)
+  - 配信での立場フィルターUIのテスト (`tests/frame-scope-filter.test.mjs`)
+  - 再生継続候補の選択ロジック (`tests/playback-sequence.test.mjs`)
+  - 再生セッション制御のテスト (`tests/playback-session-controller.test.mjs`)
   - 描画/レイアウトまわりの回帰テスト (`tests/render-layout.test.mjs`)
   - ブックマーク時のドラッグ並び替えテスト (`tests/render-drag-reorder.test.mjs`)
   - masonryレイアウト計算のテスト (`tests/render-masonry-layout.test.mjs`)
   - レイアウト補正待機のテスト (`tests/layout-anchor.test.mjs`)
   - 結果一覧スクロール制御のテスト (`tests/results-scroll.test.mjs`)
+  - 検索フィルター共有helperのテスト (`tests/search-filter-modules.test.mjs`)
+  - 検索フィルターUI controllerのテスト (`tests/search-filters-controller.test.mjs`)
+  - 検索状態保存schemaのテスト (`tests/search-state-schema.test.mjs`)
   - サイドバーUIのテスト (`tests/sidebar-ui.test.mjs`)
   - 曲データJSONのcontent hash算出テスト (`tests/songs-content-hash.test.mjs`)
   - 曲データソースのJSON優先読み込み/CSVフォールバック/キャッシュ更新テスト (`tests/songs-data-source.test.mjs`)
   - 曲データJSONキャッシュのIndexedDB/旧localStorage移行テスト (`tests/songs-json-cache.test.mjs`)
   - 曲データJSONスキーマのテスト (`tests/songs-json.test.mjs`)
   - ストレージ(ブックマーク上限/リネーム)の単体テスト (`tests/storage-bookmark-limit.test.mjs`)
+  - ストレージ(検索状態保存/復元)の単体テスト (`tests/storage-search-state.test.mjs`)
   - UI設定/ストレージ互換のテスト (`tests/ui-storage-compat.test.mjs`)
   - UI同期のテスト (`tests/ui-sync.test.mjs`)
   - YouTubeサムネイル/埋め込み再生まわりの統合テスト (`tests/youtube-controller.test.mjs`)
@@ -151,6 +161,8 @@ flowchart TD
 - テーマ(ダーク/ライト)。
 - サムネイル表示ON/OFF。
 - 検索状態(検索語・絞り込み条件・配信での立場・日付条件)。
+  - localStorage key は既存利用者の互換維持のため `searchStateV1` のままです。
+    payload 内の `version` は保存 schema の版数で、key 名とは独立して更新します。
 - ブックマーク情報(ブックマーク名・曲の対応/順序・作成日時)。
   - 保存形式は version 付き payload で管理し、旧形式は読み込み後に現行形式へ保存し直します。
 - 曲データJSONのキャッシュ(IndexedDB。旧localStorageキャッシュは読み込み時に移行します)。

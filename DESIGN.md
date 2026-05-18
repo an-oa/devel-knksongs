@@ -22,19 +22,27 @@
 - 重点ケース: ブックマーク表示時のみ有効なドラッグ並び替えと、並び順の永続化、YouTube 継続再生の失敗復旧
 - テストファイル:
   - `tests/bookmark-storage-schema.test.mjs`
+  - `tests/bookmark-import-export-ui.test.mjs`
+  - `tests/bookmark-transfer.test.mjs`
   - `tests/bookmark-ui.test.mjs`
+  - `tests/stream-role.test.mjs`
   - `tests/csv-parser.test.mjs`
   - `tests/data-loader.test.mjs`
   - `tests/dom-utils.test.mjs`
   - `tests/search-date.test.mjs`
   - `tests/format-filter.test.mjs`
+  - `tests/frame-scope-filter.test.mjs`
   - `tests/playback-sequence.test.mjs`
   - `tests/playback-session-controller.test.mjs`
   - `tests/render-drag-reorder.test.mjs`
   - `tests/render-layout.test.mjs`
   - `tests/render-masonry-layout.test.mjs`
+  - `tests/search-filter-modules.test.mjs`
+  - `tests/search-filters-controller.test.mjs`
+  - `tests/search-state-schema.test.mjs`
   - `tests/sidebar-ui.test.mjs`
   - `tests/storage-bookmark-limit.test.mjs`
+  - `tests/storage-search-state.test.mjs`
   - `tests/ui-storage-compat.test.mjs`
   - `tests/ui-sync.test.mjs`
   - `tests/youtube-controller.test.mjs`
@@ -86,7 +94,7 @@
 - **メイン**：検索結果一覧（カード）
   - 曲名/アーティスト
   - 日付
-  - タグ（形態/リレー/ハモリ）
+  - タグ（形態/コラボ/リレー/ハモリ）
   - ブックマーク操作（追加/選択中ブックマークから削除）
   - ブックマーク表示中のみドラッグハンドルを表示し、ハンドル操作でカード順を並び替え
   - YouTubeリンク
@@ -161,6 +169,7 @@ flowchart TD
   - キーワード入力
   - 日付の指定（年/月/日いずれか）
   - 形態のチェックを外す
+  - 配信での立場をホスト/ゲストへ変更
   - リレー/ハモリをON
 - **Filtered → Recommended**
   - 上記の条件をすべて解除して「未指定」に戻したとき
@@ -195,8 +204,8 @@ stateDiagram-v2
 - ブックマーク未選択かつ、形態/リレー/ハモリ/日付/キーワードの条件がすべて未指定のときのみ「おすすめモード」
 
 ### 除外条件
-- 形態/リレー/ハモリ/日付/キーワードのいずれかが未指定条件から外れた場合は、おすすめモード自体を解除
-- おすすめ候補の集計対象は `配信` / `歌みた`（`オリ曲` を含む） / `ショート` のみとし、`切り抜き` は集計対象外
+- 形態/配信での立場/リレー/ハモリ/日付/キーワードのいずれかが未指定条件から外れた場合は、おすすめモード自体を解除
+- おすすめ候補の集計対象は配信での立場が `ゲスト` 以外の行に限定し、対象形式は `配信` / `歌みた`（`オリ曲` を含む） / `ショート` とする
 - 通常は同一曲が一定回数以上歌われている場合のみ、おすすめ候補に含める
 - ただし `オリ曲` を含む曲は1回でもおすすめ候補に含める
 - 同一曲・同一アーカイブの重複候補は、`archiveOrder` と `sourceIndex` を用いて代表行へ集約する
@@ -247,7 +256,8 @@ flowchart LR
 - テーマ
 - サムネ表示
 - CSVキャッシュ（JSON取得失敗時のフォールバック用）
-- 検索条件（キーワード・日付・形態など）
+- 検索条件（キーワード・日付・形態・配信での立場・リレー/ハモリ）
+  - localStorage key の `searchStateV1` は保存場所の互換維持用で、payload の `version` は検索条件 schema の版数として別に管理する
 - ブックマーク情報（ブックマーク名・曲参照/順序・作成日時）
 - ブックマーク保存 payload は `version` を持ち、旧参照形式は曲データ読み込み後に現行の `bookmarkSongKey` へ保存し直す
 - エクスポートするJSONはブックマーク保存 payload と同じ構造にし、インポート時は同じ検証/移行を通してから全置き換えで保存する
