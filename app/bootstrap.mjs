@@ -22,6 +22,7 @@ import {
     PUBLIC_SONGS_META_URL,
     PUBLIC_CSV_URL,
     SONGS_JSON_CACHE_KEY,
+    LEGACY_CSV_CACHE_KEY,
     CSV_CACHE_KEY
 } from "./config.mjs?v=18";
 import { createSearchController } from "./controllers/search.mjs?v=18";
@@ -227,7 +228,8 @@ const dataLoader = createDataLoader({
             storage: browserStorage
         }),
         storage: browserStorage,
-        csvCacheKey: CSV_CACHE_KEY
+        csvCacheKey: CSV_CACHE_KEY,
+        legacyCsvCacheKeys: [LEGACY_CSV_CACHE_KEY]
     }),
     callbacks: {
         migrateLegacyBookmarkSongRefs: () => storageController.migrateLegacyBookmarkSongRefs(),

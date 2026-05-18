@@ -183,7 +183,7 @@ function parseCsvRFC4180(t) {
 export function parseCsvToSongs(csvText) {
     const rows = parseCsvRFC4180(csvText);
     const header = rows[0];
-    const required = ["公開範囲", "#", "##", "曲名", "アーティスト名", "キョクメイ", "アーティストメイ", "配信日", "形態", "配信での立場", "歌枠リレー？", "ハモリあり？", "URL", "メモ"];
+    const required = ["公開範囲", "#", "##", "曲名", "アーティスト名", "キョクメイ", "アーティストメイ", "配信日", "形態", "歌枠リレー？", "ハモリあり？", "URL", "メモ"];
     const missing = required.filter((name) => !header.includes(name));
     if (missing.length > 0) {
         throw new Error(`CSVヘッダ不足: ${missing.join(", ")}`);
@@ -192,7 +192,7 @@ export function parseCsvToSongs(csvText) {
     const idxMap = Object.fromEntries(header.map((name, index) => [name, index]));
     const idx = (n) => idxMap[n];
     const endTimeIndex = header.includes("終了時刻") ? idx("終了時刻") : -1;
-    const streamRoleIndex = idx("配信での立場");
+    const streamRoleIndex = header.includes("配信での立場") ? idx("配信での立場") : -1;
     const songs = [];
     for (let i = 0; i < body.length; i++) {
         const r = body[i];
@@ -220,7 +220,7 @@ export function parseCsvToSongs(csvText) {
             bookmarkSongKey: buildBookmarkSongKey({ videoId, archiveId, archiveOrder }),
             legacySongKey,
             format: r[idx("形態")],
-            streamRole: normalizeStreamRole(r[streamRoleIndex]),
+            streamRole: streamRoleIndex >= 0 ? normalizeStreamRole(r[streamRoleIndex]) : "",
             videoOrientation: parseVideoOrientation(r[idx("画面の向き")], i + 2),
             isRelay: r[idx("歌枠リレー？")] === "◯",
             isHarmony: r[idx("ハモリあり？")] === "◯",
