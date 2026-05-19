@@ -98,16 +98,6 @@ function createSongsMetaJson(contentHash) {
     return JSON.stringify(buildSongsJsonMetaPayload(contentHash));
 }
 
-/**
- * 保留中のPromise継続を進める。
- * @returns {Promise<void>}
- */
-function waitForAsyncWork() {
-    return new Promise((resolve) => {
-        setImmediate(resolve);
-    });
-}
-
 test("songs data source: csv fetch success stores csv and emits network songs", async () => {
     const previousFetch = globalThis.fetch;
     try {
@@ -178,7 +168,7 @@ test("songs data source: json fetch success stores songs json and skips csv fetc
     }
 });
 
-test("songs data source: cached json is emitted immediately and refreshed in the background", async () => {
+test("songs data source: cached json fetches fresh json without emitting stale cache when meta differs", async () => {
     const previousFetch = globalThis.fetch;
     try {
         const storage = createFakeLocalStorage();
@@ -186,7 +176,6 @@ test("songs data source: cached json is emitted immediately and refreshed in the
         const freshJson = createSongsJson("fresh-archive::1", "sha256:fresh");
         const freshMetaJson = createSongsMetaJson("sha256:fresh");
         const songsJsonCache = createFakeSongsJsonCacheStore(cachedJson);
-        let resolveFetch;
         const fetchUrls = [];
         globalThis.fetch = async (url, options) => {
             fetchUrls.push([url, options]);
@@ -200,16 +189,12 @@ test("songs data source: cached json is emitted immediately and refreshed in the
                 };
             }
             assert.equal(url, "data/songs.json");
-            return new Promise((resolve) => {
-                resolveFetch = () => {
-                    resolve({
-                        ok: true,
-                        async text() {
-                            return freshJson;
-                        }
-                    });
-                };
-            });
+            return {
+                ok: true,
+                async text() {
+                    return freshJson;
+                }
+            };
         };
         const results = [];
         const dataSource = createSongsDataSource({
@@ -222,25 +207,78 @@ test("songs data source: cached json is emitted immediately and refreshed in the
         });
 
         assert.equal(await dataSource.loadInitialSongs({ onSongsLoaded: (result) => results.push(result) }), true);
-        await waitForAsyncWork();
 
-        assert.equal(results.length, 1);
-        assert.equal(results[0].source, "cache");
-        assert.equal(results[0].songs[0].songKey, "cached-archive::1");
         assert.deepEqual(fetchUrls, [
             ["data/songs-meta.json", { cache: "no-cache" }],
             ["data/songs.json", { cache: "no-cache" }]
         ]);
-
-        resolveFetch();
-        await waitForAsyncWork();
-        await waitForAsyncWork();
-
         assert.equal(songsJsonCache.peek(), freshJson);
-        assert.equal(results.length, 2);
-        assert.equal(results[1].source, "network");
-        assert.equal(results[1].resetConditions, false);
-        assert.equal(results[1].songs[0].songKey, "fresh-archive::1");
+        assert.equal(results.length, 1);
+        assert.equal(results[0].source, "network");
+        assert.equal(results[0].songs[0].songKey, "fresh-archive::1");
+    } finally {
+        globalThis.fetch = previousFetch;
+    }
+});
+
+test("songs data source: cached json falls back to cache when fresh json and csv fail after meta differs", async () => {
+    const previousFetch = globalThis.fetch;
+    try {
+        const storage = createFakeLocalStorage();
+        const cachedJson = createSongsJson("cached-archive::1", "sha256:cached");
+        const freshMetaJson = createSongsMetaJson("sha256:fresh");
+        const songsJsonCache = createFakeSongsJsonCacheStore(cachedJson);
+        const fetchUrls = [];
+        globalThis.fetch = async (url, options) => {
+            fetchUrls.push([url, options]);
+            if (url === "data/songs-meta.json") {
+                assert.deepEqual(options, { cache: "no-cache" });
+                return {
+                    ok: true,
+                    async text() {
+                        return freshMetaJson;
+                    }
+                };
+            }
+            if (url === "data/songs.json") {
+                assert.deepEqual(options, { cache: "no-cache" });
+                return {
+                    ok: false,
+                    async text() {
+                        throw new Error("should not read json body");
+                    }
+                };
+            }
+            assert.equal(url, "https://example.test/songs.csv");
+            assert.deepEqual(options, { cache: "no-store" });
+            return {
+                ok: false,
+                async text() {
+                    throw new Error("should not read csv body");
+                }
+            };
+        };
+        const results = [];
+        const dataSource = createSongsDataSource({
+            publicSongsJsonUrl: "data/songs.json",
+            publicSongsMetaUrl: "data/songs-meta.json",
+            publicCsvUrl: "https://example.test/songs.csv",
+            songsJsonCache,
+            storage,
+            csvCacheKey: "cachedCsv"
+        });
+
+        assert.equal(await dataSource.loadInitialSongs({ onSongsLoaded: (result) => results.push(result) }), true);
+
+        assert.deepEqual(fetchUrls, [
+            ["data/songs-meta.json", { cache: "no-cache" }],
+            ["data/songs.json", { cache: "no-cache" }],
+            ["https://example.test/songs.csv", { cache: "no-store" }]
+        ]);
+        assert.equal(songsJsonCache.peek(), cachedJson);
+        assert.equal(results.length, 1);
+        assert.equal(results[0].source, "cache");
+        assert.equal(results[0].songs[0].songKey, "cached-archive::1");
     } finally {
         globalThis.fetch = previousFetch;
     }
@@ -275,7 +313,6 @@ test("songs data source: cached json skips full refresh when meta hash matches",
         });
 
         assert.equal(await dataSource.loadInitialSongs({ onSongsLoaded: (result) => results.push(result) }), true);
-        await waitForAsyncWork();
 
         assert.deepEqual(fetchUrls, [
             ["data/songs-meta.json", { cache: "no-cache" }]
@@ -323,7 +360,6 @@ test("songs data source: legacy localStorage json is migrated into songs json ca
         });
 
         assert.equal(await dataSource.loadInitialSongs({ onSongsLoaded: (result) => results.push(result) }), true);
-        await waitForAsyncWork();
 
         assert.equal(primarySongsJsonCache.peek(), cachedJson);
         assert.equal(storage.getItem("cachedSongsJson"), null);
@@ -338,13 +374,12 @@ test("songs data source: legacy localStorage json is migrated into songs json ca
     }
 });
 
-test("songs data source: cached json falls back to full refresh when meta fetch fails", async () => {
+test("songs data source: cached json falls back to cache when meta fetch fails", async () => {
     const previousFetch = globalThis.fetch;
     const previousConsoleWarn = console.warn;
     try {
         const storage = createFakeLocalStorage();
         const cachedJson = createSongsJson("cached-archive::1", "sha256:cached");
-        const freshJson = createSongsJson("fresh-archive::1", "sha256:fresh");
         const songsJsonCache = createFakeSongsJsonCacheStore(cachedJson);
         const fetchUrls = [];
         const warnings = [];
@@ -362,13 +397,7 @@ test("songs data source: cached json falls back to full refresh when meta fetch 
                     }
                 };
             }
-            assert.equal(url, "data/songs.json");
-            return {
-                ok: true,
-                async text() {
-                    return freshJson;
-                }
-            };
+            throw new Error(`unexpected fetch: ${url}`);
         };
         const results = [];
         const dataSource = createSongsDataSource({
@@ -381,17 +410,14 @@ test("songs data source: cached json falls back to full refresh when meta fetch 
         });
 
         assert.equal(await dataSource.loadInitialSongs({ onSongsLoaded: (result) => results.push(result) }), true);
-        await waitForAsyncWork();
-        await waitForAsyncWork();
 
         assert.deepEqual(fetchUrls, [
-            ["data/songs-meta.json", { cache: "no-cache" }],
-            ["data/songs.json", { cache: "no-cache" }]
+            ["data/songs-meta.json", { cache: "no-cache" }]
         ]);
-        assert.equal(songsJsonCache.peek(), freshJson);
-        assert.equal(results.length, 2);
-        assert.equal(results[1].songs[0].songKey, "fresh-archive::1");
-        assert.equal(results[1].resetConditions, false);
+        assert.equal(songsJsonCache.peek(), cachedJson);
+        assert.equal(results.length, 1);
+        assert.equal(results[0].source, "cache");
+        assert.equal(results[0].songs[0].songKey, "cached-archive::1");
         assert.match(String(warnings[0]?.[0]), /曲データJSONメタ情報の確認に失敗しました/);
     } finally {
         globalThis.fetch = previousFetch;

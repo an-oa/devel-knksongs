@@ -172,29 +172,61 @@ export function createSongsDataSource(input) {
     }
 
     /**
-     * キャッシュ表示後にバックグラウンドでJSONを更新する。
+     * 曲データJSONをネットワークから読み込み、キャッシュと画面表示へ反映する。
+     * @param {(result: { songs: unknown[], source: string, resetConditions?: boolean }) => void} onSongsLoaded
+     * @returns {Promise<boolean>}
+     */
+    async function loadNetworkSongsJson(onSongsLoaded) {
+        const jsonText = await fetchSongsJsonText();
+        const payload = parseSongsJsonPayload(jsonText);
+        if (await setCachedSongsJsonText(jsonText)) {
+            removeCachedText(storage, csvCacheKey);
+        }
+        onSongsLoaded({ songs: payload.songs, source: "network" });
+        return true;
+    }
+
+    /**
+     * CSV fallback を試し、失敗時は最後に JSON キャッシュを表示する。
      * @param {{ contentHash: string, songs: unknown[] }} cachedPayload
      * @param {(result: { songs: unknown[], source: string, resetConditions?: boolean }) => void} onSongsLoaded
+     * @returns {Promise<boolean>}
      */
-    async function refreshSongsJsonCache(cachedPayload, onSongsLoaded) {
+    async function loadCsvOrCachedSongsJson(cachedPayload, onSongsLoaded) {
+        if (await loadCsvFallback(onSongsLoaded)) return true;
+        onSongsLoaded({ songs: cachedPayload.songs, source: "cache" });
+        return true;
+    }
+
+    /**
+     * キャッシュ済みJSONの鮮度を meta で確認し、表示すべきデータを決める。
+     * meta を確認できない場合や、新しい JSON / CSV を取得できない場合はキャッシュを表示する。
+     * @param {{ contentHash: string, songs: unknown[] }} cachedPayload
+     * @param {(result: { songs: unknown[], source: string, resetConditions?: boolean }) => void} onSongsLoaded
+     * @returns {Promise<boolean>}
+     */
+    async function loadFromValidatedSongsJsonCache(cachedPayload, onSongsLoaded) {
+        if (!publicSongsMetaUrl) {
+            onSongsLoaded({ songs: cachedPayload.songs, source: "cache" });
+            return true;
+        }
+
         try {
-            if (publicSongsMetaUrl) {
-                try {
-                    const meta = parseSongsJsonMetaPayload(await fetchSongsMetaText());
-                    if (meta.contentHash === cachedPayload.contentHash) return;
-                } catch (error) {
-                    console.warn("曲データJSONメタ情報の確認に失敗しました", error);
-                }
+            const meta = parseSongsJsonMetaPayload(await fetchSongsMetaText());
+            if (meta.contentHash === cachedPayload.contentHash) {
+                onSongsLoaded({ songs: cachedPayload.songs, source: "cache" });
+                return true;
             }
-            const jsonText = await fetchSongsJsonText();
-            const payload = parseSongsJsonPayload(jsonText);
-            if (payload.contentHash === cachedPayload.contentHash) return;
-            if (await setCachedSongsJsonText(jsonText)) {
-                removeCachedText(storage, csvCacheKey);
-            }
-            onSongsLoaded({ songs: payload.songs, source: "network", resetConditions: false });
         } catch (error) {
-            console.warn("曲データJSONの更新に失敗しました", error);
+            console.warn("曲データJSONメタ情報の確認に失敗しました", error);
+            onSongsLoaded({ songs: cachedPayload.songs, source: "cache" });
+            return true;
+        }
+
+        try {
+            return await loadNetworkSongsJson(onSongsLoaded);
+        } catch (error) {
+            return loadCsvOrCachedSongsJson(cachedPayload, onSongsLoaded);
         }
     }
 
@@ -208,9 +240,7 @@ export function createSongsDataSource(input) {
         if (cachedJson) {
             try {
                 const cachedPayload = parseSongsJsonPayload(cachedJson);
-                onSongsLoaded({ songs: cachedPayload.songs, source: "cache" });
-                refreshSongsJsonCache(cachedPayload, onSongsLoaded);
-                return true;
+                return await loadFromValidatedSongsJsonCache(cachedPayload, onSongsLoaded);
             } catch (error) {
                 console.warn("曲データJSONキャッシュを読み込めませんでした", error);
                 await removeCachedSongsJsonText();
@@ -218,13 +248,7 @@ export function createSongsDataSource(input) {
         }
 
         try {
-            const jsonText = await fetchSongsJsonText();
-            const payload = parseSongsJsonPayload(jsonText);
-            if (await setCachedSongsJsonText(jsonText)) {
-                removeCachedText(storage, csvCacheKey);
-            }
-            onSongsLoaded({ songs: payload.songs, source: "network" });
-            return true;
+            return await loadNetworkSongsJson(onSongsLoaded);
         } catch (error) {
             return loadCsvFallback(onSongsLoaded);
         }
