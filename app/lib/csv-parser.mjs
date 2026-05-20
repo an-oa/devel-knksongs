@@ -128,6 +128,18 @@ function parseEndTimeSeconds(raw, rowNumber) {
 }
 
 /**
+ * 配信上の立場列を確認し、ゲスト行を表示対象から除外する。
+ * この列はCSV移行中の後方互換のため任意列として扱う。
+ * @param {string[] | undefined} row
+ * @param {number} streamRoleIndex
+ * @returns {boolean}
+ */
+function allowsStreamRole(row, streamRoleIndex) {
+    if (streamRoleIndex < 0) return true;
+    return String(row?.[streamRoleIndex] || "").trim() !== "ゲスト";
+}
+
+/**
  * RFC4180ベースでCSV文字列を2次元配列へ解析する。
  * @param {*} t
  */
@@ -189,6 +201,7 @@ export function parseCsvToSongs(csvText) {
     const idxMap = Object.fromEntries(header.map((name, index) => [name, index]));
     const idx = (n) => idxMap[n];
     const endTimeIndex = header.includes("終了時刻") ? idx("終了時刻") : -1;
+    const streamRoleIndex = header.includes("配信上の立場") ? idx("配信上の立場") : -1;
     const songs = [];
     for (let i = 0; i < body.length; i++) {
         const r = body[i];
@@ -197,7 +210,11 @@ export function parseCsvToSongs(csvText) {
         const memoAllows = !memoUpper.includes("URL") && !memoUpper.includes("URI");
         const url = r[idx("URL")] || "";
         const archiveId = (r[idx("#")] || "").trim();
-        if (r[idx("公開範囲")] !== "全体" || archiveId === "" || !memoAllows || url.trim() === "") continue;
+        if (r[idx("公開範囲")] !== "全体" ||
+            archiveId === "" ||
+            !memoAllows ||
+            url.trim() === "" ||
+            !allowsStreamRole(r, streamRoleIndex)) continue;
         const title = r[idx("曲名")];
         const artist = r[idx("アーティスト名")];
         const titleYomi = r[idx("キョクメイ")];
