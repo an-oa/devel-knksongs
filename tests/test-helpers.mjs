@@ -300,6 +300,12 @@ function createMatcher(selector) {
         const targetClass = selector.slice(1);
         return (el) => el.classList.contains(targetClass);
     }
+    const attrSelector = selector.match(/^([a-zA-Z0-9-]+)\[([a-zA-Z0-9:-]+)="([^"]*)"\]$/);
+    if (attrSelector) {
+        const [, tagName, attrName, attrValue] = attrSelector;
+        const tag = tagName.toUpperCase();
+        return (el) => el.tagName === tag && (el[attrName] === attrValue || el.getAttribute(attrName) === attrValue);
+    }
     const tag = selector.toUpperCase();
     return (el) => el.tagName === tag;
 }
@@ -452,6 +458,7 @@ export function makeRenderRow(input) {
         artist: input.artist || "artist",
         date: input.date || "2024-01-01",
         format: input.format || "配信",
+        streamRole: input.streamRole ?? "",
         videoOrientation: input.videoOrientation || "",
         isRelay: false,
         isHarmony: false,

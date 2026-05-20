@@ -11,7 +11,7 @@
   <!-- OGP -->
   <meta property="og:site_name" content="鐘輝かう 歌サーチ" />
   <meta property="og:title" content="鐘輝かう 歌サーチ" />
-  <meta property="og:description" content="曲名・アーティスト名・読みで検索。配信/歌みた/ショート/切り抜き、リレー/ハモリ、日付範囲で絞り込み。" />
+  <meta property="og:description" content="曲名・アーティスト名・読みで検索。配信/歌みた/ショート/切り抜き/収録、コラボ種別、リレー/ハモリ、日付範囲で絞り込み。" />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://an-oa.github.io/knksongs/" />
   <meta property="og:image" content="https://an-oa.github.io/knksongs/ogp.png" />
@@ -21,7 +21,7 @@
   <!-- X (Twitter) -->
   <meta name="twitter:card" content="summary" />
   <meta name="twitter:title" content="鐘輝かう 歌サーチ" />
-  <meta name="twitter:description" content="曲名・アーティスト名・読みで検索。配信/歌みた/ショート/切り抜き、リレー/ハモリ、日付範囲で絞り込み。" />
+  <meta name="twitter:description" content="曲名・アーティスト名・読みで検索。配信/歌みた/ショート/切り抜き/収録、コラボ種別、リレー/ハモリ、日付範囲で絞り込み。" />
   <meta name="twitter:image" content="https://an-oa.github.io/knksongs/ogp.png" />
 
   <script>
@@ -52,9 +52,6 @@
 
     <div class="sidebar-scroll-area">
       <section class="sidebar-group">
-        <div class="sidebar-group-header">
-          <div class="sidebar-group-title">検索条件</div>
-        </div>
         <div class="sidebar-group-body">
           <div class="sidebar-section">
             <div class="section-header">
@@ -96,8 +93,10 @@
           </div>
 
           <div class="sidebar-section sidebar-flags">
-            <label class="checkbox-item"><input type="checkbox" id="relayOnly"> 🚩 歌枠リレー</label>
-            <label class="checkbox-item"><input type="checkbox" id="harmonyOnly"> ✨ ハモリあり</label>
+            <label class="checkbox-item"><input type="checkbox" id="relayOnly"> 歌枠リレー</label>
+            <label class="checkbox-item"><input type="checkbox" id="collabHostOnly"> コラボ(ホスト)</label>
+            <label class="checkbox-item"><input type="checkbox" id="harmonyOnly"> ハモリあり</label>
+            <label class="checkbox-item"><input type="checkbox" id="collabGuestOnly"> コラボ(ゲスト)</label>
           </div>
         </div>
       </section>

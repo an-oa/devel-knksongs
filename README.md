@@ -14,9 +14,11 @@
   - ひらがな/カタカナ等の読みでも検索できます。
   - 複数キーワード(スペース区切り)に対応します(全角スペースも可)。
 - 絞り込みができます。
-  - 配信 / オリ曲/歌みた / ショート / 切り抜き。
+  - 配信 / オリ曲/歌みた / ショート / 切り抜き / 収録。
   - UI上では `オリ曲` を `歌みた` と同じ項目(「オリ曲/歌みた」)で扱います。
-  - リレー / ハモリ。
+  - 歌枠リレー / ハモリあり / コラボ(ホスト) / コラボ(ゲスト)。
+    `コラボ(ホスト)` は配信上の立場が `ホスト`、`コラボ(ゲスト)` は `ゲスト`
+    の行を対象にします。両方選択するとホスト・ゲストの両方を対象にします。
   - 条件はサイドバー(検索メニュー)から操作できます。
 - YouTubeへのリンクがあります。
   - 一覧の曲名リンクから該当動画へ遷移できます。
@@ -40,6 +42,7 @@
   - 上限は「ブックマーク数: 最大20件」「1ブックマークあたり: 最大120曲」「ブックマーク名: 最大64文字」です。
 - 初期表示(おすすめ)があります。
   - 通常表示で検索条件が未指定のときは、一定回数以上歌われた曲からおすすめ表示します。
+  - おすすめ候補は配信上の立場が `ゲスト` 以外の行から抽出します。
   - ただしオリ曲は、1回(1動画)でもおすすめ候補に含みます。
   - おすすめ一覧は条件変更でおすすめ表示を離れて戻っても維持され、曲データの再読み込み時に再抽出されます。
 - 表示テーマを切り替えられます。
@@ -90,6 +93,7 @@ flowchart TD
 - 通常の起動時は、事前生成された `data/songs.json` と `data/songs-meta.json` を優先して読み込みます。
 - `songs-meta.json` の `contentHash` で手元のJSONキャッシュが最新かを確認し、変化がなければ大きい `songs.json` の再取得を避けます。
 - 公開スプレッドシートのCSVは、事前生成JSONの元データかつJSON取得失敗時のフォールバックとして参照します(`app/config.mjs` の `PUBLIC_CSV_URL` で指定します)。
+- CSVの `配信上の立場` は曲データの `streamRole` としてJSONへ保持します。
 - `.github/workflows/update-songs-json-and-deploy.yml` は GitHub Actions 上で `npm run build:songs-json` を実行し、`data/songs.json` / `data/songs-meta.json` を更新して Pages へ deploy します。
 - フロントエンドのみで動作します(静的ホスティング想定)。
 - 配布物はHTML/CSS/JavaScriptのみで、実行時にnpm等の同梱依存はありません。
@@ -101,24 +105,33 @@ flowchart TD
 ## テスト/静的解析(開発者向け)
 
 - 現在は以下のテストを用意しています。
+  - ブックマークのインポート/エクスポートUIのテスト (`tests/bookmark-import-export-ui.test.mjs`)
   - ブックマーク保存スキーマ/移行のテスト (`tests/bookmark-storage-schema.test.mjs`)
+  - ブックマークJSON転送のテスト (`tests/bookmark-transfer.test.mjs`)
   - ブックマークUIのテスト (`tests/bookmark-ui.test.mjs`)
+  - 配信上の立場の正規化/判定テスト (`tests/stream-role.test.mjs`)
   - CSVパースのテスト (`tests/csv-parser.test.mjs`)
   - 初期データ読み込み後の状態反映テスト (`tests/data-loader.test.mjs`)
   - DOM補助関数のテスト (`tests/dom-utils.test.mjs`)
   - 検索/日付フィルタ/ブックマーク検索のロジック (`tests/search-date.test.mjs`)
   - フォーマット表示ラベルのテスト (`tests/format-filter.test.mjs`)
+  - 再生継続候補の選択ロジック (`tests/playback-sequence.test.mjs`)
+  - 再生セッション制御のテスト (`tests/playback-session-controller.test.mjs`)
   - 描画/レイアウトまわりの回帰テスト (`tests/render-layout.test.mjs`)
   - ブックマーク時のドラッグ並び替えテスト (`tests/render-drag-reorder.test.mjs`)
   - masonryレイアウト計算のテスト (`tests/render-masonry-layout.test.mjs`)
   - レイアウト補正待機のテスト (`tests/layout-anchor.test.mjs`)
   - 結果一覧スクロール制御のテスト (`tests/results-scroll.test.mjs`)
+  - 検索フィルター共有helperのテスト (`tests/search-filter-modules.test.mjs`)
+  - 検索フィルターUI controllerのテスト (`tests/search-filters-controller.test.mjs`)
+  - 検索状態保存schemaのテスト (`tests/search-state-schema.test.mjs`)
   - サイドバーUIのテスト (`tests/sidebar-ui.test.mjs`)
   - 曲データJSONのcontent hash算出テスト (`tests/songs-content-hash.test.mjs`)
   - 曲データソースのJSON優先読み込み/CSVフォールバック/キャッシュ更新テスト (`tests/songs-data-source.test.mjs`)
   - 曲データJSONキャッシュのIndexedDB/旧localStorage移行テスト (`tests/songs-json-cache.test.mjs`)
   - 曲データJSONスキーマのテスト (`tests/songs-json.test.mjs`)
   - ストレージ(ブックマーク上限/リネーム)の単体テスト (`tests/storage-bookmark-limit.test.mjs`)
+  - ストレージ(検索状態保存/復元)の単体テスト (`tests/storage-search-state.test.mjs`)
   - UI設定/ストレージ互換のテスト (`tests/ui-storage-compat.test.mjs`)
   - UI同期のテスト (`tests/ui-sync.test.mjs`)
   - YouTubeサムネイル/埋め込み再生まわりの統合テスト (`tests/youtube-controller.test.mjs`)
@@ -151,6 +164,8 @@ flowchart TD
 - テーマ(ダーク/ライト)。
 - サムネイル表示ON/OFF。
 - 検索状態(検索語・絞り込み条件・日付条件)。
+  - localStorage key は既存利用者の互換維持のため `searchStateV1` のままです。
+    payload 内の `version` は保存 schema の版数で、key 名とは独立して更新します。
 - ブックマーク情報(ブックマーク名・曲の対応/順序・作成日時)。
   - 保存形式は version 付き payload で管理し、旧形式は読み込み後に現行形式へ保存し直します。
 - 曲データJSONのキャッシュ(IndexedDB。旧localStorageキャッシュは読み込み時に移行します)。

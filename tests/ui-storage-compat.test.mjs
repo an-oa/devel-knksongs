@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createPlaybackSettingsController } from "../app/controllers/playback-settings.mjs";
-import { applyThemeFromStorage, initFilterMenu, setupTheme } from "../app/ui/core/elements.mjs";
+import { applyThemeFromStorage, setupTheme } from "../app/ui/core/elements.mjs";
 import { installFakeDom, invokeListener } from "./test-helpers.mjs";
 
 function createFakeLocalStorage() {
@@ -576,85 +576,6 @@ test("setupTheme: toggle change updates document theme class and storage", () =>
         assert.equal(globalThis.localStorage.getItem("theme"), "light");
     } finally {
         globalThis.localStorage = prevLocalStorage;
-        restoreDom();
-    }
-});
-
-test("initFilterMenu: initializes defaults, syncs checkboxes, and avoids duplicate rendering", () => {
-    const restoreDom = installFakeDom();
-    try {
-        const formatsList = document.createElement("div");
-        const ui = {
-            el: {
-                formatsList
-            },
-            search: {
-                selectedFormats: new Set(),
-                userTouchedFilters: false
-            }
-        };
-        let setDefaultCount = 0;
-        let syncCount = 0;
-        let searchCount = 0;
-        let saveCount = 0;
-        const defaultFormats = ["配信", "歌みた"];
-        const syncFormatCheckboxesFromState = () => {
-            syncCount += 1;
-            formatsList.children.forEach((label) => {
-                const checkbox = label.firstChild;
-                checkbox.checked = ui.search.selectedFormats.has(checkbox.value);
-            });
-        };
-
-        initFilterMenu({
-            ui,
-            defaultFormats,
-            getFormatFilterLabel: (format) => format,
-            setSelectedFormatsToDefault: () => {
-                setDefaultCount += 1;
-                ui.search.selectedFormats = new Set(defaultFormats);
-            },
-            syncFormatCheckboxesFromState,
-            scheduleSearch: () => {
-                searchCount += 1;
-            },
-            saveSearchState: () => {
-                saveCount += 1;
-            }
-        });
-
-        assert.equal(setDefaultCount, 1);
-        assert.equal(syncCount, 1);
-        assert.equal(formatsList.childElementCount, 2);
-        const firstCheckbox = formatsList.children[0].firstChild;
-        const secondCheckbox = formatsList.children[1].firstChild;
-        assert.equal(firstCheckbox.checked, true);
-        assert.equal(secondCheckbox.checked, true);
-
-        secondCheckbox.checked = false;
-        invokeListener(secondCheckbox, "change", { target: secondCheckbox });
-
-        assert.equal(ui.search.userTouchedFilters, true);
-        assert.deepEqual(Array.from(ui.search.selectedFormats), ["配信"]);
-        assert.equal(searchCount, 1);
-        assert.equal(saveCount, 1);
-
-        initFilterMenu({
-            ui,
-            defaultFormats,
-            getFormatFilterLabel: (format) => format,
-            setSelectedFormatsToDefault: () => {
-                throw new Error("should not rebuild defaults");
-            },
-            syncFormatCheckboxesFromState: () => {
-                throw new Error("should not sync on duplicate init");
-            },
-            scheduleSearch: () => {},
-            saveSearchState: () => {}
-        });
-
-        assert.equal(formatsList.childElementCount, 2);
-    } finally {
         restoreDom();
     }
 });

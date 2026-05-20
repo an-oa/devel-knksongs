@@ -28,6 +28,8 @@ function createSidebarUiState() {
     const closeBookmarkPanelBtn = document.createElement("button");
     const closeBookmarkSidebarBtn = document.createElement("button");
     const searchBox = document.createElement("input");
+    const collabHostOnly = document.createElement("input");
+    const collabGuestOnly = document.createElement("input");
     const relayOnly = document.createElement("input");
     const harmonyOnly = document.createElement("input");
     const dateFromYear = document.createElement("select");
@@ -71,6 +73,8 @@ function createSidebarUiState() {
         closeBookmarkPanelBtn,
         closeBookmarkSidebarBtn,
         searchBox,
+        collabHostOnly,
+        collabGuestOnly,
         relayOnly,
         harmonyOnly,
         dateFromYear,
@@ -98,6 +102,8 @@ function createSidebarUiState() {
                 closeBookmarkPanelBtn,
                 closeBookmarkSidebarBtn,
                 searchBox,
+                collabHostOnly,
+                collabGuestOnly,
                 relayOnly,
                 harmonyOnly,
                 dateFromYear,
@@ -119,6 +125,15 @@ function createSidebarUiState() {
         loadMoreBtn,
         clearBtn
     };
+}
+
+/**
+ * サイドバー controller をテスト用の状態で作る。
+ * @param {{ data: object, ui: object, constants: object, callbacks: object }} input
+ * @returns {object}
+ */
+function createSidebarControllerForTest(input) {
+    return createSidebarController(input);
 }
 
 /**
@@ -154,7 +169,7 @@ test("sidebar: opening settings panel makes background inert and focuses back bu
     try {
         const { ui, openSidebarBtn } = createSidebarUiState();
         let closedBookmarkModal = 0;
-        const controller = createSidebarController({
+        const controller = createSidebarControllerForTest({
             data: { displayLimit: 48 },
             ui,
             constants: { resultDisplayBatchSize: 48 },
@@ -191,7 +206,7 @@ test("sidebar: escape closes settings panel, removes inert, and restores focus",
     const restoreDom = installFakeDom();
     try {
         const { ui, openSidebarBtn } = createSidebarUiState();
-        const controller = createSidebarController({
+        const controller = createSidebarControllerForTest({
             data: { displayLimit: 48 },
             ui,
             constants: { resultDisplayBatchSize: 48 },
@@ -231,7 +246,7 @@ test("sidebar: openBookmarkModal opens sidebar first when closed and passes clos
         document.body.appendChild(launcher);
         launcher.focus();
         const openBookmarkCalls = [];
-        const controller = createSidebarController({
+        const controller = createSidebarControllerForTest({
             data: { displayLimit: 48 },
             ui,
             constants: { resultDisplayBatchSize: 48 },
@@ -268,7 +283,7 @@ test("sidebar: escape prioritizes settings panel over bookmark panel", () => {
     try {
         const { ui, openSidebarBtn } = createSidebarUiState();
         let bookmarkCloseCount = 0;
-        const controller = createSidebarController({
+        const controller = createSidebarControllerForTest({
             data: { displayLimit: 48 },
             ui,
             constants: { resultDisplayBatchSize: 48 },
@@ -331,7 +346,7 @@ test("sidebar: ios year change clears lower date selects and removes updating cl
         const markFilterTouchedArgs = [];
         let clampCount = 0;
         let syncCount = 0;
-        const controller = createSidebarController({
+        const controller = createSidebarControllerForTest({
             data: { displayLimit: 48 },
             ui,
             constants: { resultDisplayBatchSize: 48 },
@@ -374,7 +389,7 @@ test("sidebar: tab focus is trapped within the active sidebar in both directions
     const restoreDom = installFakeDom();
     try {
         const { ui, openSidebarBtn, closeSidebarBtn } = createSidebarUiState();
-        const controller = createSidebarController({
+        const controller = createSidebarControllerForTest({
             data: { displayLimit: 48 },
             ui,
             constants: { resultDisplayBatchSize: 48 },

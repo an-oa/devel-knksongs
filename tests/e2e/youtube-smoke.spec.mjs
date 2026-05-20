@@ -5,6 +5,7 @@ import {
     waitForMockYoutube
 } from "./support/mock-youtube.mjs";
 import {
+    closeSidebar,
     enablePlaybackSettings,
     filterBySongTitle,
     getSongCard,
@@ -66,6 +67,74 @@ test("manual playback mounts an iframe from the thumbnail", async ({ page }) => 
 
     await expect(manualCard.locator("iframe")).toBeVisible();
     await expect(manualCard.locator(".thumb-close-btn")).toBeVisible();
+});
+
+test("collab role filters switch between host and guest results", async ({ page }) => {
+    await page.locator("#open-sidebar").click();
+    await page.locator("#collabGuestOnly").locator("xpath=ancestor::label[1]").click();
+    await expect(page.locator("#collabGuestOnly")).toBeChecked();
+    await closeSidebar(page);
+
+    const guestCard = getSongCard(page, "Chain Alpha");
+    await expect(guestCard).toBeVisible();
+    await expect(guestCard.locator(".tag-collab")).toHaveText("コラボ");
+    await expect(getSongCard(page, "Manual Song")).toHaveCount(0);
+    await expect(getSongCard(page, "Replay Song")).toHaveCount(0);
+
+    await page.locator("#open-sidebar").click();
+    await page.locator("#collabGuestOnly").locator("xpath=ancestor::label[1]").click();
+    await page.locator("#collabHostOnly").locator("xpath=ancestor::label[1]").click();
+    await expect(page.locator("#collabGuestOnly")).not.toBeChecked();
+    await expect(page.locator("#collabHostOnly")).toBeChecked();
+    await closeSidebar(page);
+
+    const hostCard = getSongCard(page, "Replay Song");
+    await expect(hostCard).toBeVisible();
+    await expect(hostCard.locator(".tag-collab")).toHaveText("コラボ");
+    await expect(getSongCard(page, "Manual Song")).toHaveCount(0);
+    await expect(getSongCard(page, "Chain Alpha")).toHaveCount(0);
+
+    await page.locator("#open-sidebar").click();
+    await page.locator("#collabGuestOnly").locator("xpath=ancestor::label[1]").click();
+    await expect(page.locator("#collabHostOnly")).toBeChecked();
+    await expect(page.locator("#collabGuestOnly")).toBeChecked();
+    await closeSidebar(page);
+
+    await expect(getSongCard(page, "Replay Song")).toBeVisible();
+    await expect(getSongCard(page, "Chain Alpha")).toBeVisible();
+    await expect(getSongCard(page, "Manual Song")).toHaveCount(0);
+
+    await page.locator("#open-sidebar").click();
+    await page.locator("#collabHostOnly").locator("xpath=ancestor::label[1]").click();
+    await page.locator("#collabGuestOnly").locator("xpath=ancestor::label[1]").click();
+    await page.locator("#searchBox").fill("Replay Song");
+    await expect(page.locator("#searchBox")).toHaveValue("Replay Song");
+    await closeSidebar(page);
+
+    await expect(getSongCard(page, "Replay Song")).toBeVisible();
+});
+
+test("saved legacy guest frame scope is restored as collab guest filter", async ({ page }) => {
+    await page.evaluate(() => {
+        localStorage.setItem("searchStateV1", JSON.stringify({
+            version: 2,
+            query: "",
+            relayOnly: false,
+            harmonyOnly: false,
+            frameScope: "guest",
+            dateFrom: "",
+            dateTo: "",
+            formats: ["配信", "歌みた", "ショート", "切り抜き", "収録"]
+        }));
+    });
+    await page.reload();
+    await waitForInitialLoad(page);
+
+    await expect(page.locator("#collabGuestOnly")).toBeChecked();
+    await expect(page.locator("#collabHostOnly")).not.toBeChecked();
+    await expect(getSongCard(page, "Chain Alpha")).toBeVisible();
+    await expect(getSongCard(page, "Manual Song")).toHaveCount(0);
+    await expect(getSongCard(page, "Replay Song")).toHaveCount(0);
 });
 
 test("same thumbnail can be replayed after returning from the embedded player", async ({ page }) => {

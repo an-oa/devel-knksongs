@@ -1,4 +1,6 @@
-import { normalizeForSearch, parseDateKey } from "../controllers/search.mjs?v=20";
+import { normalizeStreamRole } from "./stream-role.mjs?v=20";
+import { parseDateKey } from "./date-key.mjs?v=20";
+import { normalizeForSearch } from "./search-filters.mjs?v=20";
 import { extractYoutubeInfo } from "./youtube-url.mjs?v=20";
 
 /**
@@ -14,6 +16,7 @@ import { extractYoutubeInfo } from "./youtube-url.mjs?v=20";
  * @property {string} bookmarkSongKey
  * @property {string} legacySongKey
  * @property {string} format
+ * @property {string} streamRole
  * @property {string} videoOrientation
  * @property {boolean} isRelay
  * @property {boolean} isHarmony
@@ -128,18 +131,6 @@ function parseEndTimeSeconds(raw, rowNumber) {
 }
 
 /**
- * 配信上の立場列を確認し、ゲスト行を表示対象から除外する。
- * この列はCSV移行中の後方互換のため任意列として扱う。
- * @param {string[] | undefined} row
- * @param {number} streamRoleIndex
- * @returns {boolean}
- */
-function allowsStreamRole(row, streamRoleIndex) {
-    if (streamRoleIndex < 0) return true;
-    return String(row?.[streamRoleIndex] || "").trim() !== "ゲスト";
-}
-
-/**
  * RFC4180ベースでCSV文字列を2次元配列へ解析する。
  * @param {*} t
  */
@@ -213,8 +204,7 @@ export function parseCsvToSongs(csvText) {
         if (r[idx("公開範囲")] !== "全体" ||
             archiveId === "" ||
             !memoAllows ||
-            url.trim() === "" ||
-            !allowsStreamRole(r, streamRoleIndex)) continue;
+            url.trim() === "") continue;
         const title = r[idx("曲名")];
         const artist = r[idx("アーティスト名")];
         const titleYomi = r[idx("キョクメイ")];
@@ -233,6 +223,7 @@ export function parseCsvToSongs(csvText) {
             bookmarkSongKey: buildBookmarkSongKey({ videoId, archiveId, archiveOrder }),
             legacySongKey,
             format: r[idx("形態")],
+            streamRole: streamRoleIndex >= 0 ? normalizeStreamRole(r[streamRoleIndex]) : "",
             videoOrientation: parseVideoOrientation(r[idx("画面の向き")], i + 2),
             isRelay: r[idx("歌枠リレー？")] === "◯",
             isHarmony: r[idx("ハモリあり？")] === "◯",

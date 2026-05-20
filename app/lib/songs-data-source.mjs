@@ -65,7 +65,8 @@ function removeCachedText(storage, key) {
  *     setItem: (key: string, value: string) => void,
  *     removeItem: (key: string) => void
  *   } | null,
- *   csvCacheKey: string
+ *   csvCacheKey: string,
+ *   legacyCsvCacheKeys?: string[]
  * }} input
  */
 export function createSongsDataSource(input) {
@@ -75,8 +76,12 @@ export function createSongsDataSource(input) {
         publicCsvUrl,
         songsJsonCache,
         storage = null,
-        csvCacheKey
+        csvCacheKey,
+        legacyCsvCacheKeys = []
     } = input;
+    const fallbackCsvCacheKeys = [csvCacheKey]
+        .concat(Array.isArray(legacyCsvCacheKeys) ? legacyCsvCacheKeys : [])
+        .filter((key, index, keys) => key && keys.indexOf(key) === index);
 
     /**
      * 非同期ストアから曲データJSONキャッシュを読み込む。
@@ -151,6 +156,19 @@ export function createSongsDataSource(input) {
     }
 
     /**
+     * 現行 key から順に CSV キャッシュを読み込む。
+     * legacy key の CSV は旧 schema 互換として読み込み、現行 key へは書き戻さない。
+     * @returns {string | null}
+     */
+    function getCachedCsvText() {
+        for (const key of fallbackCsvCacheKeys) {
+            const text = getCachedText(storage, key);
+            if (text) return text;
+        }
+        return null;
+    }
+
+    /**
      * JSON取得失敗後にCSV取得またはCSVキャッシュで初期データを返す。
      * @param {(result: { songs: unknown[], source: string, resetConditions?: boolean }) => void} onSongsLoaded
      * @returns {Promise<boolean>}
@@ -162,7 +180,7 @@ export function createSongsDataSource(input) {
             onSongsLoaded({ songs: parseCsvToSongs(csvText), source: "network" });
             return true;
         } catch (error) {
-            const cached = getCachedText(storage, csvCacheKey);
+            const cached = getCachedCsvText();
             if (cached) {
                 onSongsLoaded({ songs: parseCsvToSongs(cached), source: "cache" });
                 return true;

@@ -1,9 +1,10 @@
+import { isGuestStreamRole } from "./stream-role.mjs?v=20";
 import {
     isOriginalSongFormat,
     isShortFormat,
     isStreamFormat,
     isUtamitaEquivalentFormat
-} from "./search-filters.mjs?v=20";
+} from "./song-format.mjs?v=20";
 
 /**
  * おすすめ表示に使う曲一覧を抽選して返す。
@@ -40,6 +41,7 @@ function buildRecommendedGroups(songs, minPerformanceCount) {
 function collapseRecommendedRowsByArchive(songs) {
     const songRowsByArchive = new Map();
     for (const row of songs) {
+        if (isGuestStreamRole(row.streamRole)) continue;
         if (!isRecommendedCountFormat(row.format)) continue;
         const archiveKey = getRecommendedSongArchiveKey(row);
         const existing = songRowsByArchive.get(archiveKey);

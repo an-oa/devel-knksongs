@@ -1,4 +1,5 @@
 import { getHeaderHeight } from "../lib/dom-utils.mjs?v=20";
+import { hasStreamRole } from "../lib/stream-role.mjs?v=20";
 import { tracePlayback } from "../lib/playback-debug.mjs?v=20";
 import { scheduleScrollElementIntoView } from "../lib/results-scroll.mjs?v=20";
 import { createBookmarkDragReorderController } from "../lib/render/drag-reorder.mjs?v=20";
@@ -176,9 +177,9 @@ export function createRenderController({ data, ui, isAllFormatsSelected, resultD
     }
 
     /**
-     * 形式・リレー・ハモリのタグ表示を更新する。
-     * @param {*} tags
-     * @param {*} row
+     * 形式・コラボ・リレー・ハモリのタグ表示を更新する。
+     * @param {Element} tags
+     * @param {{ format?: string, streamRole?: string, isRelay?: boolean, isHarmony?: boolean }} row
      */
     function updateFooterTags(tags, row) {
         tags.replaceChildren();
@@ -188,16 +189,22 @@ export function createRenderController({ data, ui, isAllFormatsSelected, resultD
             fmt.textContent = row.format;
             tags.appendChild(fmt);
         }
+        if (hasStreamRole(row.streamRole)) {
+            const collab = document.createElement("span");
+            collab.className = "tag tag-collab";
+            collab.textContent = "コラボ";
+            tags.appendChild(collab);
+        }
         if (row.isRelay) {
             const relay = document.createElement("span");
             relay.className = "tag tag-relay";
-            relay.textContent = "🚩リレー";
+            relay.textContent = "リレー";
             tags.appendChild(relay);
         }
         if (row.isHarmony) {
             const harmony = document.createElement("span");
             harmony.className = "tag tag-harmony";
-            harmony.textContent = "✨ハモリ";
+            harmony.textContent = "ハモリ";
             tags.appendChild(harmony);
         }
     }

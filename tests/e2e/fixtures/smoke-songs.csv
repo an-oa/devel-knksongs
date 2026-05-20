@@ -1,7 +1,7 @@
-公開範囲,#,##,曲名,アーティスト名,キョクメイ,アーティストメイ,配信日,形態,歌枠リレー？,ハモリあり？,URL,終了時刻,メモ
-全体,1,1,Manual Song,Artist A,マニュアルソング,アーティストエー,2024/01/01,配信,,,https://www.youtube.com/watch?v=manual-video&t=10s,,
-全体,2,1,Replay Song,Artist B,リプレイソング,アーティストビー,2024/01/02,配信,,,https://www.youtube.com/watch?v=replay-video&t=20s,,
-全体,3,1,Chain Alpha,Artist C,チェーンアルファ,アーティストシー,2024/01/03,配信,,,https://www.youtube.com/watch?v=chain-alpha&t=30s,,
-全体,4,1,Chain Beta,Artist D,チェーンベータ,アーティストディー,2024/01/04,配信,,,https://www.youtube.com/watch?v=chain-beta&t=40s,,
-全体,5,1,Reject Alpha,Artist E,リジェクトアルファ,アーティストイー,2024/01/05,配信,,,https://www.youtube.com/watch?v=reject-alpha&t=50s,,
-全体,6,1,Reject Beta,Artist F,リジェクトベータ,アーティストエフ,2024/01/06,配信,,,https://www.youtube.com/watch?v=reject-beta&t=60s,,
+公開範囲,#,##,曲名,アーティスト名,キョクメイ,アーティストメイ,配信日,形態,配信上の立場,歌枠リレー？,ハモリあり？,URL,終了時刻,メモ
+全体,1,1,Manual Song,Artist A,マニュアルソング,アーティストエー,2024/01/01,配信,,,,https://www.youtube.com/watch?v=manual-video&t=10s,,
+全体,2,1,Replay Song,Artist B,リプレイソング,アーティストビー,2024/01/02,配信,ホスト,,,https://www.youtube.com/watch?v=replay-video&t=20s,,
+全体,3,1,Chain Alpha,Artist C,チェーンアルファ,アーティストシー,2024/01/03,配信,ゲスト,,,https://www.youtube.com/watch?v=chain-alpha&t=30s,,
+全体,4,1,Chain Beta,Artist D,チェーンベータ,アーティストディー,2024/01/04,配信,,,,https://www.youtube.com/watch?v=chain-beta&t=40s,,
+全体,5,1,Reject Alpha,Artist E,リジェクトアルファ,アーティストイー,2024/01/05,配信,,,,https://www.youtube.com/watch?v=reject-alpha&t=50s,,
+全体,6,1,Reject Beta,Artist F,リジェクトベータ,アーティストエフ,2024/01/06,配信,,,,https://www.youtube.com/watch?v=reject-beta&t=60s,,

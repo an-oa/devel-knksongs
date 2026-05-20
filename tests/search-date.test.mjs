@@ -1,12 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createDateFilterController } from "../app/ui/date/filter.mjs";
+import { createSearchFiltersController } from "../app/ui/search-filters/controller.mjs";
 import { pickRecommendedSongs } from "../app/lib/search-recommendation.mjs";
+import { isWithinDateRange, parseDateKey } from "../app/lib/date-key.mjs";
+import { filterSongsByCriteria, normalizeForSearch } from "../app/lib/search-filters.mjs";
 import {
-    normalizeForSearch,
-    parseDateKey,
-    isWithinDateRange,
-    filterSongsByCriteria,
     createSearchController
 } from "../app/controllers/search.mjs";
 import { installFakeDom } from "./test-helpers.mjs";
@@ -62,6 +61,21 @@ function createSearchUiState(input) {
     };
 }
 
+/**
+ * 検索コントローラーへ検索条件 UI controller を注入して作る。
+ * @param {{ data: object, ui: object, constants: object, callbacks: object }} input
+ * @returns {object}
+ */
+function createSearchControllerForTest(input) {
+    return createSearchController({
+        ...input,
+        searchFiltersController: createSearchFiltersController({
+            ui: input.ui,
+            defaultFormats: input.constants.DEFAULT_FORMATS
+        })
+    });
+}
+
 function makeRow(input) {
     const title = input.title ?? "";
     const artist = input.artist ?? "";
@@ -76,6 +90,7 @@ function makeRow(input) {
         sourceIndex: input.sourceIndex ?? 0,
         dateKey: input.dateKey ?? null,
         format: input.format ?? "配信",
+        streamRole: input.streamRole ?? "",
         isRelay: !!input.isRelay,
         isHarmony: !!input.isHarmony,
         titleNorm: normalizeForSearch(title),
@@ -166,6 +181,35 @@ test("filterSongsByCriteria: AND keywords and harmony flag", () => {
 
     const hit = filterSongsByCriteria(rows, searchState, selectedFormats);
     assert.equal(hit.length, 1);
+});
+
+test("filterSongsByCriteria: collab role filters keep selected host and guest rows", () => {
+    const rows = [
+        makeRow({ title: "Solo", streamRole: "" }),
+        makeRow({ title: "Host", streamRole: "ホスト" }),
+        makeRow({ title: "Guest", streamRole: "ゲスト" })
+    ];
+    const baseState = {
+        queryRaw: "",
+        relayOnly: false,
+        harmonyOnly: false,
+        dateFromKey: null,
+        dateToKey: null
+    };
+
+    const allRows = filterSongsByCriteria(rows, baseState, new Set(["配信"]));
+    const hostRows = filterSongsByCriteria(rows, { ...baseState, collabHostOnly: true }, new Set(["配信"]));
+    const guestRows = filterSongsByCriteria(rows, { ...baseState, collabGuestOnly: true }, new Set(["配信"]));
+    const collabRows = filterSongsByCriteria(
+        rows,
+        { ...baseState, collabHostOnly: true, collabGuestOnly: true },
+        new Set(["配信"])
+    );
+
+    assert.deepEqual(allRows.map((row) => row.titleNorm), ["solo", "host", "guest"]);
+    assert.deepEqual(hostRows.map((row) => row.titleNorm), ["host"]);
+    assert.deepEqual(guestRows.map((row) => row.titleNorm), ["guest"]);
+    assert.deepEqual(collabRows.map((row) => row.titleNorm), ["host", "guest"]);
 });
 
 test("createDateFilterController: syncDateSelectOptions constrains end-side options by start-side selection", () => {
@@ -290,6 +334,22 @@ test("pickRecommendedSongs: prefers 歌みた rows over 配信 and ショート 
     assert.equal(picked[0].format, "歌みた");
 });
 
+test("pickRecommendedSongs: excludes ゲスト rows from recommendation candidates", () => {
+    const rows = [
+        makeRow({ archiveId: "a1", sourceIndex: 1, title: "群青", artist: "A", format: "配信", streamRole: "ゲスト" }),
+        makeRow({ archiveId: "a2", sourceIndex: 2, title: "群青", artist: "A", format: "配信", streamRole: "ゲスト" }),
+        makeRow({ archiveId: "a3", sourceIndex: 3, title: "群青", artist: "A", format: "配信", streamRole: "ゲスト" }),
+        makeRow({ archiveId: "a4", sourceIndex: 4, title: "青空", artist: "B", format: "配信" }),
+        makeRow({ archiveId: "a5", sourceIndex: 5, title: "青空", artist: "B", format: "配信" })
+    ];
+
+    const picked = pickRecommendedSongs(rows, { count: 10, minPerformanceCount: 2 });
+
+    assert.equal(picked.length, 1);
+    assert.equal(picked[0].titleNorm, normalizeForSearch("青空"));
+    assert.notEqual(picked[0].streamRole, "ゲスト");
+});
+
 test("pickRecommendedSongs: keeps the latest row within the same archive", () => {
     const rows = [
         makeRow({ archiveId: "a1", archiveOrder: 1, sourceIndex: 1, title: "群青", artist: "A", format: "配信" }),
@@ -351,7 +411,7 @@ test("createSearchController: active bookmark also applies search criteria", () 
         DEFAULT_FORMATS: ["配信", "歌みた", "ショート"]
     };
 
-    const controller = createSearchController({
+    const controller = createSearchControllerForTest({
         data,
         ui,
         constants,
@@ -405,7 +465,7 @@ test("createSearchController: active bookmark resolves rows by bookmarkSongKey",
         DEFAULT_FORMATS: ["配信", "歌みた", "ショート"]
     };
 
-    const controller = createSearchController({
+    const controller = createSearchControllerForTest({
         data,
         ui,
         constants,
@@ -462,7 +522,7 @@ test("createSearchController: active bookmark uses incremental display limit", (
         DEFAULT_FORMATS: ["配信", "歌みた", "ショート"]
     };
 
-    const controller = createSearchController({
+    const controller = createSearchControllerForTest({
         data,
         ui,
         constants,
@@ -512,7 +572,7 @@ test("createSearchController: recommendation mode counts オリ曲 as 歌みた"
         DEFAULT_FORMATS: ["配信", "歌みた", "ショート", "切り抜き"]
     };
 
-    const controller = createSearchController({
+    const controller = createSearchControllerForTest({
         data,
         ui,
         constants,
@@ -568,7 +628,7 @@ test("createSearchController: single オリ曲 performance is eligible for recom
         DEFAULT_FORMATS: ["配信", "歌みた", "ショート", "切り抜き"]
     };
 
-    const controller = createSearchController({
+    const controller = createSearchControllerForTest({
         data,
         ui,
         constants,

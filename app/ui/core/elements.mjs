@@ -1,5 +1,3 @@
-import { getSearchUiState } from "../../lib/ui-slices.mjs?v=20";
-
 /**
  * 初期化時に利用する DOM 要素参照をまとめて取得する。
  * @returns {Record<string, HTMLElement | null>}
@@ -14,6 +12,8 @@ export function collectUiElements() {
         resultCount: document.getElementById("resultCount"),
         loadMoreContainer: document.getElementById("loadMoreContainer"),
         searchBox: document.getElementById("searchBox"),
+        collabHostOnly: document.getElementById("collabHostOnly"),
+        collabGuestOnly: document.getElementById("collabGuestOnly"),
         relayOnly: document.getElementById("relayOnly"),
         harmonyOnly: document.getElementById("harmonyOnly"),
         dateFromYear: document.getElementById("dateFromYear"),
@@ -76,49 +76,4 @@ export function setupTheme({ ui }) {
         document.documentElement.classList.toggle("dark-theme", isDarkNow);
         localStorage.setItem("theme", isDarkNow ? "dark" : "light");
     });
-}
-
-/**
- * フォーマットフィルタのチェックボックス UI を構築する。
- * @param {{
- *   ui: { el: Record<string, HTMLElement | null>, selectedFormats: Set<string>, userTouchedFilters: boolean },
- *   defaultFormats: string[],
- *   getFormatFilterLabel: (format: string) => string,
- *   setSelectedFormatsToDefault: () => void,
- *   syncFormatCheckboxesFromState: () => void,
- *   scheduleSearch: (options?: { immediate?: boolean }) => void,
- *   saveSearchState: () => void
- * }} input
- */
-export function initFilterMenu(input) {
-    const {
-        ui,
-        defaultFormats,
-        getFormatFilterLabel,
-        setSelectedFormatsToDefault,
-        syncFormatCheckboxesFromState,
-        scheduleSearch,
-        saveSearchState
-    } = input;
-    const searchUi = getSearchUiState(ui);
-    const container = ui.el.formatsList;
-    if (!container || container.childElementCount > 0) return;
-    if (searchUi.selectedFormats.size === 0) setSelectedFormatsToDefault();
-    defaultFormats.forEach((format) => {
-        const label = document.createElement("label");
-        label.className = "checkbox-item";
-        const checkbox = document.createElement("input");
-        checkbox.type = "checkbox";
-        checkbox.value = format;
-        checkbox.addEventListener("change", (event) => {
-            searchUi.userTouchedFilters = true;
-            if (event.target.checked) searchUi.selectedFormats.add(event.target.value);
-            else searchUi.selectedFormats.delete(event.target.value);
-            scheduleSearch();
-            saveSearchState();
-        });
-        label.append(checkbox, ` ${getFormatFilterLabel(format)}`);
-        container.appendChild(label);
-    });
-    syncFormatCheckboxesFromState();
 }

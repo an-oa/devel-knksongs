@@ -1,4 +1,5 @@
 import { getSettingsPanelUiState } from "../../lib/ui-slices.mjs?v=20";
+import { getSearchBooleanFilterElements } from "../../lib/search-boolean-filters.mjs?v=20";
 
 /**
  * サイドバー関連の UI 操作をまとめるコントローラーを作成する。
@@ -251,16 +252,12 @@ export function createSidebarController(input) {
             if (event.key === "Tab") trapSidebarFocus(event, sidebar);
         });
 
-        if (ui.el.relayOnly) {
-            ui.el.relayOnly.addEventListener("change", () => {
+        getSearchBooleanFilterElements(ui).forEach((checkbox) => {
+            if (!checkbox) return;
+            checkbox.addEventListener("change", () => {
                 markFilterTouched();
             });
-        }
-        if (ui.el.harmonyOnly) {
-            ui.el.harmonyOnly.addEventListener("change", () => {
-                markFilterTouched();
-            });
-        }
+        });
         if (ui.el.searchBox) {
             ui.el.searchBox.addEventListener("input", () => {
                 markQueryTouched();

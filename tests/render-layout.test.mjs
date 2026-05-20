@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createRenderController } from "../app/controllers/render.mjs";
 import { createSearchController } from "../app/controllers/search.mjs";
 import { extractYoutubeInfo } from "../app/controllers/youtube.mjs";
+import { createSearchFiltersController } from "../app/ui/search-filters/controller.mjs";
 import {
     createYoutubePlaybackStartResult,
     YOUTUBE_PLAYBACK_START_STATUS
@@ -361,6 +362,58 @@ test("render: refreshLayout shrinks container height after card height decreases
     }
 });
 
+test("render: adds footer tags for collaboration, relay, and harmony", () => {
+    const cleanup = installFakeDom();
+    try {
+        const collabRow = makeRenderRow({
+            songKey: "song:collab",
+            sourceIndex: 1,
+            streamRole: "ホスト"
+        });
+        collabRow.isRelay = true;
+        collabRow.isHarmony = true;
+        const soloRow = makeRenderRow({
+            songKey: "song:solo",
+            sourceIndex: 2,
+            streamRole: ""
+        });
+        const data = {
+            currentResults: [collabRow, soloRow],
+            displayLimit: 10,
+            activeBookmark: null
+        };
+        const ui = createRenderUiState({
+            el: {
+                resultList: document.createElement("div"),
+                loadMoreContainer: document.createElement("div")
+            }
+        });
+        const controller = createRenderController({
+            data,
+            ui,
+            isAllFormatsSelected: () => true,
+            callbacks: createRenderCallbacks({
+                getSearchState: () => ({ queryRaw: "" })
+            })
+        });
+
+        controller.updateDisplay();
+
+        const collabEntry = ui.render.cardEntriesBySourceKey.get("song:song:collab");
+        const soloEntry = ui.render.cardEntriesBySourceKey.get("song:song:solo");
+        const collabTags = Array.from(collabEntry.card.querySelectorAll(".tag")).map((tag) => tag.textContent);
+        const soloTags = Array.from(soloEntry.card.querySelectorAll(".tag")).map((tag) => tag.textContent);
+
+        assert.deepEqual(collabTags, ["配信", "コラボ", "リレー", "ハモリ"]);
+        assert.deepEqual(soloTags, ["配信"]);
+        assert.equal(collabEntry.card.querySelector(".tag-collab").textContent, "コラボ");
+        assert.equal(collabEntry.card.querySelector(".tag-relay").textContent, "リレー");
+        assert.equal(collabEntry.card.querySelector(".tag-harmony").textContent, "ハモリ");
+    } finally {
+        cleanup();
+    }
+});
+
 test("render: explicit video orientation overrides URL heuristic", () => {
     const cleanup = installFakeDom();
     try {
@@ -570,6 +623,10 @@ test("bookmark: shows load-more and increases by RESULT_DISPLAY_BATCH_SIZE (48)"
         const searchController = createSearchController({
             data,
             ui,
+            searchFiltersController: createSearchFiltersController({
+                ui,
+                defaultFormats: ["配信", "歌みた", "ショート", "切り抜き"]
+            }),
             constants: {
                 RANDOM_DISPLAY_COUNT: 48,
                 MIN_PERFORMANCE_FOR_RANDOM: 3,

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createSongsDataSource } from "../app/lib/songs-data-source.mjs";
 import { createLegacyLocalStorageSongsJsonCacheAdapter } from "../app/lib/storage/songs-json-cache.mjs";
 import { buildSongsJsonMetaPayload, buildSongsJsonPayload } from "../app/lib/songs-json.mjs";
+import { CSV_CACHE_KEY, LEGACY_CSV_CACHE_KEY } from "../app/config.mjs";
 
 function createFakeLocalStorage() {
     const store = new Map();
@@ -47,6 +48,17 @@ function createFakeSongsJsonCacheStore(initialValue = null) {
  */
 function createValidCsv() {
     return [
+        "#,配信日,配信上の立場,画面の向き,公開範囲,形態,歌枠リレー？,ハモリあり？,##,曲名,アーティスト名,キョクメイ,アーティストメイ,URL,終了時刻,メモ",
+        "archive-1,2026/03/11,,縦,全体,配信,,,1,KING,Kanaria feat. GUMI,キング,カナリアフィーチャリンググミ,https://www.youtube.com/watch?v=abc123&t=10s,0:09:41,"
+    ].join("\n");
+}
+
+/**
+ * data source テスト用の旧 schema CSV を返す。
+ * @returns {string}
+ */
+function createLegacyCsv() {
+    return [
         "#,配信日,画面の向き,公開範囲,形態,歌枠リレー？,ハモリあり？,##,曲名,アーティスト名,キョクメイ,アーティストメイ,URL,終了時刻,メモ",
         "archive-1,2026/03/11,縦,全体,配信,,,1,KING,Kanaria feat. GUMI,キング,カナリアフィーチャリンググミ,https://www.youtube.com/watch?v=abc123&t=10s,0:09:41,"
     ].join("\n");
@@ -72,6 +84,7 @@ function createSongsJson(songKey, contentHash = `sha256:${songKey}`) {
             bookmarkSongKey: `abc123::${songKey}`,
             legacySongKey: `${songKey}::https://www.youtube.com/watch?v=abc123&t=10s`,
             format: "配信",
+            streamRole: "",
             videoOrientation: "vertical",
             isRelay: false,
             isHarmony: false,
@@ -496,6 +509,35 @@ test("songs data source: failed csv fetch falls back to cached csv", async () =>
         assert.equal(results.length, 1);
         assert.equal(results[0].source, "cache");
         assert.equal(results[0].songs[0].songKey, "archive-1::1");
+    } finally {
+        globalThis.fetch = previousFetch;
+    }
+});
+
+test("songs data source: app csv cache key falls back to legacy csv cache", async () => {
+    const previousFetch = globalThis.fetch;
+    try {
+        const storage = createFakeLocalStorage();
+        storage.setItem(LEGACY_CSV_CACHE_KEY, createLegacyCsv());
+        globalThis.fetch = async () => {
+            throw new Error("network failed");
+        };
+        const results = [];
+        const dataSource = createSongsDataSource({
+            publicCsvUrl: "https://example.test/songs.csv",
+            storage,
+            csvCacheKey: CSV_CACHE_KEY,
+            legacyCsvCacheKeys: [LEGACY_CSV_CACHE_KEY]
+        });
+
+        assert.equal(await dataSource.loadInitialSongs({ onSongsLoaded: (result) => results.push(result) }), true);
+
+        assert.equal(CSV_CACHE_KEY, "cachedCsvV2");
+        assert.equal(LEGACY_CSV_CACHE_KEY, "cachedCsv");
+        assert.equal(results.length, 1);
+        assert.equal(results[0].source, "cache");
+        assert.equal(results[0].songs[0].songKey, "archive-1::1");
+        assert.equal(results[0].songs[0].streamRole, "");
     } finally {
         globalThis.fetch = previousFetch;
     }

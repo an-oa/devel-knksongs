@@ -1,33 +1,31 @@
 import { createDateFilterController } from "../ui/date/filter.mjs?v=20";
-import {
-    dateKeyToParts,
-    filterSongsByCriteria,
-    isWithinDateRange,
-    normalizeForSearch,
-    parseDateKey
-} from "../lib/search-filters.mjs?v=20";
+import { filterSongsByCriteria } from "../lib/search-filters.mjs?v=20";
 import { pickRecommendedSongs } from "../lib/search-recommendation.mjs?v=20";
+import {
+    collectSearchBooleanFilterState,
+    hasSelectedSearchBooleanFilterState
+} from "../lib/search-boolean-filters.mjs?v=20";
 import { getLookupUiState, getSearchUiState } from "../lib/ui-slices.mjs?v=20";
-
-export {
-    dateKeyToParts,
-    filterSongsByCriteria,
-    isWithinDateRange,
-    normalizeForSearch,
-    parseDateKey
-};
 
 /**
  * 検索条件の収集・結果解決・推薦選曲を管理するコントローラーを作成する。
- * @param {{ data: *, ui: *, constants: *, callbacks: { updateDisplay: Function, scrollResultsPaneToTop: Function } }} input
+ * @param {{
+ *   data: object,
+ *   ui: object,
+ *   searchFiltersController: {
+ *     areAllFormatsSelected: () => boolean,
+ *     areFormatsDefault: () => boolean
+ *   },
+ *   constants: object,
+ *   callbacks: { updateDisplay: Function, scrollResultsPaneToTop: Function }
+ * }} input
  */
-export function createSearchController({ data, ui, constants, callbacks }) {
+export function createSearchController({ data, ui, searchFiltersController, constants, callbacks }) {
     const {
         RANDOM_DISPLAY_COUNT,
         MIN_PERFORMANCE_FOR_RANDOM,
         RESULT_DISPLAY_BATCH_SIZE,
-        SEARCH_DEBOUNCE_MS,
-        DEFAULT_FORMATS
+        SEARCH_DEBOUNCE_MS
     } = constants;
     const searchUi = getSearchUiState(ui);
     const lookupUi = getLookupUiState(ui);
@@ -99,27 +97,11 @@ export function createSearchController({ data, ui, constants, callbacks }) {
         const toRange = dateFilterController.getPartialDateRange("to");
         return {
             queryRaw: ui.el.searchBox.value.trim(),
-            relayOnly: ui.el.relayOnly.checked,
-            harmonyOnly: ui.el.harmonyOnly.checked,
+            ...collectSearchBooleanFilterState(ui),
             dateFromKey: fromRange ? fromRange.minKey : null,
             dateToKey: toRange ? toRange.maxKey : null,
             hasDateFilter: Boolean(fromRange || toRange)
         };
-    }
-
-    /**
-     * 既定フォーマットがすべて選択されているか判定する。
-     */
-    function areAllFormatsSelected() {
-        return DEFAULT_FORMATS.every((f) => searchUi.selectedFormats.has(f));
-    }
-
-    /**
-     * フォーマット選択が既定状態と一致するか判定する。
-     */
-    function areFormatsDefault() {
-        if (searchUi.selectedFormats.size !== DEFAULT_FORMATS.length) return false;
-        return areAllFormatsSelected();
     }
 
     /**
@@ -129,10 +111,9 @@ export function createSearchController({ data, ui, constants, callbacks }) {
     function isRecommendedMode(searchState) {
         return !data.activeBookmark &&
             searchState.queryRaw === "" &&
-            !searchState.relayOnly &&
-            !searchState.harmonyOnly &&
+            !hasSelectedSearchBooleanFilterState(searchState) &&
             !searchState.hasDateFilter &&
-            areAllFormatsSelected();
+            searchFiltersController.areAllFormatsSelected();
     }
 
     /**
@@ -241,8 +222,8 @@ export function createSearchController({ data, ui, constants, callbacks }) {
         search,
         getSearchState,
         isRecommendedMode,
-        areAllFormatsSelected,
-        areFormatsDefault,
+        areAllFormatsSelected: searchFiltersController.areAllFormatsSelected,
+        areFormatsDefault: searchFiltersController.areFormatsDefault,
         hasDateSelection: dateFilterController.hasDateSelection,
         getDateSelectValue: dateFilterController.getDateSelectValue,
         applyDateSelectValue: dateFilterController.applyDateSelectValue,

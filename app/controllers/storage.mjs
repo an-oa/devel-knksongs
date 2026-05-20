@@ -8,18 +8,31 @@ import {
     exportBookmarksAsJsonText as buildBookmarkExportJsonText,
     parseBookmarkImportText as parseBookmarkImportJsonText
 } from "../lib/storage/bookmark-transfer.mjs?v=20";
+import {
+    buildStoredSearchStatePayload,
+    parseStoredSearchStatePayload
+} from "../lib/storage/search-state-schema.mjs?v=20";
+import { collectSearchBooleanFilterState } from "../lib/search-boolean-filters.mjs?v=20";
 
 /**
  * ブックマークと検索状態の保存・復元を扱うストレージコントローラーを作成する。
- * @param {*} ui
- * @param {*} constants
+ * @param {{
+ *   data: object,
+ *   ui: object,
+ *   searchFiltersController: {
+ *     getSelectedFormatValues: () => string[],
+ *     applyStoredFilterState: (payload: Record<string, unknown>) => void
+ *   },
+ *   constants: object,
+ *   callbacks: object
+ * }} input
  */
-export function createStorageController({ data, ui, constants, callbacks }) {
+export function createStorageController({ data, ui, searchFiltersController, constants, callbacks }) {
     const searchUi = getSearchUiState(ui);
     const dateUi = getDateUiState(ui);
     const {
-        DEFAULT_FORMATS,
         SEARCH_STATE_KEY,
+        DEFAULT_FORMATS = [],
         BOOKMARK_STORAGE_KEY,
         BOOKMARK_STORAGE_VERSION = 1,
         MAX_BOOKMARK_COUNT = Number.POSITIVE_INFINITY,
@@ -59,40 +72,6 @@ export function createStorageController({ data, ui, constants, callbacks }) {
             return;
         }
         console.debug("[bookmark-migration]", message, details);
-    }
-
-    /**
-     * 選択中フォーマットを既定値に戻す。
-     */
-    function setSelectedFormatsToDefault() {
-        searchUi.selectedFormats.clear();
-        DEFAULT_FORMATS.forEach((f) => searchUi.selectedFormats.add(f));
-    }
-
-    /**
-     * state上のフォーマット選択状態をチェックボックスへ同期する。
-     */
-    function syncFormatCheckboxesFromState() {
-        const formatCheckboxes = document.querySelectorAll('#formatsList input[type="checkbox"]');
-        formatCheckboxes.forEach((cb) => {
-            cb.checked = searchUi.selectedFormats.has(cb.value);
-        });
-    }
-
-    /**
-     * 保存値からフォーマット選択を復元し、不正値を除外する。
-     * @param {*} rawFormats
-     */
-    function applySelectedFormatsFromRaw(rawFormats) {
-        const formats = Array.isArray(rawFormats) ? rawFormats : [];
-        const allowed = new Set(DEFAULT_FORMATS);
-        searchUi.selectedFormats.clear();
-        formats.forEach((f) => {
-            if (allowed.has(f)) searchUi.selectedFormats.add(f);
-        });
-        if (searchUi.selectedFormats.size === 0) {
-            setSelectedFormatsToDefault();
-        }
     }
 
     /**
@@ -371,18 +350,13 @@ export function createStorageController({ data, ui, constants, callbacks }) {
     function saveSearchState() {
         try {
             const searchBox = ui.el.searchBox;
-            const relayOnly = ui.el.relayOnly;
-            const harmonyOnly = ui.el.harmonyOnly;
-            const dateFrom = getDateSelectValue("from");
-            const dateTo = getDateSelectValue("to");
-            const payload = {
-                query: searchBox ? searchBox.value : "",
-                relayOnly: relayOnly ? !!relayOnly.checked : false,
-                harmonyOnly: harmonyOnly ? !!harmonyOnly.checked : false,
-                dateFrom,
-                dateTo,
-                formats: Array.from(searchUi.selectedFormats)
-            };
+            const payload = buildStoredSearchStatePayload({
+                query: searchBox && typeof searchBox.value === "string" ? searchBox.value : "",
+                ...collectSearchBooleanFilterState(ui),
+                dateFrom: getDateSelectValue("from"),
+                dateTo: getDateSelectValue("to"),
+                formats: searchFiltersController.getSelectedFormatValues()
+            });
             localStorage.setItem(SEARCH_STATE_KEY, JSON.stringify(payload));
         } catch (e) {
             console.warn("Failed to save search state", e);
@@ -396,22 +370,18 @@ export function createStorageController({ data, ui, constants, callbacks }) {
         try {
             const raw = localStorage.getItem(SEARCH_STATE_KEY);
             if (!raw) return;
-            const parsed = JSON.parse(raw);
+            const parsed = parseStoredSearchStatePayload(raw, {
+                defaultFormats: DEFAULT_FORMATS
+            });
             const searchBox = ui.el.searchBox;
-            const relayOnly = ui.el.relayOnly;
-            const harmonyOnly = ui.el.harmonyOnly;
-            applySelectedFormatsFromRaw(parsed.formats);
-            syncFormatCheckboxesFromState();
             if (searchBox && typeof parsed.query === "string") {
                 searchBox.value = parsed.query;
             }
-            if (relayOnly) relayOnly.checked = !!parsed.relayOnly;
-            if (harmonyOnly) harmonyOnly.checked = !!parsed.harmonyOnly;
-            const pending = {
-                from: typeof parsed.dateFrom === "string" ? parsed.dateFrom : "",
-                to: typeof parsed.dateTo === "string" ? parsed.dateTo : ""
+            searchFiltersController.applyStoredFilterState(parsed);
+            dateUi.pendingValues = {
+                from: parsed.dateFrom,
+                to: parsed.dateTo
             };
-            dateUi.pendingValues = pending;
             if (dateUi.bounds) {
                 applyPendingDateValues();
             }
@@ -424,9 +394,6 @@ export function createStorageController({ data, ui, constants, callbacks }) {
     }
 
     return {
-        setSelectedFormatsToDefault,
-        syncFormatCheckboxesFromState,
-        applySelectedFormatsFromRaw,
         loadBookmarks,
         saveBookmarks,
         exportBookmarksAsJsonText,
