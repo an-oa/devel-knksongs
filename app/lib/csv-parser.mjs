@@ -1,5 +1,5 @@
-import { normalizeForSearch, parseDateKey } from "../controllers/search.mjs?v=19";
-import { extractYoutubeInfo } from "./youtube-url.mjs?v=19";
+import { normalizeForSearch, parseDateKey } from "../controllers/search.mjs?v=20";
+import { extractYoutubeInfo } from "./youtube-url.mjs?v=20";
 
 /**
  * CSVから正規化した曲データ1行分を表す。

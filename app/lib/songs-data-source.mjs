@@ -1,5 +1,5 @@
-import { parseCsvToSongs } from "./csv-parser.mjs?v=19";
-import { parseSongsJsonMetaPayload, parseSongsJsonPayload } from "./songs-json.mjs?v=19";
+import { parseCsvToSongs } from "./csv-parser.mjs?v=20";
+import { parseSongsJsonMetaPayload, parseSongsJsonPayload } from "./songs-json.mjs?v=20";
 
 /**
  * localStorage から文字列を安全に読み込む。
