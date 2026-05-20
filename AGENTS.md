@@ -83,6 +83,17 @@ feat: move settings into dedicated sidebar panel
 - 大規模変更時は `git diff` や `rg` で import / `src=` / `href=` の残存参照を確認し、
   切り替え漏れを残さない。
 
+## Persisted State Migration
+
+- localStorage / IndexedDB などに保存する状態の schema や default の意味を変える場合は、
+  既存 payload を暗黙の定数名だけで判定せず、必要に応じて明示的な version を持たせる。
+- migration 条件は、意図した旧 version に限定する。
+  将来の version まで巻き込む理由がない場合は `< CURRENT_VERSION` のような広い条件にしない。
+- 旧 version 専用の helper を残す場合は、JSDoc やコメントで migration 用であることと、
+  互換を打ち切るタイミングで削除可能であることを明記する。
+- 「旧 default の全選択」と「新 schema でユーザーが明示的に選択した状態」は区別し、
+  migration では保存済みユーザー意図を壊さない。
+
 ## Cache Busters
 
 - キャッシュバスターの `v=...` は、UI / JavaScript に変更を加えるたびには更新しない。
