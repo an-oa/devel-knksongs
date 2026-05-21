@@ -27,12 +27,14 @@ export function renderSearchFormatOptions(input) {
         syncSearchFormatCheckboxes({ searchUi, formatsList });
         return false;
     }
-    defaultFormats.forEach((format) => {
+    defaultFormats.forEach((format, index) => {
         const label = document.createElement("label");
         label.className = "checkbox-item";
         const checkbox = document.createElement("input");
+        checkbox.id = `format-filter-${index}`;
         checkbox.type = "checkbox";
         checkbox.value = format;
+        label.htmlFor = checkbox.id;
         checkbox.addEventListener("change", (event) => {
             if (checkbox.checked) searchUi.selectedFormats.add(checkbox.value);
             else searchUi.selectedFormats.delete(checkbox.value);

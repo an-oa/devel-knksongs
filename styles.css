@@ -35,6 +35,18 @@ body {
 }
 input, button { font-family: inherit; }
 
+.visually-hidden:where(:not(:focus-within, :active)) {
+  position: absolute !important;
+  clip-path: inset(50%) !important;
+  overflow: hidden !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: -1px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  white-space: nowrap !important;
+}
+
 /* サムネイル非表示設定 */
 body.hide-thumbs .thumb {
   display: none;
@@ -116,8 +128,17 @@ body.hide-thumbs .thumb {
   background: rgba(255, 255, 255, 0.7);
 }
 
-.sidebar-section { margin-bottom: 12px; }
+.sidebar-section { margin: 0 0 12px; }
 .sidebar-section-last { margin-bottom: 0; }
+.sidebar-fieldset {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+}
+.sidebar-fieldset-legend {
+  padding: 0;
+  margin-bottom: 8px;
+}
 .sidebar-flags {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

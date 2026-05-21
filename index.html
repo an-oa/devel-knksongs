@@ -55,49 +55,52 @@
         <div class="sidebar-group-body">
           <div class="sidebar-section">
             <div class="section-header">
-              <label class="section-label">キーワード検索</label>
+              <label class="section-label" for="searchBox">キーワード検索</label>
               <button id="clearBtn" class="text-clear-btn">条件をクリア</button>
             </div>
-            <input type="text" id="searchBox" placeholder="曲名・歌手・読み..." aria-label="曲名・歌手・読みで検索" disabled>
+            <input type="text" id="searchBox" placeholder="曲名・歌手・読み..." disabled>
           </div>
 
-          <div class="sidebar-section">
-            <div class="section-header">
-              <label class="section-label">日付範囲</label>
-            </div>
+          <fieldset class="sidebar-section sidebar-fieldset">
+            <legend class="section-label sidebar-fieldset-legend">日付範囲</legend>
             <div class="date-row">
               <span class="section-label date-row-label">From</span>
               <div class="date-select-group">
-                <select id="dateFromYear" class="date-select year" aria-label="開始年"></select>
-                <select id="dateFromMonth" class="date-select month" aria-label="開始月"></select>
-                <select id="dateFromDay" class="date-select day" aria-label="開始日"></select>
+                <label class="visually-hidden" for="dateFromYear">開始年</label>
+                <select id="dateFromYear" class="date-select year"></select>
+                <label class="visually-hidden" for="dateFromMonth">開始月</label>
+                <select id="dateFromMonth" class="date-select month"></select>
+                <label class="visually-hidden" for="dateFromDay">開始日</label>
+                <select id="dateFromDay" class="date-select day"></select>
               </div>
               <button id="clearDateFromBtn" class="date-clear-btn" aria-label="開始日をクリア">&times;</button>
             </div>
             <div class="date-row">
               <span class="section-label date-row-label">To</span>
               <div class="date-select-group">
-                <select id="dateToYear" class="date-select year" aria-label="終了年"></select>
-                <select id="dateToMonth" class="date-select month" aria-label="終了月"></select>
-                <select id="dateToDay" class="date-select day" aria-label="終了日"></select>
+                <label class="visually-hidden" for="dateToYear">終了年</label>
+                <select id="dateToYear" class="date-select year"></select>
+                <label class="visually-hidden" for="dateToMonth">終了月</label>
+                <select id="dateToMonth" class="date-select month"></select>
+                <label class="visually-hidden" for="dateToDay">終了日</label>
+                <select id="dateToDay" class="date-select day"></select>
               </div>
               <button id="clearDateToBtn" class="date-clear-btn" aria-label="終了日をクリア">&times;</button>
             </div>
-          </div>
+          </fieldset>
 
-          <div class="sidebar-section">
-            <div class="section-header">
-              <label class="section-label">動画の種類</label>
-            </div>
+          <fieldset class="sidebar-section sidebar-fieldset">
+            <legend class="section-label sidebar-fieldset-legend">動画の種類</legend>
             <div id="formatsList" class="filter-group-stack"></div>
-          </div>
+          </fieldset>
 
-          <div class="sidebar-section sidebar-flags">
-            <label class="checkbox-item"><input type="checkbox" id="relayOnly"> 歌枠リレー</label>
-            <label class="checkbox-item"><input type="checkbox" id="collabHostOnly"> コラボ(ホスト)</label>
-            <label class="checkbox-item"><input type="checkbox" id="harmonyOnly"> ハモリあり</label>
-            <label class="checkbox-item"><input type="checkbox" id="collabGuestOnly"> コラボ(ゲスト)</label>
-          </div>
+          <fieldset class="sidebar-section sidebar-fieldset sidebar-flags">
+            <legend class="visually-hidden">追加条件</legend>
+            <label class="checkbox-item" for="relayOnly"><input type="checkbox" id="relayOnly"> 歌枠リレー</label>
+            <label class="checkbox-item" for="collabHostOnly"><input type="checkbox" id="collabHostOnly"> コラボ(ホスト)</label>
+            <label class="checkbox-item" for="harmonyOnly"><input type="checkbox" id="harmonyOnly"> ハモリあり</label>
+            <label class="checkbox-item" for="collabGuestOnly"><input type="checkbox" id="collabGuestOnly"> コラボ(ゲスト)</label>
+          </fieldset>
         </div>
       </section>
 
@@ -125,9 +128,9 @@
           <div class="sidebar-group-body">
             <div class="sidebar-section sidebar-setting-item">
               <div class="menu-item-toggle">
-                <span>サムネイル表示</span>
+                <span id="thumbnail-toggle-label">サムネイル表示</span>
                 <label class="switch">
-                  <input type="checkbox" id="thumbnail-toggle" aria-label="サムネイル表示を切り替える">
+                  <input type="checkbox" id="thumbnail-toggle" aria-labelledby="thumbnail-toggle-label">
                   <span class="slider"></span>
                 </label>
               </div>
@@ -135,9 +138,9 @@
 
             <div class="sidebar-section sidebar-setting-item">
               <div class="menu-item-toggle">
-                <span>ダークモード</span>
+                <span id="theme-toggle-label">ダークモード</span>
                 <label class="switch">
-                  <input type="checkbox" id="theme-toggle" aria-label="ダークモードを切り替える">
+                  <input type="checkbox" id="theme-toggle" aria-labelledby="theme-toggle-label">
                   <span class="slider"></span>
                 </label>
               </div>
@@ -153,9 +156,9 @@
           <div class="sidebar-group-body">
             <div class="sidebar-section sidebar-setting-item">
               <div class="menu-item-toggle">
-                <span>曲の終わりで停止する</span>
+                <span id="end-time-toggle-label">曲の終わりで停止する</span>
                 <label class="switch">
-                  <input type="checkbox" id="end-time-toggle" aria-label="曲の終わりで停止するかを切り替える">
+                  <input type="checkbox" id="end-time-toggle" aria-labelledby="end-time-toggle-label">
                   <span class="slider"></span>
                 </label>
               </div>
@@ -164,9 +167,9 @@
             <div class="sidebar-section sidebar-setting-item">
               <div class="setting-item-copy">
                 <div class="menu-item-toggle">
-                  <span>終了後、次の曲を再生</span>
+                  <span id="continuous-playback-toggle-label">終了後、次の曲を再生</span>
                   <label class="switch">
-                    <input type="checkbox" id="continuous-playback-toggle" aria-label="終了後、次の曲を再生するかを切り替える">
+                    <input type="checkbox" id="continuous-playback-toggle" aria-labelledby="continuous-playback-toggle-label">
                     <span class="slider"></span>
                   </label>
                 </div>
@@ -177,9 +180,9 @@
             <div class="sidebar-section sidebar-setting-item">
               <div class="setting-item-copy">
                 <div class="menu-item-toggle">
-                  <span>リピート再生</span>
+                  <span id="loop-playback-toggle-label">リピート再生</span>
                   <label class="switch">
-                    <input type="checkbox" id="loop-playback-toggle" aria-label="リピート再生を切り替える">
+                    <input type="checkbox" id="loop-playback-toggle" aria-labelledby="loop-playback-toggle-label">
                     <span class="slider"></span>
                   </label>
                 </div>
@@ -198,11 +201,12 @@
       </div>
       <div class="sidebar-subpanel-body">
         <div id="bookmark-panel-create" class="bookmark-panel-create">
-          <input type="text" id="bookmark-panel-new-name" placeholder="新規ブックマーク名" aria-label="新規ブックマーク名" maxlength="64">
+          <label class="visually-hidden" for="bookmark-panel-new-name">新規ブックマーク名</label>
+          <input type="text" id="bookmark-panel-new-name" placeholder="新規ブックマーク名" maxlength="64">
           <button id="bookmark-panel-create-btn" type="button">作成</button>
           <div id="bookmark-panel-error" class="bookmark-panel-error" hidden></div>
         </div>
-        <div class="bookmark-panel-actions" aria-label="ブックマークの入出力">
+        <div class="bookmark-panel-actions" role="group" aria-label="ブックマークの入出力">
           <button id="bookmark-panel-import-btn" type="button">インポート</button>
           <button id="bookmark-panel-export-btn" type="button">エクスポート</button>
           <input id="bookmark-panel-import-input" type="file" accept="application/json,.json" hidden>

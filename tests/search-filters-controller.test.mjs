@@ -148,6 +148,10 @@ test("createSearchFiltersController: sets up format filter options", () => {
 
         assert.equal(formatsList.childElementCount, 2);
         assert.deepEqual(controller.getSelectedFormatValues(), ["配信", "歌みた"]);
+        assert.equal(formatsList.children[0].htmlFor, "format-filter-0");
+        assert.equal(formatsList.children[0].firstChild.id, "format-filter-0");
+        assert.equal(formatsList.children[1].htmlFor, "format-filter-1");
+        assert.equal(formatsList.children[1].firstChild.id, "format-filter-1");
 
         const secondFormatCheckbox = formatsList.children[1].firstChild;
         secondFormatCheckbox.checked = false;
