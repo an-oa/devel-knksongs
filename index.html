@@ -17,6 +17,7 @@
   <meta property="og:image" content="https://an-oa.github.io/knksongs/ogp.png" />
   <meta property="og:image:width" content="800" />
   <meta property="og:image:height" content="800" />
+  <meta name="color-scheme" content="light dark" />
 
   <!-- X (Twitter) -->
   <meta name="twitter:card" content="summary" />
@@ -29,7 +30,9 @@
       try {
         var saved = localStorage.getItem('theme');
         var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-        if (saved === 'dark' || (!saved && prefersDark)) {
+        var isDark = saved === 'dark' || (!saved && prefersDark);
+        document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+        if (isDark) {
           document.documentElement.classList.add('dark-theme');
         }
       } catch (e) {}

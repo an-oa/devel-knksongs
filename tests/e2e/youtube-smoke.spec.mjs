@@ -55,6 +55,37 @@ test("settings exposes playback settings through console state", async ({ page }
     await expect(playbackSettingsGroup).toBeHidden();
 });
 
+test("theme toggle syncs native color scheme", async ({ page }) => {
+    await page.evaluate(() => {
+        localStorage.setItem("theme", "light");
+    });
+    await page.reload();
+    await waitForInitialLoad(page);
+    await openSettingsPanel(page);
+
+    const themeToggle = page.locator("#theme-toggle");
+    const themeSwitch = themeToggle.locator("xpath=ancestor::label[1]");
+
+    await expect(themeToggle).not.toBeChecked();
+    await expect(page.locator("html")).toHaveCSS("color-scheme", "light");
+
+    await themeSwitch.click();
+
+    await expect(themeToggle).toBeChecked();
+    await expect(page.locator("html")).toHaveCSS("color-scheme", "dark");
+    await expect
+        .poll(() => page.evaluate(() => localStorage.getItem("theme")))
+        .toBe("dark");
+
+    await themeSwitch.click();
+
+    await expect(themeToggle).not.toBeChecked();
+    await expect(page.locator("html")).toHaveCSS("color-scheme", "light");
+    await expect
+        .poll(() => page.evaluate(() => localStorage.getItem("theme")))
+        .toBe("light");
+});
+
 test("manual playback mounts an iframe from the thumbnail", async ({ page }) => {
     await enablePlaybackSettings(page);
     await filterBySongTitle(page, "Manual Song");

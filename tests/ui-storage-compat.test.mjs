@@ -131,6 +131,7 @@ test("applyThemeFromStorage: main branch theme key restores dark mode state", ()
         applyThemeFromStorage({ ui });
 
         assert.equal(document.documentElement.classList.contains("dark-theme"), true);
+        assert.equal(document.documentElement.style.colorScheme, "dark");
         assert.equal(ui.el.themeToggle.checked, true);
     } finally {
         globalThis.localStorage = prevLocalStorage;
@@ -562,17 +563,20 @@ test("setupTheme: toggle change updates document theme class and storage", () =>
 
         setupTheme({ ui });
         assert.equal(document.documentElement.classList.contains("dark-theme"), false);
+        assert.equal(document.documentElement.style.colorScheme, "light");
 
         themeToggle.checked = true;
         invokeListener(themeToggle, "change", {});
 
         assert.equal(document.documentElement.classList.contains("dark-theme"), true);
+        assert.equal(document.documentElement.style.colorScheme, "dark");
         assert.equal(globalThis.localStorage.getItem("theme"), "dark");
 
         themeToggle.checked = false;
         invokeListener(themeToggle, "change", {});
 
         assert.equal(document.documentElement.classList.contains("dark-theme"), false);
+        assert.equal(document.documentElement.style.colorScheme, "light");
         assert.equal(globalThis.localStorage.getItem("theme"), "light");
     } finally {
         globalThis.localStorage = prevLocalStorage;

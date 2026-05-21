@@ -51,6 +51,15 @@ export function collectUiElements() {
 }
 
 /**
+ * テーマのクラスとブラウザ標準 UI 向けの色スキームを同期する。
+ * @param {boolean} isDarkMode
+ */
+export function applyDocumentTheme(isDarkMode) {
+    document.documentElement.classList.toggle("dark-theme", isDarkMode);
+    document.documentElement.style.colorScheme = isDarkMode ? "dark" : "light";
+}
+
+/**
  * 保存値またはシステム設定からテーマを適用する。
  * @param {{ ui: { el: Record<string, HTMLElement | null> } }} input
  */
@@ -59,7 +68,7 @@ export function applyThemeFromStorage({ ui }) {
     const savedTheme = localStorage.getItem("theme");
     const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
     const isDarkMode = savedTheme ? savedTheme === "dark" : systemPrefersDark;
-    document.documentElement.classList.toggle("dark-theme", isDarkMode);
+    applyDocumentTheme(isDarkMode);
     if (themeToggle) themeToggle.checked = isDarkMode;
 }
 
@@ -73,7 +82,7 @@ export function setupTheme({ ui }) {
     if (!themeToggle) return;
     themeToggle.addEventListener("change", () => {
         const isDarkNow = themeToggle.checked;
-        document.documentElement.classList.toggle("dark-theme", isDarkNow);
+        applyDocumentTheme(isDarkNow);
         localStorage.setItem("theme", isDarkNow ? "dark" : "light");
     });
 }
