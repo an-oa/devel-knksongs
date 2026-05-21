@@ -1,10 +1,10 @@
-import { isGuestStreamRole } from "./stream-role.mjs?v=20";
+import { isGuestStreamRole } from "./stream-role.mjs?v=21";
 import {
     isOriginalSongFormat,
     isShortFormat,
     isStreamFormat,
     isUtamitaEquivalentFormat
-} from "./song-format.mjs?v=20";
+} from "./song-format.mjs?v=21";
 
 /**
  * おすすめ表示に使う曲一覧を抽選して返す。

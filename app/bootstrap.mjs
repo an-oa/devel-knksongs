@@ -16,7 +16,7 @@ import {
     YT_IFRAME_READY_POLL_MS,
     STOP_PLAYBACK_ON_SCROLL_OUT,
     appState
-} from "./state.mjs?v=20";
+} from "./state.mjs?v=21";
 import {
     PUBLIC_SONGS_JSON_URL,
     PUBLIC_SONGS_META_URL,
@@ -24,31 +24,31 @@ import {
     SONGS_JSON_CACHE_KEY,
     LEGACY_CSV_CACHE_KEY,
     CSV_CACHE_KEY
-} from "./config.mjs?v=20";
-import { createSearchController } from "./controllers/search.mjs?v=20";
-import { createRenderController } from "./controllers/render.mjs?v=20";
-import { createPlaybackSessionController } from "./controllers/playback-session.mjs?v=20";
-import { createPlaybackSettingsController } from "./controllers/playback-settings.mjs?v=20";
-import { createYoutubeController, extractYoutubeInfo } from "./controllers/youtube.mjs?v=20";
-import { createStorageController } from "./controllers/storage.mjs?v=20";
-import { createBookmarkUiController } from "./ui/bookmark/ui.mjs?v=20";
-import { scrollResultListToTop } from "./lib/results-scroll.mjs?v=20";
+} from "./config.mjs?v=21";
+import { createSearchController } from "./controllers/search.mjs?v=21";
+import { createRenderController } from "./controllers/render.mjs?v=21";
+import { createPlaybackSessionController } from "./controllers/playback-session.mjs?v=21";
+import { createPlaybackSettingsController } from "./controllers/playback-settings.mjs?v=21";
+import { createYoutubeController, extractYoutubeInfo } from "./controllers/youtube.mjs?v=21";
+import { createStorageController } from "./controllers/storage.mjs?v=21";
+import { createBookmarkUiController } from "./ui/bookmark/ui.mjs?v=21";
+import { scrollResultListToTop } from "./lib/results-scroll.mjs?v=21";
 import {
     collectUiElements,
     applyThemeFromStorage,
     setupTheme
-} from "./ui/core/elements.mjs?v=20";
-import { createUiSyncController } from "./ui/core/sync.mjs?v=20";
-import { createDataLoader } from "./ui/core/data.mjs?v=20";
-import { createSidebarController } from "./ui/sidebar/ui.mjs?v=20";
-import { createSearchFiltersController } from "./ui/search-filters/controller.mjs?v=20";
-import { getSearchUiState } from "./lib/ui-slices.mjs?v=20";
-import { debugPlayback } from "./lib/playback-debug.mjs?v=20";
+} from "./ui/core/elements.mjs?v=21";
+import { createUiSyncController } from "./ui/core/sync.mjs?v=21";
+import { createDataLoader } from "./ui/core/data.mjs?v=21";
+import { createSidebarController } from "./ui/sidebar/ui.mjs?v=21";
+import { createSearchFiltersController } from "./ui/search-filters/controller.mjs?v=21";
+import { getSearchUiState } from "./lib/ui-slices.mjs?v=21";
+import { debugPlayback } from "./lib/playback-debug.mjs?v=21";
 import {
     createIndexedDbSongsJsonCacheStore,
     createLegacyLocalStorageSongsJsonCacheAdapter
-} from "./lib/storage/songs-json-cache.mjs?v=20";
-import { createSongsDataSource } from "./lib/songs-data-source.mjs?v=20";
+} from "./lib/storage/songs-json-cache.mjs?v=21";
+import { createSongsDataSource } from "./lib/songs-data-source.mjs?v=21";
 
 const appDataState = appState.data;
 const appUiState = appState.ui;

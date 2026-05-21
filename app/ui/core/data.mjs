@@ -1,4 +1,4 @@
-import { getDateUiState, getSearchUiState } from "../../lib/ui-slices.mjs?v=20";
+import { getDateUiState, getSearchUiState } from "../../lib/ui-slices.mjs?v=21";
 
 /**
  * 曲データの読込と初期データ反映を扱うコントローラーを作成する。

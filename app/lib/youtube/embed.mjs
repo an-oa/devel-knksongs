@@ -1,4 +1,4 @@
-import { isHtmlElement } from "../dom-utils.mjs?v=20";
+import { isHtmlElement } from "../dom-utils.mjs?v=21";
 
 const YT_EMBED_HOST = "https://www.youtube.com";
 
