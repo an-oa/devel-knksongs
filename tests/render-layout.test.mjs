@@ -212,6 +212,47 @@ test("render: active card hidden from next nodes stops playback", () => {
     }
 });
 
+test("render: result cards and empty state use list semantics", () => {
+    const cleanup = installFakeDom();
+    try {
+        const data = {
+            currentResults: [makeRenderRow({ songKey: "song:semantic", title: "Semantic Song" })],
+            displayLimit: 48,
+            activeBookmark: null
+        };
+        const ui = createRenderUiState({
+            el: {
+                resultList: document.createElement("ol"),
+                loadMoreContainer: document.createElement("div")
+            }
+        });
+        const controller = createRenderController({
+            data,
+            ui,
+            isAllFormatsSelected: () => true,
+            callbacks: createRenderCallbacks()
+        });
+
+        controller.updateDisplay();
+
+        const card = ui.el.resultList.children[0];
+        const article = card.querySelector("article");
+        const heading = article.querySelector("h2");
+        assert.equal(card.tagName, "LI");
+        assert.equal(article.getAttribute("aria-labelledby"), "result-title-1");
+        assert.equal(heading.getAttribute("id"), "result-title-1");
+        assert.equal(heading.querySelector(".title").textContent, "Semantic Song");
+
+        data.currentResults = [];
+        controller.updateDisplay();
+
+        assert.equal(ui.el.resultList.children[0].tagName, "LI");
+        assert.equal(ui.el.resultList.children[0].classList.contains("result-empty-state"), true);
+    } finally {
+        cleanup();
+    }
+});
+
 test("render: cards keep fixed columns while preserving DOM order", () => {
     const cleanup = installFakeDom();
     try {

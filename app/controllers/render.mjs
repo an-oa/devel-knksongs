@@ -39,15 +39,18 @@ export function createRenderController({ data, ui, isAllFormatsSelected, resultD
      * 結果カードを構成するDOM要素一式を生成する。
      */
     function createCardElements() {
-        const card = document.createElement("div");
+        const card = document.createElement("li");
         card.className = "song-card";
         card.draggable = false;
 
         const thumbDiv = document.createElement("div");
         thumbDiv.className = "thumb";
 
-        const content = document.createElement("div");
+        const content = document.createElement("article");
         content.className = "content";
+
+        const titleHeading = document.createElement("h2");
+        titleHeading.className = "title-heading";
 
         const title = document.createElement("a");
         title.className = "title";
@@ -86,20 +89,25 @@ export function createRenderController({ data, ui, isAllFormatsSelected, resultD
 
         rightGroup.append(tags, actionBtn);
         footer.append(leftGroup, rightGroup);
-        content.append(dragHandle, title, artist, footer);
+        titleHeading.append(title);
+        content.append(dragHandle, titleHeading, artist, footer);
         card.append(thumbDiv, content);
 
-        return { card, thumbDiv, titleEl: title, artistEl: artist, dateEl: date, tagsEl: tags, actionBtn, dragHandle };
+        return { card, thumbDiv, content, titleHeading, titleEl: title, artistEl: artist, dateEl: date, tagsEl: tags, actionBtn, dragHandle };
     }
 
     /**
      * 曲データをカード要素へ反映し、アクションボタンの挙動を設定する。
      * @param {*} entry
      * @param {*} row
+     * @param {number} resultIndex
      */
-    function updateCardFromRow(entry, row) {
+    function updateCardFromRow(entry, row, resultIndex) {
         const bookmarkSongRef = getBookmarkSongRef(row);
         const yt = buildYoutubeTarget(row);
+        const titleId = `result-title-${resultIndex + 1}`;
+        entry.titleHeading.setAttribute("id", titleId);
+        entry.content.setAttribute("aria-labelledby", titleId);
         updateThumbnail(entry.thumbDiv, yt);
         updateTitleLink(entry.titleEl, row);
         entry.artistEl.textContent = row.artist || "不明";
@@ -214,11 +222,8 @@ export function createRenderController({ data, ui, isAllFormatsSelected, resultD
      * @param {*} message
      */
     function createEmptyStateElement(message) {
-        const empty = document.createElement("div");
-        empty.style.gridColumn = "1/-1";
-        empty.style.textAlign = "center";
-        empty.style.padding = "50px";
-        empty.style.color = "var(--text-mute)";
+        const empty = document.createElement("li");
+        empty.className = "result-empty-state";
         empty.textContent = message;
         return empty;
     }
@@ -372,7 +377,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected, resultD
             entry.dragHandle.hidden = !isBookmarkActive;
             entry.dragHandle.draggable = isBookmarkActive;
 
-            updateCardFromRow(entry, results[i]);
+            updateCardFromRow(entry, results[i], i);
             nextEntriesBySourceKey.set(rowKey, entry);
             entries.push(entry);
             nodes.push(entry.card);
