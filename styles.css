@@ -9,6 +9,8 @@
   --border-color: #e5e7eb;
   --overlay-color: rgba(0, 0, 0, 0.4);
   --transition-speed: 0.3s;
+  --focus-ring-color: #f59e0b;
+  --focus-ring-shadow: rgba(245, 158, 11, 0.28);
 }
 
 :root.dark-theme {
@@ -20,6 +22,8 @@
   --sidebar-bg: #1e1e1e;
   --border-color: #333333;
   --primary-color: #4285f4;
+  --focus-ring-color: #facc15;
+  --focus-ring-shadow: rgba(250, 204, 21, 0.26);
 }
 
 body {
@@ -372,6 +376,23 @@ input[type="text"] {
 }
 .date-clear-btn:hover { border-color: var(--primary-color); color: var(--primary-color); }
 
+:is(
+  a[href],
+  button:not([disabled]),
+  input:not([disabled]),
+  select:not([disabled]),
+  textarea:not([disabled]),
+  [tabindex]:not([tabindex="-1"])
+):focus-visible {
+  outline: 3px solid var(--focus-ring-color);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 5px var(--focus-ring-shadow);
+}
+
+:is(input[type="text"], select, textarea):focus-visible {
+  border-color: var(--primary-color);
+}
+
 @supports not (appearance: none) {
   .date-select { -webkit-appearance: none; -moz-appearance: none; appearance: none; }
 }
@@ -578,10 +599,15 @@ input[type="text"] {
 
 .switch { position: relative; width: 34px; height: 18px; display: inline-block; flex-shrink: 0; }
 .switch input { opacity: 0; width: 0; height: 0; }
-.slider { position: absolute; cursor: pointer; inset: 0; background: #ccc; border-radius: 20px; transition: .4s; }
-.slider:before { position: absolute; content: ""; height: 12px; width: 12px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: .4s; }
+.slider { position: absolute; cursor: pointer; inset: 0; background: #ccc; border-radius: 20px; transition: background-color .4s; }
+.slider:before { position: absolute; content: ""; height: 12px; width: 12px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: transform .4s; }
 input:checked + .slider { background: var(--primary-color); }
 input:checked + .slider:before { transform: translateX(16px); }
+.switch input:focus + .slider {
+  outline: 3px solid var(--focus-ring-color);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 5px var(--focus-ring-shadow);
+}
 /* Bookmark */
 .bookmark-list {
   display: flex;
