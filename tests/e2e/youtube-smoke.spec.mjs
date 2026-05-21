@@ -5,10 +5,16 @@ import {
     waitForMockYoutube
 } from "./support/mock-youtube.mjs";
 import {
+    clickControlLabel,
+    clickSidebarBackdrop,
     closeSidebar,
     enablePlaybackSettings,
+    expectSidebarPopoverClosed,
+    expectSidebarPopoverOpen,
     filterBySongTitle,
+    getControlLabel,
     getSongCard,
+    openSidebar,
     openSettingsPanel,
     waitForInitialLoad
 } from "./support/ui-helpers.mjs";
@@ -26,9 +32,9 @@ test.beforeEach(async ({ page }) => {
 test("settings exposes playback settings through console state", async ({ page }) => {
     await openSettingsPanel(page);
 
-    const thumbnailSwitch = page.locator("#thumbnail-toggle").locator("xpath=ancestor::label[1]");
+    const thumbnailSwitch = getControlLabel(page, "#thumbnail-toggle");
     const playbackSettingsGroup = page.locator("#playback-settings-group");
-    const themeSwitch = page.locator("#theme-toggle").locator("xpath=ancestor::label[1]");
+    const themeSwitch = getControlLabel(page, "#theme-toggle");
 
     await expect(themeSwitch).toBeVisible();
     await expect(playbackSettingsGroup).toBeHidden();
@@ -64,7 +70,7 @@ test("theme toggle syncs native color scheme", async ({ page }) => {
     await openSettingsPanel(page);
 
     const themeToggle = page.locator("#theme-toggle");
-    const themeSwitch = themeToggle.locator("xpath=ancestor::label[1]");
+    const themeSwitch = getControlLabel(page, "#theme-toggle");
 
     await expect(themeToggle).not.toBeChecked();
     await expect(page.locator("html")).toHaveCSS("color-scheme", "light");
@@ -86,6 +92,21 @@ test("theme toggle syncs native color scheme", async ({ page }) => {
         .toBe("light");
 });
 
+test("sidebar native popover backdrop click closes and restores focus", async ({ page }) => {
+    const openButton = page.locator("#open-sidebar");
+
+    await openButton.focus();
+    await expect(openButton).toBeFocused();
+
+    await openSidebar(page);
+    await expectSidebarPopoverOpen(page);
+
+    await clickSidebarBackdrop(page);
+
+    await expectSidebarPopoverClosed(page);
+    await expect(openButton).toBeFocused();
+});
+
 test("manual playback mounts an iframe from the thumbnail", async ({ page }) => {
     await enablePlaybackSettings(page);
     await filterBySongTitle(page, "Manual Song");
@@ -101,8 +122,8 @@ test("manual playback mounts an iframe from the thumbnail", async ({ page }) => 
 });
 
 test("collab role filters switch between host and guest results", async ({ page }) => {
-    await page.locator("#open-sidebar").click();
-    await page.locator("#collabGuestOnly").locator("xpath=ancestor::label[1]").click();
+    await openSidebar(page);
+    await clickControlLabel(page, "#collabGuestOnly");
     await expect(page.locator("#collabGuestOnly")).toBeChecked();
     await closeSidebar(page);
 
@@ -112,9 +133,9 @@ test("collab role filters switch between host and guest results", async ({ page 
     await expect(getSongCard(page, "Manual Song")).toHaveCount(0);
     await expect(getSongCard(page, "Replay Song")).toHaveCount(0);
 
-    await page.locator("#open-sidebar").click();
-    await page.locator("#collabGuestOnly").locator("xpath=ancestor::label[1]").click();
-    await page.locator("#collabHostOnly").locator("xpath=ancestor::label[1]").click();
+    await openSidebar(page);
+    await clickControlLabel(page, "#collabGuestOnly");
+    await clickControlLabel(page, "#collabHostOnly");
     await expect(page.locator("#collabGuestOnly")).not.toBeChecked();
     await expect(page.locator("#collabHostOnly")).toBeChecked();
     await closeSidebar(page);
@@ -125,8 +146,8 @@ test("collab role filters switch between host and guest results", async ({ page 
     await expect(getSongCard(page, "Manual Song")).toHaveCount(0);
     await expect(getSongCard(page, "Chain Alpha")).toHaveCount(0);
 
-    await page.locator("#open-sidebar").click();
-    await page.locator("#collabGuestOnly").locator("xpath=ancestor::label[1]").click();
+    await openSidebar(page);
+    await clickControlLabel(page, "#collabGuestOnly");
     await expect(page.locator("#collabHostOnly")).toBeChecked();
     await expect(page.locator("#collabGuestOnly")).toBeChecked();
     await closeSidebar(page);
@@ -135,9 +156,9 @@ test("collab role filters switch between host and guest results", async ({ page 
     await expect(getSongCard(page, "Chain Alpha")).toBeVisible();
     await expect(getSongCard(page, "Manual Song")).toHaveCount(0);
 
-    await page.locator("#open-sidebar").click();
-    await page.locator("#collabHostOnly").locator("xpath=ancestor::label[1]").click();
-    await page.locator("#collabGuestOnly").locator("xpath=ancestor::label[1]").click();
+    await openSidebar(page);
+    await clickControlLabel(page, "#collabHostOnly");
+    await clickControlLabel(page, "#collabGuestOnly");
     await page.locator("#searchBox").fill("Replay Song");
     await expect(page.locator("#searchBox")).toHaveValue("Replay Song");
     await closeSidebar(page);

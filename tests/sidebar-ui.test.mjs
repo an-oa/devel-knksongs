@@ -10,6 +10,8 @@ import { installFakeDom, invokeListener } from "./test-helpers.mjs";
 function createSidebarUiState() {
     const sidebar = document.createElement("aside");
     sidebar.setAttribute("id", "sidebar");
+    const mainContent = document.createElement("main");
+    mainContent.className = "main-content";
     const sidebarHeader = document.createElement("div");
     sidebarHeader.className = "sidebar-header";
     const sidebarScrollArea = document.createElement("div");
@@ -55,6 +57,7 @@ function createSidebarUiState() {
     sidebar.appendChild(settingsSidebarPanel);
     sidebar.appendChild(bookmarkSidebarPanel);
     document.body.append(
+        mainContent,
         sidebar,
         openSidebarBtn,
         closeSidebarBtn,
@@ -91,8 +94,15 @@ function createSidebarUiState() {
         ui: {
             el: {
                 sidebar,
+                sidebarSheet: null,
                 sidebarHeader,
                 sidebarScrollArea,
+                sidebarOverlay: overlay,
+                mainContent,
+                openSidebarBtn,
+                closeSidebarBtn,
+                loadMoreBtn,
+                clearBtn,
                 settingsSidebarPanel,
                 bookmarkSidebarPanel,
                 openSettingsPanelBtn,
@@ -122,6 +132,7 @@ function createSidebarUiState() {
         openSidebarBtn,
         closeSidebarBtn,
         overlay,
+        mainContent,
         loadMoreBtn,
         clearBtn
     };
@@ -281,7 +292,7 @@ test("sidebar: openBookmarkModal opens sidebar first when closed and passes clos
 test("sidebar: open button aria-expanded follows sidebar open state", () => {
     const restoreDom = installFakeDom();
     try {
-        const { ui, openSidebarBtn, overlay } = createSidebarUiState();
+        const { ui, openSidebarBtn, overlay, mainContent } = createSidebarUiState();
         openSidebarBtn.setAttribute("aria-expanded", "false");
         const controller = createSidebarControllerForTest({
             data: { displayLimit: 48 },
@@ -295,11 +306,54 @@ test("sidebar: open button aria-expanded follows sidebar open state", () => {
 
         assert.equal(ui.el.sidebar.getAttribute("aria-hidden"), "false");
         assert.equal(openSidebarBtn.getAttribute("aria-expanded"), "true");
+        assert.equal(mainContent.hasAttribute("inert"), true);
 
         invokeListener(overlay, "click", {});
 
         assert.equal(ui.el.sidebar.getAttribute("aria-hidden"), "true");
         assert.equal(openSidebarBtn.getAttribute("aria-expanded"), "false");
+        assert.equal(mainContent.hasAttribute("inert"), false);
+    } finally {
+        restoreDom();
+    }
+});
+
+test("sidebar: native popover opens without fallback overlay and backdrop click closes", () => {
+    const restoreDom = installFakeDom();
+    try {
+        const { ui, openSidebarBtn, overlay, mainContent } = createSidebarUiState();
+        let showPopoverCount = 0;
+        let hidePopoverCount = 0;
+        ui.el.sidebar.showPopover = () => {
+            showPopoverCount += 1;
+        };
+        ui.el.sidebar.hidePopover = () => {
+            hidePopoverCount += 1;
+        };
+        const controller = createSidebarControllerForTest({
+            data: { displayLimit: 48 },
+            ui,
+            constants: { resultDisplayBatchSize: 48 },
+            callbacks: createSidebarCallbacks()
+        });
+
+        controller.setupUIHandlers();
+        invokeListener(openSidebarBtn, "click", {});
+
+        assert.equal(showPopoverCount, 1);
+        assert.equal(overlay.classList.contains("show"), false);
+        assert.equal(ui.el.sidebar.classList.contains("active"), true);
+        assert.equal(mainContent.hasAttribute("inert"), true);
+
+        invokeListener(ui.el.sidebar, "click", {
+            target: ui.el.sidebar
+        });
+
+        assert.equal(hidePopoverCount, 1);
+        assert.equal(ui.el.sidebar.classList.contains("active"), false);
+        assert.equal(ui.el.sidebar.getAttribute("aria-hidden"), "true");
+        assert.equal(openSidebarBtn.getAttribute("aria-expanded"), "false");
+        assert.equal(mainContent.hasAttribute("inert"), false);
     } finally {
         restoreDom();
     }
