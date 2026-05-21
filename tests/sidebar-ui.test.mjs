@@ -278,6 +278,33 @@ test("sidebar: openBookmarkModal opens sidebar first when closed and passes clos
     }
 });
 
+test("sidebar: open button aria-expanded follows sidebar open state", () => {
+    const restoreDom = installFakeDom();
+    try {
+        const { ui, openSidebarBtn, overlay } = createSidebarUiState();
+        openSidebarBtn.setAttribute("aria-expanded", "false");
+        const controller = createSidebarControllerForTest({
+            data: { displayLimit: 48 },
+            ui,
+            constants: { resultDisplayBatchSize: 48 },
+            callbacks: createSidebarCallbacks()
+        });
+
+        controller.setupUIHandlers();
+        invokeListener(openSidebarBtn, "click", {});
+
+        assert.equal(ui.el.sidebar.getAttribute("aria-hidden"), "false");
+        assert.equal(openSidebarBtn.getAttribute("aria-expanded"), "true");
+
+        invokeListener(overlay, "click", {});
+
+        assert.equal(ui.el.sidebar.getAttribute("aria-hidden"), "true");
+        assert.equal(openSidebarBtn.getAttribute("aria-expanded"), "false");
+    } finally {
+        restoreDom();
+    }
+});
+
 test("sidebar: escape prioritizes settings panel over bookmark panel", () => {
     const restoreDom = installFakeDom();
     try {

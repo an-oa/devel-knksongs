@@ -167,7 +167,7 @@ export function createSidebarController(input) {
             }
             sidebar.classList.add("active");
             overlay.classList.add("show");
-            sidebar.setAttribute("aria-hidden", "false");
+            syncSidebarExpandedState(sidebar, openBtn, true);
             lastFocusedElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
             focusSidebarFirst();
         });
@@ -181,7 +181,7 @@ export function createSidebarController(input) {
             blurSidebarActiveElement(sidebar);
             sidebar.classList.remove("active");
             overlay.classList.remove("show");
-            sidebar.setAttribute("aria-hidden", "true");
+            syncSidebarExpandedState(sidebar, openBtn, false);
             if (lastFocusedElement) {
                 lastFocusedElement.focus();
                 return;
@@ -313,6 +313,17 @@ export function createSidebarController(input) {
 
         clearBtn.addEventListener("click", clearSearch);
         setupBookmarkHandlers();
+    }
+
+    /**
+     * サイドバーと開閉ボタンのARIA状態を同期する。
+     * @param {HTMLElement} sidebar
+     * @param {HTMLElement} openBtn
+     * @param {boolean} isExpanded
+     */
+    function syncSidebarExpandedState(sidebar, openBtn, isExpanded) {
+        sidebar.setAttribute("aria-hidden", isExpanded ? "false" : "true");
+        openBtn.setAttribute("aria-expanded", isExpanded ? "true" : "false");
     }
 
     /**
