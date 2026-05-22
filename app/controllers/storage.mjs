@@ -1,18 +1,18 @@
-import { getDateUiState, getSearchUiState } from "../lib/ui-slices.mjs?v=21";
+import { getDateUiState, getSearchUiState } from "../lib/ui-slices.mjs?v=22";
 import {
     buildStoredBookmarksPayload,
     migrateLegacyBookmarkSongRefsToCurrent,
     parseStoredBookmarksPayload
-} from "../lib/storage/bookmark-schema.mjs?v=21";
+} from "../lib/storage/bookmark-schema.mjs?v=22";
 import {
     exportBookmarksAsJsonText as buildBookmarkExportJsonText,
     parseBookmarkImportText as parseBookmarkImportJsonText
-} from "../lib/storage/bookmark-transfer.mjs?v=21";
+} from "../lib/storage/bookmark-transfer.mjs?v=22";
 import {
     buildStoredSearchStatePayload,
     parseStoredSearchStatePayload
-} from "../lib/storage/search-state-schema.mjs?v=21";
-import { collectSearchBooleanFilterState } from "../lib/search-boolean-filters.mjs?v=21";
+} from "../lib/storage/search-state-schema.mjs?v=22";
+import { collectSearchBooleanFilterState } from "../lib/search-boolean-filters.mjs?v=22";
 
 /**
  * ブックマークと検索状態の保存・復元を扱うストレージコントローラーを作成する。

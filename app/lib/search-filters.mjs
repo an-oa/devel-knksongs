@@ -1,6 +1,6 @@
-import { isWithinDateRange } from "./date-key.mjs?v=21";
-import { matchesSelectedFormat } from "./song-format.mjs?v=21";
-import { isGuestStreamRole, normalizeStreamRole, STREAM_ROLE_HOST } from "./stream-role.mjs?v=21";
+import { isWithinDateRange } from "./date-key.mjs?v=22";
+import { matchesSelectedFormat } from "./song-format.mjs?v=22";
+import { isGuestStreamRole, normalizeStreamRole, STREAM_ROLE_HOST } from "./stream-role.mjs?v=22";
 
 /**
  * 検索比較しやすい形に文字列を正規化する。

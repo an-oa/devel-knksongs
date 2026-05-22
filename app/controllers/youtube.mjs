@@ -1,12 +1,12 @@
-import { createLayoutRefreshScheduler } from "../lib/layout-anchor.mjs?v=21";
-import { canUseDom, getHeaderHeight, isHtmlElement } from "../lib/dom-utils.mjs?v=21";
-import { debugPlayback, tracePlayback } from "../lib/playback-debug.mjs?v=21";
-import { getPlaybackUiState } from "../lib/ui-slices.mjs?v=21";
+import { createLayoutRefreshScheduler } from "../lib/layout-anchor.mjs?v=22";
+import { canUseDom, getHeaderHeight, isHtmlElement } from "../lib/dom-utils.mjs?v=22";
+import { debugPlayback, tracePlayback } from "../lib/playback-debug.mjs?v=22";
+import { getPlaybackUiState } from "../lib/ui-slices.mjs?v=22";
 import {
     applyYoutubePlayerIframeAttributes,
     buildYoutubeEmbedUrl,
     createYoutubeIframeApiLoader
-} from "../lib/youtube/embed.mjs?v=21";
+} from "../lib/youtube/embed.mjs?v=22";
 import {
     destroyYoutubeSharedPlayback,
     ensureYoutubeSharedPlaybackElements,
@@ -15,7 +15,7 @@ import {
     setPendingYoutubeSharedPlaybackAttach,
     setYoutubeSharedPlaybackSessionId,
     syncYoutubeSharedPlaybackIframe
-} from "../lib/youtube/shared-playback.mjs?v=21";
+} from "../lib/youtube/shared-playback.mjs?v=22";
 import {
     applyYoutubeThumbnailImage,
     createYoutubeThumbnailImage,
@@ -25,23 +25,23 @@ import {
     setYoutubeThumbnailOrientation,
     setYoutubeThumbnailPlaybackState,
     shouldLoadYoutubeThumbnailNow
-} from "../lib/youtube/thumbnail.mjs?v=21";
+} from "../lib/youtube/thumbnail.mjs?v=22";
 import {
     createYoutubePlaybackState,
     isYoutubePlaybackSessionActive,
     reduceYoutubePlaybackState
-} from "../lib/youtube/playback-state.mjs?v=21";
+} from "../lib/youtube/playback-state.mjs?v=22";
 import {
     createYoutubePlaybackStartAttemptManager,
     createYoutubePlaybackStartResult,
     YOUTUBE_PLAYBACK_START_STATUS
-} from "../lib/youtube/playback-start-attempt.mjs?v=21";
-import { createYoutubeUnconfirmedPlaybackStartManager } from "../lib/youtube/unconfirmed-playback-start.mjs?v=21";
+} from "../lib/youtube/playback-start-attempt.mjs?v=22";
+import { createYoutubeUnconfirmedPlaybackStartManager } from "../lib/youtube/unconfirmed-playback-start.mjs?v=22";
 import {
     createYoutubePlayerAdapter
-} from "../lib/youtube/player-adapter.mjs?v=21";
+} from "../lib/youtube/player-adapter.mjs?v=22";
 
-export { extractYoutubeInfo } from "../lib/youtube-url.mjs?v=21";
+export { extractYoutubeInfo } from "../lib/youtube-url.mjs?v=22";
 
 /**
  * サムネイル表示と埋め込み再生の制御を行うコントローラーを作成する。

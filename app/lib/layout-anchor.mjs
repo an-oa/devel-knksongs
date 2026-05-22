@@ -1,4 +1,4 @@
-import { isHtmlElement } from "./dom-utils.mjs?v=21";
+import { isHtmlElement } from "./dom-utils.mjs?v=22";
 
 /**
  * @typedef {{ element: HTMLElement, container: HTMLElement, top: number }} ViewportAnchor
