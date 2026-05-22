@@ -1,6 +1,5 @@
 export const SEARCH_STATE_CURRENT_VERSION = 5;
 export const SEARCH_STATE_V1 = 1;
-export const SEARCH_STATE_V3 = 3;
 export const SEARCH_STATE_V4 = 4;
 
 const SEARCH_STATE_V1_DEFAULT_FORMATS = ["配信", "歌みた", "ショート", "切り抜き"];

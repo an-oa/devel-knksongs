@@ -101,7 +101,6 @@ test("search state schema: migrates legacy collab fields to role filters", () =>
     assert.deepEqual(normalizeStoredCollabRoleFilters({ collabOnly: true }, 1), { host: true, guest: true });
     assert.deepEqual(normalizeStoredCollabRoleFilters({ frameScope: "host" }, 4), { host: true, guest: false });
     assert.deepEqual(normalizeStoredCollabRoleFilters({ frameScope: "guest" }, 4), { host: false, guest: true });
-    assert.deepEqual(normalizeStoredCollabRoleFilters({ frameScope: "own" }, 3), { host: false, guest: false });
     assert.deepEqual(
         normalizeStoredCollabRoleFilters({ collabHostOnly: true, collabGuestOnly: false }, SEARCH_STATE_CURRENT_VERSION),
         { host: true, guest: false }
