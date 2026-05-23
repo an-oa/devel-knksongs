@@ -1,7 +1,7 @@
-import { normalizeStreamRole } from "./stream-role.mjs?v=22";
-import { parseDateKey } from "./date-key.mjs?v=22";
-import { normalizeForSearch } from "./search-filters.mjs?v=22";
-import { extractYoutubeInfo } from "./youtube-url.mjs?v=22";
+import { normalizeStreamRole } from "./stream-role.mjs?v=23";
+import { parseDateKey } from "./date-key.mjs?v=23";
+import { normalizeForSearch } from "./search-filters.mjs?v=23";
+import { extractYoutubeInfo } from "./youtube-url.mjs?v=23";
 
 /**
  * CSVから正規化した曲データ1行分を表す。

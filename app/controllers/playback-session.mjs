@@ -1,10 +1,10 @@
-import { getPlaybackContinuationCandidates } from "../lib/playback-sequence.mjs?v=22";
-import { debugPlayback } from "../lib/playback-debug.mjs?v=22";
-import { getPlaybackUiState } from "../lib/ui-slices.mjs?v=22";
+import { getPlaybackContinuationCandidates } from "../lib/playback-sequence.mjs?v=23";
+import { debugPlayback } from "../lib/playback-debug.mjs?v=23";
+import { getPlaybackUiState } from "../lib/ui-slices.mjs?v=23";
 import {
     isYoutubePlaybackStarted,
     isYoutubePlaybackStartUnconfirmed
-} from "../lib/youtube/playback-start-attempt.mjs?v=22";
+} from "../lib/youtube/playback-start-attempt.mjs?v=23";
 
 /**
  * 再生終了後の継続再生と追従スクロールを制御する。

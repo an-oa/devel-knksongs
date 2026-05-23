@@ -1,11 +1,11 @@
-import { createDateFilterController } from "../ui/date/filter.mjs?v=22";
-import { filterSongsByCriteria } from "../lib/search-filters.mjs?v=22";
-import { pickRecommendedSongs } from "../lib/search-recommendation.mjs?v=22";
+import { createDateFilterController } from "../ui/date/filter.mjs?v=23";
+import { filterSongsByCriteria } from "../lib/search-filters.mjs?v=23";
+import { pickRecommendedSongs } from "../lib/search-recommendation.mjs?v=23";
 import {
     collectSearchBooleanFilterState,
     hasSelectedSearchBooleanFilterState
-} from "../lib/search-boolean-filters.mjs?v=22";
-import { getLookupUiState, getSearchUiState } from "../lib/ui-slices.mjs?v=22";
+} from "../lib/search-boolean-filters.mjs?v=23";
+import { getLookupUiState, getSearchUiState } from "../lib/ui-slices.mjs?v=23";
 
 /**
  * 検索条件の収集・結果解決・推薦選曲を管理するコントローラーを作成する。
