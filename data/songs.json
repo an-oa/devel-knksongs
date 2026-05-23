@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "contentHash": "sha256:5a7414b0584e475e1b2a2deac1f02499650a1af6e5051d18d4a52bb977b3846e",
+  "contentHash": "sha256:3b408d7cba9df8a66e68cda35cc03ba43729476386ec25231af4296a91202459",
   "songs": [
     {
       "date": "2026/05/20",
@@ -29603,7 +29603,7 @@
       "format": "収録",
       "streamRole": "ゲスト",
       "videoOrientation": "landscape",
-      "isRelay": true,
+      "isRelay": false,
       "isHarmony": false,
       "title": "ENAMEL",
       "artist": "シド",
