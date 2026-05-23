@@ -147,10 +147,24 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
      */
     function hideBookmarkPanel() {
         if (ui.el.bookmarkSidebarPanel) {
+            blurPanelActiveElement(ui.el.bookmarkSidebarPanel);
             ui.el.bookmarkSidebarPanel.hidden = true;
             ui.el.bookmarkSidebarPanel.setAttribute("aria-hidden", "true");
         }
         setSidebarBackgroundInert(false);
+    }
+
+    /**
+     * パネルを隠す前に、内部に残っているフォーカスを外す。
+     * @param {HTMLElement} panel
+     */
+    function blurPanelActiveElement(panel) {
+        const active = document.activeElement;
+        if (!(active instanceof HTMLElement)) return;
+        if (!panel.contains(active)) return;
+        if (typeof active.blur === "function") {
+            active.blur();
+        }
     }
 
     /**

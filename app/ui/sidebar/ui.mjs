@@ -71,6 +71,7 @@ export function createSidebarController(input) {
         const returnFocusEl = settingsPanelUi.returnFocusEl;
         settingsPanelUi.returnFocusEl = null;
         if (ui.el.settingsSidebarPanel) {
+            blurPanelActiveElement(ui.el.settingsSidebarPanel);
             ui.el.settingsSidebarPanel.hidden = true;
             ui.el.settingsSidebarPanel.setAttribute("aria-hidden", "true");
         }
@@ -394,6 +395,19 @@ export function createSidebarController(input) {
         const active = document.activeElement;
         if (!(active instanceof HTMLElement)) return;
         if (!sidebar.contains(active)) return;
+        if (typeof active.blur === "function") {
+            active.blur();
+        }
+    }
+
+    /**
+     * サブパネルを隠す前に、内部に残っているフォーカスを外す。
+     * @param {HTMLElement} panel
+     */
+    function blurPanelActiveElement(panel) {
+        const active = document.activeElement;
+        if (!(active instanceof HTMLElement)) return;
+        if (!panel.contains(active)) return;
         if (typeof active.blur === "function") {
             active.blur();
         }

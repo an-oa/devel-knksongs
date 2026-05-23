@@ -223,6 +223,30 @@ test("bookmark ui: add mode success adds to existing bookmark and closes the pan
     }
 });
 
+test("bookmark ui: create-and-add closes without leaving focus inside hidden panel", () => {
+    const restoreDom = installFakeDom();
+    try {
+        const { ui, calls, controller } = createBookmarkHarness();
+        controller.setupBookmarkHandlers();
+        controller.openBookmarkModal("song-z", {
+            returnFocusEl: ui.el.openBookmarkPanelBtn
+        });
+
+        ui.el.bookmarkPanelNewName.value = "Focus Songs";
+        ui.el.bookmarkPanelCreateBtn.focus();
+        invokeListener(ui.el.bookmarkPanelCreateBtn, "click", {});
+
+        assert.deepEqual(calls.createBookmarkAndAddArgs, [["Focus Songs", "song-z"]]);
+        assert.equal(ui.el.bookmarkSidebarPanel.hidden, true);
+        assert.equal(ui.el.bookmarkSidebarPanel.getAttribute("aria-hidden"), "true");
+        assert.equal(document.activeElement, null);
+        assert.equal(ui.el.sidebarHeader.hasAttribute("inert"), false);
+        assert.equal(ui.el.sidebarScrollArea.hasAttribute("inert"), false);
+    } finally {
+        restoreDom();
+    }
+});
+
 test("bookmark ui: duplicate add shows alert and keeps the selection panel open", () => {
     const restoreDom = installFakeDom();
     const previousAlert = globalThis.alert;
