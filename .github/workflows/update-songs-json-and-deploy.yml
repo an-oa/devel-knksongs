@@ -33,6 +33,8 @@ jobs:
 
       - run: npm run build:songs-json
 
+      - run: npm run validate:songs-json
+
       - name: Commit generated songs json
         run: |
           if git diff --quiet -- data/songs.json data/songs-meta.json; then
