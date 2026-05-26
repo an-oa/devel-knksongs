@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "target": "ES2024",
+    "module": "Preserve",
+    "moduleResolution": "Bundler",
+    "lib": ["DOM", "ES2024"],
+    "strict": false,
+    "skipLibCheck": true
+  },
+  "include": [
+    "app/state.mjs",
+    "app/controllers/playback-session.mjs",
+    "app/controllers/playback-settings.mjs",
+    "app/controllers/render.mjs",
+    "app/controllers/search.mjs",
+    "app/controllers/storage.mjs",
+    "app/controllers/youtube.mjs",
+    "app/lib/youtube-url.mjs",
+    "types/**/*.d.ts"
+  ]
+}
