@@ -1,3 +1,5 @@
+// @ts-check
+
 import { getPlaybackContinuationCandidates } from "../lib/playback-sequence.mjs?v=23";
 import { debugPlayback } from "../lib/playback-debug.mjs?v=23";
 import { getPlaybackUiState } from "../lib/ui-slices.mjs?v=23";
@@ -7,8 +9,39 @@ import {
 } from "../lib/youtube/playback-start-attempt.mjs?v=23";
 
 /**
+ * @typedef {{
+ *   currentResults: Song[]
+ * }} PlaybackSessionDataState
+ */
+
+/**
+ * @typedef {{
+ *   playback: PlaybackUiRuntimeState
+ * }} PlaybackSessionUiState
+ */
+
+/**
+ * @typedef {{ status: string }} YoutubePlaybackStartResult
+ */
+
+/**
+ * @typedef {{
+ *   playSongByKey: (songKey: string) => Promise<YoutubePlaybackStartResult> | YoutubePlaybackStartResult,
+ *   scrollSongIntoView: (songKey: string) => void
+ * }} PlaybackSessionCallbacks
+ */
+
+/**
+ * @typedef {{
+ *   data: PlaybackSessionDataState,
+ *   ui: PlaybackSessionUiState,
+ *   callbacks: PlaybackSessionCallbacks
+ * }} PlaybackSessionControllerInput
+ */
+
+/**
  * 再生終了後の継続再生と追従スクロールを制御する。
- * @param {{ data: *, ui: *, callbacks: { playSongByKey: Function, scrollSongIntoView: Function } }} input
+ * @param {PlaybackSessionControllerInput} input
  */
 export function createPlaybackSessionController({ data, ui, callbacks }) {
     const playbackUi = getPlaybackUiState(ui);

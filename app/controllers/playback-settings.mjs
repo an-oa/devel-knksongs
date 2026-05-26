@@ -1,3 +1,5 @@
+// @ts-check
+
 import { getPlaybackUiState, getSearchUiState } from "../lib/ui-slices.mjs?v=23";
 
 const THUMBNAIL_STORAGE_KEY = "showThumbnails";
@@ -13,10 +15,12 @@ const LEGACY_PLAYBACK_SETTINGS_STORAGE_KEYS = [
     CONTINUOUS_PLAYBACK_STORAGE_KEY,
     LOOP_PLAYBACK_STORAGE_KEY
 ];
+/** @type {{ readonly PERSISTED: "persisted", readonly PAGE: "page" }} */
 const PLAYBACK_SETTING_SCOPES = {
     PERSISTED: "persisted",
     PAGE: "page"
 };
+/** @type {{ readonly VISIBILITY: "visibility", readonly BEHAVIOR: "behavior" }} */
 const PLAYBACK_SETTING_KINDS = {
     VISIBILITY: "visibility",
     BEHAVIOR: "behavior"
@@ -28,8 +32,100 @@ const INITIAL_PLAYBACK_SETTING_VALUES = {
 };
 
 /**
+ * @typedef {{
+ *   showThumbnails: boolean,
+ *   showExperimentalPlaybackSettings: boolean,
+ *   stopAtEndTime: boolean,
+ *   continuousPlayback: boolean,
+ *   loopPlayback: boolean
+ * }} PlaybackSettingsUiSlice
+ */
+
+/**
+ * @typedef {{
+ *   playbackSettingsGroup?: HTMLElement | null,
+ *   closeSettingsPanelBtn?: HTMLElement | null,
+ *   thumbToggle?: HTMLInputElement | null,
+ *   endTimeToggle?: HTMLInputElement | null,
+ *   continuousPlaybackToggle?: HTMLInputElement | null,
+ *   loopPlaybackToggle?: HTMLInputElement | null
+ * }} PlaybackSettingsUiElements
+ */
+
+/**
+ * @typedef {{
+ *   el: PlaybackSettingsUiElements,
+ *   playback: PlaybackUiRuntimeState,
+ *   search: SearchUiRuntimeState
+ * }} PlaybackSettingsUiState
+ */
+
+/**
+ * @typedef {"thumbToggle" | "endTimeToggle" | "continuousPlaybackToggle" | "loopPlaybackToggle"} PlaybackSettingElementKey
+ */
+
+/**
+ * @typedef {"persisted" | "page"} PlaybackSettingScope
+ */
+
+/**
+ * @typedef {"visibility" | "behavior"} PlaybackSettingKind
+ */
+
+/**
+ * @typedef {{
+ *   scope: PlaybackSettingScope,
+ *   kind: PlaybackSettingKind,
+ *   stateKey: keyof PlaybackSettingsUiSlice,
+ *   elementKey?: PlaybackSettingElementKey,
+ *   storageKey?: string,
+ *   defaultValue: boolean,
+ *   hiddenValue?: boolean,
+ *   effectiveWhenHidden?: boolean,
+ *   interactive?: boolean,
+ *   syncValue?: (value: boolean) => void,
+ *   afterStorageApply?: (previousValue: boolean, nextValue: boolean) => void,
+ *   afterToggleChange?: (previousValue: boolean, nextValue: boolean) => void
+ * }} PlaybackSettingDefinition
+ */
+
+/**
+ * @typedef {{
+ *   showThumbnails: boolean,
+ *   showExperimentalPlaybackSettings: boolean,
+ *   stopAtEndTime: boolean,
+ *   continuousPlayback: boolean,
+ *   loopPlayback: boolean
+ * }} PlaybackSettingsSnapshot
+ */
+
+/**
+ * @typedef {{
+ *   setExperimentalPlaybackSettings: (value: boolean) => boolean,
+ *   readonly showExperimentalPlaybackSettings: boolean,
+ *   readonly state: PlaybackSettingsSnapshot
+ * }} PlaybackSettingsConsoleApi
+ */
+
+/**
+ * @typedef {{
+ *   ensureThumbnailPlaybackReady: () => void,
+ *   restoreActivePlayback: () => void,
+ *   updateDisplay: () => void,
+ *   setupScrollObserver: () => void
+ * }} PlaybackSettingsCallbacks
+ */
+
+/**
+ * @typedef {{
+ *   ui: PlaybackSettingsUiState,
+ *   callbacks: PlaybackSettingsCallbacks
+ * }} PlaybackSettingsControllerInput
+ */
+
+/**
  * 再生設定の保存値反映とトグル配線を扱うコントローラーを作成する。
- * @param {{ ui: *, callbacks: * }} input
+ * @param {PlaybackSettingsControllerInput} input
  */
 export function createPlaybackSettingsController({ ui, callbacks }) {
     const playbackUi = getPlaybackUiState(ui);
@@ -110,7 +206,7 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
 
     /**
      * 現在値とトグル状態へ設定値を反映する。
-     * @param {*} definition
+     * @param {PlaybackSettingDefinition} definition
      * @param {boolean} value
      */
     function applyPlaybackSettingValue(definition, value) {
@@ -124,7 +220,7 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
 
     /**
      * 設定定義へ現在値を反映し、副作用フックがあれば呼ぶ。
-     * @param {*} definition
+     * @param {PlaybackSettingDefinition} definition
      * @param {boolean} nextValue
      * @param {"afterStorageApply" | "afterToggleChange"} hookName
      */
@@ -138,7 +234,7 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
 
     /**
      * ページ内だけで保持する再生挙動設定かを返す。
-     * @param {*} definition
+     * @param {PlaybackSettingDefinition} definition
      * @returns {boolean}
      */
     function isPagePlaybackBehaviorDefinition(definition) {
@@ -146,6 +242,7 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
             && definition.kind === PLAYBACK_SETTING_KINDS.BEHAVIOR;
     }
 
+    /** @type {PlaybackSettingDefinition[]} */
     const playbackBehaviorDefinitions = [
         {
             scope: PLAYBACK_SETTING_SCOPES.PAGE,
@@ -181,7 +278,7 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
 
     /**
      * 表示状態に応じた再生設定の実効値を返す。
-     * @param {*} definition
+     * @param {PlaybackSettingDefinition} definition
      * @param {boolean} experimentalEnabled
      * @returns {boolean}
      */
@@ -204,6 +301,7 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
         }
     }
 
+    /** @type {PlaybackSettingDefinition} */
     const experimentalPlaybackVisibilityDefinition = {
         scope: PLAYBACK_SETTING_SCOPES.PAGE,
         kind: PLAYBACK_SETTING_KINDS.VISIBILITY,
@@ -220,6 +318,7 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
         }
     };
 
+    /** @type {PlaybackSettingDefinition} */
     const thumbnailVisibilityDefinition = {
         scope: PLAYBACK_SETTING_SCOPES.PERSISTED,
         kind: PLAYBACK_SETTING_KINDS.VISIBILITY,
@@ -245,6 +344,7 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
         }
     };
 
+    /** @type {PlaybackSettingDefinition[]} */
     const playbackSettingDefinitions = [
         thumbnailVisibilityDefinition,
         experimentalPlaybackVisibilityDefinition,
@@ -261,7 +361,7 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
 
     /**
      * 保存領域から全再生設定の値を読み出す。
-     * @param {Array<*>} definitions
+     * @param {PlaybackSettingDefinition[]} definitions
      * @returns {Map<string, boolean>}
      */
     function readPlaybackSettingValues(definitions) {
@@ -273,9 +373,9 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
 
     /**
      * 設定更新と副作用実行を行う。
-     * @param {*} definition
+     * @param {PlaybackSettingDefinition} definition
      * @param {boolean} nextValue
-     * @param {{ persist?: boolean } | undefined} options
+     * @param {{ persist?: boolean } | undefined} [options]
      */
     function applyPlaybackSettingChange(definition, nextValue, options) {
         const shouldPersist = options?.persist !== false;
@@ -298,7 +398,7 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
         const previousValue = Boolean(playbackUi[definition.stateKey]);
         if (previousValue === nextValue) return;
         applyPlaybackSettingValue(definition, nextValue);
-        if (shouldPersist && definition.storageKey) localStorage.setItem(definition.storageKey, nextValue);
+        if (shouldPersist && definition.storageKey) localStorage.setItem(definition.storageKey, String(nextValue));
         if (typeof definition.afterToggleChange === "function") {
             definition.afterToggleChange(previousValue, nextValue);
         }
@@ -306,7 +406,7 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
 
     /**
      * トグル変更時の設定更新と副作用実行を行う。
-     * @param {*} definition
+     * @param {PlaybackSettingDefinition} definition
      * @param {boolean} nextValue
      */
     function handlePlaybackSettingChange(definition, nextValue) {
@@ -357,7 +457,7 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
 
     /**
      * console から確認しやすい再生設定の現在値を返す。
-     * @returns {*}
+     * @returns {PlaybackSettingsSnapshot}
      */
     function getPlaybackSettingsSnapshot() {
         return {
@@ -371,28 +471,24 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
 
     /**
      * Inspect の console へ公開する再生設定 API を作る。
-     * @returns {*}
+     * @returns {PlaybackSettingsConsoleApi}
      */
     function createConsoleApi() {
-        const api = {};
-        Object.defineProperties(api, {
-            showExperimentalPlaybackSettings: {
-                enumerable: true,
-                get() {
-                    return getPlaybackSettingsSnapshot().showExperimentalPlaybackSettings;
-                },
-                set(value) {
-                    setExperimentalPlaybackSettings(Boolean(value));
-                }
+        /** @type {PlaybackSettingsConsoleApi} */
+        const api = {
+            get showExperimentalPlaybackSettings() {
+                return getPlaybackSettingsSnapshot().showExperimentalPlaybackSettings;
             },
-            state: {
-                enumerable: true,
-                get() {
-                    return getPlaybackSettingsSnapshot();
-                }
+            set showExperimentalPlaybackSettings(value) {
+                setExperimentalPlaybackSettings(Boolean(value));
+            },
+            get state() {
+                return getPlaybackSettingsSnapshot();
+            },
+            setExperimentalPlaybackSettings(value) {
+                return setExperimentalPlaybackSettings(Boolean(value));
             }
-        });
-        api.setExperimentalPlaybackSettings = (value) => setExperimentalPlaybackSettings(Boolean(value));
+        };
         return api;
     }
 
