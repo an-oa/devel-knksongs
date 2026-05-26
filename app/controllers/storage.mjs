@@ -1,3 +1,5 @@
+// @ts-check
+
 import { getDateUiState, getSearchUiState } from "../lib/ui-slices.mjs?v=23";
 import {
     buildStoredBookmarksPayload,
@@ -15,17 +17,84 @@ import {
 import { collectSearchBooleanFilterState } from "../lib/search-boolean-filters.mjs?v=23";
 
 /**
+ * @typedef {{
+ *   allSongsRaw: Song[],
+ *   bookmarks: Record<string, BookmarkRecord>,
+ *   activeBookmark: string | null
+ * }} StorageDataState
+ */
+
+/**
+ * @typedef {{
+ *   searchBox?: HTMLInputElement | null
+ * }} StorageUiElements
+ */
+
+/**
+ * @typedef {{
+ *   el: StorageUiElements,
+ *   search: SearchUiRuntimeState,
+ *   date: DateUiRuntimeState
+ * }} StorageUiState
+ */
+
+/**
+ * @typedef {{
+ *   SEARCH_STATE_KEY: string,
+ *   DEFAULT_FORMATS?: string[],
+ *   BOOKMARK_STORAGE_KEY: string,
+ *   BOOKMARK_STORAGE_VERSION?: number,
+ *   MAX_BOOKMARK_COUNT?: number,
+ *   MAX_SONGS_PER_BOOKMARK?: number,
+ *   MAX_BOOKMARK_NAME_LENGTH?: number
+ * }} StorageConstants
+ */
+
+/**
+ * @typedef {{
+ *   getSelectedFormatValues: () => string[],
+ *   applyStoredFilterState: (payload: Record<string, unknown>) => void
+ * }} StorageSearchFiltersController
+ */
+
+/**
+ * @typedef {{
+ *   getDateSelectValue: (kind: string) => string,
+ *   applyPendingDateValues: () => void,
+ *   renderBookmarks: () => void,
+ *   scheduleSearch: (options?: { immediate?: boolean }) => void
+ * }} StorageCallbacks
+ */
+
+/**
+ * @typedef {{
+ *   ok: boolean,
+ *   reason?: string,
+ *   name?: string,
+ *   id?: string,
+ *   changed?: boolean,
+ *   text?: string,
+ *   bookmarks?: Record<string, BookmarkRecord>,
+ *   bookmarkCount?: number,
+ *   songCount?: number,
+ *   limit?: number,
+ *   bookmarkName?: string
+ * }} StorageActionResult
+ */
+
+/**
+ * @typedef {{
+ *   data: StorageDataState,
+ *   ui: StorageUiState,
+ *   searchFiltersController: StorageSearchFiltersController,
+ *   constants: StorageConstants,
+ *   callbacks: StorageCallbacks
+ * }} StorageControllerInput
+ */
+
+/**
  * ブックマークと検索状態の保存・復元を扱うストレージコントローラーを作成する。
- * @param {{
- *   data: object,
- *   ui: object,
- *   searchFiltersController: {
- *     getSelectedFormatValues: () => string[],
- *     applyStoredFilterState: (payload: Record<string, unknown>) => void
- *   },
- *   constants: object,
- *   callbacks: object
- * }} input
+ * @param {StorageControllerInput} input
  */
 export function createStorageController({ data, ui, searchFiltersController, constants, callbacks }) {
     const searchUi = getSearchUiState(ui);
@@ -63,7 +132,7 @@ export function createStorageController({ data, ui, searchFiltersController, con
     /**
      * ブックマーク移行まわりのデバッグログを出力する。
      * @param {string} message
-     * @param {*} details
+     * @param {unknown} details
      */
     function debugBookmarkMigration(message, details) {
         if (!isBookmarkMigrationDebugEnabled()) return;
@@ -76,25 +145,27 @@ export function createStorageController({ data, ui, searchFiltersController, con
 
     /**
      * 成功時の共通レスポンスを組み立てる。
-     * @param {*} extra
+     * @param {Partial<StorageActionResult> | undefined} [extra]
+     * @returns {StorageActionResult}
      */
-    function buildActionOk(extra) {
+    function buildActionOk(extra = undefined) {
         return { ok: true, ...(extra || {}) };
     }
 
     /**
      * 失敗理由付きの共通レスポンスを組み立てる。
-     * @param {*} reason
-     * @param {*} extra
+     * @param {string} reason
+     * @param {Partial<StorageActionResult> | undefined} [extra]
+     * @returns {StorageActionResult}
      */
-    function buildActionFail(reason, extra) {
+    function buildActionFail(reason, extra = undefined) {
         return { ok: false, reason, ...(extra || {}) };
     }
 
     /**
      * ブックマーク名を検証し、保存用に前後空白を除いた文字列を返す。
-     * @param {*} bookmarkName
-     * @returns {{ ok: boolean, name?: string, reason?: string, limit?: number }}
+     * @param {unknown} bookmarkName
+     * @returns {StorageActionResult}
      */
     function validateBookmarkName(bookmarkName) {
         if (typeof bookmarkName !== "string") return buildActionFail("invalid_name_type");
@@ -108,8 +179,8 @@ export function createStorageController({ data, ui, searchFiltersController, con
 
     /**
      * インポート候補の JSON 文字列を解析し、全置き換え可能なブックマーク情報に整える。
-     * @param {*} text
-     * @returns {{ ok: boolean, reason?: string, bookmarks?: Record<string, *>, bookmarkCount?: number, songCount?: number, limit?: number, bookmarkName?: string }}
+     * @param {unknown} text
+     * @returns {StorageActionResult}
      */
     function parseBookmarkImportText(text) {
         return parseBookmarkImportJsonText(text, {
@@ -122,7 +193,7 @@ export function createStorageController({ data, ui, searchFiltersController, con
 
     /**
      * 現在のブックマークを JSON エクスポート用文字列へ変換する。
-     * @returns {{ ok: boolean, text: string, bookmarkCount: number, songCount: number }}
+     * @returns {StorageActionResult}
      */
     function exportBookmarksAsJsonText() {
         return buildBookmarkExportJsonText(data.bookmarks, BOOKMARK_STORAGE_VERSION);
@@ -167,8 +238,8 @@ export function createStorageController({ data, ui, searchFiltersController, con
 
     /**
      * JSON 文字列からブックマークを全置き換えでインポートする。
-     * @param {*} text
-     * @returns {{ ok: boolean, reason?: string, bookmarkCount?: number, songCount?: number }}
+     * @param {unknown} text
+     * @returns {StorageActionResult}
      */
     function importBookmarksFromJsonText(text) {
         const parsed = parseBookmarkImportText(text);
@@ -223,8 +294,8 @@ export function createStorageController({ data, ui, searchFiltersController, con
 
     /**
      * 指定ブックマークから曲を削除し、必要なら検索結果を更新する。
-     * @param {*} bookmarkId
-     * @param {*} songKey
+     * @param {string} bookmarkId
+     * @param {string} songKey
      */
     function removeSongFromBookmark(bookmarkId, songKey) {
         const bookmark = data.bookmarks[bookmarkId];
@@ -243,8 +314,9 @@ export function createStorageController({ data, ui, searchFiltersController, con
 
     /**
      * 指定ブックマークへ曲を追加し、上限や重複を検証して結果を返す。
-     * @param {*} bookmarkId
-     * @param {*} songKey
+     * @param {string} bookmarkId
+     * @param {string} songKey
+     * @returns {StorageActionResult}
      */
     function addSongToBookmark(bookmarkId, songKey) {
         const bookmark = data.bookmarks[bookmarkId];
@@ -264,8 +336,9 @@ export function createStorageController({ data, ui, searchFiltersController, con
 
     /**
      * 新規ブックマークを作成する共通処理。
-     * @param {*} bookmarkName
-     * @param {Array<string>} initialSongs
+     * @param {unknown} bookmarkName
+     * @param {string[]} initialSongs
+     * @returns {StorageActionResult}
      */
     function createBookmarkRecord(bookmarkName, initialSongs) {
         if (Object.keys(data.bookmarks).length >= MAX_BOOKMARK_COUNT) {
@@ -287,7 +360,8 @@ export function createStorageController({ data, ui, searchFiltersController, con
 
     /**
      * 新規ブックマークを空の状態で作成する。
-     * @param {*} bookmarkName
+     * @param {unknown} bookmarkName
+     * @returns {StorageActionResult}
      */
     function createBookmark(bookmarkName) {
         return createBookmarkRecord(bookmarkName, []);
@@ -295,8 +369,9 @@ export function createStorageController({ data, ui, searchFiltersController, con
 
     /**
      * 新規ブックマークを作成し、指定曲を初期登録する。
-     * @param {*} bookmarkName
-     * @param {*} songKey
+     * @param {unknown} bookmarkName
+     * @param {string} songKey
+     * @returns {StorageActionResult}
      */
     function createBookmarkAndAdd(bookmarkName, songKey) {
         return createBookmarkRecord(bookmarkName, [songKey]);
@@ -304,7 +379,8 @@ export function createStorageController({ data, ui, searchFiltersController, con
 
     /**
      * ブックマークを削除し、アクティブ状態と表示を更新する。
-     * @param {*} bookmarkId
+     * @param {string} bookmarkId
+     * @returns {boolean}
      */
     function deleteBookmark(bookmarkId) {
         const bookmark = data.bookmarks[bookmarkId];
@@ -323,7 +399,7 @@ export function createStorageController({ data, ui, searchFiltersController, con
      * 変更対象がアクティブな場合は検索結果表示も即時更新する。
      * @param {string} bookmarkId
      * @param {string} newName
-     * @returns {{ ok: boolean, reason?: string, changed?: boolean }}
+     * @returns {StorageActionResult}
      */
     function renameBookmark(bookmarkId, newName) {
         const bookmark = data.bookmarks[bookmarkId];
