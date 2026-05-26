@@ -1,6 +1,7 @@
 /**
  * 検索関連の UI ランタイム状態を返す。
- * @param {*} ui
+ * @param {SearchUiStateSource} ui
+ * @returns {SearchUiRuntimeState}
  */
 export function getSearchUiState(ui) {
     return ui.search;
@@ -8,7 +9,8 @@ export function getSearchUiState(ui) {
 
 /**
  * 日付フィルタ関連の UI ランタイム状態を返す。
- * @param {*} ui
+ * @param {DateUiStateSource} ui
+ * @returns {DateUiRuntimeState}
  */
 export function getDateUiState(ui) {
     return ui.date;
@@ -16,7 +18,8 @@ export function getDateUiState(ui) {
 
 /**
  * 再生・サムネイル関連の UI ランタイム状態を返す。
- * @param {*} ui
+ * @param {PlaybackUiStateSource} ui
+ * @returns {PlaybackUiRuntimeState}
  */
 export function getPlaybackUiState(ui) {
     return ui.playback;
@@ -24,7 +27,8 @@ export function getPlaybackUiState(ui) {
 
 /**
  * 検索補助のルックアップ状態を返す。
- * @param {*} ui
+ * @param {LookupUiStateSource} ui
+ * @returns {LookupUiRuntimeState}
  */
 export function getLookupUiState(ui) {
     return ui.lookup;
@@ -32,7 +36,8 @@ export function getLookupUiState(ui) {
 
 /**
  * 描画キャッシュ関連の UI ランタイム状態を返す。
- * @param {*} ui
+ * @param {RenderUiStateSource} ui
+ * @returns {RenderUiRuntimeState}
  */
 export function getRenderUiState(ui) {
     return ui.render;
@@ -40,7 +45,8 @@ export function getRenderUiState(ui) {
 
 /**
  * ブックマークパネル関連の UI ランタイム状態を返す。
- * @param {*} ui
+ * @param {BookmarkPanelUiStateSource} ui
+ * @returns {BookmarkPanelUiRuntimeState}
  */
 export function getBookmarkPanelUiState(ui) {
     return ui.bookmarkPanel;
@@ -48,7 +54,8 @@ export function getBookmarkPanelUiState(ui) {
 
 /**
  * 設定パネル関連の UI ランタイム状態を返す。
- * @param {*} ui
+ * @param {SettingsPanelUiStateSource} ui
+ * @returns {SettingsPanelUiRuntimeState}
  */
 export function getSettingsPanelUiState(ui) {
     return ui.settingsPanel;

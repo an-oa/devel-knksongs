@@ -1,3 +1,5 @@
+// @ts-check
+
 /**
  * 鐘輝かう 歌サーチ
  */
@@ -21,6 +23,7 @@ export const YT_IFRAME_API_SELECTOR = 'script[data-yt-iframe-api="true"]';
 export const YT_IFRAME_READY_POLL_MS = 50;
 export const STOP_PLAYBACK_ON_SCROLL_OUT = false;
 
+/** @type {AppState} */
 export const appState = {
     data: {
         allSongsRaw: [],

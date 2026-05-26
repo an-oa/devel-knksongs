@@ -4,35 +4,6 @@ import { normalizeForSearch } from "./search-filters.mjs?v=23";
 import { extractYoutubeInfo } from "./youtube-url.mjs?v=23";
 
 /**
- * CSVから正規化した曲データ1行分を表す。
- * @typedef {Object} SongRow
- * @property {string} date
- * @property {number | null} dateKey
- * @property {string} archiveId
- * @property {number | null} archiveOrder
- * @property {number} sourceIndex
- * @property {string} videoId
- * @property {string} songKey
- * @property {string} bookmarkSongKey
- * @property {string} legacySongKey
- * @property {string} format
- * @property {string} streamRole
- * @property {string} videoOrientation
- * @property {boolean} isRelay
- * @property {boolean} isHarmony
- * @property {string} title
- * @property {string} artist
- * @property {string} titleYomi
- * @property {string} artistYomi
- * @property {string} url
- * @property {number | null} endSeconds
- * @property {string} titleNorm
- * @property {string} artistNorm
- * @property {string} titleYomiNorm
- * @property {string} artistYomiNorm
- */
-
-/**
  * 現在仕様の曲キー（archiveId + archiveOrder）を生成する。
  * @param {*} input
  */
@@ -178,7 +149,7 @@ function parseCsvRFC4180(t) {
 /**
  * CSVを検証・整形して、検索用正規化済みの曲データ配列へ変換する。
  * @param {*} csvText
- * @returns {SongRow[]}
+ * @returns {Song[]}
  */
 export function parseCsvToSongs(csvText) {
     const rows = parseCsvRFC4180(csvText);
