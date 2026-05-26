@@ -1,3 +1,5 @@
+// @ts-check
+
 import { getHeaderHeight } from "../lib/dom-utils.mjs?v=23";
 import { hasStreamRole } from "../lib/stream-role.mjs?v=23";
 import { tracePlayback } from "../lib/playback-debug.mjs?v=23";
@@ -11,8 +13,121 @@ import {
 } from "../lib/youtube/playback-start-attempt.mjs?v=23";
 
 /**
+ * @typedef {{
+ *   videoId: string,
+ *   startSeconds: number,
+ *   endSeconds?: number | null,
+ *   isVertical: boolean
+ * }} YoutubeTarget
+ */
+
+/**
+ * @typedef {{
+ *   card: HTMLLIElement,
+ *   thumbDiv: HTMLDivElement,
+ *   content: HTMLElement,
+ *   titleHeading: HTMLHeadingElement,
+ *   titleEl: HTMLAnchorElement,
+ *   artistEl: HTMLDivElement,
+ *   dateEl: HTMLSpanElement,
+ *   tagsEl: HTMLDivElement,
+ *   actionBtn: HTMLButtonElement,
+ *   dragHandle: HTMLDivElement
+ * }} ResultCardEntry
+ */
+
+/**
+ * @typedef {{
+ *   allSongsRaw: Song[],
+ *   currentResults: Song[],
+ *   displayLimit: number,
+ *   bookmarks: Record<string, BookmarkRecord>,
+ *   activeBookmark: string | null
+ * }} RenderDataState
+ */
+
+/**
+ * @typedef {{
+ *   resultList: HTMLElement,
+ *   loadMoreContainer: HTMLElement
+ * }} RenderUiElements
+ */
+
+/**
+ * @typedef {{
+ *   el: RenderUiElements,
+ *   search: SearchUiRuntimeState,
+ *   playback: PlaybackUiRuntimeState,
+ *   render: RenderUiRuntimeState
+ * }} RenderUiState
+ */
+
+/**
+ * @typedef {{
+ *   queryRaw: string,
+ *   dateFromKey: DateKey | null,
+ *   dateToKey: DateKey | null,
+ *   hasDateFilter: boolean,
+ *   collabHostOnly?: boolean,
+ *   collabGuestOnly?: boolean,
+ *   relayOnly?: boolean,
+ *   harmonyOnly?: boolean
+ * }} RenderSearchState
+ */
+
+/**
+ * @typedef {{
+ *   activeThumb: Element | null,
+ *   activeCard: HTMLElement | null,
+ *   isActiveCardInNextNodes: boolean,
+ *   hasEmbeddedPlayer: boolean
+ * }} ActiveCardRenderState
+ */
+
+/**
+ * @typedef {{ kind: "loading" | "error" | "empty", message: string }} EmptyStateDescriptor
+ */
+
+/**
+ * @typedef {{ nodes: HTMLElement[], entries: ResultCardEntry[] }} ResultNodeBuildResult
+ */
+
+/**
+ * @typedef {{ container: HTMLElement, results: Song[], recommendedMode: boolean }} DisplayState
+ */
+
+/**
+ * @typedef {{ entries: ResultCardEntry[] }} RenderedDisplayState
+ */
+
+/**
+ * @typedef {{
+ *   getSearchState: () => RenderSearchState,
+ *   isRecommendedMode: (state: RenderSearchState) => boolean,
+ *   updateThumbnail: (thumbDiv: HTMLElement, yt: YoutubeTarget) => void,
+ *   extractYoutubeInfo: (url?: string) => YoutubeTarget,
+ *   playThumbnail: (thumbDiv: HTMLElement, yt: YoutubeTarget, options?: { playbackMode?: string }) => Promise<{ status: string }> | { status: string },
+ *   restoreActivePlayback: () => void,
+ *   openBookmarkModal: (songKey: string) => void,
+ *   setupScrollObserver: () => void,
+ *   removeSongFromActiveBookmark: (songKey: string) => void,
+ *   saveBookmarks: () => void
+ * }} RenderCallbacks
+ */
+
+/**
+ * @typedef {{
+ *   data: RenderDataState,
+ *   ui: RenderUiState,
+ *   isAllFormatsSelected: () => boolean,
+ *   resultDisplayBatchSize?: number,
+ *   callbacks: RenderCallbacks
+ * }} RenderControllerInput
+ */
+
+/**
  * 検索結果カードの生成・差分反映・表示更新を担うレンダーコントローラーを作成する。
- * @param {{ data: *, ui: *, isAllFormatsSelected: Function, resultDisplayBatchSize?: number, callbacks: * }} input
+ * @param {RenderControllerInput} input
  */
 export function createRenderController({ data, ui, isAllFormatsSelected, resultDisplayBatchSize = 48, callbacks }) {
     const searchUi = getSearchUiState(ui);
@@ -37,6 +152,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected, resultD
 
     /**
      * 結果カードを構成するDOM要素一式を生成する。
+     * @returns {ResultCardEntry}
      */
     function createCardElements() {
         const card = document.createElement("li");
@@ -98,8 +214,8 @@ export function createRenderController({ data, ui, isAllFormatsSelected, resultD
 
     /**
      * 曲データをカード要素へ反映し、アクションボタンの挙動を設定する。
-     * @param {*} entry
-     * @param {*} row
+     * @param {ResultCardEntry} entry
+     * @param {Song} row
      * @param {number} resultIndex
      */
     function updateCardFromRow(entry, row, resultIndex) {
@@ -138,7 +254,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected, resultD
 
     /**
      * 行データからブックマーク保存に使う参照キーを返す。
-     * @param {*} row
+     * @param {Song | null | undefined} row
      * @returns {string}
      */
     function getBookmarkSongRef(row) {
@@ -151,7 +267,8 @@ export function createRenderController({ data, ui, isAllFormatsSelected, resultD
 
     /**
      * 曲行からサムネイル/埋め込み再生に必要な YouTube 情報を組み立てる。
-     * @param {*} row
+     * @param {Song} row
+     * @returns {YoutubeTarget}
      */
     function buildYoutubeTarget(row) {
         const extracted = extractYoutubeInfo(row.url);
@@ -166,8 +283,8 @@ export function createRenderController({ data, ui, isAllFormatsSelected, resultD
 
     /**
      * タイトル表示とリンク属性を更新する。
-     * @param {*} titleEl
-     * @param {*} row
+     * @param {HTMLAnchorElement} titleEl
+     * @param {Song} row
      */
     function updateTitleLink(titleEl, row) {
         titleEl.textContent = row.title || "無題";
@@ -219,7 +336,8 @@ export function createRenderController({ data, ui, isAllFormatsSelected, resultD
 
     /**
      * 空結果表示用のメッセージ要素を生成する。
-     * @param {*} message
+     * @param {string} message
+     * @returns {HTMLLIElement}
      */
     function createEmptyStateElement(message) {
         const empty = document.createElement("li");
@@ -230,6 +348,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected, resultD
 
     /**
      * 現在状態に応じた空結果メッセージ種別を決定する。
+     * @returns {EmptyStateDescriptor}
      */
     function getEmptyStateDescriptor() {
         if (!searchUi.dataReady) {
@@ -243,6 +362,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected, resultD
 
     /**
      * 表示上限を考慮した可視結果一覧を返す。
+     * @returns {Song[]}
      */
     function getVisibleResults() {
         return data.currentResults.slice(0, data.displayLimit);
@@ -251,7 +371,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected, resultD
     /**
      * 曲キーに対応する描画エントリを返す。
      * @param {string} songKey
-     * @returns {*}
+     * @returns {ResultCardEntry | null}
      */
     function getCardEntryBySongKey(songKey) {
         if (!songKey) return null;
@@ -311,12 +431,12 @@ export function createRenderController({ data, ui, isAllFormatsSelected, resultD
 
     /**
      * 空結果UIを描画し、再生状態と「もっと見る」表示をリセットする。
-     * @param {*} container
-     * @param {*} loadMoreContainer
+     * @param {HTMLElement} container
+     * @param {HTMLElement} loadMoreContainer
      */
     function renderEmptyResults(container, loadMoreContainer) {
         restoreActivePlayback();
-        const emptyState = getEmptyStateDescriptor(getSearchState());
+        const emptyState = getEmptyStateDescriptor();
         container.replaceChildren(createEmptyStateElement(emptyState.message));
         container.style.height = "";
         loadMoreContainer.classList.add("hidden");
@@ -324,23 +444,25 @@ export function createRenderController({ data, ui, isAllFormatsSelected, resultD
 
     /**
      * 描画更新前のアクティブカード・再生状態を収集する。
-     * @param {*} container
-     * @param {*} nodes
+     * @param {HTMLElement} container
+     * @param {HTMLElement[]} nodes
+     * @returns {ActiveCardRenderState}
      */
     function collectActiveCardRenderState(container, nodes) {
         const activeThumb = playbackUi.activeThumb;
         const activeCard = activeThumb ? activeThumb.closest(".song-card") : null;
+        const activeCardElement = activeCard instanceof HTMLElement ? activeCard : null;
         const isActiveCardInNextNodes =
-            activeCard instanceof HTMLElement &&
-            container.contains(activeCard) &&
-            nodes.includes(activeCard);
+            activeCardElement !== null &&
+            container.contains(activeCardElement) &&
+            nodes.includes(activeCardElement);
         const hasEmbeddedPlayer = Boolean(activeThumb && activeThumb.querySelector("iframe"));
-        return { activeThumb, activeCard, isActiveCardInNextNodes, hasEmbeddedPlayer };
+        return { activeThumb, activeCard: activeCardElement, isActiveCardInNextNodes, hasEmbeddedPlayer };
     }
 
     /**
      * アクティブ再生カードが次表示に含まれない場合は再生を停止する。
-     * @param {*} activeState
+     * @param {ActiveCardRenderState} activeState
      */
     function stopActivePlaybackIfHidden(activeState) {
         if (!activeState.activeThumb) return;
@@ -356,7 +478,8 @@ export function createRenderController({ data, ui, isAllFormatsSelected, resultD
 
     /**
      * 結果配列からカードノードを再利用しつつ構築する。
-     * @param {*} results
+     * @param {Song[]} results
+     * @returns {ResultNodeBuildResult}
      */
     function buildResultNodes(results) {
         const nextEntriesBySourceKey = new Map();
@@ -388,7 +511,8 @@ export function createRenderController({ data, ui, isAllFormatsSelected, resultD
 
     /**
      * 再生中カードを描画順維持対象として固定するか判定する。
-     * @param {*} activeState
+     * @param {ActiveCardRenderState} activeState
+     * @returns {HTMLElement | null}
      */
     function getPinnedActiveCard(activeState) {
         if (!activeState.isActiveCardInNextNodes) return null;
@@ -398,15 +522,16 @@ export function createRenderController({ data, ui, isAllFormatsSelected, resultD
 
     /**
      * 再生中カードの位置を保ったまま、結果ノードとの差分を反映する。
-     * @param {*} container
-     * @param {*} nodes
-     * @param {*} pinnedActiveCard
+     * @param {HTMLElement} container
+     * @param {HTMLElement[]} nodes
+     * @param {HTMLElement | null} pinnedActiveCard
      */
     function reconcileNodesWithPinnedActive(container, nodes, pinnedActiveCard) {
+        if (!pinnedActiveCard) return;
         const keepSet = new Set(nodes);
         Array.from(container.children).forEach((child) => {
             if (child === pinnedActiveCard) return;
-            if (!keepSet.has(child)) container.removeChild(child);
+            if (!(child instanceof HTMLElement) || !keepSet.has(child)) container.removeChild(child);
         });
 
         const pinnedIndex = nodes.indexOf(pinnedActiveCard);
@@ -430,8 +555,8 @@ export function createRenderController({ data, ui, isAllFormatsSelected, resultD
 
     /**
      * 結果ノード順にDOMを並べ替え、余分なノードを除去する。
-     * @param {*} container
-     * @param {*} nodes
+     * @param {HTMLElement} container
+     * @param {HTMLElement[]} nodes
      */
     function reconcileNodesByOrder(container, nodes) {
         const children = container.children;
@@ -451,8 +576,8 @@ export function createRenderController({ data, ui, isAllFormatsSelected, resultD
 
     /**
      * 再生状態を考慮した方法で結果ノードをDOMへ反映する。
-     * @param {*} container
-     * @param {*} nodes
+     * @param {HTMLElement} container
+     * @param {HTMLElement[]} nodes
      */
     function reconcileResultNodes(container, nodes) {
         const activeState = collectActiveCardRenderState(container, nodes);
@@ -475,7 +600,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected, resultD
 
     /**
      * 表示中カードのサムネイルをIntersectionObserverへ登録する。
-     * @param {*} entries
+     * @param {ResultCardEntry[]} entries
      */
     function observeVisibleThumbnails(entries) {
         if (!playbackUi.showThumbnails || !playbackUi.scrollObserver) return;
@@ -486,7 +611,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected, resultD
 
     /**
      * 推薦モードと件数に応じて「もっと見る」表示を切り替える。
-     * @param {*} recommendedMode
+     * @param {boolean} recommendedMode
      */
     function updateLoadMoreVisibility(recommendedMode) {
         const loadMoreContainer = ui.el.loadMoreContainer;
@@ -499,6 +624,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected, resultD
 
     /**
      * 描画に必要なコンテナ・結果・モード情報をまとめる。
+     * @returns {DisplayState}
      */
     function collectDisplayState() {
         return {
@@ -518,7 +644,8 @@ export function createRenderController({ data, ui, isAllFormatsSelected, resultD
 
     /**
      * 表示状態に応じて空結果または結果カードを描画する。
-     * @param {*} displayState
+     * @param {DisplayState} displayState
+     * @returns {RenderedDisplayState | null}
      */
     function renderDisplayState(displayState) {
         const { container, results } = displayState;
@@ -534,8 +661,8 @@ export function createRenderController({ data, ui, isAllFormatsSelected, resultD
 
     /**
      * 描画後のサムネイル監視と「もっと見る」状態を更新する。
-     * @param {*} rendered
-     * @param {*} displayState
+     * @param {RenderedDisplayState} rendered
+     * @param {DisplayState} displayState
      */
     function monitorDisplayState(rendered, displayState) {
         observeVisibleThumbnails(rendered.entries);
