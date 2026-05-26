@@ -1,3 +1,5 @@
+// @ts-check
+
 import { createDateFilterController } from "../ui/date/filter.mjs?v=23";
 import { filterSongsByCriteria } from "../lib/search-filters.mjs?v=23";
 import { pickRecommendedSongs } from "../lib/search-recommendation.mjs?v=23";
@@ -9,16 +11,7 @@ import { getLookupUiState, getSearchUiState } from "../lib/ui-slices.mjs?v=23";
 
 /**
  * 検索条件の収集・結果解決・推薦選曲を管理するコントローラーを作成する。
- * @param {{
- *   data: object,
- *   ui: object,
- *   searchFiltersController: {
- *     areAllFormatsSelected: () => boolean,
- *     areFormatsDefault: () => boolean
- *   },
- *   constants: object,
- *   callbacks: { updateDisplay: Function, scrollResultsPaneToTop: Function }
- * }} input
+ * @param {SearchControllerInput} input
  */
 export function createSearchController({ data, ui, searchFiltersController, constants, callbacks }) {
     const {
@@ -27,15 +20,15 @@ export function createSearchController({ data, ui, searchFiltersController, cons
         RESULT_DISPLAY_BATCH_SIZE,
         SEARCH_DEBOUNCE_MS
     } = constants;
-    const searchUi = getSearchUiState(ui);
-    const lookupUi = getLookupUiState(ui);
+    const searchUi = /** @type {SearchUiRuntimeState} */ (getSearchUiState(ui));
+    const lookupUi = /** @type {LookupUiRuntimeState} */ (getLookupUiState(ui));
     const dateFilterController = createDateFilterController({ ui });
     const updateDisplay = callbacks.updateDisplay;
     const scrollResultsPaneToTop = callbacks.scrollResultsPaneToTop;
 
     /**
      * デバウンス付きで検索実行を予約し、必要時は即時実行する。
-     * @param {*} options
+     * @param {{ immediate?: boolean } | undefined} options
      */
     function scheduleSearch(options) {
         if (searchUi.debounceId) clearTimeout(searchUi.debounceId);
@@ -60,6 +53,7 @@ export function createSearchController({ data, ui, searchFiltersController, cons
 
     /**
      * 検索実行に必要な入力情報を収集する。
+     * @returns {SearchInput}
      */
     function collectSearchInput() {
         return {
@@ -70,7 +64,8 @@ export function createSearchController({ data, ui, searchFiltersController, cons
 
     /**
      * 検索状態から表示用の結果セットを導出する。
-     * @param {*} searchState
+     * @param {SearchState} searchState
+     * @returns {SearchOutcome}
      */
     function resolveSearchOutcome(searchState) {
         return resolveSearchResults(searchState);
@@ -78,8 +73,8 @@ export function createSearchController({ data, ui, searchFiltersController, cons
 
     /**
      * 検索結果を state と UI へ反映する。
-     * @param {*} searchInput
-     * @param {*} outcome
+     * @param {SearchInput} searchInput
+     * @param {SearchOutcome} outcome
      */
     function applySearchOutcome(searchInput, outcome) {
         data.currentResults = outcome.results;
@@ -91,6 +86,7 @@ export function createSearchController({ data, ui, searchFiltersController, cons
 
     /**
      * 現在の UI 入力から検索条件オブジェクトを生成する。
+     * @returns {SearchState}
      */
     function getSearchState() {
         const fromRange = dateFilterController.getPartialDateRange("from");
@@ -106,7 +102,8 @@ export function createSearchController({ data, ui, searchFiltersController, cons
 
     /**
      * 条件未指定時のおすすめ表示モードかどうかを判定する。
-     * @param {*} searchState
+     * @param {SearchState} searchState
+     * @returns {boolean}
      */
     function isRecommendedMode(searchState) {
         return !data.activeBookmark &&
@@ -118,7 +115,8 @@ export function createSearchController({ data, ui, searchFiltersController, cons
 
     /**
      * ブックマーク内の参照 ID を曲データ配列へ解決する。
-     * @param {*} bookmark
+     * @param {BookmarkRecord} bookmark
+     * @returns {Song[]}
      */
     function resolveBookmarkRows(bookmark) {
         ensureSongLookupMaps();
@@ -157,7 +155,8 @@ export function createSearchController({ data, ui, searchFiltersController, cons
 
     /**
      * 通常検索・ブックマーク検索・おすすめ表示を切り替えて結果を作る。
-     * @param {*} searchState
+     * @param {SearchState} searchState
+     * @returns {SearchOutcome}
      */
     function resolveSearchResults(searchState) {
         if (data.activeBookmark) {
@@ -186,8 +185,9 @@ export function createSearchController({ data, ui, searchFiltersController, cons
 
     /**
      * 段階表示用の件数上限を含む検索結果オブジェクトを作る。
-     * @param {*} results
-     * @param {*} label
+     * @param {Song[]} results
+     * @param {string} label
+     * @returns {SearchOutcome}
      */
     function buildIncrementalSearchOutcome(results, label) {
         return {
@@ -199,7 +199,8 @@ export function createSearchController({ data, ui, searchFiltersController, cons
 
     /**
      * 全曲データを現在の検索条件で絞り込む。
-     * @param {*} searchState
+     * @param {SearchState} searchState
+     * @returns {Song[]}
      */
     function filterSongs(searchState) {
         return filterSongsByCriteria(data.allSongsRaw, searchState, searchUi.selectedFormats);
@@ -207,6 +208,7 @@ export function createSearchController({ data, ui, searchFiltersController, cons
 
     /**
      * おすすめ曲をキャッシュ付きで選定して返す。
+     * @returns {Song[]}
      */
     function pickRecommended() {
         if (searchUi.recommendedCache) return searchUi.recommendedCache;
