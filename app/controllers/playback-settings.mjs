@@ -1,17 +1,17 @@
 // @ts-check
 
-import { getPlaybackUiState, getSearchUiState } from "../lib/ui-slices.mjs?v=23";
+import { getPlaybackUiState, getSearchUiState } from "../lib/ui-slices.mjs";
 import {
     createPlaybackSettingDefinitions,
     LEGACY_PLAYBACK_SETTINGS_STORAGE_KEYS,
     PLAYBACK_SETTING_SCOPES
-} from "../lib/playback-settings/definitions.mjs?v=23";
+} from "../lib/playback-settings/definitions.mjs";
 import {
     createInitialPlaybackBehaviorPageValues,
     getPlaybackBehaviorEffectiveValue,
     isPagePlaybackBehaviorDefinition,
     reducePlaybackSettingChange
-} from "../lib/playback-settings/value-reducer.mjs?v=23";
+} from "../lib/playback-settings/value-reducer.mjs";
 
 /**
  * @typedef {{

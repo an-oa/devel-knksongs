@@ -1,8 +1,8 @@
 import {
     createIndexedDbSongsJsonCacheStore,
     createLegacyLocalStorageSongsJsonCacheAdapter
-} from "../../lib/storage/songs-json-cache.mjs?v=26";
-import { createSongsDataSource } from "../../lib/songs-data-source.mjs?v=26";
+} from "../../lib/storage/songs-json-cache.mjs";
+import { createSongsDataSource } from "../../lib/songs-data-source.mjs";
 
 /**
  * @typedef {{
@@ -13,6 +13,22 @@ import { createSongsDataSource } from "../../lib/songs-data-source.mjs?v=26";
  *   csvCacheKey: string,
  *   legacyCsvCacheKey: string
  * }} BrowserSongsDataSourceInput
+ */
+
+/**
+ * @typedef {{
+ *   songs: Song[],
+ *   source: string,
+ *   resetConditions?: boolean
+ * }} SongsDataSourceResult
+ */
+
+/**
+ * @typedef {{
+ *   loadInitialSongs: (callbacks: {
+ *     onSongsLoaded: (result: SongsDataSourceResult) => void
+ *   }) => Promise<boolean>
+ * }} SongsDataSource
  */
 
 /**
@@ -32,7 +48,7 @@ function getBrowserLocalStorage() {
  * ブラウザ保存領域を使う曲データ取得元を作成する。
  * IndexedDB を主キャッシュ、旧 localStorage JSON を移行元として束ねる。
  * @param {BrowserSongsDataSourceInput} input
- * @returns {CacheBusterSongsDataSource}
+ * @returns {SongsDataSource}
  */
 export function createBrowserSongsDataSource(input) {
     const {

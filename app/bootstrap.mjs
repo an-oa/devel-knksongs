@@ -16,7 +16,7 @@ import {
     YT_IFRAME_READY_POLL_MS,
     STOP_PLAYBACK_ON_SCROLL_OUT,
     appState
-} from "./state.mjs?v=23";
+} from "./state.mjs";
 import {
     PUBLIC_SONGS_JSON_URL,
     PUBLIC_SONGS_META_URL,
@@ -24,27 +24,27 @@ import {
     SONGS_JSON_CACHE_KEY,
     LEGACY_CSV_CACHE_KEY,
     CSV_CACHE_KEY
-} from "./config.mjs?v=23";
-import { createSearchController } from "./controllers/search.mjs?v=23";
-import { createRenderController } from "./controllers/render.mjs?v=23";
-import { createPlaybackSessionController } from "./controllers/playback-session.mjs?v=23";
-import { createPlaybackSettingsController } from "./controllers/playback-settings.mjs?v=23";
-import { createYoutubeController, extractYoutubeInfo } from "./controllers/youtube.mjs?v=23";
-import { createStorageController } from "./controllers/storage.mjs?v=23";
-import { createBookmarkUiController } from "./ui/bookmark/ui.mjs?v=23";
-import { scrollResultListToTop } from "./lib/results-scroll.mjs?v=23";
+} from "./config.mjs";
+import { createSearchController } from "./controllers/search.mjs";
+import { createRenderController } from "./controllers/render.mjs";
+import { createPlaybackSessionController } from "./controllers/playback-session.mjs";
+import { createPlaybackSettingsController } from "./controllers/playback-settings.mjs";
+import { createYoutubeController, extractYoutubeInfo } from "./controllers/youtube.mjs";
+import { createStorageController } from "./controllers/storage.mjs";
+import { createBookmarkUiController } from "./ui/bookmark/ui.mjs";
+import { scrollResultListToTop } from "./lib/results-scroll.mjs";
 import {
     collectUiElements,
     applyThemeFromStorage,
     setupTheme
-} from "./ui/core/elements.mjs?v=23";
-import { createUiSyncController } from "./ui/core/sync.mjs?v=23";
-import { createDataLoader } from "./ui/core/data.mjs?v=23";
-import { createSidebarController } from "./ui/sidebar/ui.mjs?v=23";
-import { createSearchFiltersController } from "./ui/search-filters/controller.mjs?v=23";
-import { getSearchUiState } from "./lib/ui-slices.mjs?v=23";
-import { debugPlayback } from "./lib/playback-debug.mjs?v=23";
-import { createBrowserSongsDataSource } from "./ui/core/data-source.mjs?v=23";
+} from "./ui/core/elements.mjs";
+import { createUiSyncController } from "./ui/core/sync.mjs";
+import { createDataLoader } from "./ui/core/data.mjs";
+import { createSidebarController } from "./ui/sidebar/ui.mjs";
+import { createSearchFiltersController } from "./ui/search-filters/controller.mjs";
+import { getSearchUiState } from "./lib/ui-slices.mjs";
+import { debugPlayback } from "./lib/playback-debug.mjs";
+import { createBrowserSongsDataSource } from "./ui/core/data-source.mjs";
 
 /**
  * アプリ全体で共有する曲データ・検索結果・ブックマークの状態ストア。

@@ -1,12 +1,12 @@
 // @ts-check
 
-import { getPlaybackContinuationCandidates } from "../lib/playback-sequence.mjs?v=23";
-import { debugPlayback } from "../lib/playback-debug.mjs?v=23";
-import { getPlaybackUiState } from "../lib/ui-slices.mjs?v=23";
+import { getPlaybackContinuationCandidates } from "../lib/playback-sequence.mjs";
+import { debugPlayback } from "../lib/playback-debug.mjs";
+import { getPlaybackUiState } from "../lib/ui-slices.mjs";
 import {
     isYoutubePlaybackStarted,
     isYoutubePlaybackStartUnconfirmed
-} from "../lib/youtube/playback-start-attempt.mjs?v=23";
+} from "../lib/youtube/playback-start-attempt.mjs";
 
 /**
  * @typedef {{
@@ -21,7 +21,11 @@ import {
  */
 
 /**
- * @typedef {{ status: string }} YoutubePlaybackStartResult
+ * @typedef {"started" | "failed" | "unconfirmed"} YoutubePlaybackStartStatus
+ */
+
+/**
+ * @typedef {{ status: YoutubePlaybackStartStatus }} YoutubePlaybackStartResult
  */
 
 /**

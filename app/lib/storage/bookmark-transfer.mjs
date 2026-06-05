@@ -2,7 +2,7 @@ import {
     buildStoredBookmarksPayload,
     migrateLegacyBookmarkSongRefsToCurrent,
     parseStoredBookmarksPayload
-} from "./bookmark-schema.mjs?v=23";
+} from "./bookmark-schema.mjs";
 
 /**
  * @typedef {{ name?: string, songs?: Array<string | number> }} BookmarkImportEntry

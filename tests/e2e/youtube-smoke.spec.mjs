@@ -283,7 +283,7 @@ test("thumbnail images keep masonry layout stable after refresh", async ({ page 
     await expect(before.every((entry) => entry.imageDisplay === "block")).toBe(true);
 
     await page.evaluate(async () => {
-        const { applyMasonryLayout } = await import("/app/lib/render/masonry-layout.mjs?v=23");
+        const { applyMasonryLayout } = await import("/app/lib/render/masonry-layout.mjs");
         applyMasonryLayout(document.querySelector("#resultList"));
     });
 

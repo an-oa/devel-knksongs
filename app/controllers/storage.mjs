@@ -1,20 +1,20 @@
 // @ts-check
 
-import { getDateUiState, getSearchUiState } from "../lib/ui-slices.mjs?v=23";
+import { getDateUiState, getSearchUiState } from "../lib/ui-slices.mjs";
 import {
     buildStoredBookmarksPayload,
     migrateLegacyBookmarkSongRefsToCurrent,
     parseStoredBookmarksPayload
-} from "../lib/storage/bookmark-schema.mjs?v=23";
+} from "../lib/storage/bookmark-schema.mjs";
 import {
     exportBookmarksAsJsonText as buildBookmarkExportJsonText,
     parseBookmarkImportText as parseBookmarkImportJsonText
-} from "../lib/storage/bookmark-transfer.mjs?v=23";
+} from "../lib/storage/bookmark-transfer.mjs";
 import {
     buildStoredSearchStatePayload,
     parseStoredSearchStatePayload
-} from "../lib/storage/search-state-schema.mjs?v=23";
-import { collectSearchBooleanFilterState } from "../lib/search-boolean-filters.mjs?v=23";
+} from "../lib/storage/search-state-schema.mjs";
+import { collectSearchBooleanFilterState } from "../lib/search-boolean-filters.mjs";
 
 /**
  * @typedef {{

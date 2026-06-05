@@ -1,8 +1,8 @@
-import { isHtmlElement } from "../dom-utils.mjs?v=23";
+import { isHtmlElement } from "../dom-utils.mjs";
 import {
     debugPlayback,
     isAutoplayStartFallbackEnabled
-} from "../playback-debug.mjs?v=23";
+} from "../playback-debug.mjs";
 
 export const DEFAULT_PLAYBACK_START_TIMEOUT_MS = 5000;
 export const DEFAULT_PLAYBACK_SETUP_TIMEOUT_MS = 10000;

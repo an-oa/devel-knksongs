@@ -1,5 +1,5 @@
-import { dateKeyToParts, parseDateKey } from "../../lib/date-key.mjs?v=23";
-import { getDateUiState } from "../../lib/ui-slices.mjs?v=23";
+import { dateKeyToParts, parseDateKey } from "../../lib/date-key.mjs";
+import { getDateUiState } from "../../lib/ui-slices.mjs";
 
 /**
  * 日付フィルタ UI の初期化・同期・補正を扱うコントローラーを作成する。

@@ -1,16 +1,16 @@
 // @ts-check
 
-import { getHeaderHeight } from "../lib/dom-utils.mjs?v=23";
-import { hasStreamRole } from "../lib/stream-role.mjs?v=23";
-import { tracePlayback } from "../lib/playback-debug.mjs?v=23";
-import { scheduleScrollElementIntoView } from "../lib/results-scroll.mjs?v=23";
-import { createBookmarkDragReorderController } from "../lib/render/drag-reorder.mjs?v=23";
-import { applyMasonryLayout } from "../lib/render/masonry-layout.mjs?v=23";
-import { getPlaybackUiState, getRenderUiState, getSearchUiState } from "../lib/ui-slices.mjs?v=23";
+import { getHeaderHeight } from "../lib/dom-utils.mjs";
+import { hasStreamRole } from "../lib/stream-role.mjs";
+import { tracePlayback } from "../lib/playback-debug.mjs";
+import { scheduleScrollElementIntoView } from "../lib/results-scroll.mjs";
+import { createBookmarkDragReorderController } from "../lib/render/drag-reorder.mjs";
+import { applyMasonryLayout } from "../lib/render/masonry-layout.mjs";
+import { getPlaybackUiState, getRenderUiState, getSearchUiState } from "../lib/ui-slices.mjs";
 import {
     createYoutubePlaybackStartResult,
     YOUTUBE_PLAYBACK_START_STATUS
-} from "../lib/youtube/playback-start-attempt.mjs?v=23";
+} from "../lib/youtube/playback-start-attempt.mjs";
 
 /**
  * @typedef {{
@@ -19,6 +19,14 @@ import {
  *   endSeconds?: number | null,
  *   isVertical: boolean
  * }} YoutubeTarget
+ */
+
+/**
+ * @typedef {"started" | "failed" | "unconfirmed"} YoutubePlaybackStartStatus
+ */
+
+/**
+ * @typedef {{ status: YoutubePlaybackStartStatus }} YoutubePlaybackStartResult
  */
 
 /**
@@ -48,8 +56,8 @@ import {
 
 /**
  * @typedef {{
- *   resultList: HTMLElement,
- *   loadMoreContainer: HTMLElement
+ *   resultList?: HTMLElement | null,
+ *   loadMoreContainer?: HTMLElement | null
  * }} RenderUiElements
  */
 
@@ -106,7 +114,7 @@ import {
  *   isRecommendedMode: (state: RenderSearchState) => boolean,
  *   updateThumbnail: (thumbDiv: HTMLElement, yt: YoutubeTarget) => void,
  *   extractYoutubeInfo: (url?: string) => YoutubeTarget,
- *   playThumbnail: (thumbDiv: HTMLElement, yt: YoutubeTarget, options?: { playbackMode?: string }) => Promise<{ status: string }> | { status: string },
+ *   playThumbnail: (thumbDiv: HTMLElement, yt: YoutubeTarget, options?: { playbackMode?: string }) => Promise<YoutubePlaybackStartResult> | YoutubePlaybackStartResult,
  *   restoreActivePlayback: () => void,
  *   openBookmarkModal: (songKey: string) => void,
  *   setupScrollObserver: () => void,
@@ -393,7 +401,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected, resultD
     /**
      * 曲キーに対応するカードを必要に応じて描画し、再生開始する。
      * @param {string} songKey
-     * @returns {Promise<{status: string}>}
+     * @returns {Promise<YoutubePlaybackStartResult>}
      */
     function playSongByKey(songKey) {
         const index = data.currentResults.findIndex((row) => row && row.songKey === songKey);

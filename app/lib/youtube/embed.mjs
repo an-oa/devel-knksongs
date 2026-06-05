@@ -1,6 +1,15 @@
-import { isHtmlElement } from "../dom-utils.mjs?v=23";
+import { isHtmlElement } from "../dom-utils.mjs";
 
 const YT_EMBED_HOST = "https://www.youtube.com";
+
+/**
+ * @typedef {{
+ *   videoId: string,
+ *   startSeconds: number,
+ *   endSeconds?: number | null,
+ *   isVertical: boolean
+ * }} YoutubeTarget
+ */
 
 /**
  * YouTube Iframe API の読み込み完了を扱うローダーを作成する。

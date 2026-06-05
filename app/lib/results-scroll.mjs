@@ -1,5 +1,5 @@
-import { isHtmlElement } from "./dom-utils.mjs?v=23";
-import { afterLayoutSettled, findScrollableAncestor } from "./layout-anchor.mjs?v=23";
+import { isHtmlElement } from "./dom-utils.mjs";
+import { afterLayoutSettled, findScrollableAncestor } from "./layout-anchor.mjs";
 
 /**
  * 結果リストを含むスクロール領域を先頭へ戻す。

@@ -48,12 +48,9 @@ jobs:
           fi
 
       - name: Prepare Pages artifact
-        run: |
-          rm -rf _site
-          mkdir -p _site/data
-          cp index.html styles.css ogp.png _site/
-          cp -R app _site/
-          cp data/songs.json data/songs-meta.json _site/data/
+        env:
+          DEPLOY_CACHE_BUSTER: ${{ github.sha }}
+        run: npm run build:pages-artifact
 
       - uses: actions/upload-pages-artifact@v5
         with:

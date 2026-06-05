@@ -1,6 +1,6 @@
-import { isWithinDateRange } from "./date-key.mjs?v=23";
-import { matchesSelectedFormat } from "./song-format.mjs?v=23";
-import { isGuestStreamRole, normalizeStreamRole, STREAM_ROLE_HOST } from "./stream-role.mjs?v=23";
+import { isWithinDateRange } from "./date-key.mjs";
+import { matchesSelectedFormat } from "./song-format.mjs";
+import { isGuestStreamRole, normalizeStreamRole, STREAM_ROLE_HOST } from "./stream-role.mjs";
 
 /**
  * 検索比較しやすい形に文字列を正規化する。
@@ -30,9 +30,10 @@ export function matchesCollabRoleFilters(row, searchState) {
 
 /**
  * クエリ・日付・形式・コラボ種別・フラグ条件で曲一覧を絞り込む。
- * @param {Array<Record<string, *>>} rows
- * @param {Record<string, *>} searchState
+ * @param {Song[]} rows
+ * @param {SearchState} searchState
  * @param {Set<string>} selectedFormats
+ * @returns {Song[]}
  */
 export function filterSongsByCriteria(rows, searchState, selectedFormats) {
     const queryNorm = normalizeForSearch(searchState.queryRaw);

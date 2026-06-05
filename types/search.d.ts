@@ -10,7 +10,7 @@ type SearchState = {
 };
 
 type SearchUiState = {
-  el: SearchUiElements;
+  el: AppUiElements;
   search: SearchUiRuntimeState;
   date: DateUiRuntimeState;
   lookup: LookupUiRuntimeState;
@@ -33,6 +33,7 @@ type SearchConstants = {
   MIN_PERFORMANCE_FOR_RANDOM: number;
   RESULT_DISPLAY_BATCH_SIZE: number;
   SEARCH_DEBOUNCE_MS: number;
+  DEFAULT_FORMATS?: string[];
 };
 
 type SearchInput = {

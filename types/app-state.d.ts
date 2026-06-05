@@ -122,6 +122,27 @@ type YoutubeIframeApiGlobal = {
   ) => YoutubePlayerLike;
 };
 
+type PlaybackSettingsSnapshot = {
+  showThumbnails: boolean;
+  showExperimentalPlaybackSettings: boolean;
+  playArchiveToEnd: boolean;
+  continuousPlayback: boolean;
+  loopPlayback: boolean;
+};
+
+type PlaybackSettingsConsoleApi = {
+  setExperimentalPlaybackSettings: (value: boolean) => boolean;
+  readonly showExperimentalPlaybackSettings: boolean;
+  readonly state: PlaybackSettingsSnapshot;
+};
+
+type SaveFilePickerFileHandle = {
+  createWritable: () => Promise<{
+    write: (contents: Blob | string) => Promise<void>;
+    close: () => Promise<void>;
+  }>;
+};
+
 /** アプリ全体の状態ルート。 */
 type AppState = {
   /** 曲データと検索結果の状態。 */
@@ -135,6 +156,14 @@ type AppState = {
 interface Window {
   /** ブックマーク参照移行のデバッグログを一時的に有効化するフラグ。 */
   __KNK_DEBUG_BOOKMARK_MIGRATION__?: boolean;
+  /** E2E や手動検証から再生設定を切り替えるための console API。 */
+  knkPlaybackSettings?: PlaybackSettingsConsoleApi;
+  /** YouTube 再生制御のデバッグログを一時的に有効化するフラグ。 */
+  __KNK_DEBUG_YOUTUBE__?: boolean;
+  /** 自動再生開始判定の fallback を検証時だけ有効化するフラグ。 */
+  __KNK_AUTOPLAY_START_FALLBACK__?: boolean;
+  /** File System Access API を使った保存 picker。 */
+  showSaveFilePicker?: (options?: unknown) => Promise<SaveFilePickerFileHandle>;
   /** YouTube IFrame API が window に公開する namespace。 */
   YT: YoutubeIframeApiGlobal;
   /** YouTube IFrame API の読み込み完了 callback。 */

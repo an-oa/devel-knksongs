@@ -1,6 +1,6 @@
-import { getSettingsPanelUiState } from "../../lib/ui-slices.mjs?v=23";
-import { getSearchBooleanFilterElements } from "../../lib/search-boolean-filters.mjs?v=23";
-import { createSidebarPopoverController } from "./popover.mjs?v=23";
+import { getSettingsPanelUiState } from "../../lib/ui-slices.mjs";
+import { getSearchBooleanFilterElements } from "../../lib/search-boolean-filters.mjs";
+import { createSidebarPopoverController } from "./popover.mjs";
 
 /**
  * サイドバー関連の UI 操作をまとめるコントローラーを作成する。

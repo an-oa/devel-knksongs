@@ -2,8 +2,8 @@
  * サイドバーの native Popover API と fallback 表示状態を管理する。
  * @param {{
  *   sidebar: HTMLElement | null,
- *   sidebarSheet: HTMLElement | null,
- *   mainContent: HTMLElement | null,
+ *   sidebarSheet: Element | null | undefined,
+ *   mainContent: Element | null | undefined,
  *   openButton: HTMLElement | null,
  *   hideDelayMs?: number
  * }} input

@@ -1,7 +1,7 @@
 /**
  * 現在の実行環境で HTMLElement 判定が可能な場合だけ要素型チェックする。
  * @param {*} value
- * @returns {boolean}
+ * @returns {value is HTMLElement}
  */
 export function isHtmlElement(value) {
     return typeof HTMLElement === "function" && value instanceof HTMLElement;

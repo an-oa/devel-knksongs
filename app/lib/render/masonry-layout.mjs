@@ -1,4 +1,4 @@
-import { isHtmlElement } from "../dom-utils.mjs?v=23";
+import { isHtmlElement } from "../dom-utils.mjs";
 
 export const DEFAULT_MASONRY_GAP_PX = 12;
 
@@ -25,14 +25,13 @@ export function getMasonryColumnCount(containerWidth, breakpoints = DEFAULT_MASO
 /**
  * DOM順を列固定で保ちつつカードを絶対配置する。
  * @param {*} container
- * @param {{ gapPx?: number, breakpoints?: Array<{ minWidth: number, columns: number }> } | undefined} options
+ * @param {{ gapPx?: number, breakpoints?: Array<{ minWidth: number, columns: number }> }} [options]
  */
-export function applyMasonryLayout(container, options) {
+export function applyMasonryLayout(container, options = {}) {
     if (!isHtmlElement(container)) return;
-    const settings = options || {};
-    const gapPx = Number.isFinite(settings.gapPx) ? settings.gapPx : DEFAULT_MASONRY_GAP_PX;
-    const breakpoints = Array.isArray(settings.breakpoints)
-        ? settings.breakpoints
+    const gapPx = Number.isFinite(options.gapPx) ? options.gapPx : DEFAULT_MASONRY_GAP_PX;
+    const breakpoints = Array.isArray(options.breakpoints)
+        ? options.breakpoints
         : DEFAULT_MASONRY_BREAKPOINTS;
     const cards = /** @type {HTMLElement[]} */ (Array.from(container.children).filter((node) => (
         isHtmlElement(node) &&

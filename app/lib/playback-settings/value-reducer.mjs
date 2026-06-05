@@ -1,7 +1,7 @@
 import {
     PLAYBACK_SETTING_KINDS,
     PLAYBACK_SETTING_SCOPES
-} from "./definitions.mjs?v=23";
+} from "./definitions.mjs";
 
 /**
  * ページ内だけで保持する再生挙動設定かを返す。

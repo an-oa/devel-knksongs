@@ -1,10 +1,10 @@
-import { getDateUiState, getSearchUiState } from "../../lib/ui-slices.mjs?v=23";
+import { getDateUiState, getSearchUiState } from "../../lib/ui-slices.mjs";
 import {
     applySearchBooleanFilterState,
     hasEnabledSearchBooleanFilter,
     resetSearchBooleanFilters
-} from "../../lib/search-boolean-filters.mjs?v=23";
-import { renderSearchFormatOptions, syncSearchFormatCheckboxes } from "./formats.mjs?v=23";
+} from "../../lib/search-boolean-filters.mjs";
+import { renderSearchFormatOptions, syncSearchFormatCheckboxes } from "./formats.mjs";
 
 /**
  * 検索条件 UI の個別 filter controller を束ねる facade を作成する。

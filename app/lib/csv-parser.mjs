@@ -1,7 +1,7 @@
-import { normalizeStreamRole } from "./stream-role.mjs?v=23";
-import { parseDateKey } from "./date-key.mjs?v=23";
-import { normalizeForSearch } from "./search-filters.mjs?v=23";
-import { extractYoutubeInfo } from "./youtube-url.mjs?v=23";
+import { normalizeStreamRole } from "./stream-role.mjs";
+import { parseDateKey } from "./date-key.mjs";
+import { normalizeForSearch } from "./search-filters.mjs";
+import { extractYoutubeInfo } from "./youtube-url.mjs";
 
 /**
  * 現在仕様の曲キー（archiveId + archiveOrder）を生成する。

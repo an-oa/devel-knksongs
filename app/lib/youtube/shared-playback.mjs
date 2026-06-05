@@ -1,4 +1,4 @@
-import { canUseDom, isHtmlElement } from "../dom-utils.mjs?v=23";
+import { canUseDom, isHtmlElement } from "../dom-utils.mjs";
 
 /**
  * 共有埋め込みプレーヤーの保持領域を返す。

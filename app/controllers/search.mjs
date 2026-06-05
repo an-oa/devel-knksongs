@@ -1,13 +1,13 @@
 // @ts-check
 
-import { createDateFilterController } from "../ui/date/filter.mjs?v=23";
-import { filterSongsByCriteria } from "../lib/search-filters.mjs?v=23";
-import { pickRecommendedSongs } from "../lib/search-recommendation.mjs?v=23";
+import { createDateFilterController } from "../ui/date/filter.mjs";
+import { filterSongsByCriteria } from "../lib/search-filters.mjs";
+import { pickRecommendedSongs } from "../lib/search-recommendation.mjs";
 import {
     collectSearchBooleanFilterState,
     hasSelectedSearchBooleanFilterState
-} from "../lib/search-boolean-filters.mjs?v=23";
-import { getLookupUiState, getSearchUiState } from "../lib/ui-slices.mjs?v=23";
+} from "../lib/search-boolean-filters.mjs";
+import { getLookupUiState, getSearchUiState } from "../lib/ui-slices.mjs";
 
 /**
  * 検索条件の収集・結果解決・推薦選曲を管理するコントローラーを作成する。
@@ -28,7 +28,7 @@ export function createSearchController({ data, ui, searchFiltersController, cons
 
     /**
      * デバウンス付きで検索実行を予約し、必要時は即時実行する。
-     * @param {{ immediate?: boolean } | undefined} options
+     * @param {{ immediate?: boolean }} [options]
      */
     function scheduleSearch(options) {
         if (searchUi.debounceId) clearTimeout(searchUi.debounceId);
@@ -121,15 +121,15 @@ export function createSearchController({ data, ui, searchFiltersController, cons
     function resolveBookmarkRows(bookmark) {
         ensureSongLookupMaps();
         const songs = Array.isArray(bookmark.songs) ? bookmark.songs : [];
-        return songs
-            .map((songRef) => {
-                if (typeof songRef === "string") {
-                    return lookupUi.songMapByBookmarkKey.get(songRef) || lookupUi.songMapByKey.get(songRef);
-                }
-                if (Number.isFinite(songRef)) return lookupUi.songMapByLegacyIndex.get(songRef);
-                return null;
-            })
-            .filter(Boolean);
+        /** @type {Song[]} */
+        const resolvedSongs = [];
+        for (const songRef of songs) {
+            const song = typeof songRef === "string"
+                ? lookupUi.songMapByBookmarkKey.get(songRef) || lookupUi.songMapByKey.get(songRef)
+                : Number.isFinite(songRef) ? lookupUi.songMapByLegacyIndex.get(songRef) : null;
+            if (song) resolvedSongs.push(song);
+        }
+        return resolvedSongs;
     }
 
     /**

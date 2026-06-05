@@ -1,5 +1,5 @@
-import { canUseDom, getHeaderHeight, isHtmlElement } from "../dom-utils.mjs?v=23";
-import { scheduleScrollElementIntoView } from "../results-scroll.mjs?v=23";
+import { canUseDom, getHeaderHeight, isHtmlElement } from "../dom-utils.mjs";
+import { scheduleScrollElementIntoView } from "../results-scroll.mjs";
 
 /**
  * 遅延読み込み用のサムネイル画像要素を生成する。
@@ -17,7 +17,7 @@ export function createYoutubeThumbnailImage(videoId) {
  * サムネイル画像をコンテナへ適用する。
  * @param {*} thumbDiv
  * @param {string} videoId
- * @param {{ eager?: boolean } | undefined} options
+ * @param {{ eager?: boolean }} [options]
  */
 export function applyYoutubeThumbnailImage(thumbDiv, videoId, options) {
     const img = createYoutubeThumbnailImage(videoId);

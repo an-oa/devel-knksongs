@@ -1,14 +1,14 @@
 // @ts-check
 
-import { createLayoutRefreshScheduler } from "../lib/layout-anchor.mjs?v=23";
-import { canUseDom, getHeaderHeight, isHtmlElement } from "../lib/dom-utils.mjs?v=23";
-import { debugPlayback, tracePlayback } from "../lib/playback-debug.mjs?v=23";
-import { getPlaybackUiState } from "../lib/ui-slices.mjs?v=23";
+import { createLayoutRefreshScheduler } from "../lib/layout-anchor.mjs";
+import { canUseDom, getHeaderHeight, isHtmlElement } from "../lib/dom-utils.mjs";
+import { debugPlayback, tracePlayback } from "../lib/playback-debug.mjs";
+import { getPlaybackUiState } from "../lib/ui-slices.mjs";
 import {
     applyYoutubePlayerIframeAttributes,
     buildYoutubeEmbedUrl,
     createYoutubeIframeApiLoader
-} from "../lib/youtube/embed.mjs?v=23";
+} from "../lib/youtube/embed.mjs";
 import {
     destroyYoutubeSharedPlayback,
     ensureYoutubeSharedPlaybackElements,
@@ -17,7 +17,7 @@ import {
     setPendingYoutubeSharedPlaybackAttach,
     setYoutubeSharedPlaybackSessionId,
     syncYoutubeSharedPlaybackIframe
-} from "../lib/youtube/shared-playback.mjs?v=23";
+} from "../lib/youtube/shared-playback.mjs";
 import {
     applyYoutubeThumbnailImage,
     createYoutubeThumbnailImage,
@@ -27,23 +27,23 @@ import {
     setYoutubeThumbnailOrientation,
     setYoutubeThumbnailPlaybackState,
     shouldLoadYoutubeThumbnailNow
-} from "../lib/youtube/thumbnail.mjs?v=23";
+} from "../lib/youtube/thumbnail.mjs";
 import {
     createYoutubePlaybackState,
     isYoutubePlaybackSessionActive,
     reduceYoutubePlaybackState
-} from "../lib/youtube/playback-state.mjs?v=23";
+} from "../lib/youtube/playback-state.mjs";
 import {
     createYoutubePlaybackStartAttemptManager,
     createYoutubePlaybackStartResult,
     YOUTUBE_PLAYBACK_START_STATUS
-} from "../lib/youtube/playback-start-attempt.mjs?v=23";
-import { createYoutubeUnconfirmedPlaybackStartManager } from "../lib/youtube/unconfirmed-playback-start.mjs?v=23";
+} from "../lib/youtube/playback-start-attempt.mjs";
+import { createYoutubeUnconfirmedPlaybackStartManager } from "../lib/youtube/unconfirmed-playback-start.mjs";
 import {
     createYoutubePlayerAdapter
-} from "../lib/youtube/player-adapter.mjs?v=23";
+} from "../lib/youtube/player-adapter.mjs";
 
-export { extractYoutubeInfo } from "../lib/youtube-url.mjs?v=23";
+export { extractYoutubeInfo } from "../lib/youtube-url.mjs";
 
 /**
  * @typedef {{
@@ -52,6 +52,14 @@ export { extractYoutubeInfo } from "../lib/youtube-url.mjs?v=23";
  *   endSeconds?: number,
  *   isVertical: boolean
  * }} YoutubeTarget
+ */
+
+/**
+ * @typedef {"started" | "failed" | "unconfirmed"} YoutubePlaybackStartStatus
+ */
+
+/**
+ * @typedef {{ status: YoutubePlaybackStartStatus }} YoutubePlaybackStartResult
  */
 
 /**
@@ -225,7 +233,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
     /**
      * 再生開始結果オブジェクトを作成する。
      * @param {string} status
-     * @returns {{ status: string }}
+     * @returns {YoutubePlaybackStartResult}
      */
     function buildPlaybackStartResult(status) {
         return createYoutubePlaybackStartResult(status);
@@ -965,7 +973,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
      * @param {HTMLElement} thumbDiv
      * @param {YoutubeTarget} yt
      * @param {YoutubePlaybackOptions | undefined} options
-     * @returns {Promise<{status: string}>}
+     * @returns {Promise<YoutubePlaybackStartResult>}
      */
     function startEmbeddedPlayback(thumbDiv, yt, options) {
         const playbackMode = options && options.playbackMode ? options.playbackMode : "manual";
@@ -1025,7 +1033,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
      * @param {Element | null | undefined} thumbDiv
      * @param {YoutubeTarget | null | undefined} yt
      * @param {YoutubePlaybackOptions | undefined} options
-     * @returns {Promise<{status: string}>}
+     * @returns {Promise<YoutubePlaybackStartResult>}
      */
     function playThumbnail(thumbDiv, yt, options) {
         const failedResult = createYoutubePlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.FAILED);

@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build:pages-artifact": "node scripts/build-pages-artifact.mjs",
     "build:songs-json": "node scripts/build-songs-json.mjs",
     "validate:songs-json": "node scripts/validate-songs-json.mjs",
     "lint": "eslint .",

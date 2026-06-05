@@ -54,6 +54,9 @@ web_modules/
 playwright-report/
 test-results/
 
+# GitHub Pages artifact
+_site/
+
 # Optional eslint cache
 .eslintcache
 
