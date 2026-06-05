@@ -50,9 +50,31 @@ import {
 } from "./lib/storage/songs-json-cache.mjs?v=23";
 import { createSongsDataSource } from "./lib/songs-data-source.mjs?v=23";
 
+/**
+ * アプリ全体で共有する曲データ・検索結果・ブックマークの状態ストア。
+ * 各 controller はこの参照を通して検索結果やアクティブブックマークを更新する。
+ * @type {AppDataState}
+ */
 const appDataState = appState.data;
+
+/**
+ * DOM 要素キャッシュと UI ランタイム状態をまとめた状態ストア。
+ * 検索入力、日付範囲、再生設定、派生 lookup map など画面操作に必要な状態を保持する。
+ * @type {AppUiState}
+ */
 const appUiState = appState.ui;
+
+/**
+ * YouTube IFrame API と共有プレーヤーのランタイム状態ストア。
+ * API 読み込み Promise やカード間で再利用するプレーヤー状態を controller 間で共有する。
+ * @type {AppYoutubeRuntimeState}
+ */
 const youtubeRuntimeState = appState.youtube;
+
+/**
+ * 形式フィルタの選択状態を appUiState.search.selectedFormats と同期する controller。
+ * DEFAULT_FORMATS を基準に、検索条件の収集・復元・リセットから参照される。
+ */
 const searchFiltersController = createSearchFiltersController({
     ui: appUiState,
     defaultFormats: DEFAULT_FORMATS
@@ -71,6 +93,10 @@ function getBrowserLocalStorage() {
     }
 }
 
+/**
+ * 検索 UI から条件を読み取り、表示対象の曲配列を appDataState.currentResults へ反映する controller。
+ * 描画更新は renderController へ委譲し、結果リストのスクロール位置もここで揃える。
+ */
 const searchController = createSearchController({
     data: appDataState,
     ui: appUiState,
@@ -88,6 +114,10 @@ const searchController = createSearchController({
     }
 });
 
+/**
+ * appDataState.currentResults を DOM の検索結果カードへ反映する controller。
+ * サムネイル再生、ブックマーク操作、カード再利用用キャッシュとの接続点もここに集約する。
+ */
 const renderController = createRenderController({
     data: appDataState,
     ui: appUiState,
@@ -107,6 +137,9 @@ const renderController = createRenderController({
     }
 });
 
+/**
+ * 現在の検索結果と再生設定をもとに、連続再生や次曲送りのセッションを管理する controller。
+ */
 const playbackSessionController = createPlaybackSessionController({
     data: appDataState,
     ui: appUiState,
@@ -116,6 +149,9 @@ const playbackSessionController = createPlaybackSessionController({
     }
 });
 
+/**
+ * サムネイル表示や連続再生など、再生設定 UI と保存値の同期を扱う controller。
+ */
 const playbackSettingsController = createPlaybackSettingsController({
     ui: appUiState,
     callbacks: {
@@ -126,6 +162,9 @@ const playbackSettingsController = createPlaybackSettingsController({
     }
 });
 
+/**
+ * YouTube IFrame API の読み込み、サムネイル埋め込み、共有プレーヤー状態を扱う controller。
+ */
 const youtubeController = createYoutubeController({
     ui: appUiState,
     youtube: youtubeRuntimeState,
@@ -137,10 +176,31 @@ const youtubeController = createYoutubeController({
     }
 });
 
+/**
+ * ブックマークパネル UI controller の遅延参照。
+ * storageController と sidebarController の callbacks から相互参照するため、生成後に代入する。
+ * @type {ReturnType<typeof createBookmarkUiController> | null}
+ */
 let bookmarkUiController = null;
+
+/**
+ * サイドバー UI controller の遅延参照。
+ * ブックマーク UI と検索リセット callback が互いに参照し合うため、生成後に代入する。
+ * @type {ReturnType<typeof createSidebarController> | null}
+ */
 let sidebarController = null;
+
+/**
+ * 検索 UI slice への短い参照。
+ * 入力済みフラグやデバウンスタイマーなど、検索フォームのランタイム状態だけを扱う。
+ * @type {SearchUiRuntimeState}
+ */
 const searchUi = getSearchUiState(appUiState);
 
+/**
+ * localStorage 上の検索状態・ブックマーク保存データを読み書きする controller。
+ * bookmark schema version の移行、インポート/エクスポート、保存後の再描画をまとめて扱う。
+ */
 const storageController = createStorageController({
     data: appDataState,
     ui: appUiState,
@@ -164,6 +224,10 @@ const storageController = createStorageController({
     }
 });
 
+/**
+ * ブックマークパネルの表示、追加・削除・インポートなどのユーザー操作を扱う controller。
+ * 永続化の実処理は storageController へ委譲する。
+ */
 bookmarkUiController = createBookmarkUiController({
     data: appDataState,
     ui: appUiState,
@@ -187,6 +251,9 @@ bookmarkUiController = createBookmarkUiController({
     }
 });
 
+/**
+ * サイドバー全体の開閉、設定パネル、ブックマークパネル、検索リセット導線を扱う controller。
+ */
 sidebarController = createSidebarController({
     data: appDataState,
     ui: appUiState,
@@ -206,6 +273,9 @@ sidebarController = createSidebarController({
     }
 });
 
+/**
+ * bfcache 復帰やフォーカス復帰時に、保存済み設定と検索 UI を再同期する controller。
+ */
 const uiSyncController = createUiSyncController({
     uiSyncPasses: UI_SYNC_PASSES,
     syncSearchUI,
@@ -213,24 +283,50 @@ const uiSyncController = createUiSyncController({
     applyPlaybackSettingsFromStorage: () => playbackSettingsController.applyPlaybackSettingsFromStorage()
 });
 
+/**
+ * localStorage への安全な参照。
+ * 権限拒否や非対応環境では null とし、各 data source / cache adapter 側で fallback する。
+ * @type {Storage | null}
+ */
 const browserStorage = getBrowserLocalStorage();
 
+/**
+ * 曲データ JSON を保存する一次キャッシュストア。
+ * localStorage の容量制限を避けるため IndexedDB を主保存先として使う。
+ */
+const songsJsonCacheStore = createIndexedDbSongsJsonCacheStore({ cacheKey: SONGS_JSON_CACHE_KEY });
+
+/**
+ * 旧 localStorage キャッシュを IndexedDB キャッシュへ移す互換 adapter。
+ * cachedSongsJson が残っている環境では読み込み後に一次キャッシュへ移行する。
+ */
+const songsJsonCache = createLegacyLocalStorageSongsJsonCacheAdapter({
+    cache: songsJsonCacheStore,
+    legacyKey: SONGS_JSON_CACHE_KEY,
+    storage: browserStorage
+});
+
+/**
+ * 曲データの取得元を束ねる data source。
+ * 公開 JSON と meta による鮮度確認を優先し、失敗時は CSV と保存済みキャッシュへ fallback する。
+ */
+const songsDataSource = createSongsDataSource({
+    publicSongsJsonUrl: PUBLIC_SONGS_JSON_URL,
+    publicSongsMetaUrl: PUBLIC_SONGS_META_URL,
+    publicCsvUrl: PUBLIC_CSV_URL,
+    songsJsonCache,
+    storage: browserStorage,
+    csvCacheKey: CSV_CACHE_KEY,
+    legacyCsvCacheKeys: [LEGACY_CSV_CACHE_KEY]
+});
+
+/**
+ * 初期曲データの読み込み結果を appDataState へ反映し、日付範囲・検索条件・表示を初期化する loader。
+ */
 const dataLoader = createDataLoader({
     data: appDataState,
     ui: appUiState,
-    dataSource: createSongsDataSource({
-        publicSongsJsonUrl: PUBLIC_SONGS_JSON_URL,
-        publicSongsMetaUrl: PUBLIC_SONGS_META_URL,
-        publicCsvUrl: PUBLIC_CSV_URL,
-        songsJsonCache: createLegacyLocalStorageSongsJsonCacheAdapter({
-            cache: createIndexedDbSongsJsonCacheStore({ cacheKey: SONGS_JSON_CACHE_KEY }),
-            legacyKey: SONGS_JSON_CACHE_KEY,
-            storage: browserStorage
-        }),
-        storage: browserStorage,
-        csvCacheKey: CSV_CACHE_KEY,
-        legacyCsvCacheKeys: [LEGACY_CSV_CACHE_KEY]
-    }),
+    dataSource: songsDataSource,
     callbacks: {
         migrateLegacyBookmarkSongRefs: () => storageController.migrateLegacyBookmarkSongRefs(),
         applyDateInputRange: (songs) => searchController.applyDateInputRange(songs),
@@ -240,6 +336,9 @@ const dataLoader = createDataLoader({
     }
 });
 
+/**
+ * YouTube 再生イベントを描画更新と連続再生セッションへ接続する。
+ */
 youtubeController.setLayoutHook(() => renderController.refreshLayout());
 youtubeController.setPlaybackEndedHook(({ songKey }) => {
     debugPlayback("script", "continuePlayback requested from playback ended", {
