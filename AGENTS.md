@@ -53,6 +53,11 @@ feat: move settings into dedicated sidebar panel
   その場合は JSDoc に、本番コードでは同じ module 内または上位 API 経由で使う helper であり、
   境界条件を単体テストするために export していることを簡潔に残す。
 
+## Naming
+
+- boolean は true の意味がそのまま読める肯定形で命名し、否定形フラグによる二重否定を避ける。
+- boolean state は、片方が常にもう片方の反転で導出できる場合は二重に保持せず、現在の UI/ドメイン上の肯定形だけを source of truth とする。
+
 ## Verification
 
 - 初回または `node_modules` がない環境では、README.md の開発者向け準備に従い
@@ -73,6 +78,17 @@ feat: move settings into dedicated sidebar panel
 - その場合は findings を先に並べ、重大度順に file/line references を付ける。
 - 要約は findings の後に短く添え、挙動差分・回帰リスク・未テスト箇所を優先して扱う。
 - ユーザーが明示的に機能要約のみを求めた場合は、この形式を強制しない。
+
+## Complexity Reassessment
+
+- 実装中に pending state、timeout、cancel、stale event guard などが増え始めたら、
+  保守性コストが高い兆候として扱い、一度方針比較に戻る。
+- 既存の仕組みを温存するための補正が複雑になる場合は、
+  再生成・再初期化・破棄作り直しなど、構造的に単純な案も再評価する。
+- iframe や外部 API の状態イベントに依存する実装では、
+  表示制御で整合性を取る案が状態機械化しやすい。
+  手動操作、自動処理、同一対象、別対象への切替を含めて、
+  事前に分岐数とテスト量を見積もる。
 
 ## Refactor Safety
 
