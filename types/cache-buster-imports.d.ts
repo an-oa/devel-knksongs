@@ -333,6 +333,15 @@ type CacheBusterSongsDataSourceInput = {
   legacyCsvCacheKeys: string[];
 };
 
+type CacheBusterBrowserSongsDataSourceInput = {
+  publicSongsJsonUrl: string;
+  publicSongsMetaUrl: string;
+  publicCsvUrl: string;
+  songsJsonCacheKey: string;
+  csvCacheKey: string;
+  legacyCsvCacheKey: string;
+};
+
 type CacheBusterIndexedDbSongsJsonCacheStoreInput = {
   cacheKey: string;
 };
@@ -690,6 +699,12 @@ declare module "./ui/core/data.mjs?*" {
   export function createDataLoader(input: CacheBusterDataLoaderInput): CacheBusterDataLoader;
 }
 
+declare module "./ui/core/data-source.mjs?*" {
+  export function createBrowserSongsDataSource(
+    input: CacheBusterBrowserSongsDataSourceInput
+  ): CacheBusterSongsDataSource;
+}
+
 declare module "./ui/sidebar/ui.mjs?*" {
   export function createSidebarController(input: CacheBusterSidebarControllerInput): CacheBusterSidebarController;
 }
@@ -710,6 +725,19 @@ declare module "./lib/storage/songs-json-cache.mjs?*" {
 }
 
 declare module "./lib/songs-data-source.mjs?*" {
+  export function createSongsDataSource(input: CacheBusterSongsDataSourceInput): CacheBusterSongsDataSource;
+}
+
+declare module "../../lib/storage/songs-json-cache.mjs?*" {
+  export function createIndexedDbSongsJsonCacheStore(
+    options: CacheBusterIndexedDbSongsJsonCacheStoreInput
+  ): CacheBusterTextCache;
+  export function createLegacyLocalStorageSongsJsonCacheAdapter(
+    options: CacheBusterLegacyLocalStorageSongsJsonCacheAdapterInput
+  ): CacheBusterTextCache;
+}
+
+declare module "../../lib/songs-data-source.mjs?*" {
   export function createSongsDataSource(input: CacheBusterSongsDataSourceInput): CacheBusterSongsDataSource;
 }
 

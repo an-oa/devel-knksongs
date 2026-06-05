@@ -44,11 +44,7 @@ import { createSidebarController } from "./ui/sidebar/ui.mjs?v=23";
 import { createSearchFiltersController } from "./ui/search-filters/controller.mjs?v=23";
 import { getSearchUiState } from "./lib/ui-slices.mjs?v=23";
 import { debugPlayback } from "./lib/playback-debug.mjs?v=23";
-import {
-    createIndexedDbSongsJsonCacheStore,
-    createLegacyLocalStorageSongsJsonCacheAdapter
-} from "./lib/storage/songs-json-cache.mjs?v=23";
-import { createSongsDataSource } from "./lib/songs-data-source.mjs?v=23";
+import { createBrowserSongsDataSource } from "./ui/core/data-source.mjs?v=23";
 
 /**
  * アプリ全体で共有する曲データ・検索結果・ブックマークの状態ストア。
@@ -79,19 +75,6 @@ const searchFiltersController = createSearchFiltersController({
     ui: appUiState,
     defaultFormats: DEFAULT_FORMATS
 });
-
-/**
- * ブラウザの localStorage を安全に取得する。
- * @returns {Storage | null}
- */
-function getBrowserLocalStorage() {
-    try {
-        return globalThis.localStorage ?? null;
-    } catch (error) {
-        console.warn("localStorageを参照できませんでした", error);
-        return null;
-    }
-}
 
 /**
  * 検索 UI から条件を読み取り、表示対象の曲配列を appDataState.currentResults へ反映する controller。
@@ -284,40 +267,16 @@ const uiSyncController = createUiSyncController({
 });
 
 /**
- * localStorage への安全な参照。
- * 権限拒否や非対応環境では null とし、各 data source / cache adapter 側で fallback する。
- * @type {Storage | null}
- */
-const browserStorage = getBrowserLocalStorage();
-
-/**
- * 曲データ JSON を保存する一次キャッシュストア。
- * localStorage の容量制限を避けるため IndexedDB を主保存先として使う。
- */
-const songsJsonCacheStore = createIndexedDbSongsJsonCacheStore({ cacheKey: SONGS_JSON_CACHE_KEY });
-
-/**
- * 旧 localStorage キャッシュを IndexedDB キャッシュへ移す互換 adapter。
- * cachedSongsJson が残っている環境では読み込み後に一次キャッシュへ移行する。
- */
-const songsJsonCache = createLegacyLocalStorageSongsJsonCacheAdapter({
-    cache: songsJsonCacheStore,
-    legacyKey: SONGS_JSON_CACHE_KEY,
-    storage: browserStorage
-});
-
-/**
  * 曲データの取得元を束ねる data source。
  * 公開 JSON と meta による鮮度確認を優先し、失敗時は CSV と保存済みキャッシュへ fallback する。
  */
-const songsDataSource = createSongsDataSource({
+const songsDataSource = createBrowserSongsDataSource({
     publicSongsJsonUrl: PUBLIC_SONGS_JSON_URL,
     publicSongsMetaUrl: PUBLIC_SONGS_META_URL,
     publicCsvUrl: PUBLIC_CSV_URL,
-    songsJsonCache,
-    storage: browserStorage,
+    songsJsonCacheKey: SONGS_JSON_CACHE_KEY,
     csvCacheKey: CSV_CACHE_KEY,
-    legacyCsvCacheKeys: [LEGACY_CSV_CACHE_KEY]
+    legacyCsvCacheKey: LEGACY_CSV_CACHE_KEY
 });
 
 /**
