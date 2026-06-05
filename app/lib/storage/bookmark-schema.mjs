@@ -15,6 +15,7 @@
  */
 export function sanitizeBookmarks(raw) {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+    /** @type {Record<string, { name: string, createdAt: number, songs: Array<string | number> }>} */
     const sanitized = {};
     for (const [id, bookmark] of Object.entries(raw)) {
         if (!bookmark || typeof bookmark !== "object" || Array.isArray(bookmark)) continue;

@@ -59,6 +59,7 @@ function parseArchiveOrder(raw) {
  * 画面の向き列を正規化し、既知の値のみ返す。
  * @param {*} raw
  * @param {number} rowNumber
+ * @returns {VideoOrientation}
  */
 function parseVideoOrientation(raw, rowNumber) {
     const value = String(raw || "").trim();

@@ -9,9 +9,11 @@ import {
 
 /**
  * ブックマークUIのイベント処理・描画・選択状態管理をまとめたコントローラーを作成する。
- * @param {*} data
- * @param {*} ui
- * @param {*} callbacks
+ * @param {{
+ *   data: AppDataState,
+ *   ui: AppUiState,
+ *   callbacks: Record<string, *>
+ * }} input
  */
 export function createBookmarkUiController({ data, ui, callbacks }) {
     const bookmarkPanelUi = getBookmarkPanelUiState(ui);
@@ -360,6 +362,7 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
             }
 
             const nameEl = item.querySelector(".bookmark-item-name");
+            if (!(nameEl instanceof HTMLElement)) return item;
             nameEl.textContent = bookmark.name;
             nameEl.title = bookmark.name;
 

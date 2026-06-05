@@ -34,10 +34,10 @@ export function applyMasonryLayout(container, options) {
     const breakpoints = Array.isArray(settings.breakpoints)
         ? settings.breakpoints
         : DEFAULT_MASONRY_BREAKPOINTS;
-    const cards = Array.from(container.children).filter((node) => (
+    const cards = /** @type {HTMLElement[]} */ (Array.from(container.children).filter((node) => (
         isHtmlElement(node) &&
         node.classList.contains("song-card")
-    ));
+    )));
     if (cards.length === 0) {
         container.style.height = "";
         return;

@@ -21,6 +21,10 @@ export const YOUTUBE_PLAYBACK_START_STATUS = Object.freeze({
  */
 
 /**
+ * @typedef {ReturnType<typeof setTimeout> & { unref?: () => void }} PlaybackStartTimeoutHandle
+ */
+
+/**
  * 再生開始結果を表すオブジェクトを作成する。
  * @param {string} status
  * @returns {YoutubePlaybackStartResult}
@@ -147,8 +151,9 @@ export function createYoutubePlaybackStartAttemptManager(input) {
             }
             handleStartFailure(thumbDiv, failureOptions);
         }, timeoutDurationMs);
-        if (timeoutId && typeof timeoutId.unref === "function") {
-            timeoutId.unref();
+        const timeoutHandle = /** @type {PlaybackStartTimeoutHandle} */ (timeoutId);
+        if (timeoutHandle && typeof timeoutHandle.unref === "function") {
+            timeoutHandle.unref();
         }
         return timeoutId;
     }
@@ -192,9 +197,12 @@ export function createYoutubePlaybackStartAttemptManager(input) {
         settle(undefined, createYoutubePlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.FAILED));
         clearUnconfirmedStart();
         return new Promise((resolve) => {
+            /** @type {YoutubePlaybackStartAttempt} */
             const attempt = {
                 sessionId,
-                resolve,
+                resolve: (result) => resolve(normalizeYoutubePlaybackStartResult(
+                    /** @type {YoutubePlaybackStartResult} */ (result)
+                )),
                 timeoutId: null,
                 context
             };

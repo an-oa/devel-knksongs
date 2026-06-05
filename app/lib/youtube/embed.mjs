@@ -40,6 +40,7 @@ export function createYoutubeIframeApiLoader({
         if (isReady()) return Promise.resolve();
         if (youtube.apiPromise) return youtube.apiPromise;
         let script = null;
+        /** @type {(value?: void | PromiseLike<void>) => void} */
         let resolveReady = () => {};
         const prevCallback = window.onYouTubeIframeAPIReady;
 
@@ -134,13 +135,14 @@ export function buildYoutubeEmbedUrl(yt, options) {
 
 /**
  * YouTube が生成した iframe へ必要な属性を反映する。
- * @param {*} iframe
+ * @param {Element | null | undefined} iframe
  */
 export function applyYoutubePlayerIframeAttributes(iframe) {
     if (!isHtmlElement(iframe)) return;
-    iframe.allow = "autoplay; encrypted-media";
-    iframe.referrerPolicy = "strict-origin-when-cross-origin";
-    iframe.allowFullscreen = true;
+    const iframeElement = /** @type {HTMLIFrameElement} */ (iframe);
+    iframeElement.allow = "autoplay; encrypted-media";
+    iframeElement.referrerPolicy = "strict-origin-when-cross-origin";
+    iframeElement.allowFullscreen = true;
 }
 
 export { YT_EMBED_HOST };

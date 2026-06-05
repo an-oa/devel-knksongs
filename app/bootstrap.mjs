@@ -390,9 +390,15 @@ async function initUI() {
  * アプリ起動時に初期化処理を開始する。
  */
 function boot() {
-    initUI().catch((error) => {
-        console.error("initUI failed", error);
-    });
+    initUI().catch(reportInitError);
+}
+
+/**
+ * 初期化失敗時のエラーを記録する。
+ * @param {unknown} error
+ */
+function reportInitError(error) {
+    console.error("initUI failed", error);
 }
 
 document.addEventListener("DOMContentLoaded", boot);

@@ -6,7 +6,7 @@ import { createSidebarPopoverController } from "./popover.mjs?v=23";
  * サイドバー関連の UI 操作をまとめるコントローラーを作成する。
  * @param {{
  *   data: { displayLimit: number },
- *   ui: { el: Record<string, HTMLElement | null>, settingsPanelReturnFocusEl: HTMLElement | null },
+ *   ui: AppUiState,
  *   constants: { resultDisplayBatchSize: number },
  *   callbacks: {
  *     getBookmarkUiController: () => {
@@ -357,11 +357,11 @@ export function createSidebarController(input) {
 
     /**
      * 日付入力時に次のセレクトへフォーカス移動する。
-     * @param {HTMLElement} target
-     * @param {HTMLElement | null} fromYear
-     * @param {HTMLElement | null} fromMonth
-     * @param {HTMLElement | null} toYear
-     * @param {HTMLElement | null} toMonth
+     * @param {HTMLSelectElement} target
+     * @param {HTMLSelectElement | null} fromYear
+     * @param {HTMLSelectElement | null} fromMonth
+     * @param {HTMLSelectElement | null} toYear
+     * @param {HTMLSelectElement | null} toMonth
      */
     function moveDateFocusIfNeeded(target, fromYear, fromMonth, toYear, toMonth) {
         if (fromYear && target === fromYear && fromMonth && fromYear.value) {
@@ -428,12 +428,12 @@ export function createSidebarController(input) {
             "textarea:not([disabled])",
             '[tabindex]:not([tabindex="-1"])'
         ].join(","));
-        return Array.from(focusable).filter((element) => {
+        return /** @type {HTMLElement[]} */ (Array.from(focusable).filter((element) => {
             if (!(element instanceof HTMLElement)) return false;
             if (element.hasAttribute("inert") || element.hidden) return false;
             const style = window.getComputedStyle(element);
             return style.display !== "none" && style.visibility !== "hidden";
-        });
+        }));
     }
 
     /**

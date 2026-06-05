@@ -69,7 +69,7 @@ export function applyDocumentTheme(isDarkMode) {
 
 /**
  * 保存値またはシステム設定からテーマを適用する。
- * @param {{ ui: { el: Record<string, HTMLElement | null> } }} input
+ * @param {{ ui: { el: AppUiElements } }} input
  */
 export function applyThemeFromStorage({ ui }) {
     const themeToggle = ui.el.themeToggle;
@@ -77,19 +77,20 @@ export function applyThemeFromStorage({ ui }) {
     const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
     const isDarkMode = savedTheme ? savedTheme === "dark" : systemPrefersDark;
     applyDocumentTheme(isDarkMode);
-    if (themeToggle) themeToggle.checked = isDarkMode;
+    if (themeToggle) /** @type {HTMLInputElement} */ (themeToggle).checked = isDarkMode;
 }
 
 /**
  * テーマ状態を初期化し、トグル変更を保存する。
- * @param {{ ui: { el: Record<string, HTMLElement | null> } }} input
+ * @param {{ ui: { el: AppUiElements } }} input
  */
 export function setupTheme({ ui }) {
     const themeToggle = ui.el.themeToggle;
     applyThemeFromStorage({ ui });
     if (!themeToggle) return;
+    const themeToggleInput = /** @type {HTMLInputElement} */ (themeToggle);
     themeToggle.addEventListener("change", () => {
-        const isDarkNow = themeToggle.checked;
+        const isDarkNow = themeToggleInput.checked;
         applyDocumentTheme(isDarkNow);
         localStorage.setItem("theme", isDarkNow ? "dark" : "light");
     });

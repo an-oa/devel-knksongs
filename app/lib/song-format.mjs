@@ -52,7 +52,7 @@ export function isShortFormat(format) {
  * @returns {boolean}
  */
 export function matchesSelectedFormat(format, selectedFormats) {
-    if (selectedFormats.has(format)) return true;
+    if (typeof format === "string" && selectedFormats.has(format)) return true;
     if (!isUtamitaEquivalentFormat(format)) return false;
     return selectedFormats.has("歌みた") || selectedFormats.has("オリ曲");
 }

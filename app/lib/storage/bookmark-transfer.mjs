@@ -18,21 +18,23 @@ import {
 
 /**
  * 成功時の共通レスポンスを組み立てる。
- * @param {*} extra
- * @returns {{ ok: true }}
+ * @template {Record<string, unknown>} T
+ * @param {T | undefined} [extra]
+ * @returns {{ ok: true } & T}
  */
 function buildActionOk(extra) {
-    return { ok: true, ...(extra || {}) };
+    return /** @type {{ ok: true } & T} */ ({ ok: true, ...(extra || {}) });
 }
 
 /**
  * 失敗理由付きの共通レスポンスを組み立てる。
+ * @template {Record<string, unknown>} T
  * @param {string} reason
- * @param {*} extra
- * @returns {{ ok: false, reason: string }}
+ * @param {T | undefined} [extra]
+ * @returns {{ ok: false, reason: string } & T}
  */
 function buildActionFail(reason, extra) {
-    return { ok: false, reason, ...(extra || {}) };
+    return /** @type {{ ok: false, reason: string } & T} */ ({ ok: false, reason, ...(extra || {}) });
 }
 
 /**

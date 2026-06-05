@@ -4,7 +4,7 @@ import { scheduleScrollElementIntoView } from "../results-scroll.mjs?v=23";
 /**
  * 遅延読み込み用のサムネイル画像要素を生成する。
  * @param {string} videoId
- * @returns {*}
+ * @returns {HTMLImageElement | null}
  */
 export function createYoutubeThumbnailImage(videoId) {
     if (!canUseDom()) return null;

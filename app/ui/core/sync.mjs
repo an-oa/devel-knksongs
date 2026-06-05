@@ -2,7 +2,7 @@
  * 画面復帰時の UI 再同期をまとめて扱うコントローラーを作成する。
  * @param {{
  *   uiSyncPasses: number,
- *   syncSearchUI: () => void,
+ *   syncSearchUI: (options?: { visual?: boolean, search?: boolean }) => void,
  *   applyThemeFromStorage: () => void,
  *   applyPlaybackSettingsFromStorage: () => void
  * }} input
@@ -17,7 +17,7 @@ export function createUiSyncController(input) {
 
     /**
      * オプションに応じて UI の見た目と検索状態を同期する。
-     * @param {{ visual?: boolean, search?: boolean } | undefined} options
+     * @param {{ visual?: boolean, search?: boolean } | undefined} [options]
      */
     function syncUiState(options) {
         const opts = options || {};
@@ -27,7 +27,7 @@ export function createUiSyncController(input) {
 
     /**
      * UI 同期を実行し、必要に応じて次フレームでも再同期する。
-     * @param {{ visual?: boolean, search?: boolean } | undefined} options
+     * @param {{ visual?: boolean, search?: boolean } | undefined} [options]
      */
     function scheduleSyncUiState(options) {
         syncUiState(options);
@@ -37,7 +37,7 @@ export function createUiSyncController(input) {
 
     /**
      * 遅延付きで見た目のみの UI 同期を予約する。
-     * @param {number | undefined} delayMs
+     * @param {number | undefined} [delayMs]
      */
     function scheduleDelayedVisualSync(delayMs) {
         const delay = Number.isFinite(delayMs) ? delayMs : 200;

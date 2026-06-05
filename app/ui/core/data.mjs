@@ -4,7 +4,7 @@ import { getDateUiState, getSearchUiState } from "../../lib/ui-slices.mjs?v=23";
  * 曲データの読込と初期データ反映を扱うコントローラーを作成する。
  * @param {{
  *   data: { allSongsRaw: unknown[] },
- *   ui: { el: Record<string, HTMLElement | null>, recommendedCache: unknown, dataReady: boolean, hasRestoredSearchState: boolean },
+ *   ui: AppUiState,
  *   dataSource: {
  *     loadInitialSongs: (callbacks: { onSongsLoaded: (result: { songs: unknown[], source: string, resetConditions?: boolean }) => void }) => Promise<boolean>
  *   },
@@ -51,7 +51,9 @@ export function createDataLoader(input) {
         if (dateBounds) {
             clampDateInputsToBounds(dateBounds.minKey, dateBounds.maxKey);
         }
-        if (ui.el.searchBox) ui.el.searchBox.disabled = false;
+        if (ui.el.searchBox && "disabled" in ui.el.searchBox) {
+            /** @type {HTMLInputElement} */ (ui.el.searchBox).disabled = false;
+        }
         searchUi.dataReady = true;
         if (statusLabel && ui.el.resultCount) {
             ui.el.resultCount.innerText = statusLabel;

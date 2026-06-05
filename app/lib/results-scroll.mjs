@@ -19,7 +19,7 @@ export function scrollResultListToTop(resultList) {
 
 /**
  * 指定要素が見える位置まで、必要時または強制指定時にスクロールする。
- * @param {HTMLElement | null | undefined} element
+ * @param {Element | null | undefined} element
  * @param {{ topOffset?: number, behavior?: ScrollBehavior, force?: boolean } | undefined} options
  * @returns {void}
  */

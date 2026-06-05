@@ -114,7 +114,7 @@ export function normalizeStoredCollabRoleFilters(payload, searchStateVersion) {
  */
 export function getStoredSearchStateVersion(payload) {
     const version = payload && payload.version;
-    if (Number.isInteger(version) && version >= SEARCH_STATE_V1) return version;
+    if (typeof version === "number" && Number.isInteger(version) && version >= SEARCH_STATE_V1) return version;
     return SEARCH_STATE_V1;
 }
 
