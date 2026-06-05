@@ -159,38 +159,43 @@
           </div>
           <div class="sidebar-group-body">
             <div class="sidebar-section sidebar-setting-item">
-              <div class="menu-item-toggle">
-                <span id="end-time-toggle-label">曲の終わりで停止する</span>
-                <label class="switch">
-                  <input type="checkbox" id="end-time-toggle" aria-labelledby="end-time-toggle-label">
-                  <span class="slider"></span>
-                </label>
-              </div>
-            </div>
-
-            <div class="sidebar-section sidebar-setting-item">
               <div class="setting-item-copy">
                 <div class="menu-item-toggle">
-                  <span id="continuous-playback-toggle-label">終了後、次の曲を再生</span>
+                  <span id="play-archive-to-end-toggle-label">アーカイブ全体を再生</span>
                   <label class="switch">
-                    <input type="checkbox" id="continuous-playback-toggle" aria-labelledby="continuous-playback-toggle-label">
+                    <input type="checkbox" id="play-archive-to-end-toggle" aria-labelledby="play-archive-to-end-toggle-label" aria-describedby="play-archive-to-end-toggle-help">
                     <span class="slider"></span>
                   </label>
                 </div>
-                <div class="setting-item-help">現在の一覧で、次の曲へ順に進みます。</div>
+                <div id="play-archive-to-end-toggle-help" class="setting-item-help">OFFでは曲の終わりで停止します。</div>
               </div>
             </div>
 
-            <div class="sidebar-section sidebar-setting-item">
-              <div class="setting-item-copy">
-                <div class="menu-item-toggle">
-                  <span id="loop-playback-toggle-label">リピート再生</span>
-                  <label class="switch">
-                    <input type="checkbox" id="loop-playback-toggle" aria-labelledby="loop-playback-toggle-label">
-                    <span class="slider"></span>
-                  </label>
+            <div id="experimental-playback-settings" aria-hidden="true" hidden>
+              <div class="sidebar-section sidebar-setting-item">
+                <div class="setting-item-copy">
+                  <div class="menu-item-toggle">
+                    <span id="continuous-playback-toggle-label">終了後、次の曲を再生</span>
+                    <label class="switch">
+                      <input type="checkbox" id="continuous-playback-toggle" aria-labelledby="continuous-playback-toggle-label">
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+                  <div class="setting-item-help">現在の一覧で、次の曲へ順に進みます。</div>
                 </div>
-                <div class="setting-item-help">「終了後、次の曲を再生」がOFFでは1曲、ONでは一覧全体を繰り返します。</div>
+              </div>
+
+              <div class="sidebar-section sidebar-setting-item">
+                <div class="setting-item-copy">
+                  <div class="menu-item-toggle">
+                    <span id="loop-playback-toggle-label">リピート再生</span>
+                    <label class="switch">
+                      <input type="checkbox" id="loop-playback-toggle" aria-labelledby="loop-playback-toggle-label">
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+                  <div class="setting-item-help">「終了後、次の曲を再生」がOFFでは1曲、ONでは一覧全体を繰り返します。</div>
+                </div>
               </div>
             </div>
           </div>

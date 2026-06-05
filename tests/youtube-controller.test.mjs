@@ -152,12 +152,51 @@ test("youtube: player init uses prebuilt iframe src and binds YT.Player to it", 
         const iframe = thumb.querySelector("iframe");
         assert.ok(iframe);
         assert.match(iframe.src, /^https:\/\/www\.youtube\.com\/embed\/video1\?/);
-        assert.match(iframe.src, /autoplay=1/);
+        assert.match(iframe.src, /autoplay=0/);
         assert.match(iframe.src, /start=45/);
         assert.match(iframe.src, /enablejsapi=1/);
         assert.equal(iframe.allow, "autoplay; encrypted-media");
         assert.equal(iframe.referrerPolicy, "strict-origin-when-cross-origin");
         assert.equal(iframe.allowFullscreen, true);
+    } finally {
+        cleanup();
+    }
+});
+
+test("youtube: embed autoplay stays enabled when continuation playback is enabled", async () => {
+    const cleanup = installFakeDom();
+    try {
+        const ui = createYoutubeUiState({
+            continuousPlayback: true
+        });
+        const { controller } = createYoutubeControllerHarness({ ui });
+        installYoutubePlayerConstructor(class {
+            constructor(host, options) {
+                const iframe = document.createElement("iframe");
+                host.appendChild(iframe);
+                this._iframe = iframe;
+                if (options.events && typeof options.events.onReady === "function") {
+                    options.events.onReady({ target: this });
+                }
+            }
+
+            getIframe() {
+                return this._iframe;
+            }
+
+            destroy() {}
+        });
+
+        const thumb = document.createElement("div");
+        document.body.appendChild(thumb);
+        controller.updateThumbnail(thumb, { videoId: "video1", startSeconds: 45 });
+
+        thumb.onclick();
+        await flushMicrotasks();
+
+        const iframe = getSharedPlaybackIframe();
+        assert.ok(iframe);
+        assert.match(iframe.src, /autoplay=1/);
     } finally {
         cleanup();
     }
@@ -265,7 +304,8 @@ test("youtube: switching to another thumbnail recreates the shared player", asyn
     const cleanup = installFakeDom();
     try {
         const ui = createYoutubeUiState({
-            stopAtEndTime: true
+            playArchiveToEnd: false,
+            continuousPlayback: true
         });
         const { controller } = createYoutubeControllerHarness({ ui });
         const playerInstances = [];
@@ -338,11 +378,90 @@ test("youtube: switching to another thumbnail recreates the shared player", asyn
     }
 });
 
+test("youtube: switching thumbnails cues the reusable player when autoplay is disabled", async () => {
+    const cleanup = installFakeDom();
+    try {
+        const ui = createYoutubeUiState({
+            playArchiveToEnd: false
+        });
+        const { controller } = createYoutubeControllerHarness({ ui });
+        const playerInstances = [];
+        window.YT = {
+            PlayerState: {
+                ENDED: 0,
+                PLAYING: 1,
+                PAUSED: 2
+            },
+            Player: class {
+                constructor(host) {
+                    this.iframe = attachMockPlayerIframe(host);
+                    this.lastCueArgs = null;
+                    this.lastLoadArgs = null;
+                    this.cueParent = null;
+                    playerInstances.push(this);
+                }
+
+                getIframe() {
+                    return this.iframe;
+                }
+
+                cueVideoById(args) {
+                    this.lastCueArgs = args;
+                    this.cueParent = this.iframe.parentElement;
+                }
+
+                loadVideoById(args) {
+                    this.lastLoadArgs = args;
+                }
+
+                destroy() {}
+            }
+        };
+
+        const cardA = document.createElement("div");
+        const cardB = document.createElement("div");
+        cardA.className = "song-card";
+        cardB.className = "song-card";
+        const thumbA = document.createElement("div");
+        const thumbB = document.createElement("div");
+        cardA.appendChild(thumbA);
+        cardB.appendChild(thumbB);
+        document.body.append(cardA, cardB);
+
+        controller.updateThumbnail(thumbA, { videoId: "video1", startSeconds: 5, endSeconds: 25 });
+        controller.updateThumbnail(thumbB, { videoId: "video2", startSeconds: 15, endSeconds: 45 });
+
+        thumbA.onclick();
+        await flushMicrotasks();
+
+        const firstIframe = getSharedPlaybackIframe();
+        assert.ok(firstIframe);
+        assert.equal(firstIframe.src.includes("autoplay=0"), true);
+
+        thumbB.onclick();
+        await flushMicrotasks();
+
+        const secondIframe = getSharedPlaybackIframe();
+        assert.equal(secondIframe, firstIframe);
+        assert.equal(playerInstances.length, 1);
+        assert.equal(playerInstances[0].lastLoadArgs, null);
+        assert.deepEqual(playerInstances[0].lastCueArgs, {
+            videoId: "video2",
+            startSeconds: 15,
+            endSeconds: 45
+        });
+        assert.equal(playerInstances[0].cueParent.classList.contains("youtube-player-overlay-frame"), true);
+    } finally {
+        cleanup();
+    }
+});
+
 test("youtube: pending shared player init uses the latest clicked thumbnail", async () => {
     const cleanup = installFakeDom();
     try {
         const ui = createYoutubeUiState({
-            stopAtEndTime: true
+            playArchiveToEnd: false,
+            continuousPlayback: true
         });
         const { controller } = createYoutubeControllerHarness({ ui });
         const playerCalls = [];
@@ -399,7 +518,8 @@ test("youtube: same thumbnail recreates a fresh player after restore", async () 
     const cleanup = installFakeDom();
     try {
         const ui = createYoutubeUiState({
-            stopAtEndTime: true
+            playArchiveToEnd: false,
+            continuousPlayback: true
         });
         const { controller } = createYoutubeControllerHarness({ ui });
         const playerInstances = [];
@@ -471,7 +591,8 @@ test("youtube: stale ended event from a previous same-thumb playback does not te
     const cleanup = installFakeDom();
     try {
         const ui = createYoutubeUiState({
-            stopAtEndTime: true
+            playArchiveToEnd: false,
+            continuousPlayback: true
         });
         const { controller } = createYoutubeControllerHarness({ ui });
         let playerInstance = null;
@@ -565,7 +686,8 @@ test("youtube: replay ignores ended event while the next same-thumb start is sti
     const cleanup = installFakeDom();
     try {
         const ui = createYoutubeUiState({
-            stopAtEndTime: true
+            playArchiveToEnd: false,
+            continuousPlayback: true
         });
         const { controller } = createYoutubeControllerHarness({ ui });
         let playerInstance = null;
@@ -1029,11 +1151,11 @@ test("youtube: autoplay playback is restored when iframe api loading fails", asy
     }
 });
 
-test("youtube: embed url includes end time when stopAtEndTime is enabled", async () => {
+test("youtube: embed url includes end time when archive-to-end playback is disabled", async () => {
     const cleanup = installFakeDom();
     try {
         const ui = createYoutubeUiState({
-            stopAtEndTime: true
+            playArchiveToEnd: false
         });
         const { controller } = createYoutubeControllerHarness({ ui });
         globalThis.window.YT = {
@@ -1070,11 +1192,11 @@ test("youtube: embed url includes end time when stopAtEndTime is enabled", async
     }
 });
 
-test("youtube: embed url omits end time when stopAtEndTime is disabled", async () => {
+test("youtube: embed url omits end time when archive-to-end playback is enabled", async () => {
     const cleanup = installFakeDom();
     try {
         const ui = createYoutubeUiState({
-            stopAtEndTime: false
+            playArchiveToEnd: true
         });
         const { controller } = createYoutubeControllerHarness({ ui });
         globalThis.window.YT = {

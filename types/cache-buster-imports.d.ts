@@ -70,6 +70,63 @@ declare module "../lib/ui-slices.mjs?*" {
   export function getSettingsPanelUiState(ui: SettingsPanelUiStateSource): SettingsPanelUiRuntimeState;
 }
 
+declare module "../lib/playback-settings/definitions.mjs?*" {
+  export const THUMBNAIL_STORAGE_KEY: "showThumbnails";
+  export const PLAY_ARCHIVE_TO_END_STORAGE_KEY: "playArchiveToEnd";
+  export const LEGACY_PLAYBACK_SETTINGS_STORAGE_KEYS: readonly string[];
+  export const PLAYBACK_SETTING_SCOPES: {
+    readonly PERSISTED: "persisted";
+    readonly PAGE: "page";
+  };
+  export const PLAYBACK_SETTING_KINDS: {
+    readonly VISIBILITY: "visibility";
+    readonly BEHAVIOR: "behavior";
+  };
+  export const INITIAL_PLAYBACK_SETTING_VALUES: {
+    readonly playArchiveToEnd: false;
+    readonly continuousPlayback: false;
+    readonly loopPlayback: false;
+  };
+  export function createPlaybackSettingDefinitions(input: {
+    restoreActivePlayback: () => void;
+    syncExperimentalPlaybackVisibility: () => void;
+    syncThumbnailVisibility: (value: boolean) => void;
+    applyExperimentalPlaybackStorageValues: () => void;
+    applyExperimentalPlaybackToggleValues: () => void;
+    afterThumbnailStorageApply: (previousValue: boolean, nextValue: boolean) => void;
+    afterThumbnailToggleChange: () => void;
+  }): {
+    pagePlaybackBehaviorDefinitions: PlaybackSettingDefinition[];
+    experimentalPlaybackVisibilityDefinition: PlaybackSettingDefinition;
+    thumbnailVisibilityDefinition: PlaybackSettingDefinition;
+    playbackSettingDefinitions: PlaybackSettingDefinition[];
+  };
+}
+
+declare module "../lib/playback-settings/value-reducer.mjs?*" {
+  export function isPagePlaybackBehaviorDefinition(definition: PlaybackSettingDefinition): boolean;
+  export function createInitialPlaybackBehaviorPageValues(
+    definitions: PlaybackSettingDefinition[]
+  ): Map<string, boolean>;
+  export function getPlaybackBehaviorEffectiveValue(
+    definition: PlaybackSettingDefinition,
+    experimentalEnabled: boolean,
+    pageValues: Map<string, boolean>
+  ): boolean;
+  export function reducePlaybackSettingChange(input: {
+    definition: PlaybackSettingDefinition;
+    currentValue: boolean;
+    nextValue: boolean;
+    experimentalEnabled: boolean;
+    pageValues: Map<string, boolean>;
+  }): {
+    previousValue: boolean;
+    nextValue: boolean;
+    changed: boolean;
+    pageValues: Map<string, boolean>;
+  };
+}
+
 declare module "../lib/youtube/playback-start-attempt.mjs?*" {
   export const YOUTUBE_PLAYBACK_START_STATUS: {
     readonly STARTED: "started";
@@ -113,7 +170,7 @@ declare module "../lib/youtube/embed.mjs?*" {
   export function applyYoutubePlayerIframeAttributes(iframe: Element | null | undefined): void;
   export function buildYoutubeEmbedUrl(
     yt: YoutubeTarget,
-    options?: { endSeconds?: number | null }
+    options?: { endSeconds?: number | null; autoplay?: boolean }
   ): string;
   export function createYoutubeIframeApiLoader(input: {
     youtube: AppYoutubeRuntimeState;

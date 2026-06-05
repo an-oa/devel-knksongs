@@ -52,7 +52,7 @@ export const appState = {
             scrollObserver: null,
             showThumbnails: false,
             showExperimentalPlaybackSettings: false,
-            stopAtEndTime: true,
+            playArchiveToEnd: false,
             continuousPlayback: false,
             loopPlayback: false,
             activeThumb: null

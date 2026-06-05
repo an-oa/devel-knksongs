@@ -29,36 +29,90 @@ test.beforeEach(async ({ page }) => {
     await waitForInitialLoad(page);
 });
 
-test("settings exposes playback settings through console state", async ({ page }) => {
+test("playback settings are gated by thumbnail visibility", async ({ page }) => {
     await openSettingsPanel(page);
 
     const thumbnailSwitch = getControlLabel(page, "#thumbnail-toggle");
     const playbackSettingsGroup = page.locator("#playback-settings-group");
+    const experimentalPlaybackSettingsGroup = page.locator("#experimental-playback-settings");
+    const playArchiveToEndSwitch = getControlLabel(page, "#play-archive-to-end-toggle");
     const themeSwitch = getControlLabel(page, "#theme-toggle");
 
     await expect(themeSwitch).toBeVisible();
     await expect(playbackSettingsGroup).toBeHidden();
+    await expect(playArchiveToEndSwitch).toBeHidden();
+    await expect(experimentalPlaybackSettingsGroup).toBeHidden();
 
     await thumbnailSwitch.click();
 
     await expect(themeSwitch).toBeVisible();
+    await expect(playbackSettingsGroup).toBeVisible();
+    await expect(playArchiveToEndSwitch).toBeVisible();
+    await expect(page.locator("#play-archive-to-end-toggle-label")).toContainText("アーカイブ全体を再生");
+    await expect(page.locator("#play-archive-to-end-toggle-help")).toContainText("OFFでは曲の終わりで停止します。");
+    await expect(page.locator("#play-archive-to-end-toggle")).not.toBeChecked();
+
+    await thumbnailSwitch.click();
+
+    await expect(themeSwitch).toBeVisible();
+    await expect(playbackSettingsGroup).toBeHidden();
+    await expect(playArchiveToEndSwitch).toBeHidden();
+    await expect(experimentalPlaybackSettingsGroup).toBeHidden();
+});
+
+test("console playback setting survives ui resync", async ({ page }) => {
+    await openSettingsPanel(page);
+
+    const thumbnailSwitch = getControlLabel(page, "#thumbnail-toggle");
+    const playbackSettingsGroup = page.locator("#playback-settings-group");
+    const experimentalPlaybackSettingsGroup = page.locator("#experimental-playback-settings");
+
+    await thumbnailSwitch.click();
+    await expect(playbackSettingsGroup).toBeVisible();
+    await expect(experimentalPlaybackSettingsGroup).toBeHidden();
+    expect(
+        await page.evaluate(() => window.knkPlaybackSettings.showExperimentalPlaybackSettings),
+    ).toBe(false);
 
     await page.evaluate(() => {
         window.knkPlaybackSettings.showExperimentalPlaybackSettings = true;
     });
 
+    expect(
+        await page.evaluate(() => window.knkPlaybackSettings.state.showExperimentalPlaybackSettings),
+    ).toBe(true);
     await expect(playbackSettingsGroup).toBeVisible();
+    await expect(experimentalPlaybackSettingsGroup).toBeVisible();
 
     await page.evaluate(() => {
         window.dispatchEvent(new Event("focus"));
     });
 
     await expect(playbackSettingsGroup).toBeVisible();
+    await expect(experimentalPlaybackSettingsGroup).toBeVisible();
+});
 
+test("archive playback setting persists across reload", async ({ page }) => {
+    await openSettingsPanel(page);
+
+    const thumbnailSwitch = getControlLabel(page, "#thumbnail-toggle");
     await thumbnailSwitch.click();
 
-    await expect(themeSwitch).toBeVisible();
-    await expect(playbackSettingsGroup).toBeHidden();
+    const playArchiveToEndSwitch = getControlLabel(page, "#play-archive-to-end-toggle");
+    await playArchiveToEndSwitch.click();
+
+    await expect(page.locator("#play-archive-to-end-toggle")).toBeChecked();
+    expect(await page.evaluate(() => localStorage.getItem("playArchiveToEnd"))).toBe("true");
+
+    await page.reload();
+    await waitForInitialLoad(page);
+    await openSettingsPanel(page);
+
+    await expect(page.locator("#playback-settings-group")).toBeVisible();
+    await expect(page.locator("#play-archive-to-end-toggle")).toBeChecked();
+    expect(
+        await page.evaluate(() => window.knkPlaybackSettings.state.playArchiveToEnd),
+    ).toBe(true);
 });
 
 test("theme toggle syncs native color scheme", async ({ page }) => {

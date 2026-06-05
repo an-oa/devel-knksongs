@@ -313,7 +313,8 @@ export function createYoutubeController({ ui, youtube, constants }) {
          */
         buildEmbedUrl(yt) {
             return buildYoutubeEmbedUrl(yt, {
-                endSeconds: getEffectiveEndSeconds(yt)
+                endSeconds: getEffectiveEndSeconds(yt),
+                autoplay: isEmbeddedPlayerAutoplayEnabled()
             });
         },
         /**
@@ -487,6 +488,14 @@ export function createYoutubeController({ ui, youtube, constants }) {
             debugPlayback("youtube", "stopPlayer failed");
             return false;
         }
+    }
+
+    /**
+     * 現在の再生設定で埋め込みプレイヤーを自動開始するか返す。
+     * @returns {boolean}
+     */
+    function isEmbeddedPlayerAutoplayEnabled() {
+        return Boolean(playbackUi.continuousPlayback || playbackUi.loopPlayback);
     }
 
     /**
@@ -763,7 +772,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
      * @returns {number | null}
      */
     function getEffectiveEndSeconds(yt) {
-        if (!playbackUi.stopAtEndTime) return null;
+        if (playbackUi.playArchiveToEnd) return null;
         return Number.isFinite(yt && yt.endSeconds) ? yt.endSeconds : null;
     }
 

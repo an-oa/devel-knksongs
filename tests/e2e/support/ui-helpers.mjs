@@ -122,7 +122,7 @@ export async function enablePlaybackSettings(page, options) {
         await page.evaluate(() => {
             window.knkPlaybackSettings.showExperimentalPlaybackSettings = true;
         });
-        await expect(page.locator("#playback-settings-group")).toBeVisible();
+        await expect(page.locator("#experimental-playback-settings")).toBeVisible();
         await ensureToggleEnabled(page, "#continuous-playback-toggle");
     }
     await page.locator("#close-settings-panel").click();

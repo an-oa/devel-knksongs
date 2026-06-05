@@ -28,10 +28,11 @@ type AppUiElements = Partial<{
   clearDateToBtn: HTMLButtonElement | null;
   themeToggle: HTMLInputElement | null;
   thumbToggle: HTMLInputElement | null;
-  endTimeToggle: HTMLInputElement | null;
+  playArchiveToEndToggle: HTMLInputElement | null;
   continuousPlaybackToggle: HTMLInputElement | null;
   loopPlaybackToggle: HTMLInputElement | null;
   playbackSettingsGroup: HTMLElement | null;
+  experimentalPlaybackSettingsGroup: HTMLElement | null;
   openSettingsPanelBtn: HTMLButtonElement | null;
   settingsSidebarPanel: HTMLElement | null;
   closeSettingsPanelBtn: HTMLButtonElement | null;
@@ -103,14 +104,53 @@ type PlaybackUiRuntimeState = {
   showThumbnails: boolean;
   /** 実験的な再生設定を表示するかどうか。 */
   showExperimentalPlaybackSettings: boolean;
-  /** 曲の終了秒で再生を止めるかどうか。 */
-  stopAtEndTime: boolean;
+  /** アーカイブ全体を曲の終了秒で止めずに再生するかどうか。 */
+  playArchiveToEnd: boolean;
   /** 再生終了後に次の曲へ進むかどうか。 */
   continuousPlayback: boolean;
   /** 再生候補の末尾から先頭へ戻るかどうか。 */
   loopPlayback: boolean;
   /** 現在 iframe 再生を保持しているサムネイル要素。 */
   activeThumb: HTMLElement | null;
+};
+
+/** 再生設定 controller が扱う真偽値設定。 */
+type PlaybackSettingsUiSlice = Pick<
+  PlaybackUiRuntimeState,
+  "showThumbnails" |
+  "showExperimentalPlaybackSettings" |
+  "playArchiveToEnd" |
+  "continuousPlayback" |
+  "loopPlayback"
+>;
+
+/** 再生設定トグルとして使う DOM 要素キー。 */
+type PlaybackSettingElementKey =
+  "thumbToggle" |
+  "playArchiveToEndToggle" |
+  "continuousPlaybackToggle" |
+  "loopPlaybackToggle";
+
+/** 再生設定の保存範囲。 */
+type PlaybackSettingScope = "persisted" | "page";
+
+/** 再生設定の意味上の分類。 */
+type PlaybackSettingKind = "visibility" | "behavior";
+
+/** 再生設定 1 件の定義。 */
+type PlaybackSettingDefinition = {
+  scope: PlaybackSettingScope;
+  kind: PlaybackSettingKind;
+  stateKey: keyof PlaybackSettingsUiSlice;
+  elementKey?: PlaybackSettingElementKey;
+  storageKey?: string;
+  defaultValue: boolean;
+  hiddenValue?: boolean;
+  effectiveWhenHidden?: boolean;
+  interactive?: boolean;
+  syncValue?: (value: boolean) => void;
+  afterStorageApply?: (previousValue: boolean, nextValue: boolean) => void;
+  afterToggleChange?: (previousValue: boolean, nextValue: boolean) => void;
 };
 
 /** ブックマーク参照や曲キー検索に使う派生マップ。 */

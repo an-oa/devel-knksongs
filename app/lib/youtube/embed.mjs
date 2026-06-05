@@ -105,13 +105,14 @@ export function createYoutubeIframeApiLoader({
 
 /**
  * 埋め込み再生用の標準 YouTube URL を生成する。
- * @param {*} yt
- * @param {{ endSeconds?: number | null } | undefined} options
+ * @param {YoutubeTarget} yt
+ * @param {{ endSeconds?: number | null, autoplay?: boolean } | undefined} options
  * @returns {string}
  */
 export function buildYoutubeEmbedUrl(yt, options) {
+    const isAutoplayEnabled = !(options && options.autoplay === false);
     const params = new URLSearchParams({
-        autoplay: "1",
+        autoplay: isAutoplayEnabled ? "1" : "0",
         playsinline: "1",
         start: String(yt.startSeconds),
         enablejsapi: "1",

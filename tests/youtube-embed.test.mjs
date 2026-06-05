@@ -27,6 +27,19 @@ test("youtube embed: buildYoutubeEmbedUrl includes playback params and optional 
     }
 });
 
+test("youtube embed: buildYoutubeEmbedUrl can disable autoplay", () => {
+    const cleanup = installFakeDom();
+    try {
+        const url = buildYoutubeEmbedUrl(
+            { videoId: "abc123", startSeconds: 45 },
+            { autoplay: false }
+        );
+        assert.match(url, /(?:\?|&)autoplay=0(?:&|$)/);
+    } finally {
+        cleanup();
+    }
+});
+
 test("youtube embed: applyYoutubePlayerIframeAttributes updates iframe attributes", () => {
     const cleanup = installFakeDom();
     try {

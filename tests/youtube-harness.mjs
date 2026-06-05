@@ -22,14 +22,16 @@ export function createYoutubeUiState(input = {}) {
     return {
         el: {
             thumbToggle: input.thumbToggle ?? null,
-            endTimeToggle: input.endTimeToggle ?? null
+            playArchiveToEndToggle: input.playArchiveToEndToggle ?? null
         },
         search: {
             dataReady: input.dataReady ?? false
         },
         playback: {
             showThumbnails: input.showThumbnails ?? true,
-            stopAtEndTime: input.stopAtEndTime ?? false,
+            playArchiveToEnd: input.playArchiveToEnd ?? false,
+            continuousPlayback: input.continuousPlayback ?? false,
+            loopPlayback: input.loopPlayback ?? false,
             activeThumb: input.activeThumb ?? null,
             scrollObserver: null
         }
