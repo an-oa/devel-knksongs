@@ -68,6 +68,14 @@ import {
  */
 
 /**
+ * @typedef {{
+ *   syncValue?: (value: boolean) => void,
+ *   afterStorageApply?: (previousValue: boolean, nextValue: boolean) => void,
+ *   afterToggleChange?: (previousValue: boolean, nextValue: boolean) => void
+ * }} PlaybackSettingEffects
+ */
+
+/**
  * 再生設定の保存値反映とトグル配線を扱うコントローラーを作成する。
  * @param {PlaybackSettingsControllerInput} input
  */
@@ -189,9 +197,7 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
         playbackUi[definition.stateKey] = value;
         const toggle = definition.elementKey ? ui.el[definition.elementKey] : null;
         if (toggle) toggle.checked = value;
-        if (typeof definition.syncValue === "function") {
-            definition.syncValue(value);
-        }
+        runPlaybackSettingSyncEffect(definition, value);
     }
 
     /**
@@ -203,9 +209,7 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
     function applyPlaybackDefinitionValue(definition, nextValue, hookName) {
         const previousValue = Boolean(playbackUi[definition.stateKey]);
         applyPlaybackSettingValue(definition, nextValue);
-        if (typeof definition[hookName] === "function") {
-            definition[hookName](previousValue, nextValue);
-        }
+        runPlaybackSettingValueEffect(definition, hookName, previousValue, nextValue);
     }
 
     /**
@@ -257,17 +261,61 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
 
     const {
         pagePlaybackBehaviorDefinitions,
+        archivePlaybackBehaviorDefinition,
         experimentalPlaybackVisibilityDefinition,
+        thumbnailVisibilityDefinition,
         playbackSettingDefinitions
-    } = createPlaybackSettingDefinitions({
-        restoreActivePlayback,
-        syncExperimentalPlaybackVisibility,
-        syncThumbnailVisibility,
-        applyExperimentalPlaybackStorageValues: () => applyExperimentalPlaybackSettingValues("afterStorageApply"),
-        applyExperimentalPlaybackToggleValues: () => applyExperimentalPlaybackSettingValues("afterToggleChange"),
-        afterThumbnailStorageApply,
-        afterThumbnailToggleChange
-    });
+    } = createPlaybackSettingDefinitions();
+
+    /** @type {Map<PlaybackSettingDefinition, PlaybackSettingEffects>} */
+    const playbackSettingEffectsByDefinition = new Map([
+        [thumbnailVisibilityDefinition, {
+            syncValue: syncThumbnailVisibility,
+            afterStorageApply: afterThumbnailStorageApply,
+            afterToggleChange: afterThumbnailToggleChange
+        }],
+        [archivePlaybackBehaviorDefinition, {
+            afterStorageApply: restoreActivePlaybackWhenChanged,
+            afterToggleChange: restoreActivePlaybackWhenChanged
+        }],
+        [experimentalPlaybackVisibilityDefinition, {
+            syncValue: syncExperimentalPlaybackVisibility,
+            afterStorageApply: () => applyExperimentalPlaybackSettingValues("afterStorageApply"),
+            afterToggleChange: () => applyExperimentalPlaybackSettingValues("afterToggleChange")
+        }]
+    ]);
+
+    /**
+     * 設定値の反映時に同期系の副作用を実行する。
+     * @param {PlaybackSettingDefinition} definition
+     * @param {boolean} value
+     */
+    function runPlaybackSettingSyncEffect(definition, value) {
+        const effects = playbackSettingEffectsByDefinition.get(definition);
+        if (typeof effects?.syncValue === "function") effects.syncValue(value);
+    }
+
+    /**
+     * 設定値の反映後に保存反映またはトグル操作の副作用を実行する。
+     * @param {PlaybackSettingDefinition} definition
+     * @param {"afterStorageApply" | "afterToggleChange"} hookName
+     * @param {boolean} previousValue
+     * @param {boolean} nextValue
+     */
+    function runPlaybackSettingValueEffect(definition, hookName, previousValue, nextValue) {
+        const effects = playbackSettingEffectsByDefinition.get(definition);
+        const effect = effects ? effects[hookName] : null;
+        if (typeof effect === "function") effect(previousValue, nextValue);
+    }
+
+    /**
+     * 再生対象範囲が変わったときだけ現在の再生を作り直す。
+     * @param {boolean} previousValue
+     * @param {boolean} nextValue
+     */
+    function restoreActivePlaybackWhenChanged(previousValue, nextValue) {
+        if (previousValue !== nextValue) restoreActivePlayback();
+    }
 
     const persistedDefinitions = playbackSettingDefinitions.filter((definition) => (
         definition.scope === PLAYBACK_SETTING_SCOPES.PERSISTED
@@ -310,9 +358,12 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
         if (shouldPersist && definition.storageKey) {
             localStorage.setItem(definition.storageKey, String(reduction.nextValue));
         }
-        if (typeof definition.afterToggleChange === "function") {
-            definition.afterToggleChange(reduction.previousValue, reduction.nextValue);
-        }
+        runPlaybackSettingValueEffect(
+            definition,
+            "afterToggleChange",
+            reduction.previousValue,
+            reduction.nextValue
+        );
     }
 
     /**

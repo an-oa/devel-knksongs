@@ -29,40 +29,18 @@ export const INITIAL_PLAYBACK_SETTING_VALUES = Object.freeze({
 });
 
 /**
- * @typedef {{
- *   restoreActivePlayback: () => void,
- *   syncExperimentalPlaybackVisibility: () => void,
- *   syncThumbnailVisibility: (value: boolean) => void,
- *   applyExperimentalPlaybackStorageValues: () => void,
- *   applyExperimentalPlaybackToggleValues: () => void,
- *   afterThumbnailStorageApply: (previousValue: boolean, nextValue: boolean) => void,
- *   afterThumbnailToggleChange: () => void
- * }} PlaybackSettingDefinitionHooks
- */
-
-/**
  * 再生設定の定義一覧を作成する。
  * 本番コードでは playback settings controller から使い、
- * 定義と controller の副作用を分けるため export している。
- * @param {PlaybackSettingDefinitionHooks} hooks
+ * 設定 metadata の境界条件を単体テストするため export している。
  * @returns {{
  *   pagePlaybackBehaviorDefinitions: PlaybackSettingDefinition[],
+ *   archivePlaybackBehaviorDefinition: PlaybackSettingDefinition,
  *   experimentalPlaybackVisibilityDefinition: PlaybackSettingDefinition,
  *   thumbnailVisibilityDefinition: PlaybackSettingDefinition,
  *   playbackSettingDefinitions: PlaybackSettingDefinition[]
  * }}
  */
-export function createPlaybackSettingDefinitions(hooks) {
-    const {
-        restoreActivePlayback,
-        syncExperimentalPlaybackVisibility,
-        syncThumbnailVisibility,
-        applyExperimentalPlaybackStorageValues,
-        applyExperimentalPlaybackToggleValues,
-        afterThumbnailStorageApply,
-        afterThumbnailToggleChange
-    } = hooks;
-
+export function createPlaybackSettingDefinitions() {
     /** @type {PlaybackSettingDefinition} */
     const archivePlaybackBehaviorDefinition = {
         scope: PLAYBACK_SETTING_SCOPES.PERSISTED,
@@ -71,13 +49,7 @@ export function createPlaybackSettingDefinitions(hooks) {
         stateKey: "playArchiveToEnd",
         elementKey: "playArchiveToEndToggle",
         storageKey: PLAY_ARCHIVE_TO_END_STORAGE_KEY,
-        defaultValue: INITIAL_PLAYBACK_SETTING_VALUES.playArchiveToEnd,
-        afterStorageApply(previousValue, nextValue) {
-            if (previousValue !== nextValue) restoreActivePlayback();
-        },
-        afterToggleChange(previousValue, nextValue) {
-            if (previousValue !== nextValue) restoreActivePlayback();
-        }
+        defaultValue: INITIAL_PLAYBACK_SETTING_VALUES.playArchiveToEnd
     };
 
     /** @type {PlaybackSettingDefinition[]} */
@@ -105,16 +77,7 @@ export function createPlaybackSettingDefinitions(hooks) {
         scope: PLAYBACK_SETTING_SCOPES.PAGE,
         kind: PLAYBACK_SETTING_KINDS.VISIBILITY,
         stateKey: "showExperimentalPlaybackSettings",
-        defaultValue: false,
-        syncValue() {
-            syncExperimentalPlaybackVisibility();
-        },
-        afterStorageApply() {
-            applyExperimentalPlaybackStorageValues();
-        },
-        afterToggleChange() {
-            applyExperimentalPlaybackToggleValues();
-        }
+        defaultValue: false
     };
 
     /** @type {PlaybackSettingDefinition} */
@@ -125,16 +88,7 @@ export function createPlaybackSettingDefinitions(hooks) {
         stateKey: "showThumbnails",
         elementKey: "thumbToggle",
         storageKey: THUMBNAIL_STORAGE_KEY,
-        defaultValue: false,
-        syncValue(value) {
-            syncThumbnailVisibility(value);
-        },
-        afterStorageApply(previousValue, nextValue) {
-            afterThumbnailStorageApply(previousValue, nextValue);
-        },
-        afterToggleChange() {
-            afterThumbnailToggleChange();
-        }
+        defaultValue: false
     };
 
     const playbackSettingDefinitions = [
@@ -146,6 +100,7 @@ export function createPlaybackSettingDefinitions(hooks) {
 
     return {
         pagePlaybackBehaviorDefinitions,
+        archivePlaybackBehaviorDefinition,
         experimentalPlaybackVisibilityDefinition,
         thumbnailVisibilityDefinition,
         playbackSettingDefinitions

@@ -12,24 +12,8 @@ import {
     reducePlaybackSettingChange
 } from "../app/lib/playback-settings/value-reducer.mjs";
 
-/**
- * 定義生成に必要な no-op hooks を作る。
- * @returns {Record<string, (...args: unknown[]) => void>}
- */
-function createDefinitionHooks() {
-    return {
-        restoreActivePlayback() {},
-        syncExperimentalPlaybackVisibility() {},
-        syncThumbnailVisibility() {},
-        applyExperimentalPlaybackStorageValues() {},
-        applyExperimentalPlaybackToggleValues() {},
-        afterThumbnailStorageApply() {},
-        afterThumbnailToggleChange() {}
-    };
-}
-
 test("playback settings reducer: initializes page behavior values from definitions", () => {
-    const { pagePlaybackBehaviorDefinitions } = createPlaybackSettingDefinitions(createDefinitionHooks());
+    const { pagePlaybackBehaviorDefinitions } = createPlaybackSettingDefinitions();
     const pageValues = createInitialPlaybackBehaviorPageValues(pagePlaybackBehaviorDefinitions);
 
     assert.equal(pagePlaybackBehaviorDefinitions.every(isPagePlaybackBehaviorDefinition), true);
@@ -37,6 +21,16 @@ test("playback settings reducer: initializes page behavior values from definitio
         ["continuousPlayback", false],
         ["loopPlayback", false]
     ]);
+});
+
+test("playback settings definitions: expose archive playback metadata in the full list", () => {
+    const {
+        archivePlaybackBehaviorDefinition,
+        playbackSettingDefinitions
+    } = createPlaybackSettingDefinitions();
+
+    assert.equal(archivePlaybackBehaviorDefinition.stateKey, "playArchiveToEnd");
+    assert.equal(playbackSettingDefinitions.includes(archivePlaybackBehaviorDefinition), true);
 });
 
 test("playback settings reducer: hidden values override inactive experimental settings", () => {

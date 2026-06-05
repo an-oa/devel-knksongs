@@ -447,15 +447,7 @@ declare module "./definitions.mjs?*" {
     readonly continuousPlayback: false;
     readonly loopPlayback: false;
   };
-  export function createPlaybackSettingDefinitions(input: {
-    restoreActivePlayback: () => void;
-    syncExperimentalPlaybackVisibility: () => void;
-    syncThumbnailVisibility: (value: boolean) => void;
-    applyExperimentalPlaybackStorageValues: () => void;
-    applyExperimentalPlaybackToggleValues: () => void;
-    afterThumbnailStorageApply: (previousValue: boolean, nextValue: boolean) => void;
-    afterThumbnailToggleChange: () => void;
-  }): {
+  export function createPlaybackSettingDefinitions(): {
     pagePlaybackBehaviorDefinitions: PlaybackSettingDefinition[];
     experimentalPlaybackVisibilityDefinition: PlaybackSettingDefinition;
     thumbnailVisibilityDefinition: PlaybackSettingDefinition;
@@ -810,15 +802,7 @@ declare module "../lib/playback-settings/definitions.mjs?*" {
     readonly continuousPlayback: false;
     readonly loopPlayback: false;
   };
-  export function createPlaybackSettingDefinitions(input: {
-    restoreActivePlayback: () => void;
-    syncExperimentalPlaybackVisibility: () => void;
-    syncThumbnailVisibility: (value: boolean) => void;
-    applyExperimentalPlaybackStorageValues: () => void;
-    applyExperimentalPlaybackToggleValues: () => void;
-    afterThumbnailStorageApply: (previousValue: boolean, nextValue: boolean) => void;
-    afterThumbnailToggleChange: () => void;
-  }): {
+  export function createPlaybackSettingDefinitions(): {
     pagePlaybackBehaviorDefinitions: PlaybackSettingDefinition[];
     experimentalPlaybackVisibilityDefinition: PlaybackSettingDefinition;
     thumbnailVisibilityDefinition: PlaybackSettingDefinition;
