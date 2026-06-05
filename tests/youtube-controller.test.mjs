@@ -53,6 +53,66 @@ function assertPlaybackStartStatus(actual, status) {
     assert.deepEqual(actual, playbackStartResult(status));
 }
 
+/**
+ * 共有プレーヤー再生成テスト用の YT.Player mock を登録する。
+ * @returns {Array<{
+ *   iframe: HTMLIFrameElement,
+ *   stopCalls: number,
+ *   destroyCalls: number,
+ *   lastLoadArgs: unknown
+ * }>}
+ */
+function installSharedPlayerRecreationMock() {
+    const playerInstances = [];
+    installYoutubePlayerConstructor(class {
+        constructor(host) {
+            this.iframe = attachMockPlayerIframe(host);
+            this.stopCalls = 0;
+            this.destroyCalls = 0;
+            this.lastLoadArgs = null;
+            playerInstances.push(this);
+        }
+
+        getIframe() {
+            return this.iframe;
+        }
+
+        stopVideo() {
+            this.stopCalls += 1;
+        }
+
+        loadVideoById(args) {
+            this.lastLoadArgs = args;
+        }
+
+        destroy() {
+            this.destroyCalls += 1;
+        }
+    });
+    return playerInstances;
+}
+
+/**
+ * 共有プレーヤー再生成テスト用のサムネイル2件を作成して初期化する。
+ * @param {ReturnType<typeof createYoutubeControllerHarness>["controller"]} controller
+ * @returns {{ thumbA: HTMLElement, thumbB: HTMLElement }}
+ */
+function createTwoYoutubePlaybackThumbs(controller) {
+    const cardA = document.createElement("div");
+    const cardB = document.createElement("div");
+    cardA.className = "song-card";
+    cardB.className = "song-card";
+    const thumbA = document.createElement("div");
+    const thumbB = document.createElement("div");
+    cardA.appendChild(thumbA);
+    cardB.appendChild(thumbB);
+    document.body.append(cardA, cardB);
+
+    controller.updateThumbnail(thumbA, { videoId: "video1", startSeconds: 5, endSeconds: 25 });
+    controller.updateThumbnail(thumbB, { videoId: "video2", startSeconds: 15, endSeconds: 45 });
+    return { thumbA, thumbB };
+}
+
 test("youtube: disconnected active thumb is cleared without restore work", () => {
     const cleanup = installFakeDom();
     try {
@@ -163,7 +223,7 @@ test("youtube: player init uses prebuilt iframe src and binds YT.Player to it", 
     }
 });
 
-test("youtube: embed autoplay stays enabled when continuation playback is enabled", async () => {
+test("youtube: manual playback keeps embed autoplay disabled during continuous playback", async () => {
     const cleanup = installFakeDom();
     try {
         const ui = createYoutubeUiState({
@@ -194,7 +254,50 @@ test("youtube: embed autoplay stays enabled when continuation playback is enable
         thumb.onclick();
         await flushMicrotasks();
 
-        const iframe = getSharedPlaybackIframe();
+        const iframe = thumb.querySelector("iframe");
+        assert.ok(iframe);
+        assert.match(iframe.src, /autoplay=0/);
+    } finally {
+        cleanup();
+    }
+});
+
+test("youtube: embed autoplay is enabled for continuation playback", async () => {
+    const cleanup = installFakeDom();
+    try {
+        const ui = createYoutubeUiState({
+            continuousPlayback: true
+        });
+        const { controller } = createYoutubeControllerHarness({ ui });
+        installYoutubePlayerConstructor(class {
+            constructor(host, options) {
+                const iframe = document.createElement("iframe");
+                host.appendChild(iframe);
+                this._iframe = iframe;
+                if (options.events && typeof options.events.onReady === "function") {
+                    options.events.onReady({ target: this });
+                }
+            }
+
+            getIframe() {
+                return this._iframe;
+            }
+
+            destroy() {}
+        });
+
+        const thumb = document.createElement("div");
+        document.body.appendChild(thumb);
+
+        controller.playThumbnail(thumb, {
+            videoId: "video1",
+            startSeconds: 45
+        }, {
+            playbackMode: "autoplay"
+        });
+        await flushMicrotasks();
+
+        const iframe = thumb.querySelector("iframe");
         assert.ok(iframe);
         assert.match(iframe.src, /autoplay=1/);
     } finally {
@@ -308,58 +411,15 @@ test("youtube: switching to another thumbnail recreates the shared player", asyn
             continuousPlayback: true
         });
         const { controller } = createYoutubeControllerHarness({ ui });
-        const playerInstances = [];
-        window.YT = {
-            PlayerState: {
-                ENDED: 0,
-                PLAYING: 1,
-                PAUSED: 2
-            },
-            Player: class {
-                constructor(host) {
-                    this.iframe = attachMockPlayerIframe(host);
-                    this.stopCalls = 0;
-                    this.destroyCalls = 0;
-                    this.lastLoadArgs = null;
-                    playerInstances.push(this);
-                }
-
-                getIframe() {
-                    return this.iframe;
-                }
-
-                stopVideo() {
-                    this.stopCalls += 1;
-                }
-
-                loadVideoById(args) {
-                    this.lastLoadArgs = args;
-                }
-
-                destroy() {
-                    this.destroyCalls += 1;
-                }
-            }
-        };
-
-        const cardA = document.createElement("div");
-        const cardB = document.createElement("div");
-        cardA.className = "song-card";
-        cardB.className = "song-card";
-        const thumbA = document.createElement("div");
-        const thumbB = document.createElement("div");
-        cardA.appendChild(thumbA);
-        cardB.appendChild(thumbB);
-        document.body.append(cardA, cardB);
-
-        controller.updateThumbnail(thumbA, { videoId: "video1", startSeconds: 5, endSeconds: 25 });
-        controller.updateThumbnail(thumbB, { videoId: "video2", startSeconds: 15, endSeconds: 45 });
+        const playerInstances = installSharedPlayerRecreationMock();
+        const { thumbA, thumbB } = createTwoYoutubePlaybackThumbs(controller);
 
         thumbA.onclick();
         await flushMicrotasks();
 
         const firstIframe = thumbA.querySelector("iframe");
         assert.ok(firstIframe);
+        assert.equal(firstIframe.src.includes("autoplay=0"), true);
         assert.equal(playerInstances.length, 1);
 
         thumbB.onclick();
@@ -369,88 +429,11 @@ test("youtube: switching to another thumbnail recreates the shared player", asyn
         assert.equal(thumbA.querySelector("iframe"), null);
         assert.ok(secondIframe);
         assert.notEqual(secondIframe, firstIframe);
+        assert.equal(secondIframe.src.includes("autoplay=0"), true);
         assert.equal(playerInstances.length, 2);
         assert.equal(playerInstances[0].stopCalls, 1);
         assert.equal(playerInstances[0].destroyCalls, 1);
         assert.equal(playerInstances[0].lastLoadArgs, null);
-    } finally {
-        cleanup();
-    }
-});
-
-test("youtube: switching thumbnails cues the reusable player when autoplay is disabled", async () => {
-    const cleanup = installFakeDom();
-    try {
-        const ui = createYoutubeUiState({
-            playArchiveToEnd: false
-        });
-        const { controller } = createYoutubeControllerHarness({ ui });
-        const playerInstances = [];
-        window.YT = {
-            PlayerState: {
-                ENDED: 0,
-                PLAYING: 1,
-                PAUSED: 2
-            },
-            Player: class {
-                constructor(host) {
-                    this.iframe = attachMockPlayerIframe(host);
-                    this.lastCueArgs = null;
-                    this.lastLoadArgs = null;
-                    this.cueParent = null;
-                    playerInstances.push(this);
-                }
-
-                getIframe() {
-                    return this.iframe;
-                }
-
-                cueVideoById(args) {
-                    this.lastCueArgs = args;
-                    this.cueParent = this.iframe.parentElement;
-                }
-
-                loadVideoById(args) {
-                    this.lastLoadArgs = args;
-                }
-
-                destroy() {}
-            }
-        };
-
-        const cardA = document.createElement("div");
-        const cardB = document.createElement("div");
-        cardA.className = "song-card";
-        cardB.className = "song-card";
-        const thumbA = document.createElement("div");
-        const thumbB = document.createElement("div");
-        cardA.appendChild(thumbA);
-        cardB.appendChild(thumbB);
-        document.body.append(cardA, cardB);
-
-        controller.updateThumbnail(thumbA, { videoId: "video1", startSeconds: 5, endSeconds: 25 });
-        controller.updateThumbnail(thumbB, { videoId: "video2", startSeconds: 15, endSeconds: 45 });
-
-        thumbA.onclick();
-        await flushMicrotasks();
-
-        const firstIframe = getSharedPlaybackIframe();
-        assert.ok(firstIframe);
-        assert.equal(firstIframe.src.includes("autoplay=0"), true);
-
-        thumbB.onclick();
-        await flushMicrotasks();
-
-        const secondIframe = getSharedPlaybackIframe();
-        assert.equal(secondIframe, firstIframe);
-        assert.equal(playerInstances.length, 1);
-        assert.equal(playerInstances[0].lastLoadArgs, null);
-        assert.deepEqual(playerInstances[0].lastCueArgs, {
-            videoId: "video2",
-            startSeconds: 15,
-            endSeconds: 45
-        });
-        assert.equal(playerInstances[0].cueParent.classList.contains("youtube-player-overlay-frame"), true);
     } finally {
         cleanup();
     }
@@ -1722,6 +1705,7 @@ test("youtube: autoplay timeout emits debug logs only when debug mode is enabled
     const previousSetTimeout = globalThis.setTimeout;
     const previousClearTimeout = globalThis.clearTimeout;
     const previousConsoleDebug = console.debug;
+    const previousConsoleTrace = console.trace;
     const previousLocalStorage = globalThis.localStorage;
     let timeoutCallback = null;
     const debugCalls = [];
@@ -1736,6 +1720,7 @@ test("youtube: autoplay timeout emits debug logs only when debug mode is enabled
     console.debug = (...args) => {
         debugCalls.push(args);
     };
+    console.trace = () => {};
     try {
         const ui = createYoutubeUiState({});
         const { controller } = createYoutubeControllerHarness({ ui });
@@ -1782,6 +1767,7 @@ test("youtube: autoplay timeout emits debug logs only when debug mode is enabled
         );
     } finally {
         console.debug = previousConsoleDebug;
+        console.trace = previousConsoleTrace;
         setGlobalValue("localStorage", previousLocalStorage);
         setGlobalValue("setTimeout", previousSetTimeout);
         setGlobalValue("clearTimeout", previousClearTimeout);

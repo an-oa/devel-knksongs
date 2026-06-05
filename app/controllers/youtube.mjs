@@ -309,12 +309,13 @@ export function createYoutubeController({ ui, youtube, constants }) {
         /**
          * 埋め込み再生用の標準 YouTube URL を生成する。
          * @param {YoutubeTarget} yt
+         * @param {YoutubePlaybackMode | undefined} playbackMode
          * @returns {string}
          */
-        buildEmbedUrl(yt) {
+        buildEmbedUrl(yt, playbackMode) {
             return buildYoutubeEmbedUrl(yt, {
                 endSeconds: getEffectiveEndSeconds(yt),
-                autoplay: isEmbeddedPlayerAutoplayEnabled()
+                autoplay: isEmbeddedPlayerAutoplayEnabled(playbackMode)
             });
         },
         /**
@@ -491,11 +492,13 @@ export function createYoutubeController({ ui, youtube, constants }) {
     }
 
     /**
-     * 現在の再生設定で埋め込みプレイヤーを自動開始するか返す。
+     * 再生開始方法に応じて埋め込みプレイヤーを自動開始するか返す。
+     * 手動クリックは連続再生設定中でも autoplay へ昇格させない。
+     * @param {YoutubePlaybackMode | undefined} playbackMode
      * @returns {boolean}
      */
-    function isEmbeddedPlayerAutoplayEnabled() {
-        return Boolean(playbackUi.continuousPlayback || playbackUi.loopPlayback);
+    function isEmbeddedPlayerAutoplayEnabled(playbackMode) {
+        return playbackMode === "autoplay";
     }
 
     /**
@@ -687,9 +690,10 @@ export function createYoutubeController({ ui, youtube, constants }) {
      * @param {HTMLElement} thumbDiv
      * @param {YoutubeTarget} yt
      * @param {number} playbackSessionId
+     * @param {YoutubePlaybackMode} playbackMode
      * @returns {Promise<boolean>}
      */
-    function mountSharedPlayback(thumbDiv, yt, playbackSessionId) {
+    function mountSharedPlayback(thumbDiv, yt, playbackSessionId, playbackMode) {
         let sharedPlayback = getSharedPlaybackState();
         if (sharedPlayback.player || sharedPlayback.iframe || sharedPlayback.hostThumb) {
             debugPlayback("youtube", "mountSharedPlayback recreating iframe-backed player", {
@@ -705,7 +709,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
         if (!isHtmlElement(iframe)) {
             return Promise.resolve(false);
         }
-        iframe.src = youtubeApi.buildEmbedUrl(yt);
+        iframe.src = youtubeApi.buildEmbedUrl(yt, playbackMode);
         thumbDiv.replaceChildren(iframe, sharedPlayback.closeButton);
         sharedPlayback.hostThumb = thumbDiv;
         setSharedPlaybackSessionId(playbackSessionId);
@@ -980,7 +984,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
         setYoutubeThumbnailOrientation(thumbDiv, yt && yt.isVertical ? "vertical" : "landscape");
         setYoutubeThumbnailPlaybackState(thumbDiv, "playing");
         setYoutubeThumbnailExpandedCardState(thumbDiv, Boolean(yt && yt.isVertical));
-        Promise.resolve(mountSharedPlayback(thumbDiv, yt, playbackSessionId)).then((didMount) => {
+        Promise.resolve(mountSharedPlayback(thumbDiv, yt, playbackSessionId, playbackMode)).then((didMount) => {
             if (didMount) {
                 playbackStartAttempts.armStartTimeout(playbackSessionId);
                 return;

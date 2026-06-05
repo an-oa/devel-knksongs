@@ -15,7 +15,7 @@ test("youtube embed: buildYoutubeEmbedUrl includes playback params and optional 
             { endSeconds: 75 }
         );
         assert.match(url, /^https:\/\/www\.youtube\.com\/embed\/abc123\?/);
-        assert.match(url, /(?:\?|&)autoplay=1(?:&|$)/);
+        assert.match(url, /(?:\?|&)autoplay=0(?:&|$)/);
         assert.match(url, /(?:\?|&)start=45(?:&|$)/);
         assert.match(url, /(?:\?|&)end=75(?:&|$)/);
         assert.match(
@@ -35,6 +35,19 @@ test("youtube embed: buildYoutubeEmbedUrl can disable autoplay", () => {
             { autoplay: false }
         );
         assert.match(url, /(?:\?|&)autoplay=0(?:&|$)/);
+    } finally {
+        cleanup();
+    }
+});
+
+test("youtube embed: buildYoutubeEmbedUrl can enable autoplay", () => {
+    const cleanup = installFakeDom();
+    try {
+        const url = buildYoutubeEmbedUrl(
+            { videoId: "abc123", startSeconds: 45 },
+            { autoplay: true }
+        );
+        assert.match(url, /(?:\?|&)autoplay=1(?:&|$)/);
     } finally {
         cleanup();
     }

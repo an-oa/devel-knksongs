@@ -111,9 +111,9 @@ export function createYoutubeIframeApiLoader({
  * @returns {string}
  */
 export function buildYoutubeEmbedUrl(yt, options) {
-    const isAutoplayEnabled = !(options && options.autoplay === false);
+    const autoplay = options && options.autoplay === true ? "1" : "0";
     const params = new URLSearchParams({
-        autoplay: isAutoplayEnabled ? "1" : "0",
+        autoplay,
         playsinline: "1",
         start: String(yt.startSeconds),
         enablejsapi: "1",
