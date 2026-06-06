@@ -1175,6 +1175,49 @@ test("youtube: embed url includes end time when archive-to-end playback is disab
     }
 });
 
+test("youtube: embed url uses youtube-nocookie host when enabled", async () => {
+    const cleanup = installFakeDom();
+    try {
+        const ui = createYoutubeUiState({
+            useYoutubeNoCookie: true
+        });
+        const { controller } = createYoutubeControllerHarness({ ui });
+        globalThis.window.YT = {
+            PlayerState: {
+                PAUSED: 2,
+                ENDED: 0,
+                PLAYING: 1
+            },
+            Player: class {
+                constructor(host, options) {
+                    this.iframe = attachMockPlayerIframe(host, options);
+                }
+
+                getIframe() {
+                    return this.iframe;
+                }
+
+                destroy() {}
+            }
+        };
+
+        const thumb = document.createElement("div");
+        document.body.appendChild(thumb);
+        controller.updateThumbnail(thumb, { videoId: "video1", startSeconds: 45, endSeconds: 75 });
+        thumb.onclick();
+        await flushMicrotasks();
+
+        assert.match(
+            thumb.querySelector("iframe").src,
+            /^https:\/\/www\.youtube-nocookie\.com\/embed\/video1\?/
+        );
+        assert.match(thumb.querySelector("iframe").src, /start=45/);
+        assert.match(thumb.querySelector("iframe").src, /end=75/);
+    } finally {
+        cleanup();
+    }
+});
+
 test("youtube: embed url omits end time when archive-to-end playback is enabled", async () => {
     const cleanup = installFakeDom();
     try {

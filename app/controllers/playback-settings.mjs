@@ -19,6 +19,7 @@ import {
  *   experimentalPlaybackSettingsGroup?: HTMLElement | null,
  *   closeSettingsPanelBtn?: HTMLElement | null,
  *   thumbToggle?: HTMLInputElement | null,
+ *   youtubeNoCookieToggle?: HTMLInputElement | null,
  *   playArchiveToEndToggle?: HTMLInputElement | null,
  *   continuousPlaybackToggle?: HTMLInputElement | null,
  *   loopPlaybackToggle?: HTMLInputElement | null
@@ -37,6 +38,7 @@ import {
  * @typedef {{
  *   showThumbnails: boolean,
  *   showExperimentalPlaybackSettings: boolean,
+ *   useYoutubeNoCookie: boolean,
  *   playArchiveToEnd: boolean,
  *   continuousPlayback: boolean,
  *   loopPlayback: boolean
@@ -423,6 +425,7 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
         return {
             showThumbnails: Boolean(playbackUi.showThumbnails),
             showExperimentalPlaybackSettings: Boolean(playbackUi.showExperimentalPlaybackSettings),
+            useYoutubeNoCookie: Boolean(playbackUi.useYoutubeNoCookie),
             playArchiveToEnd: Boolean(playbackUi.playArchiveToEnd),
             continuousPlayback: Boolean(playbackUi.continuousPlayback),
             loopPlayback: Boolean(playbackUi.loopPlayback)

@@ -1,4 +1,5 @@
 export const THUMBNAIL_STORAGE_KEY = "showThumbnails";
+export const USE_YOUTUBE_NOCOOKIE_STORAGE_KEY = "useYoutubeNoCookie";
 export const PLAY_ARCHIVE_TO_END_STORAGE_KEY = "playArchiveToEnd";
 
 // 旧バージョンが localStorage に残した個別キー。現行では読み込まず起動時に削除する。
@@ -25,6 +26,7 @@ export const PLAYBACK_SETTING_KINDS = Object.freeze({
 export const INITIAL_PLAYBACK_SETTING_VALUES = Object.freeze({
     showThumbnails: false,
     showExperimentalPlaybackSettings: false,
+    useYoutubeNoCookie: false,
     playArchiveToEnd: false,
     continuousPlayback: false,
     loopPlayback: false
@@ -36,6 +38,7 @@ export const INITIAL_PLAYBACK_SETTING_VALUES = Object.freeze({
  * 設定 metadata の境界条件を単体テストするため export している。
  * @returns {{
  *   pagePlaybackBehaviorDefinitions: PlaybackSettingDefinition[],
+ *   youtubeNoCookieDefinition: PlaybackSettingDefinition,
  *   archivePlaybackBehaviorDefinition: PlaybackSettingDefinition,
  *   experimentalPlaybackVisibilityDefinition: PlaybackSettingDefinition,
  *   thumbnailVisibilityDefinition: PlaybackSettingDefinition,
@@ -43,6 +46,18 @@ export const INITIAL_PLAYBACK_SETTING_VALUES = Object.freeze({
  * }}
  */
 export function createPlaybackSettingDefinitions() {
+    /** @type {PlaybackSettingDefinition} */
+    const youtubeNoCookieDefinition = {
+        scope: PLAYBACK_SETTING_SCOPES.PERSISTED,
+        kind: PLAYBACK_SETTING_KINDS.BEHAVIOR,
+        interactive: true,
+        stateKey: "useYoutubeNoCookie",
+        elementKey: "youtubeNoCookieToggle",
+        storageKey: USE_YOUTUBE_NOCOOKIE_STORAGE_KEY,
+        defaultValue: INITIAL_PLAYBACK_SETTING_VALUES.useYoutubeNoCookie,
+        restoreActivePlaybackOnChange: true
+    };
+
     /** @type {PlaybackSettingDefinition} */
     const archivePlaybackBehaviorDefinition = {
         scope: PLAYBACK_SETTING_SCOPES.PERSISTED,
@@ -96,6 +111,7 @@ export function createPlaybackSettingDefinitions() {
 
     const playbackSettingDefinitions = [
         thumbnailVisibilityDefinition,
+        youtubeNoCookieDefinition,
         archivePlaybackBehaviorDefinition,
         experimentalPlaybackVisibilityDefinition,
         ...pagePlaybackBehaviorDefinitions
@@ -103,6 +119,7 @@ export function createPlaybackSettingDefinitions() {
 
     return {
         pagePlaybackBehaviorDefinitions,
+        youtubeNoCookieDefinition,
         archivePlaybackBehaviorDefinition,
         experimentalPlaybackVisibilityDefinition,
         thumbnailVisibilityDefinition,

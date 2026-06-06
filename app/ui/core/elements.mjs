@@ -33,6 +33,7 @@ export function collectUiElements() {
         clearDateToBtn: document.getElementById("clearDateToBtn"),
         themeToggle: document.getElementById("theme-toggle"),
         thumbToggle: document.getElementById("thumbnail-toggle"),
+        youtubeNoCookieToggle: document.getElementById("youtube-nocookie-toggle"),
         playArchiveToEndToggle: document.getElementById("play-archive-to-end-toggle"),
         continuousPlaybackToggle: document.getElementById("continuous-playback-toggle"),
         loopPlaybackToggle: document.getElementById("loop-playback-toggle"),

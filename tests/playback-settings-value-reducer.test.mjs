@@ -34,6 +34,19 @@ test("playback settings definitions: expose archive playback metadata in the ful
     assert.equal(playbackSettingDefinitions.includes(archivePlaybackBehaviorDefinition), true);
 });
 
+test("playback settings definitions: expose youtube-nocookie metadata in the full list", () => {
+    const {
+        youtubeNoCookieDefinition,
+        playbackSettingDefinitions
+    } = createPlaybackSettingDefinitions();
+
+    assert.equal(youtubeNoCookieDefinition.stateKey, "useYoutubeNoCookie");
+    assert.equal(youtubeNoCookieDefinition.elementKey, "youtubeNoCookieToggle");
+    assert.equal(youtubeNoCookieDefinition.storageKey, "useYoutubeNoCookie");
+    assert.equal(youtubeNoCookieDefinition.restoreActivePlaybackOnChange, true);
+    assert.equal(playbackSettingDefinitions.includes(youtubeNoCookieDefinition), true);
+});
+
 test("playback settings reducer: hidden values override inactive experimental settings", () => {
     const definition = {
         scope: PLAYBACK_SETTING_SCOPES.PAGE,

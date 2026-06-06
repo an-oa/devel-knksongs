@@ -323,7 +323,8 @@ export function createYoutubeController({ ui, youtube, constants }) {
         buildEmbedUrl(yt, playbackMode) {
             return buildYoutubeEmbedUrl(yt, {
                 endSeconds: getEffectiveEndSeconds(yt),
-                autoplay: isEmbeddedPlayerAutoplayEnabled(playbackMode)
+                autoplay: isEmbeddedPlayerAutoplayEnabled(playbackMode),
+                useYoutubeNoCookie: Boolean(playbackUi.useYoutubeNoCookie)
             });
         },
         /**

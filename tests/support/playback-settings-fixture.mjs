@@ -5,6 +5,7 @@ import { LEGACY_PLAYBACK_SETTINGS_STORAGE_KEYS } from "../../app/lib/playback-se
 /**
  * @typedef {{
  *   thumbToggle?: HTMLInputElement | null,
+ *   youtubeNoCookieToggle?: HTMLInputElement | null,
  *   playArchiveToEndToggle?: HTMLInputElement | null,
  *   continuousPlaybackToggle?: HTMLInputElement | null,
  *   loopPlaybackToggle?: HTMLInputElement | null,
@@ -14,6 +15,7 @@ import { LEGACY_PLAYBACK_SETTINGS_STORAGE_KEYS } from "../../app/lib/playback-se
  *   dataReady?: boolean,
  *   showThumbnails?: boolean,
  *   showExperimentalPlaybackSettings?: boolean,
+ *   useYoutubeNoCookie?: boolean,
  *   playArchiveToEnd?: boolean,
  *   continuousPlayback?: boolean,
  *   loopPlayback?: boolean,
@@ -24,6 +26,7 @@ import { LEGACY_PLAYBACK_SETTINGS_STORAGE_KEYS } from "../../app/lib/playback-se
 /**
  * @typedef {{
  *   thumbToggle: HTMLInputElement | null,
+ *   youtubeNoCookieToggle: HTMLInputElement | null,
  *   playArchiveToEndToggle: HTMLInputElement | null,
  *   continuousPlaybackToggle: HTMLInputElement | null,
  *   loopPlaybackToggle: HTMLInputElement | null,
@@ -42,6 +45,7 @@ import { LEGACY_PLAYBACK_SETTINGS_STORAGE_KEYS } from "../../app/lib/playback-se
  * @typedef {{
  *   showThumbnails: boolean,
  *   showExperimentalPlaybackSettings: boolean,
+ *   useYoutubeNoCookie: boolean,
  *   playArchiveToEnd: boolean,
  *   continuousPlayback: boolean,
  *   loopPlayback: boolean,
@@ -121,6 +125,7 @@ function createPlaybackSettingsUiState(input) {
     return {
         el: {
             thumbToggle: input.thumbToggle ?? null,
+            youtubeNoCookieToggle: input.youtubeNoCookieToggle ?? null,
             playArchiveToEndToggle: input.playArchiveToEndToggle ?? null,
             continuousPlaybackToggle: input.continuousPlaybackToggle ?? null,
             loopPlaybackToggle: input.loopPlaybackToggle ?? null,
@@ -134,6 +139,7 @@ function createPlaybackSettingsUiState(input) {
         playback: {
             showThumbnails: input.showThumbnails ?? true,
             showExperimentalPlaybackSettings: input.showExperimentalPlaybackSettings ?? false,
+            useYoutubeNoCookie: input.useYoutubeNoCookie ?? false,
             playArchiveToEnd: input.playArchiveToEnd ?? false,
             continuousPlayback: input.continuousPlayback ?? false,
             loopPlayback: input.loopPlayback ?? false,
@@ -173,6 +179,7 @@ export function createPlaybackSettingsFixture(input) {
     experimentalPlaybackSettingsGroup.setAttribute("aria-hidden", "true");
     const ui = createPlaybackSettingsUiState({
         thumbToggle: document.createElement("input"),
+        youtubeNoCookieToggle: document.createElement("input"),
         playArchiveToEndToggle: document.createElement("input"),
         continuousPlaybackToggle: document.createElement("input"),
         loopPlaybackToggle: document.createElement("input"),

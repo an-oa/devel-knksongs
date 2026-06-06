@@ -54,10 +54,12 @@ test("setupPlaybackSettings: playback settings are reset to load defaults on boo
 
         assert.equal(ui.playback.showThumbnails, false);
         assert.equal(ui.playback.showExperimentalPlaybackSettings, false);
+        assert.equal(ui.playback.useYoutubeNoCookie, false);
         assert.equal(ui.playback.playArchiveToEnd, false);
         assert.equal(ui.playback.continuousPlayback, false);
         assert.equal(ui.playback.loopPlayback, false);
         assert.equal(ui.el.thumbToggle.checked, false);
+        assert.equal(ui.el.youtubeNoCookieToggle.checked, false);
         assert.equal(ui.el.playArchiveToEndToggle.checked, false);
         assert.equal(ui.el.continuousPlaybackToggle.checked, false);
         assert.equal(ui.el.loopPlaybackToggle.checked, false);
@@ -78,6 +80,7 @@ test("applyPlaybackSettingsFromStorage: ui sync reapplies stored playback settin
     try {
         seedPlaybackSettingsStorage({
             showThumbnails: "true",
+            useYoutubeNoCookie: "true",
             playArchiveToEnd: "true",
             showExperimentalPlaybackSettings: "false",
             stopAtEndTime: "true",
@@ -102,10 +105,12 @@ test("applyPlaybackSettingsFromStorage: ui sync reapplies stored playback settin
 
         assert.equal(ui.playback.showThumbnails, true);
         assert.equal(ui.playback.showExperimentalPlaybackSettings, false);
+        assert.equal(ui.playback.useYoutubeNoCookie, true);
         assert.equal(ui.playback.playArchiveToEnd, true);
         assert.equal(ui.playback.continuousPlayback, false);
         assert.equal(ui.playback.loopPlayback, false);
         assert.equal(ui.el.thumbToggle.checked, true);
+        assert.equal(ui.el.youtubeNoCookieToggle.checked, true);
         assert.equal(ui.el.playArchiveToEndToggle.checked, true);
         assert.equal(ui.el.continuousPlaybackToggle.checked, false);
         assert.equal(ui.el.loopPlaybackToggle.checked, false);
@@ -205,6 +210,37 @@ test("setupPlaybackSettings: archive playback toggle restores active playback be
 
         assert.equal(ui.playback.playArchiveToEnd, true);
         assert.equal(globalThis.localStorage.getItem("playArchiveToEnd"), "true");
+        assertLegacyPlaybackSettingsStorageCleared();
+        assert.equal(restoreCount, 1);
+    } finally {
+        globalThis.localStorage = prevLocalStorage;
+        restoreDom();
+    }
+});
+
+test("setupPlaybackSettings: youtube-nocookie toggle restores active playback before switching host", () => {
+    const restoreDom = installFakeDom();
+    const prevLocalStorage = globalThis.localStorage;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        seedPlaybackSettingsStorage({
+            showThumbnails: "true"
+        });
+        const { ui, controller } = createPlaybackSettingsFixture({
+            callbacks: {
+                restoreActivePlayback: () => {
+                    restoreCount += 1;
+                }
+            }
+        });
+        let restoreCount = 0;
+
+        controller.setupPlaybackSettings();
+        ui.el.youtubeNoCookieToggle.checked = true;
+        invokeListener(ui.el.youtubeNoCookieToggle, "change", {});
+
+        assert.equal(ui.playback.useYoutubeNoCookie, true);
+        assert.equal(globalThis.localStorage.getItem("useYoutubeNoCookie"), "true");
         assertLegacyPlaybackSettingsStorageCleared();
         assert.equal(restoreCount, 1);
     } finally {

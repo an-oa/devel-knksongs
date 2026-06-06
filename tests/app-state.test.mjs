@@ -15,6 +15,7 @@ function pickPlaybackSettingValues(playback) {
     return {
         showThumbnails: playback.showThumbnails,
         showExperimentalPlaybackSettings: playback.showExperimentalPlaybackSettings,
+        useYoutubeNoCookie: playback.useYoutubeNoCookie,
         playArchiveToEnd: playback.playArchiveToEnd,
         continuousPlayback: playback.continuousPlayback,
         loopPlayback: playback.loopPlayback

@@ -22,6 +22,7 @@ export function createYoutubeUiState(input = {}) {
     return {
         el: {
             thumbToggle: input.thumbToggle ?? null,
+            youtubeNoCookieToggle: input.youtubeNoCookieToggle ?? null,
             playArchiveToEndToggle: input.playArchiveToEndToggle ?? null
         },
         search: {
@@ -29,6 +30,7 @@ export function createYoutubeUiState(input = {}) {
         },
         playback: {
             showThumbnails: input.showThumbnails ?? true,
+            useYoutubeNoCookie: input.useYoutubeNoCookie ?? false,
             playArchiveToEnd: input.playArchiveToEnd ?? false,
             continuousPlayback: input.continuousPlayback ?? false,
             loopPlayback: input.loopPlayback ?? false,

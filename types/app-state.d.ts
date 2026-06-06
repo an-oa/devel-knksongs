@@ -125,6 +125,7 @@ type YoutubeIframeApiGlobal = {
 type PlaybackSettingsSnapshot = {
   showThumbnails: boolean;
   showExperimentalPlaybackSettings: boolean;
+  useYoutubeNoCookie: boolean;
   playArchiveToEnd: boolean;
   continuousPlayback: boolean;
   loopPlayback: boolean;

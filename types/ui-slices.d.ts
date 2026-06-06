@@ -28,6 +28,7 @@ type AppUiElements = Partial<{
   clearDateToBtn: HTMLButtonElement | null;
   themeToggle: HTMLInputElement | null;
   thumbToggle: HTMLInputElement | null;
+  youtubeNoCookieToggle: HTMLInputElement | null;
   playArchiveToEndToggle: HTMLInputElement | null;
   continuousPlaybackToggle: HTMLInputElement | null;
   loopPlaybackToggle: HTMLInputElement | null;
@@ -104,6 +105,8 @@ type PlaybackUiRuntimeState = {
   showThumbnails: boolean;
   /** 実験的な再生設定を表示するかどうか。 */
   showExperimentalPlaybackSettings: boolean;
+  /** 埋め込み再生 URL に youtube-nocookie.com を使うかどうか。 */
+  useYoutubeNoCookie: boolean;
   /** アーカイブ全体を曲の終了秒で止めずに再生するかどうか。 */
   playArchiveToEnd: boolean;
   /** 再生終了後に次の曲へ進むかどうか。 */
@@ -119,6 +122,7 @@ type PlaybackSettingsUiSlice = Pick<
   PlaybackUiRuntimeState,
   "showThumbnails" |
   "showExperimentalPlaybackSettings" |
+  "useYoutubeNoCookie" |
   "playArchiveToEnd" |
   "continuousPlayback" |
   "loopPlayback"
@@ -127,6 +131,7 @@ type PlaybackSettingsUiSlice = Pick<
 /** 再生設定トグルとして使う DOM 要素キー。 */
 type PlaybackSettingElementKey =
   "thumbToggle" |
+  "youtubeNoCookieToggle" |
   "playArchiveToEndToggle" |
   "continuousPlaybackToggle" |
   "loopPlaybackToggle";
