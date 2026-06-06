@@ -23,6 +23,8 @@ export const PLAYBACK_SETTING_KINDS = Object.freeze({
 });
 
 export const INITIAL_PLAYBACK_SETTING_VALUES = Object.freeze({
+    showThumbnails: false,
+    showExperimentalPlaybackSettings: false,
     playArchiveToEnd: false,
     continuousPlayback: false,
     loopPlayback: false
@@ -78,7 +80,7 @@ export function createPlaybackSettingDefinitions() {
         scope: PLAYBACK_SETTING_SCOPES.PAGE,
         kind: PLAYBACK_SETTING_KINDS.VISIBILITY,
         stateKey: "showExperimentalPlaybackSettings",
-        defaultValue: false
+        defaultValue: INITIAL_PLAYBACK_SETTING_VALUES.showExperimentalPlaybackSettings
     };
 
     /** @type {PlaybackSettingDefinition} */
@@ -89,7 +91,7 @@ export function createPlaybackSettingDefinitions() {
         stateKey: "showThumbnails",
         elementKey: "thumbToggle",
         storageKey: THUMBNAIL_STORAGE_KEY,
-        defaultValue: false
+        defaultValue: INITIAL_PLAYBACK_SETTING_VALUES.showThumbnails
     };
 
     const playbackSettingDefinitions = [

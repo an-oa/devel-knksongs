@@ -1,5 +1,7 @@
 // @ts-check
 
+import { INITIAL_PLAYBACK_SETTING_VALUES } from "./lib/playback-settings/definitions.mjs";
+
 /**
  * 鐘輝かう 歌サーチ
  */
@@ -22,6 +24,20 @@ export const YT_IFRAME_API_SRC = "https://www.youtube.com/iframe_api";
 export const YT_IFRAME_API_SELECTOR = 'script[data-yt-iframe-api="true"]';
 export const YT_IFRAME_READY_POLL_MS = 50;
 export const STOP_PLAYBACK_ON_SCROLL_OUT = false;
+
+/**
+ * 再生 UI ランタイム状態の初期値を作成する。
+ * 本番コードでは appState 初期化に使い、設定 default との同期を
+ * 単体テストするため export している。
+ * @returns {PlaybackUiRuntimeState}
+ */
+export function createInitialPlaybackUiRuntimeState() {
+    return {
+        scrollObserver: null,
+        ...INITIAL_PLAYBACK_SETTING_VALUES,
+        activeThumb: null
+    };
+}
 
 /** @type {AppState} */
 export const appState = {
@@ -48,15 +64,7 @@ export const appState = {
             index: null,
             pendingValues: null
         },
-        playback: {
-            scrollObserver: null,
-            showThumbnails: false,
-            showExperimentalPlaybackSettings: false,
-            playArchiveToEnd: false,
-            continuousPlayback: false,
-            loopPlayback: false,
-            activeThumb: null
-        },
+        playback: createInitialPlaybackUiRuntimeState(),
         lookup: {
             songMapByBookmarkKey: new Map(),
             songMapByKey: new Map(),
