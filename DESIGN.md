@@ -11,8 +11,9 @@
 - 静的フロントエンドのみ（HTML/CSS/JS, ES Modules）
 - データ取得：事前生成JSON（`data/songs.json` / `data/songs-meta.json`）を優先し、公開スプレッドシートのCSVは生成元とフォールバックに使う
 - データ生成/公開：GitHub Actions でCSVからJSONを生成・検証し、Pages artifact を生成して deploy する
+- CI：GitHub Actions で曲データ検証、typecheck、lint、unit test を実行する
 - 実行時の同梱外部ライブラリ依存：なし
-- 埋め込み再生まわりでは YouTube Iframe API を動的に利用
+- 埋め込み再生まわりでは YouTube Iframe API を動的に利用し、標準では `youtube.com`、プライバシー強化設定ON時は `youtube-nocookie.com` の埋め込みURLを使う
 - 開発時確認：曲データJSON検証、TypeScript noEmit typecheck、ESLint、Node.js 標準 `node:test`、Playwright Chromium smoke を利用
 - 型安全性は JavaScript + JSDoc + ESLint を基本に段階的に高める。
   TypeScript 化は全面移行ではなく、必要性が高まった時点で別途検討する。
@@ -25,6 +26,7 @@
   - `tests/bookmark-import-export-ui.test.mjs`
   - `tests/bookmark-transfer.test.mjs`
   - `tests/bookmark-ui.test.mjs`
+  - `tests/app-state.test.mjs`
   - `tests/stream-role.test.mjs`
   - `tests/csv-parser.test.mjs`
   - `tests/data-loader.test.mjs`
@@ -66,6 +68,9 @@
 - 補助モジュール:
   - `tests/test-helpers.mjs`
   - `tests/youtube-harness.mjs`
+  - `tests/support/playback-settings-fixture.mjs`
+  - `tests/e2e/support/mock-youtube.mjs`
+  - `tests/e2e/support/ui-helpers.mjs`
 - 実行コマンド:
   - `npm run validate:songs-json`
   - `npm run typecheck`
@@ -79,7 +84,7 @@
 - ブックマーク（作成/名称変更/削除/曲の追加・削除/選択/表示中の曲順並び替え）
 - おすすめ表示（条件未指定時）
 - 段階表示（追加読み込み）
-- サムネイル表示、埋め込み再生、再生範囲設定
+- サムネイル表示、埋め込み再生、再生範囲設定、プライバシー強化設定
 - テーマ切替（ダーク/ライト）
 
 ## UI構成
@@ -96,6 +101,7 @@
     - ダークモード切替
   - 再生
     - サムネイル表示ON時のみ再生セクションを表示
+    - プライバシー強化（ONでは `youtube-nocookie.com` の埋め込みURLを使用）
     - アーカイブ全体を再生（OFFでは曲データの終了秒数で停止）
     - 実験的な連続再生/リピート設定は通常UIでは非表示にし、`window.knkPlaybackSettings` からページ内だけ有効化して検証する
 - **サイドバー内ブックマークパネル**：ブックマーク一覧と曲追加
@@ -262,7 +268,7 @@ flowchart LR
     data --> d3[表示件数]
     data --> d4[ブックマーク情報]
     ui --> u1[search: フィルタ状態とrecommendedCache]
-    ui --> u2[playback: サムネ表示]
+    ui --> u2[playback: サムネ表示/埋め込み再生設定]
     ui --> u3[render: カード再利用Map]
     ui --> u4[settings/bookmark panel: 一時状態]
     youtube --> y1[API準備]
@@ -273,7 +279,9 @@ flowchart LR
 ローカルストレージ保存：
 - テーマ
 - サムネ表示
+- プライバシー強化（youtube-nocookie.com 使用）
 - アーカイブ全体を再生
+- 旧バージョンで localStorage に保存していた実験的再生設定キーは、起動時に削除し、現行では読み込まない
 - CSVキャッシュ（JSON取得失敗時のフォールバック用）
 - 検索条件（キーワード・日付・形態・コラボ種別・リレー/ハモリ）
   - localStorage key の `searchStateV1` は保存場所の互換維持用で、payload の `version` は検索条件 schema の版数として別に管理する
@@ -288,10 +296,10 @@ IndexedDB保存：
   - 旧localStorageの曲データJSONキャッシュは読み込み時に移行し、移行成功後に旧キャッシュを削除する
 
 ## YouTube埋め込み
-- `youtube.com` の標準埋め込みを使用
+- 標準では `youtube.com` の埋め込みを使用し、`プライバシー強化` がONの場合は `youtube-nocookie.com` の埋め込みを使用する
 - サムネイル表示ON時にクリックで埋め込み再生し、`×` でサムネイルへ戻す
 - 曲データの `endSeconds` がある場合は、`アーカイブ全体を再生` がOFFのときだけ埋め込み再生の終了秒数として反映する
-- `アーカイブ全体を再生` は localStorage に保存し、サムネイル表示ON時のみ設定UIを表示する
+- `プライバシー強化` と `アーカイブ全体を再生` は localStorage に保存し、サムネイル表示ON時のみ設定UIを表示する
 - 実験的な `終了後、次の曲を再生` / `リピート再生` はページ内 state だけで保持し、通常UIでは非表示にする
 - 手動再生でカード上端がヘッダー下に隠れる場合は、再生開始後に見える位置まで補正スクロールする
 - 曲名リンクは元の `row.url` を別タブで開く

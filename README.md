@@ -4,7 +4,7 @@
 
 - 公開スプレッドシート由来の歌データを、曲名・アーティスト名(読み含む)で検索できるシンプルなWebサイトです。
 - PC / スマホ両対応です。本サイト運営者のサーバへ個人情報を送信したり、独自の解析用トラッキングを行いません(設定保持のためにローカルストレージを使用します)。
-- 通常の曲データ表示では GitHub Pages 上の生成済みJSONを取得します。JSON生成やフォールバック時には Google(スプレッドシートのCSV取得)、YouTube表示では youtube.com やサムネイル配信元などへの通信が発生します。
+- 通常の曲データ表示では GitHub Pages 上の生成済みJSONを取得します。JSON生成やフォールバック時には Google(スプレッドシートのCSV取得)、YouTube表示では youtube.com / youtube-nocookie.com やサムネイル配信元などへの通信が発生します。
 
 ---
 
@@ -35,7 +35,7 @@
 - YouTubeへのリンクがあります。
   - 一覧の曲名リンクから該当動画へ遷移できます。
   - サムネイル表示をONにした場合、サムネイルをクリックしてページ内で埋め込み再生できます(×で閉じてサムネに戻ります)。
-  - 埋め込み再生は標準の `youtube.com` 埋め込みを使用します(曲名リンクは通常の `youtube.com` / `youtu.be` を開きます)。
+  - 埋め込み再生は標準では `youtube.com` 埋め込みを使用し、設定の `プライバシー強化` がONの場合は `youtube-nocookie.com` 埋め込みを使用します(曲名リンクは通常の `youtube.com` / `youtu.be` を開きます)。
     - CSVの終了時刻がある曲は、その時刻を埋め込み再生の終了位置として使います。
     - 一部のモバイル環境では、再生開始時刻が反映されない場合があります(端末/ブラウザ/YouTube側の挙動差によります)。
 - 段階表示(追加読み込み)に対応します。
@@ -61,7 +61,7 @@
   - ダークモード切替に対応します(設定はブラウザに保存されます)。
 - 設定パネルで表示/再生設定を切り替えられます。
   - 表示: サムネイル表示 / ダークモード
-  - 再生: サムネイル表示ON時のみ、曲の終了時刻で止めずにアーカイブ全体を再生する設定を切り替えられます。
+  - 再生: サムネイル表示ON時のみ、`youtube-nocookie.com` を使うプライバシー強化設定と、曲の終了時刻で止めずにアーカイブ全体を再生する設定を切り替えられます。
 
 ---
 
@@ -108,6 +108,7 @@ flowchart TD
 - 公開スプレッドシートのCSVは、事前生成JSONの元データかつJSON取得失敗時のフォールバックとして参照します(`app/config.mjs` の `PUBLIC_CSV_URL` で指定します)。
 - CSVの `配信上の立場` は曲データの `streamRole` としてJSONへ保持します。
 - `.github/workflows/update-songs-json-and-deploy.yml` は GitHub Actions 上で `npm run build:songs-json` と `npm run validate:songs-json` を実行し、`data/songs.json` / `data/songs-meta.json` に差分があればコミットします。その後 `npm run build:pages-artifact` で `_site` を作成し、Pages へ deploy します。
+- `.github/workflows/ci.yml` は push / pull request / 手動実行で `npm run validate:songs-json`、`npm run typecheck`、`npm run lint`、`npm run test:unit` を実行します。
 - Pages artifact 生成時は `DEPLOY_CACHE_BUSTER` または `GITHUB_SHA` を使い、`index.html` の `styles.css` / `app/bootstrap.mjs` と、`app/**/*.mjs` 内の相対 `.mjs` 参照へ `?v=...` を付与します。ソースの `index.html` や import には通常 `?v=...` を書きません。
 - フロントエンドのみで動作します(静的ホスティング想定)。
 - 配布物はHTML/CSS/JavaScriptのみで、実行時にnpm等の同梱依存はありません。
@@ -123,6 +124,7 @@ flowchart TD
   - ブックマーク保存スキーマ/移行のテスト (`tests/bookmark-storage-schema.test.mjs`)
   - ブックマークJSON転送のテスト (`tests/bookmark-transfer.test.mjs`)
   - ブックマークUIのテスト (`tests/bookmark-ui.test.mjs`)
+  - アプリ初期状態のテスト (`tests/app-state.test.mjs`)
   - 配信上の立場の正規化/判定テスト (`tests/stream-role.test.mjs`)
   - CSVパースのテスト (`tests/csv-parser.test.mjs`)
   - 初期データ読み込み後の状態反映テスト (`tests/data-loader.test.mjs`)
@@ -157,7 +159,7 @@ flowchart TD
   - YouTube playback state / start attempt / player adapter の単体テスト (`tests/youtube-playback-state.test.mjs`, `tests/youtube-playback-start-attempt.test.mjs`, `tests/youtube-player-adapter.test.mjs`)
   - YouTube shared playback / thumbnail helper / unconfirmed playback start の単体テスト (`tests/youtube-shared-playback.test.mjs`, `tests/youtube-thumbnail.test.mjs`, `tests/youtube-unconfirmed-playback-start.test.mjs`)
   - Chromium 上での YouTube 再生スモークテスト (`tests/e2e/youtube-smoke.spec.mjs`)
-- `tests/test-helpers.mjs` と `tests/youtube-harness.mjs` は複数テストで共有する補助モジュールです。
+- `tests/test-helpers.mjs`、`tests/youtube-harness.mjs`、`tests/support/playback-settings-fixture.mjs`、`tests/e2e/support/mock-youtube.mjs`、`tests/e2e/support/ui-helpers.mjs` は複数テストで共有する補助モジュールです。
 - 実行コマンド:
   - `npm run validate:songs-json`
   - `npm run typecheck`
@@ -184,7 +186,7 @@ flowchart TD
 
 - テーマ(ダーク/ライト)。
 - サムネイル表示ON/OFF。
-- 再生設定(アーカイブ全体を再生ON/OFF)。
+- 再生設定(プライバシー強化ON/OFF、アーカイブ全体を再生ON/OFF)。
 - 検索状態(検索語・絞り込み条件・日付条件)。
   - localStorage key は既存利用者の互換維持のため `searchStateV1` のままです。
     payload 内の `version` は保存 schema の版数で、key 名とは独立して更新します。
