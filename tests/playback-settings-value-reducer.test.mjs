@@ -30,6 +30,7 @@ test("playback settings definitions: expose archive playback metadata in the ful
     } = createPlaybackSettingDefinitions();
 
     assert.equal(archivePlaybackBehaviorDefinition.stateKey, "playArchiveToEnd");
+    assert.equal(archivePlaybackBehaviorDefinition.restoreActivePlaybackOnChange, true);
     assert.equal(playbackSettingDefinitions.includes(archivePlaybackBehaviorDefinition), true);
 });
 

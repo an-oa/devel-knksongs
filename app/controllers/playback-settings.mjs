@@ -261,7 +261,6 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
 
     const {
         pagePlaybackBehaviorDefinitions,
-        archivePlaybackBehaviorDefinition,
         experimentalPlaybackVisibilityDefinition,
         thumbnailVisibilityDefinition,
         playbackSettingDefinitions
@@ -273,10 +272,6 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
             syncValue: syncThumbnailVisibility,
             afterStorageApply: afterThumbnailStorageApply,
             afterToggleChange: afterThumbnailToggleChange
-        }],
-        [archivePlaybackBehaviorDefinition, {
-            afterStorageApply: restoreActivePlaybackWhenChanged,
-            afterToggleChange: restoreActivePlaybackWhenChanged
         }],
         [experimentalPlaybackVisibilityDefinition, {
             syncValue: syncExperimentalPlaybackVisibility,
@@ -306,6 +301,9 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
         const effects = playbackSettingEffectsByDefinition.get(definition);
         const effect = effects ? effects[hookName] : null;
         if (typeof effect === "function") effect(previousValue, nextValue);
+        if (definition.restoreActivePlaybackOnChange) {
+            restoreActivePlaybackWhenChanged(previousValue, nextValue);
+        }
     }
 
     /**

@@ -49,7 +49,8 @@ export function createPlaybackSettingDefinitions() {
         stateKey: "playArchiveToEnd",
         elementKey: "playArchiveToEndToggle",
         storageKey: PLAY_ARCHIVE_TO_END_STORAGE_KEY,
-        defaultValue: INITIAL_PLAYBACK_SETTING_VALUES.playArchiveToEnd
+        defaultValue: INITIAL_PLAYBACK_SETTING_VALUES.playArchiveToEnd,
+        restoreActivePlaybackOnChange: true
     };
 
     /** @type {PlaybackSettingDefinition[]} */

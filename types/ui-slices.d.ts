@@ -148,6 +148,7 @@ type PlaybackSettingDefinition = {
   hiddenValue?: boolean;
   effectiveWhenHidden?: boolean;
   interactive?: boolean;
+  restoreActivePlaybackOnChange?: boolean;
 };
 
 /** ブックマーク参照や曲キー検索に使う派生マップ。 */
