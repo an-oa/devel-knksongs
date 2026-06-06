@@ -1,6 +1,7 @@
 import { isHtmlElement } from "../dom-utils.mjs";
 
 const YT_EMBED_HOST = "https://www.youtube.com";
+const YT_NOCOOKIE_EMBED_HOST = "https://www.youtube-nocookie.com";
 
 /**
  * @typedef {{
@@ -114,13 +115,37 @@ export function createYoutubeIframeApiLoader({
 }
 
 /**
+ * YouTube 埋め込みに使う host を設定値から返す。
+ * @param {{ useYoutubeNoCookie?: boolean } | undefined} options
+ * @returns {string}
+ */
+export function resolveYoutubeEmbedHost(options) {
+    return options && options.useYoutubeNoCookie
+        ? YT_NOCOOKIE_EMBED_HOST
+        : YT_EMBED_HOST;
+}
+
+/**
+ * iframe の URL から YouTube Player API に渡す host を返す。
+ * @param {string | null | undefined} iframeSrc
+ * @returns {string}
+ */
+export function resolveYoutubeEmbedHostFromUrl(iframeSrc) {
+    const src = String(iframeSrc || "");
+    return resolveYoutubeEmbedHost({
+        useYoutubeNoCookie: src.startsWith(`${YT_NOCOOKIE_EMBED_HOST}/`)
+    });
+}
+
+/**
  * 埋め込み再生用の標準 YouTube URL を生成する。
  * @param {YoutubeTarget} yt
- * @param {{ endSeconds?: number | null, autoplay?: boolean } | undefined} options
+ * @param {{ endSeconds?: number | null, autoplay?: boolean, useYoutubeNoCookie?: boolean } | undefined} options
  * @returns {string}
  */
 export function buildYoutubeEmbedUrl(yt, options) {
     const autoplay = options && options.autoplay === true ? "1" : "0";
+    const embedHost = resolveYoutubeEmbedHost(options);
     const params = new URLSearchParams({
         autoplay,
         playsinline: "1",
@@ -139,7 +164,7 @@ export function buildYoutubeEmbedUrl(yt, options) {
     if (location.origin !== "null") {
         params.set("origin", location.origin);
     }
-    return `${YT_EMBED_HOST}/embed/${yt.videoId}?${params.toString()}`;
+    return `${embedHost}/embed/${yt.videoId}?${params.toString()}`;
 }
 
 /**
@@ -154,4 +179,4 @@ export function applyYoutubePlayerIframeAttributes(iframe) {
     iframeElement.allowFullscreen = true;
 }
 
-export { YT_EMBED_HOST };
+export { YT_EMBED_HOST, YT_NOCOOKIE_EMBED_HOST };

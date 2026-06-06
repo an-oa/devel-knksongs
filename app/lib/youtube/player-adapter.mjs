@@ -1,5 +1,5 @@
 import { isHtmlElement } from "../dom-utils.mjs";
-import { YT_EMBED_HOST } from "./embed.mjs";
+import { resolveYoutubeEmbedHostFromUrl } from "./embed.mjs";
 
 /**
  * 共有 iframe に YouTube Iframe API の Player を紐付ける adapter を作成する。
@@ -65,7 +65,7 @@ export function createYoutubePlayerAdapter(input) {
             }
             if (latestSharedPlayback.player) return latestSharedPlayback.player;
             latestSharedPlayback.player = new window.YT.Player(nextIframe, {
-                host: YT_EMBED_HOST,
+                host: resolveYoutubeEmbedHostFromUrl(/** @type {HTMLIFrameElement} */ (nextIframe).src),
                 events: {
                     onReady: (event) => {
                         applyIframeAttributes(

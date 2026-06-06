@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { YT_EMBED_HOST } from "../app/lib/youtube/embed.mjs";
+import {
+    YT_EMBED_HOST,
+    YT_NOCOOKIE_EMBED_HOST
+} from "../app/lib/youtube/embed.mjs";
 import { createYoutubePlayerAdapter } from "../app/lib/youtube/player-adapter.mjs";
 import { installFakeDom } from "./test-helpers.mjs";
 
@@ -107,6 +110,37 @@ test("youtube player adapter: creates a YT.Player for the pending iframe and bri
 
         assert.deepEqual(calls.stateChanges, [{ event: stateEvent, playbackSessionId: 7 }]);
         assert.deepEqual(calls.errors, [{ event: errorEvent, playbackSessionId: 7 }]);
+    } finally {
+        cleanup();
+    }
+});
+
+test("youtube player adapter: uses nocookie host option for nocookie iframes", async () => {
+    const cleanup = installFakeDom();
+    try {
+        const { adapter } = createAdapterHarness();
+        const iframe = document.createElement("iframe");
+        iframe.src = `${YT_NOCOOKIE_EMBED_HOST}/embed/video1?enablejsapi=1`;
+        document.body.appendChild(iframe);
+        const playerCalls = [];
+        window.YT = {
+            Player: class {
+                constructor(host, options) {
+                    playerCalls.push({ host, options });
+                    this.iframe = host;
+                    options.events.onReady({ target: this });
+                }
+
+                getIframe() {
+                    return this.iframe;
+                }
+            }
+        };
+
+        await adapter.attach(iframe, 7);
+
+        assert.equal(playerCalls.length, 1);
+        assert.equal(playerCalls[0].options.host, YT_NOCOOKIE_EMBED_HOST);
     } finally {
         cleanup();
     }

@@ -1,9 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+    YT_EMBED_HOST,
+    YT_NOCOOKIE_EMBED_HOST,
     applyYoutubePlayerIframeAttributes,
     buildYoutubeEmbedUrl,
-    createYoutubeIframeApiLoader
+    createYoutubeIframeApiLoader,
+    resolveYoutubeEmbedHost,
+    resolveYoutubeEmbedHostFromUrl
 } from "../app/lib/youtube/embed.mjs";
 import { installFakeDom } from "./test-helpers.mjs";
 
@@ -51,6 +55,34 @@ test("youtube embed: buildYoutubeEmbedUrl can enable autoplay", () => {
     } finally {
         cleanup();
     }
+});
+
+test("youtube embed: buildYoutubeEmbedUrl can use youtube-nocookie host", () => {
+    const cleanup = installFakeDom();
+    try {
+        const url = buildYoutubeEmbedUrl(
+            { videoId: "abc123", startSeconds: 45 },
+            { useYoutubeNoCookie: true }
+        );
+        assert.match(url, /^https:\/\/www\.youtube-nocookie\.com\/embed\/abc123\?/);
+        assert.match(url, /(?:\?|&)enablejsapi=1(?:&|$)/);
+    } finally {
+        cleanup();
+    }
+});
+
+test("youtube embed: resolves embed hosts from settings and iframe urls", () => {
+    assert.equal(resolveYoutubeEmbedHost(undefined), YT_EMBED_HOST);
+    assert.equal(resolveYoutubeEmbedHost({ useYoutubeNoCookie: false }), YT_EMBED_HOST);
+    assert.equal(resolveYoutubeEmbedHost({ useYoutubeNoCookie: true }), YT_NOCOOKIE_EMBED_HOST);
+    assert.equal(
+        resolveYoutubeEmbedHostFromUrl(`${YT_NOCOOKIE_EMBED_HOST}/embed/abc123?enablejsapi=1`),
+        YT_NOCOOKIE_EMBED_HOST
+    );
+    assert.equal(
+        resolveYoutubeEmbedHostFromUrl(`${YT_EMBED_HOST}/embed/abc123?enablejsapi=1`),
+        YT_EMBED_HOST
+    );
 });
 
 test("youtube embed: applyYoutubePlayerIframeAttributes updates iframe attributes", () => {
