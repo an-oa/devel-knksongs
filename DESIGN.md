@@ -10,10 +10,10 @@
 ## 全体構成
 - 静的フロントエンドのみ（HTML/CSS/JS, ES Modules）
 - データ取得：事前生成JSON（`data/songs.json` / `data/songs-meta.json`）を優先し、公開スプレッドシートのCSVは生成元とフォールバックに使う
-- データ生成/公開：GitHub Actions でCSVからJSONを生成し、Pages artifact を deploy する
+- データ生成/公開：GitHub Actions でCSVからJSONを生成・検証し、Pages artifact を生成して deploy する
 - 実行時の同梱外部ライブラリ依存：なし
 - 埋め込み再生まわりでは YouTube Iframe API を動的に利用
-- 開発時確認：ESLint、Node.js 標準 `node:test`、Playwright Chromium smoke を利用
+- 開発時確認：曲データJSON検証、TypeScript noEmit typecheck、ESLint、Node.js 標準 `node:test`、Playwright Chromium smoke を利用
 - 型安全性は JavaScript + JSDoc + ESLint を基本に段階的に高める。
   TypeScript 化は全面移行ではなく、必要性が高まった時点で別途検討する。
 
@@ -30,9 +30,12 @@
   - `tests/data-loader.test.mjs`
   - `tests/dom-utils.test.mjs`
   - `tests/search-date.test.mjs`
+  - `tests/search-boolean-filters.test.mjs`
   - `tests/format-filter.test.mjs`
+  - `tests/pages-artifact.test.mjs`
   - `tests/playback-sequence.test.mjs`
   - `tests/playback-session-controller.test.mjs`
+  - `tests/playback-settings-value-reducer.test.mjs`
   - `tests/render-drag-reorder.test.mjs`
   - `tests/render-layout.test.mjs`
   - `tests/render-masonry-layout.test.mjs`
@@ -59,9 +62,15 @@
   - `tests/songs-data-source.test.mjs`
   - `tests/songs-json-cache.test.mjs`
   - `tests/songs-json.test.mjs`
+  - `tests/songs-json-validation.test.mjs`
+- 補助モジュール:
+  - `tests/test-helpers.mjs`
+  - `tests/youtube-harness.mjs`
 - 実行コマンド:
+  - `npm run validate:songs-json`
+  - `npm run typecheck`
   - `npm run lint`
-  - `node --test tests/*.mjs`
+  - `npm run test:unit` (`node --test tests/*.mjs`)
   - `npm run test:e2e`
 
 ## 主要機能
@@ -70,7 +79,7 @@
 - ブックマーク（作成/名称変更/削除/曲の追加・削除/選択/表示中の曲順並び替え）
 - おすすめ表示（条件未指定時）
 - 段階表示（追加読み込み）
-- サムネイル表示と埋め込み再生
+- サムネイル表示、埋め込み再生、再生範囲設定
 - テーマ切替（ダーク/ライト）
 
 ## UI構成
@@ -81,10 +90,14 @@
   - リレー/ハモリ/コラボ種別（歌枠リレー/ハモリあり/コラボ(ホスト)/コラボ(ゲスト)）
   - ブックマーク導線（専用パネルを開く）
   - 設定導線（専用パネルを開く）
-- **サイドバー内設定パネル**：表示設定
+- **サイドバー内設定パネル**：表示/再生設定
   - 表示
     - サムネイル表示
     - ダークモード切替
+  - 再生
+    - サムネイル表示ON時のみ再生セクションを表示
+    - アーカイブ全体を再生（OFFでは曲データの終了秒数で停止）
+    - 実験的な連続再生/リピート設定は通常UIでは非表示にし、`window.knkPlaybackSettings` からページ内だけ有効化して検証する
 - **サイドバー内ブックマークパネル**：ブックマーク一覧と曲追加
   - 一覧の選択/名称変更/削除
   - 曲カードの `+` 押下時は同パネル上で既存ブックマーク選択または新規作成して追加
@@ -99,28 +112,35 @@
 
 ## データフロー
 1. IndexedDB の曲データJSONキャッシュを確認する。
-2. キャッシュがあれば即時表示し、バックグラウンドで `songs-meta.json` の `contentHash` を確認する。
-3. キャッシュがない、または `contentHash` が変わっている場合は `songs.json` を取得し、schema と曲データを検証して保存する。
+2. キャッシュがある場合は `songs-meta.json` の `contentHash` を確認する。
+   - hash が一致、または meta 確認に失敗した場合はキャッシュを表示する。
+   - hash が変わっている場合は、古いキャッシュを先に表示せず `songs.json` の取得を試す。
+3. キャッシュがない、または `contentHash` が変わっている場合は `songs.json` を取得し、schema を検証して保存する。
 4. JSON取得に失敗した場合は、公開CSVまたはCSVキャッシュを取得し、`SongRow` に正規化する。
-5. （ブックマーク選択中なら）ブックマーク内の曲集合を解決する。
-6. 条件未指定ならおすすめ結果を解決し、通常時は検索条件を取得してフィルタする。
-7. 結果一覧を描画し、通常検索/ブックマーク検索時のみ段階表示を有効化する。
+5. 新しいJSON/CSVを取得できない場合は、最後に既存JSONキャッシュを表示する。
+6. （ブックマーク選択中なら）ブックマーク内の曲集合を解決する。
+7. 条件未指定ならおすすめ結果を解決し、通常時は検索条件を取得してフィルタする。
+8. 結果一覧を描画し、通常検索/ブックマーク検索時のみ段階表示を有効化する。
 
 ```mermaid
 flowchart TD
     A[IndexedDBの曲データJSONキャッシュ確認] --> B{キャッシュあり?}
-    B -- Yes --> C[キャッシュを即時表示]
-    C --> D[songs-meta.jsonのcontentHash確認]
-    B -- No --> E[songs.json取得]
-    D --> F{hash変更あり?}
-    F -- No --> G[表示維持]
-    F -- Yes --> E
-    E --> H{JSON取得成功?}
-    H -- Yes --> I[JSONを検証してSongRow配列を適用しIndexedDB更新]
-    H -- No --> J[公開CSVまたはCSVキャッシュを取得]
-    J --> K[CSVをパースしてSongRowへ正規化]
-    I --> L[検索/ブックマーク/おすすめ/描画]
-    K --> L
+    B -- Yes --> C[songs-meta.jsonのcontentHash確認]
+    C --> D{hash一致またはmeta確認失敗?}
+    D -- Yes --> E[JSONキャッシュを表示]
+    D -- No --> F[songs.json取得]
+    B -- No --> F
+    F --> G{JSON取得成功?}
+    G -- Yes --> H[JSON schemaを検証してSongRow配列を適用しIndexedDB更新]
+    G -- No --> I[公開CSVまたはCSVキャッシュを取得]
+    I --> J{CSV取得成功?}
+    J -- Yes --> K[CSVをパースしてSongRowへ正規化]
+    J -- No --> L{JSONキャッシュあり?}
+    L -- Yes --> E
+    L -- No --> M[読込エラー]
+    E --> N[検索/ブックマーク/おすすめ/描画]
+    H --> N
+    K --> N
 ```
 
 ## データモデル（概要）
@@ -217,7 +237,8 @@ stateDiagram-v2
 - 曲データ再読み込み時のみキャッシュを破棄
 
 ## 関連関数の責務一覧（おすすめ）
-- `createSongsDataSource()`：生成済みJSON、JSONキャッシュ、meta hash、CSVフォールバックをまとめた曲データ取得の入口
+- `createBrowserSongsDataSource()`：ブラウザの IndexedDB / localStorage を使う曲データ取得元を作る
+- `createSongsDataSource()`：生成済みJSON、JSONキャッシュ、meta hash、CSVフォールバックをまとめた曲データ取得の中核
 - `createDataLoader()`：取得した曲データを状態へ反映し、検索更新をスケジュールする
 - `applyLoadedSongs()`：曲データ読込後の初期化（おすすめキャッシュのリセット含む）
 - `pickRecommended()`：おすすめ候補の抽出とシャッフル、キャッシュ利用の中心
@@ -252,6 +273,7 @@ flowchart LR
 ローカルストレージ保存：
 - テーマ
 - サムネ表示
+- アーカイブ全体を再生
 - CSVキャッシュ（JSON取得失敗時のフォールバック用）
 - 検索条件（キーワード・日付・形態・コラボ種別・リレー/ハモリ）
   - localStorage key の `searchStateV1` は保存場所の互換維持用で、payload の `version` は検索条件 schema の版数として別に管理する
@@ -268,7 +290,9 @@ IndexedDB保存：
 ## YouTube埋め込み
 - `youtube.com` の標準埋め込みを使用
 - サムネイル表示ON時にクリックで埋め込み再生し、`×` でサムネイルへ戻す
-- 曲データの `endSeconds` がある場合は埋め込み再生の終了秒数として反映する
+- 曲データの `endSeconds` がある場合は、`アーカイブ全体を再生` がOFFのときだけ埋め込み再生の終了秒数として反映する
+- `アーカイブ全体を再生` は localStorage に保存し、サムネイル表示ON時のみ設定UIを表示する
+- 実験的な `終了後、次の曲を再生` / `リピート再生` はページ内 state だけで保持し、通常UIでは非表示にする
 - 手動再生でカード上端がヘッダー下に隠れる場合は、再生開始後に見える位置まで補正スクロールする
 - 曲名リンクは元の `row.url` を別タブで開く
 - 縦動画はサムネイル時は横レイアウトのまま表示し、埋め込み再生時のみ縦向き表示へ切り替える
@@ -279,7 +303,7 @@ IndexedDB保存：
 - `aria-label` / `aria-modal` / `aria-hidden`
 
 ## パフォーマンス
-- 曲データJSONをIndexedDBにキャッシュし、初期表示に利用する
+- 曲データJSONをIndexedDBにキャッシュし、初期表示時の取得候補として利用する
 - `songs-meta.json` の content hash で鮮度を確認し、大きい `songs.json` の取得頻度を抑える
 - JSON取得に失敗した場合に備え、CSVもフォールバック用にキャッシュする
 - 段階表示（追加読み込み）
@@ -288,10 +312,9 @@ IndexedDB保存：
 
 ## 制約・注意点
 - iOSでは埋め込み再生に制約あり
-- Safari等でCSSキャッシュが残ることがあるため更新時はバスター推奨
-- `index.html` の `styles.css?v=...` と `app/bootstrap.mjs?v=...` は同じ値で運用する
-  - UI/JS変更ごとには上げず、公開反映や配布反映の直前にまとめて値を上げる
-- `app/bootstrap.mjs` から読む ES Modules を更新した場合は、対応する import の `?v=...` も上げる
-  - 変更途中は既存値へ揃え、公開時に全体を同じ値へ切り替える
+- Safari等でCSS/JSキャッシュが残ることがあるため、公開 artifact 生成時に cache buster を付与する
+- ソースの `index.html` と `app/**/*.mjs` の参照には通常 `?v=...` を書かない
+- `scripts/build-pages-artifact.mjs` が `_site` へコピーした `index.html` の `styles.css` / `app/bootstrap.mjs` と、相対 `.mjs` import/export/dynamic import に `?v=<DEPLOY_CACHE_BUSTER or GITHUB_SHA>` を付与する
+- cache buster の仕様を変える場合は `scripts/build-pages-artifact.mjs` と `tests/pages-artifact.test.mjs` を合わせて更新する
 - `songs.json` / `songs-meta.json` の内容更新だけでは cache buster を上げず、`contentHash` による鮮度確認で反映する
 - 日付入力はセレクト方式（ブラウザ互換性優先）

@@ -59,8 +59,9 @@
   - おすすめ一覧は条件変更でおすすめ表示を離れて戻っても維持され、曲データの再読み込み時に再抽出されます。
 - 表示テーマを切り替えられます。
   - ダークモード切替に対応します(設定はブラウザに保存されます)。
-- 設定パネルで表示設定を切り替えられます。
+- 設定パネルで表示/再生設定を切り替えられます。
   - 表示: サムネイル表示 / ダークモード
+  - 再生: サムネイル表示ON時のみ、曲の終了時刻で止めずにアーカイブ全体を再生する設定を切り替えられます。
 
 ---
 
@@ -106,11 +107,12 @@ flowchart TD
 - `songs-meta.json` の `contentHash` で手元のJSONキャッシュが最新かを確認し、変化がなければ大きい `songs.json` の再取得を避けます。
 - 公開スプレッドシートのCSVは、事前生成JSONの元データかつJSON取得失敗時のフォールバックとして参照します(`app/config.mjs` の `PUBLIC_CSV_URL` で指定します)。
 - CSVの `配信上の立場` は曲データの `streamRole` としてJSONへ保持します。
-- `.github/workflows/update-songs-json-and-deploy.yml` は GitHub Actions 上で `npm run build:songs-json` を実行し、`data/songs.json` / `data/songs-meta.json` を更新して Pages へ deploy します。
+- `.github/workflows/update-songs-json-and-deploy.yml` は GitHub Actions 上で `npm run build:songs-json` と `npm run validate:songs-json` を実行し、`data/songs.json` / `data/songs-meta.json` に差分があればコミットします。その後 `npm run build:pages-artifact` で `_site` を作成し、Pages へ deploy します。
+- Pages artifact 生成時は `DEPLOY_CACHE_BUSTER` または `GITHUB_SHA` を使い、`index.html` の `styles.css` / `app/bootstrap.mjs` と、`app/**/*.mjs` 内の相対 `.mjs` 参照へ `?v=...` を付与します。ソースの `index.html` や import には通常 `?v=...` を書きません。
 - フロントエンドのみで動作します(静的ホスティング想定)。
 - 配布物はHTML/CSS/JavaScriptのみで、実行時にnpm等の同梱依存はありません。
 - サムネイル表示/埋め込み再生まわりでは YouTube Iframe API を動的に利用します。
-- 開発時の静的解析は ESLint を利用します。
+- 開発時の静的解析は TypeScript noEmit typecheck と ESLint を利用します。
 - 開発時テストは Node.js 標準の `node:test` を利用します。
 - ブラウザ回帰確認として Playwright による Chromium スモークテストを用意しています。
 
@@ -126,9 +128,12 @@ flowchart TD
   - 初期データ読み込み後の状態反映テスト (`tests/data-loader.test.mjs`)
   - DOM補助関数のテスト (`tests/dom-utils.test.mjs`)
   - 検索/日付フィルタ/ブックマーク検索のロジック (`tests/search-date.test.mjs`)
+  - 検索booleanフィルター共有helperのテスト (`tests/search-boolean-filters.test.mjs`)
   - フォーマット表示ラベルのテスト (`tests/format-filter.test.mjs`)
+  - Pages artifact生成とcache buster付与のテスト (`tests/pages-artifact.test.mjs`)
   - 再生継続候補の選択ロジック (`tests/playback-sequence.test.mjs`)
   - 再生セッション制御のテスト (`tests/playback-session-controller.test.mjs`)
+  - 再生設定値reducerのテスト (`tests/playback-settings-value-reducer.test.mjs`)
   - 描画/レイアウトまわりの回帰テスト (`tests/render-layout.test.mjs`)
   - ブックマーク時のドラッグ並び替えテスト (`tests/render-drag-reorder.test.mjs`)
   - masonryレイアウト計算のテスト (`tests/render-masonry-layout.test.mjs`)
@@ -142,6 +147,7 @@ flowchart TD
   - 曲データソースのJSON優先読み込み/CSVフォールバック/キャッシュ更新テスト (`tests/songs-data-source.test.mjs`)
   - 曲データJSONキャッシュのIndexedDB/旧localStorage移行テスト (`tests/songs-json-cache.test.mjs`)
   - 曲データJSONスキーマのテスト (`tests/songs-json.test.mjs`)
+  - 曲データJSON品質検証スクリプトのテスト (`tests/songs-json-validation.test.mjs`)
   - ストレージ(ブックマーク上限/リネーム)の単体テスト (`tests/storage-bookmark-limit.test.mjs`)
   - ストレージ(検索状態保存/復元)の単体テスト (`tests/storage-search-state.test.mjs`)
   - UI設定/ストレージ互換のテスト (`tests/ui-storage-compat.test.mjs`)
@@ -151,9 +157,12 @@ flowchart TD
   - YouTube playback state / start attempt / player adapter の単体テスト (`tests/youtube-playback-state.test.mjs`, `tests/youtube-playback-start-attempt.test.mjs`, `tests/youtube-player-adapter.test.mjs`)
   - YouTube shared playback / thumbnail helper / unconfirmed playback start の単体テスト (`tests/youtube-shared-playback.test.mjs`, `tests/youtube-thumbnail.test.mjs`, `tests/youtube-unconfirmed-playback-start.test.mjs`)
   - Chromium 上での YouTube 再生スモークテスト (`tests/e2e/youtube-smoke.spec.mjs`)
+- `tests/test-helpers.mjs` と `tests/youtube-harness.mjs` は複数テストで共有する補助モジュールです。
 - 実行コマンド:
+  - `npm run validate:songs-json`
+  - `npm run typecheck`
   - `npm run lint`
-  - `node --test tests/*.mjs`
+  - `npm run test:unit` (`node --test tests/*.mjs`)
   - `npm run test:e2e`
 - 初回または `node_modules` がない環境では、検証コマンドの前に
   `npm install` を実行してください。
@@ -175,6 +184,7 @@ flowchart TD
 
 - テーマ(ダーク/ライト)。
 - サムネイル表示ON/OFF。
+- 再生設定(アーカイブ全体を再生ON/OFF)。
 - 検索状態(検索語・絞り込み条件・日付条件)。
   - localStorage key は既存利用者の互換維持のため `searchStateV1` のままです。
     payload 内の `version` は保存 schema の版数で、key 名とは独立して更新します。

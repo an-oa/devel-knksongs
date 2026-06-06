@@ -18,9 +18,12 @@
    - 既存テストを回すだけでなく、バグ修正や仕様追加に対応する回帰テストを必要に応じて追加
    - 初回または `node_modules` がない環境では、README.md の開発者向け準備に従い
      `npm install` を実行してから検証する。
-   - JavaScript 変更時の基本コマンド:
+   - JavaScript / 型定義変更時の基本コマンド:
+     - `npm run typecheck`
      - `npm run lint`
-     - `node --test tests/*.mjs`
+     - `npm run test:unit`
+   - 曲データや生成/検証スクリプトに関わる変更では、
+     `npm run validate:songs-json` も実行する。
    - YouTube 再生やサイドバー操作などブラウザ上の回帰に関わる変更では、
      `npm run test:e2e` も実行する。
 5. **必要なら DESIGN.md / README.md / AGENTS.md 等へ反映**
@@ -77,7 +80,7 @@ flowchart TD
 3. **段階的に検証**
    - 変更したファイル群へ `node --check <file>` を段階的に実行
    - 残存参照は `rg` で確認
-   - 最後に `npm run lint` と `node --test tests/*.mjs`
+   - 最後に `npm run typecheck`、`npm run lint`、`npm run test:unit`
    - ブラウザ操作や YouTube smoke に影響する場合は `npm run test:e2e`
 
 ### 置換作業の注意
@@ -95,5 +98,5 @@ flowchart TD
 ### 事故が起きたとき
 - 破損が疑われる場合は、そのまま置換を続けず、まず正常なファイルへ戻す。
 - 構文エラーが出たファイルと、文字化けや記号破損が見えるファイルを優先して修復する。
-- 修復後に再度 `node --check` と `node --test tests/*.mjs` を実行し、
+- 修復後に再度 `node --check` と `npm run test:unit` を実行し、
   回帰がないことを確認する。
