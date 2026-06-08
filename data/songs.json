@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "contentHash": "sha256:fec65f46d5b0dd386c3ad1d5d4a0d623461389d53ce0a935696568bea007c711",
+  "contentHash": "sha256:5ceb9d419935455318049ce14877e0d97f7a8bf09b7088872eb9da780a111d0f",
   "songs": [
     {
       "date": "2026/06/08",
@@ -149,8 +149,8 @@
       "isHarmony": false,
       "title": "ピエロ",
       "artist": "伊東歌詞太郎",
-      "titleYomi": "ぴえろ",
-      "artistYomi": "いとうかしたろう",
+      "titleYomi": "ピエロ",
+      "artistYomi": "イトウカシタロウ",
       "url": "https://www.youtube.com/watch?v=iv3Na9mQN3c&t=2303s",
       "endSeconds": 2562,
       "titleNorm": "ピエロ",
@@ -12031,8 +12031,8 @@
       "isHarmony": false,
       "title": "ピエロ",
       "artist": "伊東歌詞太郎",
-      "titleYomi": "ぴえろ",
-      "artistYomi": "いとうかしたろう",
+      "titleYomi": "ピエロ",
+      "artistYomi": "イトウカシタロウ",
       "url": "https://www.youtube.com/watch?v=Qpl43TMzsFc&t=3304s",
       "endSeconds": 3561,
       "titleNorm": "ピエロ",
