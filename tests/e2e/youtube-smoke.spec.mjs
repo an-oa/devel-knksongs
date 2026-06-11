@@ -161,6 +161,51 @@ test("sidebar native popover backdrop click closes and restores focus", async ({
     await expect(openButton).toBeFocused();
 });
 
+test("bookmark notification toast opens, closes, and auto-dismisses", async ({ page }) => {
+    const bookmarkName = "Toast Check";
+    await page.locator("#searchBox").fill("Manual Song");
+    await expect(page.locator("#searchBox")).toHaveValue("Manual Song");
+
+    const manualCard = getSongCard(page, "Manual Song");
+    await expect(manualCard).toBeVisible();
+
+    await manualCard.locator(".add-to-bookmark-btn").click();
+    await expect(page.locator("#bookmark-sidebar-panel")).toBeVisible();
+    await page.locator("#bookmark-panel-new-name").fill(bookmarkName);
+    await page.locator("#bookmark-panel-create-btn").click();
+
+    const createToast = page.locator(".bookmark-toast");
+    await expect(createToast.locator(".bookmark-toast-message")).toHaveText(
+        `ブックマーク「${bookmarkName}」を作成し、「Manual Song」を保存しました。`
+    );
+    await expect
+        .poll(() => createToast.evaluate((element) => element.matches(":popover-open")))
+        .toBe(true);
+
+    await createToast.locator(".bookmark-toast-close").click();
+    await expect(createToast).toHaveCount(0);
+
+    await page.locator("#open-bookmark-panel").click();
+    await expect(page.locator("#bookmark-sidebar-panel")).toBeVisible();
+    await page.locator(".bookmark-item").filter({ hasText: bookmarkName }).click();
+    await page.locator("#close-bookmark-sidebar").click();
+    await expect(page.locator("#sidebar")).toHaveAttribute("aria-hidden", "true");
+    await expect(page.locator("#open-sidebar")).toHaveAttribute("aria-expanded", "false");
+
+    const activeBookmarkCard = getSongCard(page, "Manual Song");
+    await expect(activeBookmarkCard.locator(".remove-from-bookmark-btn")).toBeVisible();
+    await activeBookmarkCard.locator(".remove-from-bookmark-btn").click();
+
+    const removeToast = page.locator(".bookmark-toast");
+    await expect(removeToast.locator(".bookmark-toast-message")).toHaveText(
+        `ブックマーク「${bookmarkName}」から「Manual Song」を削除しました。`
+    );
+    await expect
+        .poll(() => removeToast.evaluate((element) => element.matches(":popover-open")))
+        .toBe(true);
+    await expect(removeToast).toHaveCount(0, { timeout: 6_000 });
+});
+
 test("manual playback mounts an iframe from the thumbnail", async ({ page }) => {
     await enablePlaybackSettings(page);
     await filterBySongTitle(page, "Manual Song");
