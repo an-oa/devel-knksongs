@@ -7,6 +7,7 @@ import {
     collectSearchBooleanFilterState,
     hasSelectedSearchBooleanFilterState
 } from "../lib/search-boolean-filters.mjs";
+import { resolveSongRefs } from "../lib/song-lookup.mjs";
 import { getLookupUiState, getSearchUiState } from "../lib/ui-slices.mjs";
 
 /**
@@ -119,38 +120,7 @@ export function createSearchController({ data, ui, searchFiltersController, cons
      * @returns {Song[]}
      */
     function resolveBookmarkRows(bookmark) {
-        ensureSongLookupMaps();
-        const songs = Array.isArray(bookmark.songs) ? bookmark.songs : [];
-        /** @type {Song[]} */
-        const resolvedSongs = [];
-        for (const songRef of songs) {
-            const song = typeof songRef === "string"
-                ? lookupUi.songMapByBookmarkKey.get(songRef) || lookupUi.songMapByKey.get(songRef)
-                : Number.isFinite(songRef) ? lookupUi.songMapByLegacyIndex.get(songRef) : null;
-            if (song) resolvedSongs.push(song);
-        }
-        return resolvedSongs;
-    }
-
-    /**
-     * 曲参照用の検索マップを必要時に再構築する。
-     */
-    function ensureSongLookupMaps() {
-        if (lookupUi.songLookupSourceRef === data.allSongsRaw &&
-            lookupUi.songMapByBookmarkKey instanceof Map &&
-            lookupUi.songMapByKey instanceof Map &&
-            lookupUi.songMapByLegacyIndex instanceof Map) {
-            return;
-        }
-        lookupUi.songMapByBookmarkKey = new Map();
-        lookupUi.songMapByKey = new Map(data.allSongsRaw.map((row) => [row.songKey, row]));
-        data.allSongsRaw.forEach((row) => {
-            if (typeof row.bookmarkSongKey === "string" && row.bookmarkSongKey) {
-                lookupUi.songMapByBookmarkKey.set(row.bookmarkSongKey, row);
-            }
-        });
-        lookupUi.songMapByLegacyIndex = new Map(data.allSongsRaw.map((row) => [row.sourceIndex, row]));
-        lookupUi.songLookupSourceRef = data.allSongsRaw;
+        return resolveSongRefs(lookupUi, data.allSongsRaw, bookmark.songs);
     }
 
     /**
