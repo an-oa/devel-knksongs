@@ -51,6 +51,7 @@ type AppUiElements = Partial<{
   bookmarkPanelImportBtn: HTMLButtonElement | null;
   bookmarkPanelImportInput: HTMLInputElement | null;
   bookmarkList: HTMLElement | null;
+  bookmarkNotificationRegion: HTMLElement | null;
 }> & Record<string, Element | null | undefined>;
 
 /** 検索コントローラーが必須として扱う DOM 要素。 */

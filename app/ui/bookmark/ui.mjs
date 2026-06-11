@@ -6,6 +6,7 @@ import {
     readFileText,
     saveTextFile
 } from "./import-export.mjs";
+import { createBookmarkNotificationController } from "./notifications.mjs";
 
 /**
  * ブックマークUIのイベント処理・描画・選択状態管理をまとめたコントローラーを作成する。
@@ -17,6 +18,7 @@ import {
  */
 export function createBookmarkUiController({ data, ui, callbacks }) {
     const bookmarkPanelUi = getBookmarkPanelUiState(ui);
+    const bookmarkNotifications = createBookmarkNotificationController({ data, ui });
     const {
         clearSearchDebounce,
         scheduleSearch,
@@ -375,10 +377,12 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
                 if (!target) return;
 
                 if (addingMode) {
+                    const pendingSongKey = bookmarkPanelUi.pendingAction.songKey;
                     const result = normalizeActionResult(
-                        onAddSongToBookmark(id, bookmarkPanelUi.pendingAction.songKey)
+                        onAddSongToBookmark(id, pendingSongKey)
                     );
                     if (result.ok) {
+                        bookmarkNotifications.notifySongSavedToBookmark(bookmark.name, pendingSongKey);
                         closeBookmarkModal();
                         return;
                     }
@@ -436,11 +440,14 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
             ? normalizeActionResult(onCreateBookmarkAndAdd(newName, bookmarkPanelUi.pendingAction.songKey))
             : normalizeActionResult(onCreateBookmark(newName));
         if (result.ok) {
+            const pendingSongKey = isAddingSongMode() ? bookmarkPanelUi.pendingAction.songKey : null;
             nameInput.value = "";
             clearBookmarkPanelError();
-            if (isAddingSongMode()) {
+            if (pendingSongKey) {
+                bookmarkNotifications.notifySongSavedToBookmark(newName, pendingSongKey, { createdBookmark: true });
                 closeBookmarkModal();
             } else {
+                bookmarkNotifications.notifyBookmarkCreated(newName);
                 renderBookmarks();
                 nameInput.focus();
             }
@@ -577,11 +584,17 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
 
     /**
      * 現在アクティブなブックマークから指定曲を削除する。
-     * @param {*} songKey
+     * @param {string} songKey
      */
     function removeSongFromActiveBookmark(songKey) {
         if (!data.activeBookmark) return;
-        onRemoveSongFromBookmark(data.activeBookmark, songKey);
+        const bookmarkId = data.activeBookmark;
+        const bookmark = data.bookmarks[data.activeBookmark];
+        const bookmarkName = bookmark ? bookmark.name : "";
+        const result = normalizeActionResult(onRemoveSongFromBookmark(bookmarkId, songKey));
+        if (result.ok && bookmarkName) {
+            bookmarkNotifications.notifySongRemovedFromBookmark(bookmarkName, songKey);
+        }
     }
 
     return {

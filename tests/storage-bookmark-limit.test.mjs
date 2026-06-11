@@ -562,6 +562,59 @@ test("addSongToBookmark: succeeds under limit and triggers render/search for act
     }
 });
 
+test("removeSongFromBookmark: succeeds and returns action result", () => {
+    const prevLocalStorage = globalThis.localStorage;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        const { controller, data, getRenderCount, getScheduleCount } = setupStorageController({
+            bookmarks: {
+                b1: { name: "A", songs: ["s1", "s2"], createdAt: 1 }
+            },
+            activeBookmark: "b1",
+            maxBookmarkCount: 20,
+            maxSongsPerBookmark: 120
+        });
+
+        const result = controller.removeSongFromBookmark("b1", "s1");
+
+        assert.equal(result.ok, true);
+        assert.equal(result.changed, true);
+        assert.deepEqual(data.bookmarks.b1.songs, ["s2"]);
+        assert.equal(getRenderCount(), 1);
+        assert.equal(getScheduleCount(), 1);
+    } finally {
+        globalThis.localStorage = prevLocalStorage;
+    }
+});
+
+test("removeSongFromBookmark: missing bookmark or song returns failure without side effects", () => {
+    const prevLocalStorage = globalThis.localStorage;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        const { controller, data, getRenderCount, getScheduleCount } = setupStorageController({
+            bookmarks: {
+                b1: { name: "A", songs: ["s1"], createdAt: 1 }
+            },
+            activeBookmark: "b1",
+            maxBookmarkCount: 20,
+            maxSongsPerBookmark: 120
+        });
+
+        const missingBookmarkResult = controller.removeSongFromBookmark("missing", "s1");
+        const missingSongResult = controller.removeSongFromBookmark("b1", "missing");
+
+        assert.equal(missingBookmarkResult.ok, false);
+        assert.equal(missingBookmarkResult.reason, "bookmark_not_found");
+        assert.equal(missingSongResult.ok, false);
+        assert.equal(missingSongResult.reason, "song_not_found");
+        assert.deepEqual(data.bookmarks.b1.songs, ["s1"]);
+        assert.equal(getRenderCount(), 0);
+        assert.equal(getScheduleCount(), 0);
+    } finally {
+        globalThis.localStorage = prevLocalStorage;
+    }
+});
+
 test("renameBookmark: rejects invalid input and keeps state unchanged", () => {
     const prevLocalStorage = globalThis.localStorage;
     globalThis.localStorage = createFakeLocalStorage();

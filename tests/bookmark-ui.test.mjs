@@ -22,6 +22,7 @@ function createBookmarkUiState() {
     const bookmarkPanelImportBtn = document.createElement("button");
     const bookmarkPanelImportInput = document.createElement("input");
     const bookmarkList = document.createElement("div");
+    const bookmarkNotificationRegion = document.createElement("div");
 
     openBookmarkPanelBtn.setAttribute("id", "open-bookmark-panel");
     bookmarkSidebarPanel.hidden = true;
@@ -49,6 +50,7 @@ function createBookmarkUiState() {
         bookmarkPanelImportInput
     );
     bookmarkSidebarPanel.append(bookmarkList);
+    document.body.appendChild(bookmarkNotificationRegion);
     document.body.appendChild(sidebar);
 
     return {
@@ -66,7 +68,14 @@ function createBookmarkUiState() {
             bookmarkPanelExportBtn,
             bookmarkPanelImportBtn,
             bookmarkPanelImportInput,
-            bookmarkList
+            bookmarkList,
+            bookmarkNotificationRegion
+        },
+        lookup: {
+            songMapByBookmarkKey: new Map(),
+            songMapByKey: new Map(),
+            songMapByLegacyIndex: new Map(),
+            songLookupSourceRef: null
         },
         bookmarkPanel: {
             pendingAction: null,
@@ -94,6 +103,14 @@ function findBookmarkItem(ui, bookmarkId) {
 function createBookmarkHarness(input) {
     const options = input || {};
     const data = {
+        allSongsRaw: options.allSongsRaw || [
+            {
+                songKey: "song-z",
+                bookmarkSongKey: "song-z",
+                sourceIndex: 30,
+                title: "透明な朝"
+            }
+        ],
         bookmarks: options.bookmarks || {
             "bookmark-1": { name: "First", createdAt: 10, songs: ["song-a"] },
             "bookmark-2": { name: "Second", createdAt: 20, songs: ["song-b", "song-c"] }
@@ -155,6 +172,7 @@ function createBookmarkHarness(input) {
         },
         onRemoveSongFromBookmark(bookmarkId, songKey) {
             calls.removeSongArgs.push([bookmarkId, songKey]);
+            return options.onRemoveSongFromBookmarkResult || { ok: true };
         },
         onExportBookmarks() {
             calls.exportBookmarkCount += 1;
@@ -223,6 +241,29 @@ test("bookmark ui: add mode success adds to existing bookmark and closes the pan
     }
 });
 
+test("bookmark ui: add mode success notifies bookmark name and song title", () => {
+    const restoreDom = installFakeDom();
+    try {
+        const { ui, controller } = createBookmarkHarness();
+
+        controller.openBookmarkModal("song-z", {
+            returnFocusEl: ui.el.openBookmarkPanelBtn
+        });
+
+        const firstItem = findBookmarkItem(ui, "bookmark-1");
+        assert.ok(firstItem);
+        invokeListener(firstItem, "click", {
+            target: firstItem,
+            stopPropagation() {}
+        });
+
+        const message = ui.el.bookmarkNotificationRegion.querySelector(".bookmark-toast-message");
+        assert.equal(message.textContent, "ブックマーク「First」に「透明な朝」を保存しました。");
+    } finally {
+        restoreDom();
+    }
+});
+
 test("bookmark ui: create-and-add closes without leaving focus inside hidden panel", () => {
     const restoreDom = installFakeDom();
     try {
@@ -242,6 +283,25 @@ test("bookmark ui: create-and-add closes without leaving focus inside hidden pan
         assert.equal(document.activeElement, null);
         assert.equal(ui.el.sidebarHeader.hasAttribute("inert"), false);
         assert.equal(ui.el.sidebarScrollArea.hasAttribute("inert"), false);
+    } finally {
+        restoreDom();
+    }
+});
+
+test("bookmark ui: create-and-add notifies created bookmark and saved song title", () => {
+    const restoreDom = installFakeDom();
+    try {
+        const { ui, controller } = createBookmarkHarness();
+        controller.setupBookmarkHandlers();
+        controller.openBookmarkModal("song-z", {
+            returnFocusEl: ui.el.openBookmarkPanelBtn
+        });
+
+        ui.el.bookmarkPanelNewName.value = "Focus Songs";
+        invokeListener(ui.el.bookmarkPanelCreateBtn, "click", {});
+
+        const message = ui.el.bookmarkNotificationRegion.querySelector(".bookmark-toast-message");
+        assert.equal(message.textContent, "ブックマーク「Focus Songs」を作成し、「透明な朝」を保存しました。");
     } finally {
         restoreDom();
     }
@@ -306,6 +366,66 @@ test("bookmark ui: create form shows inline error, clears it on input, and creat
         assert.equal(document.activeElement, ui.el.bookmarkPanelNewName);
         assert.ok(data.bookmarks["bookmark-new"]);
         assert.equal(findBookmarkItem(ui, "bookmark-new").querySelector(".bookmark-item-name").textContent, "Focus Songs");
+    } finally {
+        restoreDom();
+    }
+});
+
+test("bookmark ui: create form success notifies created bookmark", () => {
+    const restoreDom = installFakeDom();
+    try {
+        const { ui, controller } = createBookmarkHarness();
+        controller.setupBookmarkHandlers();
+
+        ui.el.bookmarkPanelNewName.value = "Focus Songs";
+        invokeListener(ui.el.bookmarkPanelCreateBtn, "click", {});
+
+        const toast = ui.el.bookmarkNotificationRegion.querySelector(".bookmark-toast");
+        const message = toast.querySelector(".bookmark-toast-message");
+        const closeBtn = toast.querySelector(".bookmark-toast-close");
+        assert.equal(message.textContent, "ブックマーク「Focus Songs」を作成しました。");
+        assert.equal(closeBtn.getAttribute("aria-label"), "通知を閉じる");
+        assert.equal(closeBtn.getAttribute("popovertargetaction"), "hide");
+    } finally {
+        restoreDom();
+    }
+});
+
+test("bookmark ui: removing a song from active bookmark notifies bookmark name and song title", () => {
+    const restoreDom = installFakeDom();
+    try {
+        const { ui, calls, controller } = createBookmarkHarness({
+            activeBookmark: "bookmark-1",
+            bookmarks: {
+                "bookmark-1": { name: "First", createdAt: 10, songs: ["song-z"] }
+            }
+        });
+
+        controller.removeSongFromActiveBookmark("song-z");
+
+        const message = ui.el.bookmarkNotificationRegion.querySelector(".bookmark-toast-message");
+        assert.deepEqual(calls.removeSongArgs, [["bookmark-1", "song-z"]]);
+        assert.equal(message.textContent, "ブックマーク「First」から「透明な朝」を削除しました。");
+    } finally {
+        restoreDom();
+    }
+});
+
+test("bookmark ui: failed song removal does not show a success notification", () => {
+    const restoreDom = installFakeDom();
+    try {
+        const { ui, calls, controller } = createBookmarkHarness({
+            activeBookmark: "bookmark-1",
+            bookmarks: {
+                "bookmark-1": { name: "First", createdAt: 10, songs: ["song-z"] }
+            },
+            onRemoveSongFromBookmarkResult: { ok: false, reason: "song_not_found" }
+        });
+
+        controller.removeSongFromActiveBookmark("song-z");
+
+        assert.deepEqual(calls.removeSongArgs, [["bookmark-1", "song-z"]]);
+        assert.equal(ui.el.bookmarkNotificationRegion.childElementCount, 0);
     } finally {
         restoreDom();
     }

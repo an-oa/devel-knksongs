@@ -296,20 +296,23 @@ export function createStorageController({ data, ui, searchFiltersController, con
      * 指定ブックマークから曲を削除し、必要なら検索結果を更新する。
      * @param {string} bookmarkId
      * @param {string} songKey
+     * @returns {StorageActionResult}
      */
     function removeSongFromBookmark(bookmarkId, songKey) {
         const bookmark = data.bookmarks[bookmarkId];
-        if (!bookmark) return;
+        if (!bookmark) return buildActionFail("bookmark_not_found");
 
         const songIndex = bookmark.songs.indexOf(songKey);
-        if (songIndex > -1) {
-            bookmark.songs.splice(songIndex, 1);
-            saveBookmarks();
-            renderBookmarks();
-            if (data.activeBookmark === bookmarkId) {
-                scheduleSearch({ immediate: true });
-            }
+        if (songIndex <= -1) {
+            return buildActionFail("song_not_found");
         }
+        bookmark.songs.splice(songIndex, 1);
+        saveBookmarks();
+        renderBookmarks();
+        if (data.activeBookmark === bookmarkId) {
+            scheduleSearch({ immediate: true });
+        }
+        return buildActionOk({ changed: true });
     }
 
     /**

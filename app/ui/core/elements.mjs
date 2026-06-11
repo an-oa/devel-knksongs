@@ -55,7 +55,8 @@ export function collectUiElements() {
         bookmarkPanelExportBtn: document.getElementById("bookmark-panel-export-btn"),
         bookmarkPanelImportBtn: document.getElementById("bookmark-panel-import-btn"),
         bookmarkPanelImportInput: document.getElementById("bookmark-panel-import-input"),
-        bookmarkList: document.getElementById("bookmark-list")
+        bookmarkList: document.getElementById("bookmark-list"),
+        bookmarkNotificationRegion: document.getElementById("bookmark-notification-region")
     };
 }
 
