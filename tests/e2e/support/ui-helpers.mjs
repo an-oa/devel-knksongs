@@ -148,3 +148,58 @@ export async function filterBySongTitle(page, query) {
 export function getSongCard(page, title) {
     return page.locator(".song-card").filter({ hasText: title });
 }
+
+/**
+ * 指定した曲カードからブックマークを作成する。
+ * @param {import("@playwright/test").Page} page
+ * @param {{
+ *   bookmarkName: string,
+ *   songTitle: string
+ * }} options
+ */
+export async function createBookmarkFromSong(page, { bookmarkName, songTitle }) {
+    await page.locator("#searchBox").fill(songTitle);
+    await expect(page.locator("#searchBox")).toHaveValue(songTitle);
+
+    const songCard = getSongCard(page, songTitle);
+    await expect(songCard).toBeVisible();
+
+    await songCard.locator(".add-to-bookmark-btn").click();
+    await expect(page.locator("#bookmark-sidebar-panel")).toBeVisible();
+    await page.locator("#bookmark-panel-new-name").fill(bookmarkName);
+    await page.locator("#bookmark-panel-create-btn").click();
+}
+
+/**
+ * 指定名のブックマーク項目を返す。
+ * @param {import("@playwright/test").Page} page
+ * @param {string} bookmarkName
+ * @returns {import("@playwright/test").Locator}
+ */
+export function getBookmarkItem(page, bookmarkName) {
+    return page.locator(".bookmark-item").filter({ hasText: bookmarkName });
+}
+
+/**
+ * ブックマーク通知 toast の文言と popover 表示を確認する。
+ * @param {import("@playwright/test").Page} page
+ * @param {string} message
+ * @returns {Promise<import("@playwright/test").Locator>}
+ */
+export async function expectBookmarkToast(page, message) {
+    const toast = page.locator(".bookmark-toast");
+    await expect(toast.locator(".bookmark-toast-message")).toHaveText(message);
+    await expect
+        .poll(() => toast.evaluate((element) => element.matches(":popover-open")))
+        .toBe(true);
+    return toast;
+}
+
+/**
+ * ブックマーク管理パネルを開く。
+ * @param {import("@playwright/test").Page} page
+ */
+export async function openBookmarkPanel(page) {
+    await page.locator("#open-bookmark-panel").click();
+    await expect(page.locator("#bookmark-sidebar-panel")).toBeVisible();
+}

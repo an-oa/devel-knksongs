@@ -8,12 +8,16 @@ import {
     clickControlLabel,
     clickSidebarBackdrop,
     closeSidebar,
+    createBookmarkFromSong,
     enablePlaybackSettings,
+    expectBookmarkToast,
     expectSidebarPopoverClosed,
     expectSidebarPopoverOpen,
     filterBySongTitle,
+    getBookmarkItem,
     getControlLabel,
     getSongCard,
+    openBookmarkPanel,
     openSidebar,
     openSettingsPanel,
     waitForInitialLoad
@@ -163,31 +167,21 @@ test("sidebar native popover backdrop click closes and restores focus", async ({
 
 test("bookmark notification toast opens, closes, and auto-dismisses", async ({ page }) => {
     const bookmarkName = "Toast Check";
-    await page.locator("#searchBox").fill("Manual Song");
-    await expect(page.locator("#searchBox")).toHaveValue("Manual Song");
+    await createBookmarkFromSong(page, {
+        bookmarkName,
+        songTitle: "Manual Song"
+    });
 
-    const manualCard = getSongCard(page, "Manual Song");
-    await expect(manualCard).toBeVisible();
-
-    await manualCard.locator(".add-to-bookmark-btn").click();
-    await expect(page.locator("#bookmark-sidebar-panel")).toBeVisible();
-    await page.locator("#bookmark-panel-new-name").fill(bookmarkName);
-    await page.locator("#bookmark-panel-create-btn").click();
-
-    const createToast = page.locator(".bookmark-toast");
-    await expect(createToast.locator(".bookmark-toast-message")).toHaveText(
+    const createToast = await expectBookmarkToast(
+        page,
         `ブックマーク「${bookmarkName}」を作成し、「Manual Song」を保存しました。`
     );
-    await expect
-        .poll(() => createToast.evaluate((element) => element.matches(":popover-open")))
-        .toBe(true);
 
     await createToast.locator(".bookmark-toast-close").click();
     await expect(createToast).toHaveCount(0);
 
-    await page.locator("#open-bookmark-panel").click();
-    await expect(page.locator("#bookmark-sidebar-panel")).toBeVisible();
-    await page.locator(".bookmark-item").filter({ hasText: bookmarkName }).click();
+    await openBookmarkPanel(page);
+    await getBookmarkItem(page, bookmarkName).click();
     await page.locator("#close-bookmark-sidebar").click();
     await expect(page.locator("#sidebar")).toHaveAttribute("aria-hidden", "true");
     await expect(page.locator("#open-sidebar")).toHaveAttribute("aria-expanded", "false");
@@ -196,14 +190,50 @@ test("bookmark notification toast opens, closes, and auto-dismisses", async ({ p
     await expect(activeBookmarkCard.locator(".remove-from-bookmark-btn")).toBeVisible();
     await activeBookmarkCard.locator(".remove-from-bookmark-btn").click();
 
-    const removeToast = page.locator(".bookmark-toast");
-    await expect(removeToast.locator(".bookmark-toast-message")).toHaveText(
+    const removeToast = await expectBookmarkToast(
+        page,
         `ブックマーク「${bookmarkName}」から「Manual Song」を削除しました。`
     );
-    await expect
-        .poll(() => removeToast.evaluate((element) => element.matches(":popover-open")))
-        .toBe(true);
     await expect(removeToast).toHaveCount(0, { timeout: 6_000 });
+});
+
+test("bookmark deletion toast shows the deleted bookmark name", async ({ page }) => {
+    const bookmarkName = "Delete Toast";
+    await createBookmarkFromSong(page, {
+        bookmarkName,
+        songTitle: "Manual Song"
+    });
+
+    const createToast = await expectBookmarkToast(
+        page,
+        `ブックマーク「${bookmarkName}」を作成し、「Manual Song」を保存しました。`
+    );
+    await createToast.locator(".bookmark-toast-close").click();
+    await expect(createToast).toHaveCount(0);
+
+    await openBookmarkPanel(page);
+
+    const bookmarkItem = getBookmarkItem(page, bookmarkName);
+    await expect(bookmarkItem).toBeVisible();
+    await bookmarkItem.hover();
+    await expect(bookmarkItem.locator(".bookmark-delete-btn")).toHaveCSS("pointer-events", "auto");
+
+    const dialogPromise = new Promise((resolve) => {
+        page.once("dialog", async (dialog) => {
+            const message = dialog.message();
+            await dialog.accept();
+            resolve(message);
+        });
+    });
+
+    await bookmarkItem.locator(".bookmark-delete-btn").click();
+    expect(await dialogPromise).toBe(`ブックマーク「${bookmarkName}」を削除しますか？`);
+
+    await expectBookmarkToast(
+        page,
+        `ブックマーク「${bookmarkName}」を削除しました。`
+    );
+    await expect(bookmarkItem).toHaveCount(0);
 });
 
 test("manual playback mounts an iframe from the thumbnail", async ({ page }) => {
