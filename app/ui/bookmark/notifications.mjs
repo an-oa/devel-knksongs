@@ -132,6 +132,14 @@ export function createBookmarkNotificationController({ data, ui, timeoutMs = BOO
     }
 
     /**
+     * ブックマーク削除の成功をユーザーへ通知する。
+     * @param {string} bookmarkName
+     */
+    function notifyBookmarkDeleted(bookmarkName) {
+        showBookmarkNotification(`ブックマーク「${bookmarkName}」を削除しました。`);
+    }
+
+    /**
      * カードをブックマークへ保存した成功をユーザーへ通知する。
      * @param {string} bookmarkName
      * @param {string | number | null | undefined} songRef
@@ -159,6 +167,7 @@ export function createBookmarkNotificationController({ data, ui, timeoutMs = BOO
     return {
         dismissBookmarkNotification,
         notifyBookmarkCreated,
+        notifyBookmarkDeleted,
         notifySongSavedToBookmark,
         notifySongRemovedFromBookmark
     };

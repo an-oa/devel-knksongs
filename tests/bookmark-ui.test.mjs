@@ -165,6 +165,7 @@ function createBookmarkHarness(input) {
         },
         onDeleteBookmark(bookmarkId) {
             calls.deleteBookmarkArgs.push(bookmarkId);
+            return options.onDeleteBookmarkResult ?? { ok: true };
         },
         onRenameBookmark(bookmarkId, name) {
             calls.renameBookmarkArgs.push([bookmarkId, name]);
@@ -427,6 +428,62 @@ test("bookmark ui: failed song removal does not show a success notification", ()
         assert.deepEqual(calls.removeSongArgs, [["bookmark-1", "song-z"]]);
         assert.equal(ui.el.bookmarkNotificationRegion.childElementCount, 0);
     } finally {
+        restoreDom();
+    }
+});
+
+test("bookmark ui: deleting a bookmark notifies the deleted bookmark name", () => {
+    const restoreDom = installFakeDom();
+    const previousConfirm = globalThis.confirm;
+    globalThis.confirm = () => true;
+    try {
+        const { ui, calls, controller } = createBookmarkHarness();
+        controller.renderBookmarks();
+
+        const firstItem = findBookmarkItem(ui, "bookmark-1");
+        const deleteButton = firstItem.querySelector(".bookmark-delete-btn");
+        invokeListener(firstItem, "click", {
+            target: deleteButton,
+            stopPropagation() {}
+        });
+
+        const message = ui.el.bookmarkNotificationRegion.querySelector(".bookmark-toast-message");
+        assert.deepEqual(calls.deleteBookmarkArgs, ["bookmark-1"]);
+        assert.equal(message.textContent, "ブックマーク「First」を削除しました。");
+    } finally {
+        globalThis.confirm = previousConfirm;
+        restoreDom();
+    }
+});
+
+test("bookmark ui: failed bookmark deletion does not show a success notification", () => {
+    const restoreDom = installFakeDom();
+    const previousConfirm = globalThis.confirm;
+    const previousAlert = globalThis.alert;
+    const alerts = [];
+    globalThis.confirm = () => true;
+    globalThis.alert = (message) => {
+        alerts.push(String(message));
+    };
+    try {
+        const { ui, calls, controller } = createBookmarkHarness({
+            onDeleteBookmarkResult: { ok: false, reason: "bookmark_not_found" }
+        });
+        controller.renderBookmarks();
+
+        const firstItem = findBookmarkItem(ui, "bookmark-1");
+        const deleteButton = firstItem.querySelector(".bookmark-delete-btn");
+        invokeListener(firstItem, "click", {
+            target: deleteButton,
+            stopPropagation() {}
+        });
+
+        assert.deepEqual(calls.deleteBookmarkArgs, ["bookmark-1"]);
+        assert.equal(ui.el.bookmarkNotificationRegion.childElementCount, 0);
+        assert.deepEqual(alerts, ["ブックマークが見つかりません。画面を更新して再度お試しください。"]);
+    } finally {
+        globalThis.confirm = previousConfirm;
+        globalThis.alert = previousAlert;
         restoreDom();
     }
 });

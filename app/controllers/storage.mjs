@@ -383,18 +383,18 @@ export function createStorageController({ data, ui, searchFiltersController, con
     /**
      * ブックマークを削除し、アクティブ状態と表示を更新する。
      * @param {string} bookmarkId
-     * @returns {boolean}
+     * @returns {StorageActionResult}
      */
     function deleteBookmark(bookmarkId) {
         const bookmark = data.bookmarks[bookmarkId];
-        if (!bookmark) return false;
+        if (!bookmark) return buildActionFail("bookmark_not_found");
         const wasActive = data.activeBookmark === bookmarkId;
         delete data.bookmarks[bookmarkId];
         if (wasActive) data.activeBookmark = null;
         saveBookmarks();
         renderBookmarks();
         if (wasActive) scheduleSearch({ immediate: true });
-        return true;
+        return buildActionOk({ changed: true });
     }
 
     /**

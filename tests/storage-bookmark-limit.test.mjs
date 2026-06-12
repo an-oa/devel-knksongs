@@ -615,6 +615,60 @@ test("removeSongFromBookmark: missing bookmark or song returns failure without s
     }
 });
 
+test("deleteBookmark: succeeds and returns action result", () => {
+    const prevLocalStorage = globalThis.localStorage;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        const { controller, data, getRenderCount, getScheduleCount } = setupStorageController({
+            bookmarks: {
+                b1: { name: "A", songs: ["s1"], createdAt: 1 },
+                b2: { name: "B", songs: ["s2"], createdAt: 2 }
+            },
+            activeBookmark: "b1",
+            maxBookmarkCount: 20,
+            maxSongsPerBookmark: 120
+        });
+
+        const result = controller.deleteBookmark("b1");
+
+        assert.equal(result.ok, true);
+        assert.equal(result.changed, true);
+        assert.equal(data.bookmarks.b1, undefined);
+        assert.ok(data.bookmarks.b2);
+        assert.equal(data.activeBookmark, null);
+        assert.equal(getRenderCount(), 1);
+        assert.equal(getScheduleCount(), 1);
+    } finally {
+        globalThis.localStorage = prevLocalStorage;
+    }
+});
+
+test("deleteBookmark: missing bookmark returns failure without side effects", () => {
+    const prevLocalStorage = globalThis.localStorage;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        const { controller, data, getRenderCount, getScheduleCount } = setupStorageController({
+            bookmarks: {
+                b1: { name: "A", songs: ["s1"], createdAt: 1 }
+            },
+            activeBookmark: "b1",
+            maxBookmarkCount: 20,
+            maxSongsPerBookmark: 120
+        });
+
+        const result = controller.deleteBookmark("missing");
+
+        assert.equal(result.ok, false);
+        assert.equal(result.reason, "bookmark_not_found");
+        assert.ok(data.bookmarks.b1);
+        assert.equal(data.activeBookmark, "b1");
+        assert.equal(getRenderCount(), 0);
+        assert.equal(getScheduleCount(), 0);
+    } finally {
+        globalThis.localStorage = prevLocalStorage;
+    }
+});
+
 test("renameBookmark: rejects invalid input and keeps state unchanged", () => {
     const prevLocalStorage = globalThis.localStorage;
     globalThis.localStorage = createFakeLocalStorage();

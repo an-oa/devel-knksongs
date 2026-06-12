@@ -9,11 +9,54 @@ import {
 import { createBookmarkNotificationController } from "./notifications.mjs";
 
 /**
+ * @typedef {{
+ *   ok: boolean,
+ *   reason?: string,
+ *   limit?: number,
+ *   text?: string,
+ *   fileName?: string,
+ *   bookmarkCount?: number,
+ *   songCount?: number
+ * }} BookmarkUiActionResult
+ */
+
+/**
+ * @typedef {boolean | BookmarkUiActionResult | null | undefined} BookmarkUiActionCallbackResult
+ */
+
+/**
+ * @typedef {{
+ *   clearSearchDebounce: () => void,
+ *   scheduleSearch: (options?: { immediate?: boolean }) => void,
+ *   onAddSongToBookmark: (
+ *     bookmarkId: string,
+ *     songKey: string
+ *   ) => BookmarkUiActionCallbackResult,
+ *   onCreateBookmark: (bookmarkName: string) => BookmarkUiActionCallbackResult,
+ *   onCreateBookmarkAndAdd: (
+ *     bookmarkName: string,
+ *     songKey: string
+ *   ) => BookmarkUiActionCallbackResult,
+ *   onDeleteBookmark: (bookmarkId: string) => BookmarkUiActionCallbackResult,
+ *   onRenameBookmark: (bookmarkId: string, bookmarkName: string) => BookmarkUiActionCallbackResult,
+ *   onRemoveSongFromBookmark: (
+ *     bookmarkId: string,
+ *     songKey: string
+ *   ) => BookmarkUiActionCallbackResult,
+ *   onRequestCloseSidebar: () => void,
+ *   onExportBookmarks: () => BookmarkUiActionCallbackResult,
+ *   onPreviewBookmarkImport: (text: string) => BookmarkUiActionCallbackResult,
+ *   onImportBookmarksText: (text: string) => BookmarkUiActionCallbackResult,
+ *   saveTextFile?: (text: string, fileName: string, mimeType: string) => Promise<void> | void
+ * }} BookmarkUiCallbacks
+ */
+
+/**
  * ブックマークUIのイベント処理・描画・選択状態管理をまとめたコントローラーを作成する。
  * @param {{
  *   data: AppDataState,
  *   ui: AppUiState,
- *   callbacks: Record<string, *>
+ *   callbacks: BookmarkUiCallbacks
  * }} input
  */
 export function createBookmarkUiController({ data, ui, callbacks }) {
@@ -37,11 +80,15 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
 
     /**
      * 各アクションの戻り値を `{ ok, reason }` 形式に正規化する。
-     * @param {*} result
+     * @param {BookmarkUiActionCallbackResult} result
+     * @returns {BookmarkUiActionResult}
      */
     function normalizeActionResult(result) {
-        if (result && typeof result === "object" && typeof result.ok === "boolean") {
-            return result;
+        if (result && typeof result === "object") {
+            const actionResult = /** @type {Partial<BookmarkUiActionResult>} */ (result);
+            if (typeof actionResult.ok === "boolean") {
+                return /** @type {BookmarkUiActionResult} */ (actionResult);
+            }
         }
         if (typeof result === "boolean") {
             return { ok: result, reason: result ? "" : "unknown" };
@@ -51,7 +98,8 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
 
     /**
      * 上限エラー時に理由別のメッセージを表示し、通知したかどうかを返す。
-     * @param {*} result
+     * @param {BookmarkUiActionResult} result
+     * @returns {boolean}
      */
     function notifyIfLimitError(result) {
         if (!result || result.ok) return false;
@@ -76,8 +124,19 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
     }
 
     /**
+     * ブックマークが見つからない失敗を共通文言で通知する。
+     * @param {BookmarkUiActionResult} result
+     * @returns {boolean}
+     */
+    function notifyIfBookmarkNotFoundError(result) {
+        if (!result || result.ok || result.reason !== "bookmark_not_found") return false;
+        alert("ブックマークが見つかりません。画面を更新して再度お試しください。");
+        return true;
+    }
+
+    /**
      * リネーム失敗時に理由別メッセージを表示し、通知したかどうかを返す。
-     * @param {*} result
+     * @param {BookmarkUiActionResult} result
      * @returns {boolean}
      */
     function notifyIfRenameError(result) {
@@ -93,16 +152,13 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
                 : `ブックマーク名は最大${limit}文字までです。`);
             return true;
         }
-        if (result.reason === "bookmark_not_found") {
-            alert("ブックマークが見つかりません。画面を更新して再度お試しください。");
-            return true;
-        }
+        if (notifyIfBookmarkNotFoundError(result)) return true;
         return false;
     }
 
     /**
      * 曲追加失敗時に理由別メッセージを表示し、通知したかどうかを返す。
-     * @param {*} result
+     * @param {BookmarkUiActionResult} result
      * @returns {boolean}
      */
     function notifyIfAddSongError(result) {
@@ -112,10 +168,7 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
             alert("この曲はすでに選択したブックマークに追加されています。");
             return true;
         }
-        if (result.reason === "bookmark_not_found") {
-            alert("ブックマークが見つかりません。画面を更新して再度お試しください。");
-            return true;
-        }
+        if (notifyIfBookmarkNotFoundError(result)) return true;
         return false;
     }
 
@@ -190,7 +243,7 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
 
     /**
      * パネルを閉じたあとにフォーカスを戻す要素を保持する。
-     * @param {*} returnFocusEl
+     * @param {Element | null | undefined} returnFocusEl
      */
     function rememberBookmarkPanelReturnFocus(returnFocusEl) {
         bookmarkPanelUi.returnFocusEl = returnFocusEl instanceof HTMLElement ? returnFocusEl : null;
@@ -404,7 +457,12 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
                 if (deleteBtn) {
                     e.stopPropagation();
                     if (confirm(`ブックマーク「${bookmark.name}」を削除しますか？`)) {
-                        onDeleteBookmark(id);
+                        const result = normalizeActionResult(onDeleteBookmark(id));
+                        if (result.ok) {
+                            bookmarkNotifications.notifyBookmarkDeleted(bookmark.name);
+                        } else {
+                            notifyIfBookmarkNotFoundError(result);
+                        }
                     }
                     return;
                 }
@@ -503,11 +561,12 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
 
     /**
      * 閲覧モードでブックマークパネルを開く。
+     * @param {{ returnFocusEl?: Element | null | undefined } | undefined} [options]
      */
     function openBookmarkBrowser(options) {
         bookmarkPanelUi.pendingAction = null;
         bookmarkPanelUi.exitClosesSidebar = false;
-        rememberBookmarkPanelReturnFocus(options && options.returnFocusEl);
+        rememberBookmarkPanelReturnFocus(options?.returnFocusEl);
         clearBookmarkPanelError();
         renderBookmarks();
         showBookmarkPanel();
@@ -518,12 +577,16 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
 
     /**
      * 指定した曲を追加するためのブックマーク選択パネルを開く。
-     * @param {*} songKey
+     * @param {string} songKey
+     * @param {{
+     *   closeSidebarOnExit?: boolean,
+     *   returnFocusEl?: Element | null | undefined
+     * } | undefined} [options]
      */
     function openBookmarkModal(songKey, options) {
         bookmarkPanelUi.pendingAction = { songKey };
-        bookmarkPanelUi.exitClosesSidebar = Boolean(options && options.closeSidebarOnExit);
-        rememberBookmarkPanelReturnFocus(options && options.returnFocusEl);
+        bookmarkPanelUi.exitClosesSidebar = Boolean(options?.closeSidebarOnExit);
+        rememberBookmarkPanelReturnFocus(options?.returnFocusEl);
         clearBookmarkPanelError();
         renderBookmarks();
         showBookmarkPanel();
@@ -536,10 +599,11 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
 
     /**
      * ブックマーク追加モードを終了し、専用パネルを閉じる。
+     * @param {{ restoreFocus?: boolean } | undefined} [options]
      */
     function closeBookmarkModal(options) {
         const shouldCloseSidebar =
-            Boolean(options && options.restoreFocus) &&
+            Boolean(options?.restoreFocus) &&
             Boolean(bookmarkPanelUi.exitClosesSidebar);
         bookmarkPanelUi.pendingAction = null;
         bookmarkPanelUi.exitClosesSidebar = false;
@@ -551,7 +615,7 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
             onRequestCloseSidebar();
             return;
         }
-        if (options && options.restoreFocus) {
+        if (options?.restoreFocus) {
             restoreBookmarkPanelFocus();
             return;
         }
@@ -560,7 +624,7 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
 
     /**
      * アクティブなブックマークを切り替えて検索を再実行する。
-     * @param {*} bookmarkId
+     * @param {string} bookmarkId
      */
     function setActiveBookmark(bookmarkId) {
         clearSearchDebounce();
@@ -571,13 +635,13 @@ export function createBookmarkUiController({ data, ui, callbacks }) {
 
     /**
      * アクティブなブックマークを解除し、必要に応じて検索を再実行する。
-     * @param {*} options
+     * @param {{ skipSearch?: boolean } | undefined} [options]
      */
     function clearActiveBookmark(options) {
         if (!data.activeBookmark) return;
         data.activeBookmark = null;
         renderBookmarks();
-        if (!(options && options.skipSearch)) {
+        if (!options?.skipSearch) {
             scheduleSearch({ immediate: true });
         }
     }
