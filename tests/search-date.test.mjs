@@ -242,6 +242,147 @@ test("createDateFilterController: syncDateSelectOptions constrains end-side opti
     }
 });
 
+test("createDateFilterController: getDateSelectValue returns partial date values", () => {
+    const restoreDom = installFakeDom();
+    try {
+        const ui = createDateUiState();
+        const controller = createDateFilterController({ ui });
+
+        ui.el.dateFromYear.value = "2024";
+        assert.equal(controller.getDateSelectValue("from"), "2024");
+
+        ui.el.dateFromMonth.value = "02";
+        assert.equal(controller.getDateSelectValue("from"), "2024-02");
+
+        ui.el.dateFromDay.value = "10";
+        assert.equal(controller.getDateSelectValue("from"), "2024-02-10");
+    } finally {
+        restoreDom();
+    }
+});
+
+test("createDateFilterController: applyDateSelectValue restores partial date values", () => {
+    const restoreDom = installFakeDom();
+    try {
+        const ui = createDateUiState();
+        const controller = createDateFilterController({ ui });
+        const rows = [
+            makeRow({ dateKey: 20240210 }),
+            makeRow({ dateKey: 20240215 }),
+            makeRow({ dateKey: 20240305 })
+        ];
+
+        controller.applyDateInputRange(rows);
+        controller.applyDateSelectValue("from", "2024-02");
+        controller.applyDateSelectValue("to", "2024");
+
+        assert.equal(controller.getDateSelectValue("from"), "2024-02");
+        assert.equal(ui.el.dateFromDay.value, "");
+        assert.equal(controller.getDateSelectValue("to"), "2024");
+        assert.equal(ui.el.dateToMonth.value, "");
+        assert.equal(ui.el.dateToDay.value, "");
+
+        controller.applyDateSelectValue("from", "2024-02-10");
+        controller.applyDateSelectValue("from", "2024-02");
+        assert.equal(controller.getDateSelectValue("from"), "2024-02");
+        assert.equal(ui.el.dateFromDay.value, "");
+
+        controller.applyDateSelectValue("to", "2024-03-05");
+        controller.applyDateSelectValue("to", "2024");
+        assert.equal(controller.getDateSelectValue("to"), "2024");
+        assert.equal(ui.el.dateToMonth.value, "");
+        assert.equal(ui.el.dateToDay.value, "");
+    } finally {
+        restoreDom();
+    }
+});
+
+test("createDateFilterController: applyDateSelectValue rounds unavailable saved days to month precision", () => {
+    const restoreDom = installFakeDom();
+    try {
+        const ui = createDateUiState();
+        const controller = createDateFilterController({ ui });
+        const rows = [
+            makeRow({ dateKey: 20240210 }),
+            makeRow({ dateKey: 20240220 }),
+            makeRow({ dateKey: 20240305 })
+        ];
+
+        controller.applyDateInputRange(rows);
+        controller.applyDateSelectValue("from", "2024-02-15");
+
+        assert.equal(controller.getDateSelectValue("from"), "2024-02");
+        assert.equal(ui.el.dateFromDay.value, "");
+        assert.deepEqual(controller.getPartialDateRange("from"), {
+            minKey: 20240201,
+            maxKey: 20240229
+        });
+
+        controller.resetDateSelects();
+        controller.applyDateSelectValue("to", "2024-02-15");
+
+        assert.equal(controller.getDateSelectValue("to"), "2024-02");
+        assert.equal(ui.el.dateToDay.value, "");
+        assert.deepEqual(controller.getPartialDateRange("to"), {
+            minKey: 20240201,
+            maxKey: 20240229
+        });
+    } finally {
+        restoreDom();
+    }
+});
+
+test("createDateFilterController: clampDateInputsIfNeeded preserves partial opposite side with complete dates", () => {
+    const restoreDom = installFakeDom();
+    try {
+        const ui = createDateUiState();
+        const controller = createDateFilterController({ ui });
+        const rows = [
+            makeRow({ dateKey: 20240210 }),
+            makeRow({ dateKey: 20240215 }),
+            makeRow({ dateKey: 20240305 })
+        ];
+
+        controller.applyDateInputRange(rows);
+        controller.applyDateSelectValue("from", "2024-02-10");
+
+        ui.el.dateToYear.value = "2024";
+        controller.clampDateInputsIfNeeded();
+        controller.syncDateSelectOptions();
+        assert.equal(controller.getDateSelectValue("to"), "2024");
+
+        ui.el.dateToMonth.value = "02";
+        controller.clampDateInputsIfNeeded();
+        controller.syncDateSelectOptions();
+        assert.equal(controller.getDateSelectValue("to"), "2024-02");
+
+        ui.el.dateToDay.value = "15";
+        controller.clampDateInputsIfNeeded();
+        controller.syncDateSelectOptions();
+        assert.equal(controller.getDateSelectValue("to"), "2024-02-15");
+
+        controller.resetDateSelects();
+        controller.applyDateSelectValue("to", "2024-03-05");
+
+        ui.el.dateFromYear.value = "2024";
+        controller.clampDateInputsIfNeeded();
+        controller.syncDateSelectOptions();
+        assert.equal(controller.getDateSelectValue("from"), "2024");
+
+        ui.el.dateFromMonth.value = "02";
+        controller.clampDateInputsIfNeeded();
+        controller.syncDateSelectOptions();
+        assert.equal(controller.getDateSelectValue("from"), "2024-02");
+
+        ui.el.dateFromDay.value = "10";
+        controller.clampDateInputsIfNeeded();
+        controller.syncDateSelectOptions();
+        assert.equal(controller.getDateSelectValue("from"), "2024-02-10");
+    } finally {
+        restoreDom();
+    }
+});
+
 test("createDateFilterController: clampDateInputsToBounds clamps and preserves chronological order", () => {
     const restoreDom = installFakeDom();
     try {

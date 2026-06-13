@@ -2,6 +2,19 @@ import { dateKeyToParts, parseDateKey } from "../../lib/date-key.mjs";
 import { getDateUiState } from "../../lib/ui-slices.mjs";
 
 /**
+ * @typedef {"year" | "month" | "day"} DateSelectPrecision
+ */
+
+/**
+ * @typedef {{
+ *   year: number,
+ *   month: number | null,
+ *   day: number | null,
+ *   precision: DateSelectPrecision
+ * }} DateSelectValue
+ */
+
+/**
  * 日付フィルタ UI の初期化・同期・補正を扱うコントローラーを作成する。
  * @param {{ ui: any }} options
  */
@@ -25,7 +38,8 @@ export function createDateFilterController({ ui }) {
 
     /**
      * 開始または終了側の日付セレクト値を取得する。
-     * @param {*} kind
+     * @param {string} kind
+     * @returns {{ year: string, month: string, day: string }}
      */
     function getDateSelectParts(kind) {
         const isFrom = kind === "from";
@@ -36,35 +50,127 @@ export function createDateFilterController({ ui }) {
     }
 
     /**
-     * 日付セレクトの値を `YYYY-MM-DD` 文字列で取得する。
-     * @param {*} kind
+     * 日付セレクトの値を精度に応じた文字列で取得する。
+     * @param {string} kind
+     * @returns {string}
      */
     function getDateSelectValue(kind) {
-        const { year, month, day } = getDateSelectParts(kind);
-        if (!year || !month || !day) return "";
-        return `${year}-${month}-${day}`;
+        return formatDateSelectValue(normalizeDateSelectParts(getDateSelectParts(kind)));
+    }
+
+    /**
+     * セレクト部品の文字列値を部分日付値へ正規化する。
+     * @param {{ year: string, month: string, day: string }} parts
+     * @returns {DateSelectValue | null}
+     */
+    function normalizeDateSelectParts(parts) {
+        const yearText = parts.year.trim();
+        if (!/^\d{4}$/.test(yearText)) return null;
+        const year = Number(yearText);
+        const monthText = parts.month.trim();
+        if (!monthText) return { year, month: null, day: null, precision: "year" };
+        if (!/^\d{1,2}$/.test(monthText)) return null;
+        const month = Number(monthText);
+        if (month < 1 || month > 12) return null;
+        const dayText = parts.day.trim();
+        if (!dayText) return { year, month, day: null, precision: "month" };
+        if (!/^\d{1,2}$/.test(dayText)) return null;
+        const day = Number(dayText);
+        const key = parseDateKey(`${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`);
+        if (!key) return null;
+        const normalized = dateKeyToParts(key);
+        return {
+            year: normalized.year,
+            month: normalized.month,
+            day: normalized.day,
+            precision: "day"
+        };
+    }
+
+    /**
+     * 年・年月・年月日の日付文字列を解析する。
+     * @param {string | null | undefined} value
+     * @returns {DateSelectValue | null}
+     */
+    function parseDateSelectValue(value) {
+        if (!value) return null;
+        const trimmed = value.trim();
+        const match = /^(\d{4})(?:[/-](\d{1,2})(?:[/-](\d{1,2}))?)?$/.exec(trimmed);
+        if (!match) return null;
+        return normalizeDateSelectParts({
+            year: match[1],
+            month: match[2] ?? "",
+            day: match[3] ?? ""
+        });
+    }
+
+    /**
+     * 部分日付値を保存用の文字列へ整形する。
+     * @param {DateSelectValue | null} value
+     * @returns {string}
+     */
+    function formatDateSelectValue(value) {
+        if (!value) return "";
+        const year = String(value.year).padStart(4, "0");
+        if (value.precision === "year" || value.month === null) return year;
+        const month = String(value.month).padStart(2, "0");
+        if (value.precision === "month" || value.day === null) return `${year}-${month}`;
+        return `${year}-${month}-${String(value.day).padStart(2, "0")}`;
+    }
+
+    /**
+     * 部分日付値から検索に使う最小/最大キー範囲を求める。
+     * @param {DateSelectValue | null} value
+     * @returns {{ minKey: number, maxKey: number } | null}
+     */
+    function getDateSelectRange(value) {
+        if (!value) return null;
+        const { year, month, day } = value;
+        if (value.precision === "year" || month === null) {
+            return { minKey: year * 10000 + 101, maxKey: year * 10000 + 1231 };
+        }
+        const daysInMonth = new Date(year, month, 0).getDate();
+        if (value.precision === "month" || day === null) {
+            return { minKey: year * 10000 + month * 100 + 1, maxKey: year * 10000 + month * 100 + daysInMonth };
+        }
+        const key = year * 10000 + month * 100 + day;
+        return { minKey: key, maxKey: key };
+    }
+
+    /**
+     * 完全年月日の部分日付値から日付キーを返す。
+     * @param {DateSelectValue | null} value
+     * @returns {number | null}
+     */
+    function getCompleteDateSelectKey(value) {
+        if (!value || value.precision !== "day" || value.month === null || value.day === null) return null;
+        return value.year * 10000 + value.month * 100 + value.day;
     }
 
     /**
      * 日付文字列をセレクト UI へ反映する。
-     * @param {*} kind
-     * @param {*} value
+     * @param {string} kind
+     * @param {string | null | undefined} value
      */
     function applyDateSelectValue(kind, value) {
-        if (!value) return;
-        const key = parseDateKey(value);
-        if (!key) return;
-        const { year, month, day } = dateKeyToParts(key);
+        const dateValue = parseDateSelectValue(value);
+        if (!dateValue) return;
         const isFrom = kind === "from";
         const yearSelect = isFrom ? ui.el.dateFromYear : ui.el.dateToYear;
         const monthSelect = isFrom ? ui.el.dateFromMonth : ui.el.dateToMonth;
         const daySelect = isFrom ? ui.el.dateFromDay : ui.el.dateToDay;
         if (!yearSelect || !monthSelect || !daySelect) return;
-        yearSelect.value = String(year);
+        yearSelect.value = String(dateValue.year);
+        monthSelect.value = "";
+        daySelect.value = "";
         syncDateSelectOptions(kind);
-        monthSelect.value = String(month).padStart(2, "0");
+        if (dateValue.precision === "year" || dateValue.month === null) return;
+        monthSelect.value = String(dateValue.month).padStart(2, "0");
+        daySelect.value = "";
         syncDateSelectOptions(kind);
-        daySelect.value = String(day).padStart(2, "0");
+        if (dateValue.precision === "month" || dateValue.day === null) return;
+        daySelect.value = String(dateValue.day).padStart(2, "0");
+        syncDateSelectOptions(kind);
     }
 
     /**
@@ -85,22 +191,11 @@ export function createDateFilterController({ ui }) {
 
     /**
      * 部分指定を含む日付入力から最小/最大キー範囲を求める。
-     * @param {*} kind
+     * @param {string} kind
+     * @returns {{ minKey: number, maxKey: number } | null}
      */
     function getPartialDateRange(kind) {
-        const { year, month, day } = getDateSelectParts(kind);
-        if (!year) return null;
-        const y = Number(year);
-        if (!month) {
-            return { minKey: y * 10000 + 101, maxKey: y * 10000 + 1231 };
-        }
-        const m = Number(month);
-        const daysInMonth = new Date(y, m, 0).getDate();
-        if (!day) {
-            return { minKey: y * 10000 + m * 100 + 1, maxKey: y * 10000 + m * 100 + daysInMonth };
-        }
-        const d = Number(day);
-        return { minKey: y * 10000 + m * 100 + d, maxKey: y * 10000 + m * 100 + d };
+        return getDateSelectRange(normalizeDateSelectParts(getDateSelectParts(kind)));
     }
 
     /**
@@ -316,9 +411,9 @@ export function createDateFilterController({ ui }) {
     }
 
     /**
-     * 日付入力を許容範囲内に収め、前後関係を補正する。
-     * @param {*} minKey
-     * @param {*} maxKey
+     * 日付入力を許容範囲内に収め、完全日付同士の前後関係を補正する。
+     * @param {number} minKey
+     * @param {number} maxKey
      */
     function clampDateInputsToBounds(minKey, maxKey) {
         const dateFromYear = ui.el.dateFromYear;
@@ -334,21 +429,17 @@ export function createDateFilterController({ ui }) {
             if (key > maxKey) return maxKey;
             return key;
         };
-        let fromKey = clampKey(parseDateKey(getDateSelectValue("from")));
-        let toKey = clampKey(parseDateKey(getDateSelectValue("to")));
+        const currentFromValue = normalizeDateSelectParts(getDateSelectParts("from"));
+        const currentToValue = normalizeDateSelectParts(getDateSelectParts("to"));
+        const currentFromKey = getCompleteDateSelectKey(currentFromValue);
+        const currentToKey = getCompleteDateSelectKey(currentToValue);
+        let fromKey = clampKey(currentFromKey);
+        let toKey = clampKey(currentToKey);
         if (fromKey !== null && toKey !== null && fromKey > toKey) {
             toKey = fromKey;
         }
-        if (fromKey === null && toKey === null) return;
-        dateFromYear.value = "";
-        dateFromMonth.value = "";
-        dateFromDay.value = "";
-        dateToYear.value = "";
-        dateToMonth.value = "";
-        dateToDay.value = "";
-        syncDateSelectOptions();
-        if (fromKey !== null) applyDateSelectValue("from", formatDateKeyForInput(fromKey));
-        if (toKey !== null) applyDateSelectValue("to", formatDateKeyForInput(toKey));
+        if (fromKey !== null && fromKey !== currentFromKey) applyDateSelectValue("from", formatDateKeyForInput(fromKey));
+        if (toKey !== null && toKey !== currentToKey) applyDateSelectValue("to", formatDateKeyForInput(toKey));
     }
 
     /**
