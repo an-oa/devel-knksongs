@@ -250,6 +250,27 @@ test("manual playback mounts an iframe from the thumbnail", async ({ page }) => 
     await expect(manualCard.locator(".thumb-close-btn")).toBeVisible();
 });
 
+test("thumbnail context menu is suppressed", async ({ page }) => {
+    await enablePlaybackSettings(page);
+    await filterBySongTitle(page, "Manual Song");
+
+    const manualCard = getSongCard(page, "Manual Song");
+    const thumbnail = manualCard.locator(".thumb");
+    await expect(thumbnail.locator("img")).toBeVisible();
+
+    await page.evaluate(() => {
+        window.__knkLastThumbnailContextMenuPrevented = null;
+        document.addEventListener("contextmenu", (event) => {
+            window.__knkLastThumbnailContextMenuPrevented = event.defaultPrevented;
+        }, { once: true });
+    });
+    await thumbnail.click({ button: "right" });
+
+    await expect
+        .poll(() => page.evaluate(() => window.__knkLastThumbnailContextMenuPrevented))
+        .toBe(true);
+});
+
 test("collab role filters switch between host and guest results", async ({ page }) => {
     await openSidebar(page);
     await clickControlLabel(page, "#collabGuestOnly");

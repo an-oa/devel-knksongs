@@ -4,10 +4,12 @@ import {
     applyYoutubeThumbnailImage,
     createYoutubeThumbnailImage,
     getSongKeyFromYoutubeThumb,
+    preventYoutubeThumbnailDefaultAction,
     setYoutubeThumbnailExpandedCardState,
     setYoutubeThumbnailOrientation,
     setYoutubeThumbnailPlaybackState,
-    shouldLoadYoutubeThumbnailNow
+    shouldLoadYoutubeThumbnailNow,
+    suppressYoutubeThumbnailContextMenu
 } from "../app/lib/youtube/thumbnail.mjs";
 import { installFakeDom } from "./test-helpers.mjs";
 
@@ -24,6 +26,33 @@ test("youtube thumbnail: create/apply image keeps mqdefault source and eager loa
         assert.ok(img);
         assert.equal(img.dataset.src, "https://i.ytimg.com/vi/video1/mqdefault.jpg");
         assert.equal(img.src, "https://i.ytimg.com/vi/video1/mqdefault.jpg");
+    } finally {
+        cleanup();
+    }
+});
+
+test("youtube thumbnail: save-related default actions are suppressed", () => {
+    const cleanup = installFakeDom();
+    try {
+        let prevented = false;
+        preventYoutubeThumbnailDefaultAction({
+            preventDefault() {
+                prevented = true;
+            }
+        });
+        assert.equal(prevented, true);
+
+        const thumb = document.createElement("div");
+        suppressYoutubeThumbnailContextMenu(thumb);
+        const thumbContextMenu = thumb._events.get("contextmenu");
+        assert.equal(typeof thumbContextMenu, "function");
+
+        const img = createYoutubeThumbnailImage("video1");
+        assert.ok(img);
+        assert.equal(img.draggable, false);
+        assert.equal(img.getAttribute("draggable"), "false");
+        assert.equal(typeof img._events.get("contextmenu"), "function");
+        assert.equal(typeof img._events.get("dragstart"), "function");
     } finally {
         cleanup();
     }

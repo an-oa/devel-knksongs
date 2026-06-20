@@ -2,6 +2,38 @@ import { canUseDom, getHeaderHeight, isHtmlElement } from "../dom-utils.mjs";
 import { scheduleScrollElementIntoView } from "../results-scroll.mjs";
 
 /**
+ * サムネイル上のブラウザ標準保存導線をキャンセルする。
+ * 本番コードではこの module 内の設定関数から使い、境界条件を単体テストするために export している。
+ * @param {{ preventDefault?: () => void } | null | undefined} event
+ */
+export function preventYoutubeThumbnailDefaultAction(event) {
+    if (event && typeof event.preventDefault === "function") {
+        event.preventDefault();
+    }
+}
+
+/**
+ * サムネイルコンテナの右クリックメニューを抑止する。
+ * @param {Element | null | undefined} thumbDiv
+ */
+export function suppressYoutubeThumbnailContextMenu(thumbDiv) {
+    if (!isHtmlElement(thumbDiv)) return;
+    thumbDiv.addEventListener("contextmenu", preventYoutubeThumbnailDefaultAction);
+}
+
+/**
+ * サムネイル画像の右クリックメニューとドラッグ保存を抑止する。
+ * @param {Element | null | undefined} img
+ */
+export function suppressYoutubeThumbnailImageSaveActions(img) {
+    if (!isHtmlElement(img)) return;
+    img.draggable = false;
+    img.setAttribute("draggable", "false");
+    img.addEventListener("contextmenu", preventYoutubeThumbnailDefaultAction);
+    img.addEventListener("dragstart", preventYoutubeThumbnailDefaultAction);
+}
+
+/**
  * 遅延読み込み用のサムネイル画像要素を生成する。
  * @param {string} videoId
  * @returns {HTMLImageElement | null}
@@ -10,6 +42,7 @@ export function createYoutubeThumbnailImage(videoId) {
     if (!canUseDom()) return null;
     const img = document.createElement("img");
     img.dataset.src = `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
+    suppressYoutubeThumbnailImageSaveActions(img);
     return img;
 }
 

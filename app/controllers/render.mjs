@@ -11,6 +11,7 @@ import {
     createYoutubePlaybackStartResult,
     YOUTUBE_PLAYBACK_START_STATUS
 } from "../lib/youtube/playback-start-attempt.mjs";
+import { suppressYoutubeThumbnailContextMenu } from "../lib/youtube/thumbnail.mjs";
 
 /**
  * @typedef {{
@@ -169,6 +170,7 @@ export function createRenderController({ data, ui, isAllFormatsSelected, resultD
 
         const thumbDiv = document.createElement("div");
         thumbDiv.className = "thumb";
+        suppressYoutubeThumbnailContextMenu(thumbDiv);
 
         const content = document.createElement("article");
         content.className = "content";
