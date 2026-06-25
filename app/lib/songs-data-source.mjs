@@ -60,6 +60,11 @@ function removeCachedText(storage, key) {
  *     setText: (value: string) => Promise<boolean>,
  *     removeText: () => Promise<void>
  *   },
+ *   csvCache?: {
+ *     getText: () => Promise<string | null>,
+ *     setText: (value: string) => Promise<boolean>,
+ *     removeText: () => Promise<void>
+ *   },
  *   storage?: {
  *     getItem: (key: string) => string | null,
  *     setItem: (key: string, value: string) => void,
@@ -75,6 +80,7 @@ export function createSongsDataSource(input) {
         publicSongsMetaUrl,
         publicCsvUrl,
         songsJsonCache,
+        csvCache,
         storage = null,
         csvCacheKey,
         legacyCsvCacheKeys = []
@@ -156,16 +162,60 @@ export function createSongsDataSource(input) {
     }
 
     /**
-     * 現行 key から順に CSV キャッシュを読み込む。
-     * legacy key の CSV は旧 schema 互換として読み込み、現行 key へは書き戻さない。
-     * @returns {string | null}
+     * 非同期ストアへCSVキャッシュを保存する。
+     * @param {string} csvText
+     * @returns {Promise<boolean>}
      */
-    function getCachedCsvText() {
+    async function setCachedCsvText(csvText) {
+        // CSV 用の非同期 cache があれば localStorage へ書き戻さず保存を試みる。
+        if (csvCache) {
+            try {
+                return await csvCache.setText(csvText);
+            } catch (error) {
+                console.warn("CSVキャッシュを保存できませんでした", error);
+                return false;
+            }
+        }
+        return setCachedText(storage, csvCacheKey, csvText);
+    }
+
+    /**
+     * 非同期ストアまたは現行 key から順に CSV キャッシュを読み込む。
+     * legacy key の CSV は旧 schema 互換として読み込み、現行 key へは書き戻さない。
+     * @returns {Promise<string | null>}
+     */
+    async function getCachedCsvText() {
+        // CSV 用の非同期 cache を優先し、未指定時だけ localStorage 互換経路を使う。
+        if (csvCache) {
+            try {
+                return await csvCache.getText();
+            } catch (error) {
+                console.warn("CSVキャッシュを読み込めませんでした", error);
+                return null;
+            }
+        }
         for (const key of fallbackCsvCacheKeys) {
             const text = getCachedText(storage, key);
             if (text) return text;
         }
         return null;
+    }
+
+    /**
+     * CSVキャッシュを削除する。
+     * @returns {Promise<void>}
+     */
+    async function removeCachedCsvText() {
+        // JSON キャッシュが使える場合に、不要な CSV cache を解放する。
+        if (csvCache) {
+            try {
+                await csvCache.removeText();
+            } catch (error) {
+                console.warn("CSVキャッシュを削除できませんでした", error);
+            }
+            return;
+        }
+        removeCachedText(storage, csvCacheKey);
     }
 
     /**
@@ -176,11 +226,11 @@ export function createSongsDataSource(input) {
     async function loadCsvFallback(onSongsLoaded) {
         try {
             const csvText = await fetchCsvText();
-            setCachedText(storage, csvCacheKey, csvText);
+            await setCachedCsvText(csvText);
             onSongsLoaded({ songs: parseCsvToSongs(csvText), source: "network" });
             return true;
         } catch (error) {
-            const cached = getCachedCsvText();
+            const cached = await getCachedCsvText();
             if (cached) {
                 onSongsLoaded({ songs: parseCsvToSongs(cached), source: "cache" });
                 return true;
@@ -198,7 +248,7 @@ export function createSongsDataSource(input) {
         const jsonText = await fetchSongsJsonText();
         const payload = parseSongsJsonPayload(jsonText);
         if (await setCachedSongsJsonText(jsonText)) {
-            removeCachedText(storage, csvCacheKey);
+            await removeCachedCsvText();
         }
         onSongsLoaded({ songs: payload.songs, source: "network" });
         return true;

@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createLegacyLocalStorageSongsJsonCacheAdapter } from "../app/lib/storage/songs-json-cache.mjs";
+import {
+    createLegacyLocalStorageSongsJsonCacheAdapter,
+    createLegacyLocalStorageTextCacheAdapter
+} from "../app/lib/storage/songs-json-cache.mjs";
 
 /**
  * songs json cache adapter テスト用の localStorage を作る。
@@ -125,4 +128,65 @@ test("songs json cache adapter: keeps legacy localStorage text when migration sa
     } finally {
         console.warn = previousConsoleWarn;
     }
+});
+
+test("text cache adapter: migrates multiple legacy localStorage keys into primary cache", async () => {
+    const storage = createFakeLocalStorage();
+    let primaryValue = null;
+    const cache = {
+        async getText() {
+            return primaryValue;
+        },
+        async setText(value) {
+            primaryValue = value;
+            return true;
+        },
+        async removeText() {
+            primaryValue = null;
+        }
+    };
+    const adapter = createLegacyLocalStorageTextCacheAdapter({
+        cache,
+        legacyKeys: ["cachedCsvV2", "cachedCsv"],
+        storage,
+        label: "CSVキャッシュ"
+    });
+
+    storage.setItem("cachedCsv", "legacy,csv");
+
+    assert.equal(await adapter.getText(), "legacy,csv");
+    assert.equal(primaryValue, "legacy,csv");
+    assert.equal(storage.getItem("cachedCsvV2"), null);
+    assert.equal(storage.getItem("cachedCsv"), null);
+});
+
+test("text cache adapter: setText success clears legacy localStorage keys", async () => {
+    const storage = createFakeLocalStorage();
+    let primaryValue = null;
+    const cache = {
+        async getText() {
+            return primaryValue;
+        },
+        async setText(value) {
+            primaryValue = value;
+            return true;
+        },
+        async removeText() {
+            primaryValue = null;
+        }
+    };
+    const adapter = createLegacyLocalStorageTextCacheAdapter({
+        cache,
+        legacyKeys: ["cachedCsvV2", "cachedCsv"],
+        storage,
+        label: "CSVキャッシュ"
+    });
+
+    storage.setItem("cachedCsvV2", "current,csv");
+    storage.setItem("cachedCsv", "legacy,csv");
+
+    assert.equal(await adapter.setText("fresh,csv"), true);
+    assert.equal(primaryValue, "fresh,csv");
+    assert.equal(storage.getItem("cachedCsvV2"), null);
+    assert.equal(storage.getItem("cachedCsv"), null);
 });

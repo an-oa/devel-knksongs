@@ -1,7 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createSongsDataSource } from "../app/lib/songs-data-source.mjs";
-import { createLegacyLocalStorageSongsJsonCacheAdapter } from "../app/lib/storage/songs-json-cache.mjs";
+import {
+    createLegacyLocalStorageSongsJsonCacheAdapter,
+    createLegacyLocalStorageTextCacheAdapter
+} from "../app/lib/storage/songs-json-cache.mjs";
 import { buildSongsJsonMetaPayload, buildSongsJsonPayload } from "../app/lib/songs-json.mjs";
 import { CSV_CACHE_KEY, LEGACY_CSV_CACHE_KEY } from "../app/config.mjs";
 
@@ -23,7 +26,7 @@ function createFakeLocalStorage() {
     };
 }
 
-function createFakeSongsJsonCacheStore(initialValue = null) {
+function createFakeTextCacheStore(initialValue = null) {
     let value = initialValue;
     return {
         async getText() {
@@ -116,6 +119,7 @@ test("songs data source: csv fetch success stores csv and emits network songs", 
     try {
         const storage = createFakeLocalStorage();
         const csv = createValidCsv();
+        const csvCache = createFakeTextCacheStore();
         globalThis.fetch = async (url, options) => {
             assert.equal(url, "https://example.test/songs.csv");
             assert.deepEqual(options, { cache: "no-store" });
@@ -129,13 +133,15 @@ test("songs data source: csv fetch success stores csv and emits network songs", 
         const results = [];
         const dataSource = createSongsDataSource({
             publicCsvUrl: "https://example.test/songs.csv",
+            csvCache,
             storage,
             csvCacheKey: "cachedCsv"
         });
 
         assert.equal(await dataSource.loadInitialSongs({ onSongsLoaded: (result) => results.push(result) }), true);
 
-        assert.equal(storage.getItem("cachedCsv"), csv);
+        assert.equal(csvCache.peek(), csv);
+        assert.equal(storage.getItem("cachedCsv"), null);
         assert.equal(results.length, 1);
         assert.equal(results[0].source, "network");
         assert.equal(results[0].songs[0].songKey, "archive-1::1");
@@ -144,12 +150,58 @@ test("songs data source: csv fetch success stores csv and emits network songs", 
     }
 });
 
+test("songs data source: csv cache save failure does not write localStorage fallback", async () => {
+    const previousFetch = globalThis.fetch;
+    const previousConsoleWarn = console.warn;
+    try {
+        const storage = createFakeLocalStorage();
+        const csv = createValidCsv();
+        const warnings = [];
+        const csvCache = {
+            async getText() {
+                return null;
+            },
+            async setText() {
+                throw new Error("IndexedDB is not available");
+            },
+            async removeText() {}
+        };
+        console.warn = (...args) => {
+            warnings.push(args);
+        };
+        globalThis.fetch = async () => ({
+            ok: true,
+            async text() {
+                return csv;
+            }
+        });
+        const results = [];
+        const dataSource = createSongsDataSource({
+            publicCsvUrl: "https://example.test/songs.csv",
+            csvCache,
+            storage,
+            csvCacheKey: "cachedCsv"
+        });
+
+        assert.equal(await dataSource.loadInitialSongs({ onSongsLoaded: (result) => results.push(result) }), true);
+
+        assert.equal(storage.getItem("cachedCsv"), null);
+        assert.equal(results.length, 1);
+        assert.equal(results[0].source, "network");
+        assert.match(String(warnings[0]?.[0]), /CSVキャッシュを保存できませんでした/);
+    } finally {
+        globalThis.fetch = previousFetch;
+        console.warn = previousConsoleWarn;
+    }
+});
+
 test("songs data source: json fetch success stores songs json and skips csv fetch", async () => {
     const previousFetch = globalThis.fetch;
     try {
         const storage = createFakeLocalStorage();
         const songsJson = createSongsJson("json-archive::1");
-        const songsJsonCache = createFakeSongsJsonCacheStore();
+        const songsJsonCache = createFakeTextCacheStore();
+        const csvCache = createFakeTextCacheStore(createValidCsv());
         globalThis.fetch = async (url, options) => {
             assert.equal(url, "data/songs.json");
             assert.deepEqual(options, { cache: "no-cache" });
@@ -165,6 +217,7 @@ test("songs data source: json fetch success stores songs json and skips csv fetc
             publicSongsJsonUrl: "data/songs.json",
             publicCsvUrl: "https://example.test/songs.csv",
             songsJsonCache,
+            csvCache,
             storage,
             csvCacheKey: "cachedCsv"
         });
@@ -172,6 +225,7 @@ test("songs data source: json fetch success stores songs json and skips csv fetc
         assert.equal(await dataSource.loadInitialSongs({ onSongsLoaded: (result) => results.push(result) }), true);
 
         assert.equal(songsJsonCache.peek(), songsJson);
+        assert.equal(csvCache.peek(), null);
         assert.equal(storage.getItem("cachedCsv"), null);
         assert.equal(results.length, 1);
         assert.equal(results[0].source, "network");
@@ -188,7 +242,7 @@ test("songs data source: cached json fetches fresh json without emitting stale c
         const cachedJson = createSongsJson("cached-archive::1", "sha256:cached");
         const freshJson = createSongsJson("fresh-archive::1", "sha256:fresh");
         const freshMetaJson = createSongsMetaJson("sha256:fresh");
-        const songsJsonCache = createFakeSongsJsonCacheStore(cachedJson);
+        const songsJsonCache = createFakeTextCacheStore(cachedJson);
         const fetchUrls = [];
         globalThis.fetch = async (url, options) => {
             fetchUrls.push([url, options]);
@@ -240,7 +294,7 @@ test("songs data source: cached json falls back to cache when fresh json and csv
         const storage = createFakeLocalStorage();
         const cachedJson = createSongsJson("cached-archive::1", "sha256:cached");
         const freshMetaJson = createSongsMetaJson("sha256:fresh");
-        const songsJsonCache = createFakeSongsJsonCacheStore(cachedJson);
+        const songsJsonCache = createFakeTextCacheStore(cachedJson);
         const fetchUrls = [];
         globalThis.fetch = async (url, options) => {
             fetchUrls.push([url, options]);
@@ -302,7 +356,7 @@ test("songs data source: cached json skips full refresh when meta hash matches",
     try {
         const storage = createFakeLocalStorage();
         const cachedJson = createSongsJson("cached-archive::1", "sha256:cached");
-        const songsJsonCache = createFakeSongsJsonCacheStore(cachedJson);
+        const songsJsonCache = createFakeTextCacheStore(cachedJson);
         const fetchUrls = [];
         globalThis.fetch = async (url, options) => {
             fetchUrls.push([url, options]);
@@ -343,7 +397,7 @@ test("songs data source: legacy localStorage json is migrated into songs json ca
     try {
         const storage = createFakeLocalStorage();
         const cachedJson = createSongsJson("legacy-archive::1", "sha256:legacy");
-        const primarySongsJsonCache = createFakeSongsJsonCacheStore();
+        const primarySongsJsonCache = createFakeTextCacheStore();
         const songsJsonCache = createLegacyLocalStorageSongsJsonCacheAdapter({
             cache: primarySongsJsonCache,
             legacyKey: "cachedSongsJson",
@@ -393,7 +447,7 @@ test("songs data source: cached json falls back to cache when meta fetch fails",
     try {
         const storage = createFakeLocalStorage();
         const cachedJson = createSongsJson("cached-archive::1", "sha256:cached");
-        const songsJsonCache = createFakeSongsJsonCacheStore(cachedJson);
+        const songsJsonCache = createFakeTextCacheStore(cachedJson);
         const fetchUrls = [];
         const warnings = [];
         console.warn = (...args) => {
@@ -443,7 +497,8 @@ test("songs data source: json fetch failure falls back to csv fetch", async () =
     try {
         const storage = createFakeLocalStorage();
         const csv = createValidCsv();
-        const songsJsonCache = createFakeSongsJsonCacheStore();
+        const songsJsonCache = createFakeTextCacheStore();
+        const csvCache = createFakeTextCacheStore();
         const fetchUrls = [];
         globalThis.fetch = async (url, options) => {
             fetchUrls.push([url, options]);
@@ -469,6 +524,7 @@ test("songs data source: json fetch failure falls back to csv fetch", async () =
             publicSongsJsonUrl: "data/songs.json",
             publicCsvUrl: "https://example.test/songs.csv",
             songsJsonCache,
+            csvCache,
             storage,
             csvCacheKey: "cachedCsv"
         });
@@ -479,7 +535,8 @@ test("songs data source: json fetch failure falls back to csv fetch", async () =
             ["data/songs.json", { cache: "no-cache" }],
             ["https://example.test/songs.csv", { cache: "no-store" }]
         ]);
-        assert.equal(storage.getItem("cachedCsv"), csv);
+        assert.equal(csvCache.peek(), csv);
+        assert.equal(storage.getItem("cachedCsv"), null);
         assert.equal(results.length, 1);
         assert.equal(results[0].source, "network");
         assert.equal(results[0].songs[0].songKey, "archive-1::1");
@@ -493,13 +550,14 @@ test("songs data source: failed csv fetch falls back to cached csv", async () =>
     try {
         const storage = createFakeLocalStorage();
         const cachedCsv = createValidCsv();
-        storage.setItem("cachedCsv", cachedCsv);
+        const csvCache = createFakeTextCacheStore(cachedCsv);
         globalThis.fetch = async () => {
             throw new Error("network failed");
         };
         const results = [];
         const dataSource = createSongsDataSource({
             publicCsvUrl: "https://example.test/songs.csv",
+            csvCache,
             storage,
             csvCacheKey: "cachedCsv"
         });
@@ -518,6 +576,13 @@ test("songs data source: app csv cache key falls back to legacy csv cache", asyn
     const previousFetch = globalThis.fetch;
     try {
         const storage = createFakeLocalStorage();
+        const primaryCsvCache = createFakeTextCacheStore();
+        const csvCache = createLegacyLocalStorageTextCacheAdapter({
+            cache: primaryCsvCache,
+            legacyKeys: [CSV_CACHE_KEY, LEGACY_CSV_CACHE_KEY],
+            storage,
+            label: "CSVキャッシュ"
+        });
         storage.setItem(LEGACY_CSV_CACHE_KEY, createLegacyCsv());
         globalThis.fetch = async () => {
             throw new Error("network failed");
@@ -525,6 +590,7 @@ test("songs data source: app csv cache key falls back to legacy csv cache", asyn
         const results = [];
         const dataSource = createSongsDataSource({
             publicCsvUrl: "https://example.test/songs.csv",
+            csvCache,
             storage,
             csvCacheKey: CSV_CACHE_KEY,
             legacyCsvCacheKeys: [LEGACY_CSV_CACHE_KEY]
@@ -534,6 +600,8 @@ test("songs data source: app csv cache key falls back to legacy csv cache", asyn
 
         assert.equal(CSV_CACHE_KEY, "cachedCsvV2");
         assert.equal(LEGACY_CSV_CACHE_KEY, "cachedCsv");
+        assert.equal(primaryCsvCache.peek(), createLegacyCsv());
+        assert.equal(storage.getItem(LEGACY_CSV_CACHE_KEY), null);
         assert.equal(results.length, 1);
         assert.equal(results[0].source, "cache");
         assert.equal(results[0].songs[0].songKey, "archive-1::1");
@@ -547,6 +615,7 @@ test("songs data source: failed fetch without cache returns false", async () => 
     const previousFetch = globalThis.fetch;
     try {
         const storage = createFakeLocalStorage();
+        const csvCache = createFakeTextCacheStore();
         globalThis.fetch = async () => ({
             ok: false,
             async text() {
@@ -556,6 +625,7 @@ test("songs data source: failed fetch without cache returns false", async () => 
         const results = [];
         const dataSource = createSongsDataSource({
             publicCsvUrl: "https://example.test/songs.csv",
+            csvCache,
             storage,
             csvCacheKey: "cachedCsv"
         });
