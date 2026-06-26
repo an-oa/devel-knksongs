@@ -83,7 +83,7 @@ import {
  */
 export function createPlaybackSettingsController({ ui, callbacks }) {
     const playbackUi = getPlaybackUiState(ui);
-    const searchUi = getSearchUiState(ui);
+    const searchUiState = getSearchUiState(ui);
     const ensureThumbnailPlaybackReady = callbacks.ensureThumbnailPlaybackReady;
     const restoreActivePlayback = callbacks.restoreActivePlayback;
     const updateDisplay = callbacks.updateDisplay;
@@ -247,7 +247,7 @@ export function createPlaybackSettingsController({ ui, callbacks }) {
      * @param {boolean} nextValue
      */
     function afterThumbnailStorageApply(previousValue, nextValue) {
-        if (previousValue === nextValue || !searchUi.dataReady) return;
+        if (previousValue === nextValue || !searchUiState.dataReady) return;
         updateDisplay();
         setupScrollObserver();
     }

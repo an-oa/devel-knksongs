@@ -139,7 +139,7 @@ import { suppressYoutubeThumbnailContextMenu } from "../lib/youtube/thumbnail.mj
  * @param {RenderControllerInput} input
  */
 export function createRenderController({ data, ui, isAllFormatsSelected, resultDisplayBatchSize = 48, callbacks }) {
-    const searchUi = getSearchUiState(ui);
+    const searchUiState = getSearchUiState(ui);
     const playbackUi = getPlaybackUiState(ui);
     const renderUi = getRenderUiState(ui);
     const getSearchState = callbacks.getSearchState;
@@ -361,10 +361,10 @@ export function createRenderController({ data, ui, isAllFormatsSelected, resultD
      * @returns {EmptyStateDescriptor}
      */
     function getEmptyStateDescriptor() {
-        if (!searchUi.dataReady) {
+        if (!searchUiState.dataReady) {
             return { kind: "loading", message: "読み込み中..." };
         }
-        if (!isAllFormatsSelected() && searchUi.selectedFormats.size === 0) {
+        if (!isAllFormatsSelected() && searchUiState.selectedFormats.size === 0) {
             return { kind: "error", message: "動画の種類を選択してください" };
         }
         return { kind: "empty", message: "見つかりませんでした" };

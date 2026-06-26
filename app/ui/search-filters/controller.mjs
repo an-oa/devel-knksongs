@@ -24,7 +24,7 @@ import { renderSearchFormatOptions, syncSearchFormatCheckboxes } from "./formats
  * }}
  */
 export function createSearchFiltersController({ ui, defaultFormats = [] }) {
-    const searchUi = getSearchUiState(ui) || ui;
+    const searchUiState = getSearchUiState(ui) || ui;
     const dateUi = getDateUiState(ui) || null;
 
     /**
@@ -32,10 +32,10 @@ export function createSearchFiltersController({ ui, defaultFormats = [] }) {
      * @returns {Set<string>}
      */
     function getSelectedFormats() {
-        if (!(searchUi.selectedFormats instanceof Set)) {
-            searchUi.selectedFormats = new Set();
+        if (!(searchUiState.selectedFormats instanceof Set)) {
+            searchUiState.selectedFormats = new Set();
         }
-        return searchUi.selectedFormats;
+        return searchUiState.selectedFormats;
     }
 
     /**
@@ -44,7 +44,7 @@ export function createSearchFiltersController({ ui, defaultFormats = [] }) {
      */
     function renderFilterOptions(options) {
         renderSearchFormatOptions({
-            searchUi,
+            selectedFormats: getSelectedFormats(),
             formatsList: ui.el.formatsList,
             defaultFormats,
             onChange: options && options.onFormatChange
@@ -101,7 +101,7 @@ export function createSearchFiltersController({ ui, defaultFormats = [] }) {
      */
     function syncFormatCheckboxesFromState() {
         syncSearchFormatCheckboxes({
-            searchUi: { selectedFormats: getSelectedFormats() },
+            selectedFormats: getSelectedFormats(),
             formatsList: ui.el.formatsList
         });
     }
@@ -151,7 +151,7 @@ export function createSearchFiltersController({ ui, defaultFormats = [] }) {
         if (dateUi) dateUi.pendingValues = null;
         setSelectedFormatsToDefault();
         syncFormatCheckboxesFromState();
-        searchUi.userTouchedFilters = false;
+        searchUiState.userTouchedFilters = false;
     }
 
     /**

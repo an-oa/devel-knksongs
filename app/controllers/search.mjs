@@ -21,7 +21,7 @@ export function createSearchController({ data, ui, searchFiltersController, cons
         RESULT_DISPLAY_BATCH_SIZE,
         SEARCH_DEBOUNCE_MS
     } = constants;
-    const searchUi = /** @type {SearchUiRuntimeState} */ (getSearchUiState(ui));
+    const searchUiState = /** @type {SearchUiRuntimeState} */ (getSearchUiState(ui));
     const lookupUi = /** @type {LookupUiRuntimeState} */ (getLookupUiState(ui));
     const dateFilterController = createDateFilterController({ ui });
     const updateDisplay = callbacks.updateDisplay;
@@ -32,13 +32,13 @@ export function createSearchController({ data, ui, searchFiltersController, cons
      * @param {{ immediate?: boolean }} [options]
      */
     function scheduleSearch(options) {
-        if (searchUi.debounceId) clearTimeout(searchUi.debounceId);
+        if (searchUiState.debounceId) clearTimeout(searchUiState.debounceId);
         if (options && options.immediate) {
             search();
             return;
         }
-        searchUi.debounceId = setTimeout(() => {
-            searchUi.debounceId = 0;
+        searchUiState.debounceId = setTimeout(() => {
+            searchUiState.debounceId = 0;
             search();
         }, SEARCH_DEBOUNCE_MS);
     }
@@ -133,7 +133,7 @@ export function createSearchController({ data, ui, searchFiltersController, cons
             const bookmark = data.bookmarks[data.activeBookmark];
             if (bookmark) {
                 const bookmarkRows = resolveBookmarkRows(bookmark);
-                const results = filterSongsByCriteria(bookmarkRows, searchState, searchUi.selectedFormats);
+                const results = filterSongsByCriteria(bookmarkRows, searchState, searchUiState.selectedFormats);
                 return buildIncrementalSearchOutcome(
                     results,
                     `ブックマーク: ${bookmark.name} (${results.length} 件)`
@@ -173,7 +173,7 @@ export function createSearchController({ data, ui, searchFiltersController, cons
      * @returns {Song[]}
      */
     function filterSongs(searchState) {
-        return filterSongsByCriteria(data.allSongsRaw, searchState, searchUi.selectedFormats);
+        return filterSongsByCriteria(data.allSongsRaw, searchState, searchUiState.selectedFormats);
     }
 
     /**
@@ -181,12 +181,12 @@ export function createSearchController({ data, ui, searchFiltersController, cons
      * @returns {Song[]}
      */
     function pickRecommended() {
-        if (searchUi.recommendedCache) return searchUi.recommendedCache;
-        searchUi.recommendedCache = pickRecommendedSongs(data.allSongsRaw, {
+        if (searchUiState.recommendedCache) return searchUiState.recommendedCache;
+        searchUiState.recommendedCache = pickRecommendedSongs(data.allSongsRaw, {
             count: RANDOM_DISPLAY_COUNT,
             minPerformanceCount: MIN_PERFORMANCE_FOR_RANDOM
         });
-        return searchUi.recommendedCache;
+        return searchUiState.recommendedCache;
     }
 
     return {

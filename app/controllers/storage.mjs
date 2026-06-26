@@ -97,7 +97,7 @@ import { collectSearchBooleanFilterState } from "../lib/search-boolean-filters.m
  * @param {StorageControllerInput} input
  */
 export function createStorageController({ data, ui, searchFiltersController, constants, callbacks }) {
-    const searchUi = getSearchUiState(ui);
+    const searchUiState = getSearchUiState(ui);
     const dateUi = getDateUiState(ui);
     const {
         SEARCH_STATE_KEY,
@@ -464,9 +464,9 @@ export function createStorageController({ data, ui, searchFiltersController, con
             if (dateUi.bounds) {
                 applyPendingDateValues();
             }
-            searchUi.userTouchedQuery = true;
-            searchUi.userTouchedFilters = true;
-            searchUi.hasRestoredSearchState = true;
+            searchUiState.userTouchedQuery = true;
+            searchUiState.userTouchedFilters = true;
+            searchUiState.hasRestoredSearchState = true;
         } catch (e) {
             console.warn("Failed to restore search state", e);
         }

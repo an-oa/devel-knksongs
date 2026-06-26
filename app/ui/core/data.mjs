@@ -24,7 +24,7 @@ export function createDataLoader(input) {
         dataSource,
         callbacks
     } = input;
-    const searchUi = getSearchUiState(ui);
+    const searchUiState = getSearchUiState(ui);
     const dateUi = getDateUiState(ui);
     const {
         migrateLegacyBookmarkSongRefs,
@@ -43,10 +43,10 @@ export function createDataLoader(input) {
     function applyLoadedSongs(songs, statusLabel, options) {
         const shouldResetConditions = options && typeof options.resetConditions === "boolean"
             ? options.resetConditions
-            : !searchUi.dataReady;
+            : !searchUiState.dataReady;
         data.allSongsRaw = songs;
         migrateLegacyBookmarkSongRefs();
-        searchUi.recommendedCache = null;
+        searchUiState.recommendedCache = null;
         const dateBounds = applyDateInputRange(data.allSongsRaw);
         if (dateBounds) {
             clampDateInputsToBounds(dateBounds.minKey, dateBounds.maxKey);
@@ -54,11 +54,11 @@ export function createDataLoader(input) {
         if (ui.el.searchBox && "disabled" in ui.el.searchBox) {
             /** @type {HTMLInputElement} */ (ui.el.searchBox).disabled = false;
         }
-        searchUi.dataReady = true;
+        searchUiState.dataReady = true;
         if (statusLabel && ui.el.resultCount) {
             ui.el.resultCount.innerText = statusLabel;
         }
-        if (shouldResetConditions && !searchUi.hasRestoredSearchState && !dateUi.pendingValues) {
+        if (shouldResetConditions && !searchUiState.hasRestoredSearchState && !dateUi.pendingValues) {
             resetSearchConditions(false);
         }
         scheduleSearch({ immediate: true });
