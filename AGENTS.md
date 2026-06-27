@@ -53,6 +53,19 @@ feat: move settings into dedicated sidebar panel
   その場合は JSDoc に、本番コードでは同じ module 内または上位 API 経由で使う helper であり、
   境界条件を単体テストするために export していることを簡潔に残す。
 
+## JavaScript Type References
+
+- アプリ内の特定 module が所有する状態やデータ構造の型は、可能な限りその実装 module の近くに
+  JSDoc `@typedef` として置き、利用側では `import("./path/to/module.mjs").TypeName` 形式で参照元を明示する。
+- `types/**/*.d.ts` の ambient 宣言は、ブラウザ API の拡張や複数 module にまたがる共有ドメイン型など、
+  所有 module を自然に決めにくい型に限定する。
+- 実装に所有者がある型を ambient に追加しない。やむを得ず追加する場合は、どの実装領域の型なのか、
+  なぜ ambient に置く必要があるのかをコメントや近接する型名で分かるようにする。
+- 型参照の記述量を減らすことより、依存方向が読めることを優先する。
+  循環参照や所有境界の曖昧さに気づけるよう、型だけの参照でも参照元を隠さない。
+- `AppState` や UI slice など実装の初期化・更新処理と強く結びつく型は、
+  `types/*.d.ts` へ遠ざける前に、実装 module 側へ寄せられないか検討する。
+
 ## Naming
 
 - boolean は true の意味がそのまま読める肯定形で命名し、否定形フラグによる二重否定を避ける。
