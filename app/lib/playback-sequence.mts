@@ -1,8 +1,15 @@
-// Generated from app/lib/playback-sequence.mts.
-// Do not edit this .mjs file by hand; edit the .mts source and run npm run build:ts.
+type PlaybackSequenceRow = {
+    songKey?: string;
+};
+
+type PlaybackContinuationOptions = {
+    continuousPlayback?: boolean;
+    loopPlayback?: boolean;
+} | undefined;
 
 /** @typedef {{ songKey?: string }} PlaybackSequenceRow */
 /** @typedef {{ continuousPlayback?: boolean, loopPlayback?: boolean } | undefined} PlaybackContinuationOptions */
+
 /**
  * 現在の結果順から、次に再生候補となる曲キー列を返す。
  * 再生継続候補の境界条件を単体テストするため export している。
@@ -11,12 +18,15 @@
  * @param {boolean} shouldLoop
  * @returns {string[]}
  */
-export function getSequentialPlaybackCandidates(results, currentSongKey, shouldLoop) {
-    if (!Array.isArray(results) || results.length === 0)
-        return [];
+export function getSequentialPlaybackCandidates(
+    results: PlaybackSequenceRow[] | undefined,
+    currentSongKey: string,
+    shouldLoop: boolean
+): string[] {
+    if (!Array.isArray(results) || results.length === 0) return [];
     const currentIndex = results.findIndex((row) => row && row.songKey === currentSongKey);
-    if (currentIndex === -1)
-        return [];
+    if (currentIndex === -1) return [];
+
     const candidates = [];
     for (let index = currentIndex + 1; index < results.length; index++) {
         const songKey = results[index] && results[index].songKey;
@@ -24,8 +34,8 @@ export function getSequentialPlaybackCandidates(results, currentSongKey, shouldL
             candidates.push(songKey);
         }
     }
-    if (!shouldLoop)
-        return candidates;
+    if (!shouldLoop) return candidates;
+
     for (let index = 0; index < currentIndex; index++) {
         const songKey = results[index] && results[index].songKey;
         if (typeof songKey === "string" && songKey) {
@@ -37,6 +47,7 @@ export function getSequentialPlaybackCandidates(results, currentSongKey, shouldL
     }
     return candidates;
 }
+
 /**
  * 現在の再生設定に応じて、次に再生を試みる曲キー列を返す。
  * @param {PlaybackSequenceRow[] | undefined} results
@@ -44,7 +55,11 @@ export function getSequentialPlaybackCandidates(results, currentSongKey, shouldL
  * @param {PlaybackContinuationOptions} options
  * @returns {string[]}
  */
-export function getPlaybackContinuationCandidates(results, currentSongKey, options) {
+export function getPlaybackContinuationCandidates(
+    results: PlaybackSequenceRow[] | undefined,
+    currentSongKey: string,
+    options: PlaybackContinuationOptions
+): string[] {
     const settings = options || {};
     const isContinuous = Boolean(settings.continuousPlayback);
     const isLoop = Boolean(settings.loopPlayback);

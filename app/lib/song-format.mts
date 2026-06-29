@@ -1,47 +1,49 @@
-// Generated from app/lib/song-format.mts.
-// Do not edit this .mjs file by hand; edit the .mts source and run npm run build:ts.
-
 /**
  * 形式が「歌みた」かどうかを判定する。
  * @param {unknown} format
  * @returns {boolean}
  */
-function isUtamitaFormat(format) {
+function isUtamitaFormat(format: unknown): boolean {
     return format === "歌みた";
 }
+
 /**
  * 形式が「オリ曲」かどうかを判定する。
  * @param {unknown} format
  * @returns {boolean}
  */
-export function isOriginalSongFormat(format) {
+export function isOriginalSongFormat(format: unknown): boolean {
     return format === "オリ曲";
 }
+
 /**
  * 形式が「歌みた」系かどうかを判定する。
  * 「オリ曲」は「歌みた」と同等に扱う。
  * @param {unknown} format
  * @returns {boolean}
  */
-export function isUtamitaEquivalentFormat(format) {
+export function isUtamitaEquivalentFormat(format: unknown): boolean {
     return isUtamitaFormat(format) || isOriginalSongFormat(format);
 }
+
 /**
  * 形式が「配信」かどうかを判定する。
  * @param {unknown} format
  * @returns {boolean}
  */
-export function isStreamFormat(format) {
+export function isStreamFormat(format: unknown): boolean {
     return format === "配信";
 }
+
 /**
  * 形式が「ショート」かどうかを判定する。
  * @param {unknown} format
  * @returns {boolean}
  */
-export function isShortFormat(format) {
+export function isShortFormat(format: unknown): boolean {
     return format === "ショート";
 }
+
 /**
  * 指定フォーマットが現在の選択状態に含まれるかを判定する。
  * 「オリ曲」は「歌みた」と同じ選択肢で通す。
@@ -49,10 +51,8 @@ export function isShortFormat(format) {
  * @param {Set<string>} selectedFormats
  * @returns {boolean}
  */
-export function matchesSelectedFormat(format, selectedFormats) {
-    if (typeof format === "string" && selectedFormats.has(format))
-        return true;
-    if (!isUtamitaEquivalentFormat(format))
-        return false;
+export function matchesSelectedFormat(format: unknown, selectedFormats: Set<string>): boolean {
+    if (typeof format === "string" && selectedFormats.has(format)) return true;
+    if (!isUtamitaEquivalentFormat(format)) return false;
     return selectedFormats.has("歌みた") || selectedFormats.has("オリ曲");
 }

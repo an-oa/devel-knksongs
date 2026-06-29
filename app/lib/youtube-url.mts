@@ -1,13 +1,17 @@
-// Generated from app/lib/youtube-url.mts.
-// Do not edit this .mjs file by hand; edit the .mts source and run npm run build:ts.
+type YoutubeUrlInfo = {
+    videoId: string;
+    startSeconds: number;
+    isVertical: boolean;
+};
 
 /** @typedef {{ videoId: string, startSeconds: number, isVertical: boolean }} YoutubeUrlInfo */
+
 /**
  * YouTube URLから `videoId` と開始秒数を抽出する。
  * @param {string | URL | null | undefined} url
  * @returns {YoutubeUrlInfo}
  */
-export function extractYoutubeInfo(url) {
+export function extractYoutubeInfo(url: string | URL | null | undefined): YoutubeUrlInfo {
     if (typeof url !== "string" && !(url instanceof URL)) {
         return { videoId: "", startSeconds: 0, isVertical: false };
     }
@@ -19,8 +23,7 @@ export function extractYoutubeInfo(url) {
             : (u.searchParams.get("v") || u.pathname.match(/\/shorts\/([^/?#]+)/)?.[1] || u.pathname.match(/\/live\/([^/?#]+)/)?.[1])) || "";
         const t = u.searchParams.get("t") || u.searchParams.get("start") || "0";
         return { videoId: id, startSeconds: parseInt(t, 10) || 0, isVertical: isShorts };
-    }
-    catch {
+    } catch {
         return { videoId: "", startSeconds: 0, isVertical: false };
     }
 }
