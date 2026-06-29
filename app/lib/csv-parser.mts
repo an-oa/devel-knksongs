@@ -1,10 +1,8 @@
-// Generated from app/lib/csv-parser.mts.
-// Do not edit this .mjs file by hand; edit the .mts source and run npm run build:ts.
-
 import { normalizeStreamRole } from "./stream-role.mjs";
 import { parseDateKey } from "./date-key.mjs";
 import { normalizeForSearch } from "./search-filters.mjs";
 import { extractYoutubeInfo } from "./youtube-url.mjs";
+
 /**
  * 現在仕様の曲キー（archiveId + archiveOrder）を生成する。
  * @param {*} input
@@ -17,6 +15,7 @@ function buildSongKey(input) {
         orderPart
     ].join("::");
 }
+
 /**
  * ブックマーク保存用の曲キー（videoId + archiveOrder）を生成する。
  * videoId を抽出できない場合は従来の songKey 形式へフォールバックする。
@@ -31,6 +30,7 @@ function buildBookmarkSongKey(input) {
         orderPart
     ].join("::");
 }
+
 /**
  * 旧仕様互換の曲キー（archiveId + archiveOrder + url）を生成する。
  * @param {*} input
@@ -44,16 +44,17 @@ function buildLegacySongKey(input) {
         String(url || "").trim()
     ].join("::");
 }
+
 /**
  * アーカイブ順序の値を整数として解析し、無効値は `null` を返す。
  * @param {*} raw
  */
 function parseArchiveOrder(raw) {
-    if (!raw)
-        return null;
+    if (!raw) return null;
     const value = Number.parseInt(String(raw).trim(), 10);
     return Number.isFinite(value) ? value : null;
 }
+
 /**
  * 画面の向き列を正規化し、既知の値のみ返す。
  * @param {*} raw
@@ -62,15 +63,14 @@ function parseArchiveOrder(raw) {
  */
 function parseVideoOrientation(raw, rowNumber) {
     const value = String(raw || "").trim();
-    if (value === "縦")
-        return "vertical";
-    if (value === "横")
-        return "landscape";
+    if (value === "縦") return "vertical";
+    if (value === "横") return "landscape";
     if (value !== "") {
         console.warn(`CSV画面の向きが不正です: ${rowNumber}行目 "${value}"`);
     }
     return "";
 }
+
 /**
  * 終了時刻列の値を秒数へ変換し、空欄や不正値は `null` を返す。
  * @param {*} raw
@@ -78,8 +78,7 @@ function parseVideoOrientation(raw, rowNumber) {
  */
 function parseEndTimeSeconds(raw, rowNumber) {
     const value = String(raw || "").trim();
-    if (value === "")
-        return null;
+    if (value === "") return null;
     if (/^\d+$/.test(value)) {
         const seconds = Number.parseInt(value, 10);
         return Number.isFinite(seconds) ? seconds : null;
@@ -102,6 +101,7 @@ function parseEndTimeSeconds(raw, rowNumber) {
     }
     return (hours * 3600) + (minutes * 60) + seconds;
 }
+
 /**
  * RFC4180ベースでCSV文字列を2次元配列へ解析する。
  * @param {*} t
@@ -117,31 +117,24 @@ function parseCsvRFC4180(t) {
             if (c === '"' && t[i + 1] === '"') {
                 field += '"';
                 i++;
-            }
-            else if (c === '"') {
+            } else if (c === '"') {
                 inQ = false;
-            }
-            else {
+            } else {
                 field += c;
             }
-        }
-        else {
+        } else {
             if (c === '"') {
                 inQ = true;
-            }
-            else if (c === ',') {
+            } else if (c === ',') {
                 row.push(field);
                 field = "";
-            }
-            else if (c === '\n' || c === '\r') {
+            } else if (c === '\n' || c === '\r') {
                 row.push(field);
                 res.push(row);
                 row = [];
                 field = "";
-                if (c === '\r' && t[i + 1] === '\n')
-                    i++;
-            }
-            else {
+                if (c === '\r' && t[i + 1] === '\n') i++;
+            } else {
                 field += c;
             }
         }
@@ -153,6 +146,7 @@ function parseCsvRFC4180(t) {
     }
     return res;
 }
+
 /**
  * CSVを検証・整形して、検索用正規化済みの曲データ配列へ変換する。
  * @param {*} csvText
@@ -182,8 +176,7 @@ export function parseCsvToSongs(csvText) {
         if (r[idx("公開範囲")] !== "全体" ||
             archiveId === "" ||
             !memoAllows ||
-            url.trim() === "")
-            continue;
+            url.trim() === "") continue;
         const title = r[idx("曲名")];
         const artist = r[idx("アーティスト名")];
         const titleYomi = r[idx("キョクメイ")];

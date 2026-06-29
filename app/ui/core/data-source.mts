@@ -1,8 +1,11 @@
-// Generated from app/ui/core/data-source.mts.
-// Do not edit this .mjs file by hand; edit the .mts source and run npm run build:ts.
-
-import { createIndexedDbSongsJsonCacheStore, createIndexedDbTextCacheStore, createLegacyLocalStorageSongsJsonCacheAdapter, createLegacyLocalStorageTextCacheAdapter } from "../../lib/storage/songs-json-cache.mjs";
+import {
+    createIndexedDbSongsJsonCacheStore,
+    createIndexedDbTextCacheStore,
+    createLegacyLocalStorageSongsJsonCacheAdapter,
+    createLegacyLocalStorageTextCacheAdapter
+} from "../../lib/storage/songs-json-cache.mjs";
 import { createSongsDataSource } from "../../lib/songs-data-source.mjs";
+
 /**
  * @typedef {{
  *   publicSongsJsonUrl: string,
@@ -13,6 +16,7 @@ import { createSongsDataSource } from "../../lib/songs-data-source.mjs";
  *   legacyCsvCacheKey: string
  * }} BrowserSongsDataSourceInput
  */
+
 /**
  * @typedef {{
  *   songs: Song[],
@@ -20,6 +24,7 @@ import { createSongsDataSource } from "../../lib/songs-data-source.mjs";
  *   resetConditions?: boolean
  * }} SongsDataSourceResult
  */
+
 /**
  * @typedef {{
  *   loadInitialSongs: (callbacks: {
@@ -27,6 +32,7 @@ import { createSongsDataSource } from "../../lib/songs-data-source.mjs";
  *   }) => Promise<boolean>
  * }} SongsDataSource
  */
+
 /**
  * ブラウザの localStorage を安全に取得する。
  * @returns {Storage | null}
@@ -34,12 +40,12 @@ import { createSongsDataSource } from "../../lib/songs-data-source.mjs";
 function getBrowserLocalStorage() {
     try {
         return globalThis.localStorage ?? null;
-    }
-    catch (error) {
+    } catch (error) {
         console.warn("localStorageを参照できませんでした", error);
         return null;
     }
 }
+
 /**
  * ブラウザ保存領域を使う曲データ取得元を作成する。
  * IndexedDB を主キャッシュ、旧 localStorage キャッシュを移行元として束ねる。
@@ -47,7 +53,14 @@ function getBrowserLocalStorage() {
  * @returns {SongsDataSource}
  */
 export function createBrowserSongsDataSource(input) {
-    const { publicSongsJsonUrl, publicSongsMetaUrl, publicCsvUrl, songsJsonCacheKey, csvCacheKey, legacyCsvCacheKey } = input;
+    const {
+        publicSongsJsonUrl,
+        publicSongsMetaUrl,
+        publicCsvUrl,
+        songsJsonCacheKey,
+        csvCacheKey,
+        legacyCsvCacheKey
+    } = input;
     const browserStorage = getBrowserLocalStorage();
     const songsJsonCacheStore = createIndexedDbSongsJsonCacheStore({
         cacheKey: songsJsonCacheKey
@@ -66,6 +79,7 @@ export function createBrowserSongsDataSource(input) {
         storage: browserStorage,
         label: "CSVキャッシュ"
     });
+
     return createSongsDataSource({
         publicSongsJsonUrl,
         publicSongsMetaUrl,

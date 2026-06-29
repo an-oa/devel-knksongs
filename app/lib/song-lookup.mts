@@ -1,7 +1,5 @@
-// Generated from app/lib/song-lookup.mts.
-// Do not edit this .mjs file by hand; edit the .mts source and run npm run build:ts.
-
 /** @typedef {import("../state.types").LookupUiRuntimeState} LookupUiRuntimeState */
+
 /**
  * 曲参照用の検索マップが最新の曲配列を指しているかを返す。
  * @param {LookupUiRuntimeState} lookupUi
@@ -14,6 +12,7 @@ function hasCurrentSongLookupMaps(lookupUi, songRows) {
         lookupUi.songMapByKey instanceof Map &&
         lookupUi.songMapByLegacyIndex instanceof Map;
 }
+
 /**
  * 曲参照用の検索マップを必要時に再構築する。
  * 本番コードでは検索/ブックマーク通知の参照解決から使い、境界条件を単体テストするため export している。
@@ -22,8 +21,8 @@ function hasCurrentSongLookupMaps(lookupUi, songRows) {
  */
 export function ensureSongLookupMaps(lookupUi, songRows) {
     const rows = Array.isArray(songRows) ? songRows : [];
-    if (hasCurrentSongLookupMaps(lookupUi, rows))
-        return;
+    if (hasCurrentSongLookupMaps(lookupUi, rows)) return;
+
     lookupUi.songMapByBookmarkKey = new Map();
     lookupUi.songMapByKey = new Map(rows.map((row) => [row.songKey, row]));
     rows.forEach((row) => {
@@ -34,6 +33,7 @@ export function ensureSongLookupMaps(lookupUi, songRows) {
     lookupUi.songMapByLegacyIndex = new Map(rows.map((row) => [row.sourceIndex, row]));
     lookupUi.songLookupSourceRef = rows;
 }
+
 /**
  * 曲参照から曲データを返す。
  * @param {LookupUiRuntimeState} lookupUi
@@ -51,6 +51,7 @@ export function resolveSongRef(lookupUi, songRows, songRef) {
     }
     return null;
 }
+
 /**
  * ブックマーク内の曲参照配列を曲データ配列へ解決する。
  * @param {LookupUiRuntimeState} lookupUi
@@ -64,8 +65,7 @@ export function resolveSongRefs(lookupUi, songRows, songRefs) {
     const resolvedSongs = [];
     refs.forEach((songRef) => {
         const song = resolveSongRef(lookupUi, songRows, songRef);
-        if (song)
-            resolvedSongs.push(song);
+        if (song) resolvedSongs.push(song);
     });
     return resolvedSongs;
 }

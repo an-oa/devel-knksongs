@@ -1,16 +1,46 @@
-// Generated from app/lib/storage/bookmark-transfer.mts.
-// Do not edit this .mjs file by hand; edit the .mts source and run npm run build:ts.
+import {
+    buildStoredBookmarksPayload,
+    migrateLegacyBookmarkSongRefsToCurrent,
+    parseStoredBookmarksPayload
+} from "./bookmark-schema.mjs";
 
-import { buildStoredBookmarksPayload, migrateLegacyBookmarkSongRefsToCurrent, parseStoredBookmarksPayload } from "./bookmark-schema.mjs";
+/**
+ * @typedef {{ name?: string, songs?: Array<string | number> }} BookmarkImportEntry
+ */
+
+/**
+ * @typedef {{
+ *   maxBookmarkCount?: number,
+ *   maxSongsPerBookmark?: number,
+ *   maxBookmarkNameLength?: number
+ * }} BookmarkImportLimits
+ */
+
+type BookmarkImportEntry = {
+    name?: string;
+    songs?: Array<string | number>;
+};
+
+type BookmarkImportLimits = {
+    maxBookmarkCount?: number;
+    maxSongsPerBookmark?: number;
+    maxBookmarkNameLength?: number;
+};
+
+type BookmarkImportOptions = BookmarkImportLimits & {
+    songRows?: Array<Record<string, unknown>>;
+};
+
 /**
  * 成功時の共通レスポンスを組み立てる。
  * @template {Record<string, unknown>} T
  * @param {T | undefined} [extra]
  * @returns {{ ok: true } & T}
  */
-function buildActionOk(extra) {
-    return { ok: true, ...(extra || {}) };
+function buildActionOk<T extends Record<string, unknown>>(extra?: T): { ok: true } & T {
+    return { ok: true, ...(extra || {}) } as { ok: true } & T;
 }
+
 /**
  * 失敗理由付きの共通レスポンスを組み立てる。
  * @template {Record<string, unknown>} T
@@ -18,26 +48,34 @@ function buildActionOk(extra) {
  * @param {T | undefined} [extra]
  * @returns {{ ok: false, reason: string } & T}
  */
-function buildActionFail(reason, extra) {
-    return { ok: false, reason, ...(extra || {}) };
+function buildActionFail<T extends Record<string, unknown>>(
+    reason: string,
+    extra?: T
+): { ok: false, reason: string } & T {
+    return { ok: false, reason, ...(extra || {}) } as { ok: false, reason: string } & T;
 }
+
 /**
  * ブックマーク内の合計曲数を数える。
  * @param {Record<string, { songs?: Array<*> }>} bookmarks
  * @returns {number}
  */
-function countBookmarkSongs(bookmarks) {
+function countBookmarkSongs(bookmarks: Record<string, { songs?: unknown }>) {
     return Object.values(bookmarks).reduce((total, bookmark) => {
         return total + (Array.isArray(bookmark.songs) ? bookmark.songs.length : 0);
     }, 0);
 }
+
 /**
  * ブックマーク数、名前の長さ、各ブックマーク内の曲数が上限内かを確認する。
  * @param {Record<string, BookmarkImportEntry>} bookmarks
  * @param {BookmarkImportLimits | undefined} limits
  * @returns {{ ok: boolean, reason?: string, limit?: number, bookmarkName?: string }}
  */
-function validateBookmarkImportLimits(bookmarks, limits) {
+function validateBookmarkImportLimits(
+    bookmarks: Record<string, BookmarkImportEntry>,
+    limits: BookmarkImportLimits | undefined
+) {
     const maxBookmarkCount = Number.isFinite(limits && limits.maxBookmarkCount)
         ? limits.maxBookmarkCount
         : Number.POSITIVE_INFINITY;
@@ -65,6 +103,7 @@ function validateBookmarkImportLimits(bookmarks, limits) {
     }
     return buildActionOk();
 }
+
 /**
  * インポート候補の JSON 文字列を解析し、全置き換え可能なブックマーク情報に整える。
  * @param {*} text
@@ -76,20 +115,21 @@ function validateBookmarkImportLimits(bookmarks, limits) {
  * }} options
  * @returns {{ ok: boolean, reason?: string, bookmarks?: Record<string, *>, bookmarkCount?: number, songCount?: number, limit?: number, bookmarkName?: string }}
  */
-export function parseBookmarkImportText(text, options = {}) {
-    if (typeof text !== "string")
-        return buildActionFail("invalid_text");
+export function parseBookmarkImportText(text, options: BookmarkImportOptions = {}) {
+    if (typeof text !== "string") return buildActionFail("invalid_text");
+
     let raw;
     try {
         raw = JSON.parse(text);
-    }
-    catch {
+    } catch {
         return buildActionFail("invalid_json");
     }
+
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
         return buildActionFail("invalid_bookmark_file");
     }
-    const payload = raw;
+
+    const payload = raw as { bookmarks?: unknown };
     const isVersionedPayload = Object.prototype.hasOwnProperty.call(payload, "bookmarks");
     const rawBookmarkMap = isVersionedPayload ? payload.bookmarks : raw;
     const rawEntryCount = rawBookmarkMap && typeof rawBookmarkMap === "object" && !Array.isArray(rawBookmarkMap)
@@ -98,12 +138,14 @@ export function parseBookmarkImportText(text, options = {}) {
     if (isVersionedPayload && (!rawBookmarkMap || typeof rawBookmarkMap !== "object" || Array.isArray(rawBookmarkMap))) {
         return buildActionFail("invalid_bookmark_file");
     }
+
     const parsed = parseStoredBookmarksPayload(raw);
     const bookmarks = parsed.bookmarks;
     const bookmarkCount = Object.keys(bookmarks).length;
     if ((!isVersionedPayload || rawEntryCount > 0) && bookmarkCount === 0) {
         return buildActionFail("invalid_bookmark_file");
     }
+
     const songRows = Array.isArray(options && options.songRows) ? options.songRows : [];
     if (songRows.length > 0) {
         migrateLegacyBookmarkSongRefsToCurrent({
@@ -111,15 +153,17 @@ export function parseBookmarkImportText(text, options = {}) {
             songRows
         });
     }
+
     const limitCheck = validateBookmarkImportLimits(bookmarks, options);
-    if (!limitCheck.ok)
-        return limitCheck;
+    if (!limitCheck.ok) return limitCheck;
+
     return buildActionOk({
         bookmarks,
         bookmarkCount,
         songCount: countBookmarkSongs(bookmarks)
     });
 }
+
 /**
  * 現在のブックマークを JSON エクスポート用文字列へ変換する。
  * @param {Record<string, *>} bookmarks

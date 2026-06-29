@@ -1,7 +1,5 @@
-// Generated from app/lib/songs-json.mts.
-// Do not edit this .mjs file by hand; edit the .mts source and run npm run build:ts.
-
 export const SONGS_JSON_SCHEMA_VERSION = 1;
+
 /**
  * 曲データJSONのcontentHashを検証する。
  * @param {*} contentHash
@@ -13,6 +11,7 @@ function parseContentHash(contentHash) {
     }
     return contentHash;
 }
+
 /**
  * JSON文字列をオブジェクトとして解析する。
  * @param {string} jsonText
@@ -25,6 +24,7 @@ function parseJsonObject(jsonText) {
     }
     return payload;
 }
+
 /**
  * 曲データJSONのschemaVersionを検証する。
  * @param {*} schemaVersion
@@ -34,6 +34,7 @@ function assertSupportedSchemaVersion(schemaVersion) {
         throw new Error(`unsupported songs json schema: ${schemaVersion}`);
     }
 }
+
 /**
  * 曲データ配列を現在のJSONスキーマへ包む。
  * @param {unknown[]} songs
@@ -50,6 +51,7 @@ export function buildSongsJsonPayload(songs, contentHash) {
         songs
     };
 }
+
 /**
  * 曲データJSONのメタ情報を現在のJSONスキーマへ包む。
  * @param {string} contentHash
@@ -61,6 +63,7 @@ export function buildSongsJsonMetaPayload(contentHash) {
         contentHash: parseContentHash(contentHash)
     };
 }
+
 /**
  * 曲データJSONを検証して、現在のスキーマの内容を返す。
  * @param {string} jsonText
@@ -78,6 +81,7 @@ export function parseSongsJsonPayload(jsonText) {
         songs: payload.songs
     };
 }
+
 /**
  * 曲データJSONのメタ情報を検証して返す。
  * @param {string} jsonText

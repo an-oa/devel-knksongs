@@ -1,9 +1,7 @@
-// Generated from app/lib/search-filters.mts.
-// Do not edit this .mjs file by hand; edit the .mts source and run npm run build:ts.
-
 import { isWithinDateRange } from "./date-key.mjs";
 import { matchesSelectedFormat } from "./song-format.mjs";
 import { isGuestStreamRole, normalizeStreamRole, STREAM_ROLE_HOST } from "./stream-role.mjs";
+
 /**
  * 検索比較しやすい形に文字列を正規化する。
  * @param {*} s
@@ -14,6 +12,7 @@ export function normalizeForSearch(s) {
         .replace(/[\u3041-\u3096\u309D-\u309F]/g, (m) => String.fromCharCode(m.charCodeAt(0) + 0x60))
         .toLowerCase();
 }
+
 /**
  * コラボ種別フィルタの選択状態に曲行が一致するか判定する。
  * @param {{ streamRole?: string | null } | null | undefined} row
@@ -23,13 +22,12 @@ export function normalizeForSearch(s) {
 export function matchesCollabRoleFilters(row, searchState) {
     const useHost = Boolean(searchState.collabHostOnly);
     const useGuest = Boolean(searchState.collabGuestOnly);
-    if (!useHost && !useGuest)
-        return true;
+    if (!useHost && !useGuest) return true;
     const streamRole = row && row.streamRole;
-    if (useGuest && isGuestStreamRole(streamRole))
-        return true;
+    if (useGuest && isGuestStreamRole(streamRole)) return true;
     return useHost && normalizeStreamRole(streamRole) === STREAM_ROLE_HOST;
 }
+
 /**
  * クエリ・日付・形式・コラボ種別・フラグ条件で曲一覧を絞り込む。
  * @param {Song[]} rows
@@ -41,10 +39,12 @@ export function filterSongsByCriteria(rows, searchState, selectedFormats) {
     const queryNorm = normalizeForSearch(searchState.queryRaw);
     const keywords = queryNorm.split(/[\s\u3000]+/).filter((k) => k.length > 0);
     return rows.filter((row) => {
-        const matchText = keywords.every((kw) => row.titleNorm.includes(kw) ||
+        const matchText = keywords.every((kw) =>
+            row.titleNorm.includes(kw) ||
             row.artistNorm.includes(kw) ||
             row.titleYomiNorm.includes(kw) ||
-            row.artistYomiNorm.includes(kw));
+            row.artistYomiNorm.includes(kw)
+        );
         const matchDate = isWithinDateRange(row, searchState.dateFromKey, searchState.dateToKey);
         return matchText &&
             matchDate &&

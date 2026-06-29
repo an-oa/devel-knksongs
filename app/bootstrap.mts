@@ -1,8 +1,30 @@
-// Generated from app/bootstrap.mts.
-// Do not edit this .mjs file by hand; edit the .mts source and run npm run build:ts.
-
-import { RANDOM_DISPLAY_COUNT, MIN_PERFORMANCE_FOR_RANDOM, RESULT_DISPLAY_BATCH_SIZE, DEFAULT_FORMATS, SEARCH_STATE_KEY, BOOKMARK_STORAGE_KEY, BOOKMARK_STORAGE_VERSION, MAX_BOOKMARK_COUNT, MAX_SONGS_PER_BOOKMARK, MAX_BOOKMARK_NAME_LENGTH, UI_SYNC_PASSES, SEARCH_DEBOUNCE_MS, YT_IFRAME_API_SRC, YT_IFRAME_API_SELECTOR, YT_IFRAME_READY_POLL_MS, STOP_PLAYBACK_ON_SCROLL_OUT, appState } from "./state.mjs";
-import { PUBLIC_SONGS_JSON_URL, PUBLIC_SONGS_META_URL, PUBLIC_CSV_URL, SONGS_JSON_CACHE_KEY, LEGACY_CSV_CACHE_KEY, CSV_CACHE_KEY } from "./config.mjs";
+import {
+    RANDOM_DISPLAY_COUNT,
+    MIN_PERFORMANCE_FOR_RANDOM,
+    RESULT_DISPLAY_BATCH_SIZE,
+    DEFAULT_FORMATS,
+    SEARCH_STATE_KEY,
+    BOOKMARK_STORAGE_KEY,
+    BOOKMARK_STORAGE_VERSION,
+    MAX_BOOKMARK_COUNT,
+    MAX_SONGS_PER_BOOKMARK,
+    MAX_BOOKMARK_NAME_LENGTH,
+    UI_SYNC_PASSES,
+    SEARCH_DEBOUNCE_MS,
+    YT_IFRAME_API_SRC,
+    YT_IFRAME_API_SELECTOR,
+    YT_IFRAME_READY_POLL_MS,
+    STOP_PLAYBACK_ON_SCROLL_OUT,
+    appState
+} from "./state.mjs";
+import {
+    PUBLIC_SONGS_JSON_URL,
+    PUBLIC_SONGS_META_URL,
+    PUBLIC_CSV_URL,
+    SONGS_JSON_CACHE_KEY,
+    LEGACY_CSV_CACHE_KEY,
+    CSV_CACHE_KEY
+} from "./config.mjs";
 import { createSearchController } from "./controllers/search.mjs";
 import { createRenderController } from "./controllers/render.mjs";
 import { createPlaybackSessionController } from "./controllers/playback-session.mjs";
@@ -11,7 +33,11 @@ import { createYoutubeController, extractYoutubeInfo } from "./controllers/youtu
 import { createStorageController } from "./controllers/storage.mjs";
 import { createBookmarkUiController } from "./ui/bookmark/ui.mjs";
 import { scrollResultListToTop } from "./lib/results-scroll.mjs";
-import { collectUiElements, applyThemeFromStorage, setupTheme } from "./ui/core/elements.mjs";
+import {
+    collectUiElements,
+    applyThemeFromStorage,
+    setupTheme
+} from "./ui/core/elements.mjs";
 import { createUiSyncController } from "./ui/core/sync.mjs";
 import { createDataLoader } from "./ui/core/data.mjs";
 import { createSidebarController } from "./ui/sidebar/ui.mjs";
@@ -19,11 +45,19 @@ import { createSearchFiltersController } from "./ui/search-filters/controller.mj
 import { getSearchUiState } from "./lib/ui-slices.mjs";
 import { debugPlayback } from "./lib/playback-debug.mjs";
 import { createBrowserSongsDataSource } from "./ui/core/data-source.mjs";
-const appDataState = appState.data;
+import type {
+    AppDataState,
+    AppUiState,
+    AppYoutubeRuntimeState
+} from "./state.types";
+
+const appDataState: AppDataState = appState.data;
+
 /** @typedef {import("./state.types").AppUiState} AppUiState */
-const appUiState = appState.ui;
+const appUiState: AppUiState = appState.ui;
 const searchUiState = getSearchUiState(appUiState);
-const youtubeRuntimeState = appState.youtube;
+const youtubeRuntimeState: AppYoutubeRuntimeState = appState.youtube;
+
 /**
  * 検索 controller から描画更新へ委譲する callback 群を作成する。
  * @param {{
@@ -41,6 +75,7 @@ function createSearchCallbacks({ getRenderController, ui }) {
         scrollResultsPaneToTop: () => scrollResultListToTop(ui.el.resultList)
     };
 }
+
 /**
  * 描画 controller から検索・YouTube・サイドバー・保存へ委譲する callback 群を作成する。
  * controller 生成順の循環を避けるため、後続 controller は呼び出し時に getter で解決する。
@@ -51,7 +86,12 @@ function createSearchCallbacks({ getRenderController, ui }) {
  *   getStorageController: () => ReturnType<typeof createStorageController>
  * }} input
  */
-function createRenderCallbacks({ getSearchController, getYoutubeController, getSidebarController, getStorageController }) {
+function createRenderCallbacks({
+    getSearchController,
+    getYoutubeController,
+    getSidebarController,
+    getStorageController
+}) {
     return {
         getSearchState: () => getSearchController().getSearchState(),
         isRecommendedMode: (state) => getSearchController().isRecommendedMode(state),
@@ -65,6 +105,7 @@ function createRenderCallbacks({ getSearchController, getYoutubeController, getS
         saveBookmarks: () => getStorageController().saveBookmarks()
     };
 }
+
 /**
  * storage controller から検索とブックマーク UI へ委譲する callback 群を作成する。
  * @param {{
@@ -84,12 +125,12 @@ function createStorageCallbacks({ searchController, getBookmarkUiController }) {
         applyPendingDateValues: () => searchController.applyPendingDateValues(),
         renderBookmarks: () => {
             const bookmarkUiController = getBookmarkUiController();
-            if (bookmarkUiController)
-                bookmarkUiController.renderBookmarks();
+            if (bookmarkUiController) bookmarkUiController.renderBookmarks();
         },
         scheduleSearch: (options) => searchController.scheduleSearch(options)
     };
 }
+
 /**
  * ブックマーク UI controller から検索・保存・サイドバーへ委譲する callback 群を作成する。
  * @param {{
@@ -99,7 +140,12 @@ function createStorageCallbacks({ searchController, getBookmarkUiController }) {
  *   clearSearchDebounce: () => void
  * }} input
  */
-function createBookmarkUiCallbacks({ searchController, storageController, getSidebarController, clearSearchDebounce }) {
+function createBookmarkUiCallbacks({
+    searchController,
+    storageController,
+    getSidebarController,
+    clearSearchDebounce
+}) {
     return {
         clearSearchDebounce,
         scheduleSearch: (options) => searchController.scheduleSearch(options),
@@ -114,11 +160,11 @@ function createBookmarkUiCallbacks({ searchController, storageController, getSid
         onImportBookmarksText: (text) => storageController.importBookmarksFromJsonText(text),
         onRequestCloseSidebar: () => {
             const sidebarController = getSidebarController();
-            if (sidebarController)
-                sidebarController.closeSidebarMenu();
+            if (sidebarController) sidebarController.closeSidebarMenu();
         }
     };
 }
+
 /**
  * サイドバー controller から各 controller へ委譲する callback 群を作成する。
  * @param {{
@@ -132,7 +178,16 @@ function createBookmarkUiCallbacks({ searchController, storageController, getSid
  *   clearSearch: () => void
  * }} input
  */
-function createSidebarCallbacks({ getBookmarkUiController, youtubeController, searchController, renderController, markFilterTouched, markQueryTouched, resetDateSelectGroup, clearSearch }) {
+function createSidebarCallbacks({
+    getBookmarkUiController,
+    youtubeController,
+    searchController,
+    renderController,
+    markFilterTouched,
+    markQueryTouched,
+    resetDateSelectGroup,
+    clearSearch
+}) {
     return {
         getBookmarkUiController,
         isIOSWebKit: () => youtubeController.isIOSWebKit(),
@@ -145,6 +200,7 @@ function createSidebarCallbacks({ getBookmarkUiController, youtubeController, se
         clearSearch
     };
 }
+
 /**
  * YouTube 再生イベントを描画更新と連続再生セッションへ接続する。
  * @param {{
@@ -167,8 +223,7 @@ function wireYoutubePlaybackHooks({ youtubeController, renderController, playbac
             playbackMode,
             wasPlaybackStartUnconfirmed: Boolean(wasPlaybackStartUnconfirmed)
         });
-        if (playbackMode !== "manual" && !wasPlaybackStartUnconfirmed)
-            return;
+        if (playbackMode !== "manual" && !wasPlaybackStartUnconfirmed) return;
         debugPlayback("script", wasPlaybackStartUnconfirmed
             ? "continuePlayback requested from unconfirmed playback start failure"
             : "continuePlayback requested from manual playback start failure", {
@@ -177,6 +232,7 @@ function wireYoutubePlaybackHooks({ youtubeController, renderController, playbac
         playbackSessionController.continuePlayback(songKey);
     });
 }
+
 /**
  * アプリ controller 群を作成し、相互 callback を同じ composition 境界内で配線する。
  * @returns {{
@@ -200,6 +256,7 @@ function createAppControllers() {
         ui: appUiState,
         defaultFormats: DEFAULT_FORMATS
     });
+
     /**
      * 検索 UI から条件を読み取り、表示対象の曲配列を appDataState.currentResults へ反映する controller。
      * 描画更新は renderController へ委譲し、結果リストのスクロール位置もここで揃える。
@@ -220,6 +277,7 @@ function createAppControllers() {
             ui: appUiState
         })
     });
+
     /**
      * appDataState.currentResults を DOM の検索結果カードへ反映する controller。
      * サムネイル再生、ブックマーク操作、カード再利用用キャッシュとの接続点もここに集約する。
@@ -236,6 +294,7 @@ function createAppControllers() {
             getStorageController: () => storageController
         })
     });
+
     /**
      * 現在の検索結果と再生設定をもとに、連続再生や次曲送りのセッションを管理する controller。
      */
@@ -247,6 +306,7 @@ function createAppControllers() {
             scrollSongIntoView: (songKey) => renderController.scrollSongIntoView(songKey)
         }
     });
+
     /**
      * サムネイル表示や連続再生など、再生設定 UI と保存値の同期を扱う controller。
      */
@@ -259,6 +319,7 @@ function createAppControllers() {
             setupScrollObserver: () => youtubeController.setupScrollObserver()
         }
     });
+
     /**
      * YouTube IFrame API の読み込み、サムネイル埋め込み、共有プレーヤー状態を扱う controller。
      */
@@ -272,18 +333,21 @@ function createAppControllers() {
             STOP_PLAYBACK_ON_SCROLL_OUT
         }
     });
+
     /**
      * ブックマークパネル UI controller の遅延参照。
      * storageController と sidebarController の callbacks から相互参照するため、生成後に代入する。
      * @type {ReturnType<typeof createBookmarkUiController> | null}
      */
     let bookmarkUiController = null;
+
     /**
      * サイドバー UI controller の遅延参照。
      * ブックマーク UI と検索リセット callback が互いに参照し合うため、生成後に代入する。
      * @type {ReturnType<typeof createSidebarController> | null}
      */
     let sidebarController = null;
+
     /**
      * localStorage 上の検索状態・ブックマーク保存データを読み書きする controller。
      * bookmark schema version の移行、インポート/エクスポート、保存後の再描画をまとめて扱う。
@@ -306,6 +370,7 @@ function createAppControllers() {
             getBookmarkUiController: () => bookmarkUiController
         })
     });
+
     /**
      * ブックマークパネルの表示、追加・削除・インポートなどのユーザー操作を扱う controller。
      * 永続化の実処理は storageController へ委譲する。
@@ -320,6 +385,7 @@ function createAppControllers() {
             clearSearchDebounce
         })
     });
+
     /**
      * サイドバー全体の開閉、設定パネル、ブックマークパネル、検索リセット導線を扱う controller。
      */
@@ -340,6 +406,7 @@ function createAppControllers() {
             clearSearch
         })
     });
+
     /**
      * bfcache 復帰やフォーカス復帰時に、保存済み設定と検索 UI を再同期する controller。
      */
@@ -349,6 +416,7 @@ function createAppControllers() {
         applyThemeFromStorage: () => applyThemeFromStorage({ ui: appUiState }),
         applyPlaybackSettingsFromStorage: () => playbackSettingsController.applyPlaybackSettingsFromStorage()
     });
+
     /**
      * 曲データの取得元を束ねる data source。
      * 公開 JSON と meta による鮮度確認を優先し、失敗時は CSV と保存済みキャッシュへ fallback する。
@@ -361,6 +429,7 @@ function createAppControllers() {
         csvCacheKey: CSV_CACHE_KEY,
         legacyCsvCacheKey: LEGACY_CSV_CACHE_KEY
     });
+
     /**
      * 初期曲データの読み込み結果を appDataState へ反映し、日付範囲・検索条件・表示を初期化する loader。
      */
@@ -376,11 +445,13 @@ function createAppControllers() {
             scheduleSearch: (options) => searchController.scheduleSearch(options)
         }
     });
+
     wireYoutubePlaybackHooks({
         youtubeController,
         renderController,
         playbackSessionController
     });
+
     return {
         searchFiltersController,
         searchController,
@@ -393,14 +464,26 @@ function createAppControllers() {
         dataLoader
     };
 }
-const { searchFiltersController, searchController, renderController, playbackSettingsController, youtubeController, storageController, sidebarController, uiSyncController, dataLoader } = createAppControllers();
+
+const {
+    searchFiltersController,
+    searchController,
+    renderController,
+    playbackSettingsController,
+    youtubeController,
+    storageController,
+    sidebarController,
+    uiSyncController,
+    dataLoader
+} = createAppControllers();
+
 /**
  * DOM 参照の初期化と UI 各機能のセットアップを行う。
  */
 async function initUI() {
     appUiState.el = collectUiElements();
-    if (youtubeController.isIOSWebKit())
-        document.documentElement.classList.add("ios");
+    if (youtubeController.isIOSWebKit()) document.documentElement.classList.add("ios");
+
     searchFiltersController.setupFilterOptions({
         onFilterChange: markFilterTouched
     });
@@ -418,12 +501,14 @@ async function initUI() {
     storageController.restoreSearchState();
     await dataLoader.loadInitialData();
 }
+
 /**
  * アプリ起動時に初期化処理を開始する。
  */
 function boot() {
     initUI().catch(reportInitError);
 }
+
 /**
  * 初期化失敗時のエラーを記録する。
  * @param {unknown} error
@@ -431,13 +516,16 @@ function boot() {
 function reportInitError(error) {
     console.error("initUI failed", error);
 }
+
 document.addEventListener("DOMContentLoaded", boot);
+
 /**
  * Inspect の console から隠し再生設定をページ内だけで操作できる API を公開する。
  */
 function exposePlaybackSettingsConsoleApi() {
     window.knkPlaybackSettings = playbackSettingsController.createConsoleApi();
 }
+
 /**
  * 指定側の日付セレクトをクリアして候補を同期する。
  * @param {string} kind
@@ -447,14 +535,12 @@ function resetDateSelectGroup(kind) {
     const year = isFrom ? appUiState.el.dateFromYear : appUiState.el.dateToYear;
     const month = isFrom ? appUiState.el.dateFromMonth : appUiState.el.dateToMonth;
     const day = isFrom ? appUiState.el.dateFromDay : appUiState.el.dateToDay;
-    if (year)
-        year.value = "";
-    if (month)
-        month.value = "";
-    if (day)
-        day.value = "";
+    if (year) year.value = "";
+    if (month) month.value = "";
+    if (day) day.value = "";
     searchController.syncDateSelectOptions();
 }
+
 /**
  * 検索条件とアクティブブックマークをリセットして保存する。
  */
@@ -463,6 +549,7 @@ function clearSearch() {
     resetSearchConditions(true);
     storageController.saveSearchState();
 }
+
 /**
  * フィルタ操作済みフラグを立てて検索・保存を行う。
  * @param {Event | { immediate?: boolean }} [options]
@@ -473,6 +560,7 @@ function markFilterTouched(options) {
     searchController.scheduleSearch(scheduleOptions);
     storageController.saveSearchState();
 }
+
 /**
  * 検索語操作済みフラグを立てて検索・保存を行う。
  */
@@ -481,6 +569,7 @@ function markQueryTouched() {
     searchController.scheduleSearch();
     storageController.saveSearchState();
 }
+
 /**
  * 保留中の検索デバウンスタイマーを解除する。
  */
@@ -490,14 +579,15 @@ function clearSearchDebounce() {
         searchUiState.debounceId = 0;
     }
 }
+
 /**
  * 検索語入力を初期化する。
  */
 function resetSearchQuery() {
-    if (appUiState.el.searchBox)
-        appUiState.el.searchBox.value = "";
+    if (appUiState.el.searchBox) appUiState.el.searchBox.value = "";
     searchUiState.userTouchedQuery = false;
 }
+
 /**
  * フィルタ条件を既定状態へ戻す。
  */
@@ -506,6 +596,7 @@ function resetSearchFilters() {
         resetDateSelects: () => searchController.resetDateSelects()
     });
 }
+
 /**
  * 検索語とフィルタをまとめて初期化し必要なら再検索する。
  * @param {boolean} shouldSearch
@@ -518,27 +609,26 @@ function resetSearchConditions(shouldSearch) {
         searchController.scheduleSearch({ immediate: true });
     }
 }
+
 /**
  * 未操作時に検索語の不整合があればリセットする。
  * @returns {boolean}
  */
 function syncSearchQueryIfNeeded() {
-    if (searchUiState.userTouchedQuery)
-        return false;
+    if (searchUiState.userTouchedQuery) return false;
     const searchBox = appUiState.el.searchBox;
-    if (!searchBox || searchBox.value === "")
-        return false;
+    if (!searchBox || searchBox.value === "") return false;
     resetSearchQuery();
     return true;
 }
+
 /**
  * 未操作時にフィルタの不整合があればリセットする。
  * @returns {boolean}
  */
 function syncSearchFiltersIfNeeded() {
     searchFiltersController.syncFormatCheckboxesFromState();
-    if (searchUiState.userTouchedFilters)
-        return false;
+    if (searchUiState.userTouchedFilters) return false;
     if (!searchFiltersController.needsFilterReset({
         hasDateSelection: () => searchController.hasDateSelection()
     })) {
@@ -547,6 +637,7 @@ function syncSearchFiltersIfNeeded() {
     resetSearchFilters();
     return true;
 }
+
 /**
  * 検索語・フィルタ同期の結果に応じて再検索する。
  */
