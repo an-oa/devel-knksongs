@@ -1,88 +1,183 @@
-// Generated from app/controllers/storage.mts.
-// Do not edit this .mjs file by hand; edit the .mts source and run npm run build:ts.
-
 import { getDateUiState, getSearchUiState } from "../lib/ui-slices.mjs";
-import { buildStoredBookmarksPayload, migrateLegacyBookmarkSongRefsToCurrent, parseStoredBookmarksPayload } from "../lib/storage/bookmark-schema.mjs";
-import { exportBookmarksAsJsonText as buildBookmarkExportJsonText, parseBookmarkImportText as parseBookmarkImportJsonText } from "../lib/storage/bookmark-transfer.mjs";
-import { buildStoredSearchStatePayload, parseStoredSearchStatePayload } from "../lib/storage/search-state-schema.mjs";
+import {
+    buildStoredBookmarksPayload,
+    migrateLegacyBookmarkSongRefsToCurrent,
+    parseStoredBookmarksPayload
+} from "../lib/storage/bookmark-schema.mjs";
+import {
+    exportBookmarksAsJsonText as buildBookmarkExportJsonText,
+    parseBookmarkImportText as parseBookmarkImportJsonText
+} from "../lib/storage/bookmark-transfer.mjs";
+import {
+    buildStoredSearchStatePayload,
+    parseStoredSearchStatePayload
+} from "../lib/storage/search-state-schema.mjs";
 import { collectSearchBooleanFilterState } from "../lib/search-boolean-filters.mjs";
+import type {
+    AppUiElements,
+    BookmarkRecord,
+    DateUiRuntimeState,
+    SearchUiRuntimeState
+} from "../state.types";
+
+type StorageDataState = {
+    allSongsRaw: Song[];
+    bookmarks: Record<string, BookmarkRecord>;
+    activeBookmark: string | null;
+};
+
+type StorageUiElements = Pick<AppUiElements, "searchBox"> & Record<string, Element | null | undefined>;
+
+type StorageUiState = {
+    el: StorageUiElements;
+    search: SearchUiRuntimeState;
+    date: DateUiRuntimeState;
+};
+
+type StorageConstants = {
+    SEARCH_STATE_KEY: string;
+    DEFAULT_FORMATS?: string[];
+    BOOKMARK_STORAGE_KEY: string;
+    BOOKMARK_STORAGE_VERSION?: number;
+    MAX_BOOKMARK_COUNT?: number;
+    MAX_SONGS_PER_BOOKMARK?: number;
+    MAX_BOOKMARK_NAME_LENGTH?: number;
+};
+
+type StorageSearchFiltersController = {
+    getSelectedFormatValues: () => string[];
+    applyStoredFilterState: (payload: Record<string, unknown>) => void;
+};
+
+type StorageCallbacks = {
+    getDateSelectValue: (kind: string) => string;
+    applyPendingDateValues: () => void;
+    renderBookmarks: () => void;
+    scheduleSearch: (options?: { immediate?: boolean }) => void;
+};
+
+type StorageActionResult = {
+    ok: boolean;
+    reason?: string;
+    name?: string;
+    id?: string;
+    changed?: boolean;
+    text?: string;
+    bookmarks?: Record<string, BookmarkRecord>;
+    bookmarkCount?: number;
+    songCount?: number;
+    limit?: number;
+    bookmarkName?: string;
+};
+
+type StorageControllerInput = {
+    data: StorageDataState;
+    ui: StorageUiState;
+    searchFiltersController: StorageSearchFiltersController;
+    constants: StorageConstants;
+    callbacks: StorageCallbacks;
+};
+
 /**
  * ブックマークと検索状態の保存・復元を扱うストレージコントローラーを作成する。
  * @param {StorageControllerInput} input
  */
-export function createStorageController({ data, ui, searchFiltersController, constants, callbacks }) {
+export function createStorageController({
+    data,
+    ui,
+    searchFiltersController,
+    constants,
+    callbacks
+}: StorageControllerInput) {
     const searchUiState = getSearchUiState(ui);
     const dateUi = getDateUiState(ui);
-    const { SEARCH_STATE_KEY, DEFAULT_FORMATS = [], BOOKMARK_STORAGE_KEY, BOOKMARK_STORAGE_VERSION = 1, MAX_BOOKMARK_COUNT = Number.POSITIVE_INFINITY, MAX_SONGS_PER_BOOKMARK = Number.POSITIVE_INFINITY, MAX_BOOKMARK_NAME_LENGTH = Number.POSITIVE_INFINITY } = constants;
-    const { getDateSelectValue, applyPendingDateValues, renderBookmarks, scheduleSearch } = callbacks;
+    const {
+        SEARCH_STATE_KEY,
+        DEFAULT_FORMATS = [],
+        BOOKMARK_STORAGE_KEY,
+        BOOKMARK_STORAGE_VERSION = 1,
+        MAX_BOOKMARK_COUNT = Number.POSITIVE_INFINITY,
+        MAX_SONGS_PER_BOOKMARK = Number.POSITIVE_INFINITY,
+        MAX_BOOKMARK_NAME_LENGTH = Number.POSITIVE_INFINITY
+    } = constants;
+    const {
+        getDateSelectValue,
+        applyPendingDateValues,
+        renderBookmarks,
+        scheduleSearch
+    } = callbacks;
     let loadedBookmarkStorageVersion = BOOKMARK_STORAGE_VERSION;
+
     /**
      * ブックマーク移行デバッグログの有効状態を返す。
      * @returns {boolean}
      */
-    function isBookmarkMigrationDebugEnabled() {
+    function isBookmarkMigrationDebugEnabled(): boolean {
         try {
-            if (window.__KNK_DEBUG_BOOKMARK_MIGRATION__ === true)
-                return true;
+            if (window.__KNK_DEBUG_BOOKMARK_MIGRATION__ === true) return true;
             return localStorage.getItem("debugBookmarkMigration") === "true";
-        }
-        catch {
+        } catch {
             return false;
         }
     }
+
     /**
      * ブックマーク移行まわりのデバッグログを出力する。
      * @param {string} message
      * @param {unknown} details
      */
-    function debugBookmarkMigration(message, details) {
-        if (!isBookmarkMigrationDebugEnabled())
-            return;
+    function debugBookmarkMigration(message: string, details?: unknown): void {
+        if (!isBookmarkMigrationDebugEnabled()) return;
         if (details === undefined) {
             console.debug("[bookmark-migration]", message);
             return;
         }
         console.debug("[bookmark-migration]", message, details);
     }
+
     /**
      * 成功時の共通レスポンスを組み立てる。
      * @param {Partial<StorageActionResult> | undefined} [extra]
      * @returns {StorageActionResult}
      */
-    function buildActionOk(extra = undefined) {
+    function buildActionOk(extra: Partial<StorageActionResult> | undefined = undefined): StorageActionResult {
         return { ok: true, ...(extra || {}) };
     }
+
     /**
      * 失敗理由付きの共通レスポンスを組み立てる。
      * @param {string} reason
      * @param {Partial<StorageActionResult> | undefined} [extra]
      * @returns {StorageActionResult}
      */
-    function buildActionFail(reason, extra = undefined) {
+    function buildActionFail(
+        reason: string,
+        extra: Partial<StorageActionResult> | undefined = undefined
+    ): StorageActionResult {
         return { ok: false, reason, ...(extra || {}) };
     }
+
     /**
      * ブックマーク名を検証し、保存用に前後空白を除いた文字列を返す。
      * @param {unknown} bookmarkName
      * @returns {StorageActionResult}
      */
-    function validateBookmarkName(bookmarkName) {
-        if (typeof bookmarkName !== "string")
-            return buildActionFail("invalid_name_type");
+    function validateBookmarkName(bookmarkName: unknown): StorageActionResult {
+        if (typeof bookmarkName !== "string") return buildActionFail("invalid_name_type");
         const trimmedName = bookmarkName.trim();
-        if (!trimmedName)
-            return buildActionFail("empty_name");
+        if (!trimmedName) return buildActionFail("empty_name");
         if (trimmedName.length > MAX_BOOKMARK_NAME_LENGTH) {
             return buildActionFail("max_bookmark_name_length", { limit: MAX_BOOKMARK_NAME_LENGTH });
         }
         return buildActionOk({ name: trimmedName });
     }
+
     /**
      * インポート候補の JSON 文字列を解析し、全置き換え可能なブックマーク情報に整える。
      * @param {unknown} text
      * @returns {StorageActionResult}
      */
-    function parseBookmarkImportText(text) {
+    function parseBookmarkImportText(text: unknown): StorageActionResult {
         return parseBookmarkImportJsonText(text, {
             songRows: data.allSongsRaw,
             maxBookmarkCount: MAX_BOOKMARK_COUNT,
@@ -90,29 +185,34 @@ export function createStorageController({ data, ui, searchFiltersController, con
             maxBookmarkNameLength: MAX_BOOKMARK_NAME_LENGTH
         });
     }
+
     /**
      * 現在のブックマークを JSON エクスポート用文字列へ変換する。
      * @returns {StorageActionResult}
      */
-    function exportBookmarksAsJsonText() {
+    function exportBookmarksAsJsonText(): StorageActionResult {
         return buildBookmarkExportJsonText(data.bookmarks, BOOKMARK_STORAGE_VERSION);
     }
+
     /**
      * ブックマーク情報をローカルストレージへ保存する。
      */
-    function saveBookmarks() {
+    function saveBookmarks(): void {
         try {
-            localStorage.setItem(BOOKMARK_STORAGE_KEY, JSON.stringify(buildStoredBookmarksPayload(data.bookmarks, BOOKMARK_STORAGE_VERSION)));
+            localStorage.setItem(
+                BOOKMARK_STORAGE_KEY,
+                JSON.stringify(buildStoredBookmarksPayload(data.bookmarks, BOOKMARK_STORAGE_VERSION))
+            );
             loadedBookmarkStorageVersion = BOOKMARK_STORAGE_VERSION;
-        }
-        catch (e) {
+        } catch (e) {
             console.error("Failed to save bookmarks", e);
         }
     }
+
     /**
      * ブックマーク情報をローカルストレージから読み込み、描画を更新する。
      */
-    function loadBookmarks() {
+    function loadBookmarks(): void {
         try {
             const stored = localStorage.getItem(BOOKMARK_STORAGE_KEY);
             if (stored) {
@@ -124,22 +224,22 @@ export function createStorageController({ data, ui, searchFiltersController, con
                     bookmarkCount: Object.keys(parsed.bookmarks).length
                 });
             }
-        }
-        catch (e) {
+        } catch (e) {
             console.error("Failed to load bookmarks", e);
             data.bookmarks = {};
         }
         renderBookmarks();
     }
+
     /**
      * JSON 文字列からブックマークを全置き換えでインポートする。
      * @param {unknown} text
      * @returns {StorageActionResult}
      */
-    function importBookmarksFromJsonText(text) {
+    function importBookmarksFromJsonText(text: unknown): StorageActionResult {
         const parsed = parseBookmarkImportText(text);
-        if (!parsed.ok)
-            return parsed;
+        if (!parsed.ok) return parsed;
+
         const hadActiveBookmark = Boolean(data.activeBookmark);
         data.bookmarks = parsed.bookmarks;
         if (data.activeBookmark && !data.bookmarks[data.activeBookmark]) {
@@ -155,10 +255,11 @@ export function createStorageController({ data, ui, searchFiltersController, con
             songCount: parsed.songCount
         });
     }
+
     /**
      * 旧参照形式のブックマーク曲IDを現行の `bookmarkSongKey` へ移行する。
      */
-    function migrateLegacyBookmarkSongRefs() {
+    function migrateLegacyBookmarkSongRefs(): void {
         debugBookmarkMigration("start bookmark ref migration", {
             storedVersion: loadedBookmarkStorageVersion,
             targetVersion: BOOKMARK_STORAGE_VERSION,
@@ -185,16 +286,17 @@ export function createStorageController({ data, ui, searchFiltersController, con
             currentVersion: loadedBookmarkStorageVersion
         });
     }
+
     /**
      * 指定ブックマークから曲を削除し、必要なら検索結果を更新する。
      * @param {string} bookmarkId
      * @param {string} songKey
      * @returns {StorageActionResult}
      */
-    function removeSongFromBookmark(bookmarkId, songKey) {
+    function removeSongFromBookmark(bookmarkId: string, songKey: string): StorageActionResult {
         const bookmark = data.bookmarks[bookmarkId];
-        if (!bookmark)
-            return buildActionFail("bookmark_not_found");
+        if (!bookmark) return buildActionFail("bookmark_not_found");
+
         const songIndex = bookmark.songs.indexOf(songKey);
         if (songIndex <= -1) {
             return buildActionFail("song_not_found");
@@ -207,18 +309,17 @@ export function createStorageController({ data, ui, searchFiltersController, con
         }
         return buildActionOk({ changed: true });
     }
+
     /**
      * 指定ブックマークへ曲を追加し、上限や重複を検証して結果を返す。
      * @param {string} bookmarkId
      * @param {string} songKey
      * @returns {StorageActionResult}
      */
-    function addSongToBookmark(bookmarkId, songKey) {
+    function addSongToBookmark(bookmarkId: string, songKey: string): StorageActionResult {
         const bookmark = data.bookmarks[bookmarkId];
-        if (!bookmark)
-            return buildActionFail("bookmark_not_found");
-        if (bookmark.songs.includes(songKey))
-            return buildActionFail("duplicate_song");
+        if (!bookmark) return buildActionFail("bookmark_not_found");
+        if (bookmark.songs.includes(songKey)) return buildActionFail("duplicate_song");
         if (bookmark.songs.length >= MAX_SONGS_PER_BOOKMARK) {
             return buildActionFail("max_songs_per_bookmark", { limit: MAX_SONGS_PER_BOOKMARK });
         }
@@ -230,19 +331,19 @@ export function createStorageController({ data, ui, searchFiltersController, con
         }
         return buildActionOk();
     }
+
     /**
      * 新規ブックマークを作成する共通処理。
      * @param {unknown} bookmarkName
      * @param {string[]} initialSongs
      * @returns {StorageActionResult}
      */
-    function createBookmarkRecord(bookmarkName, initialSongs) {
+    function createBookmarkRecord(bookmarkName: unknown, initialSongs: string[]): StorageActionResult {
         if (Object.keys(data.bookmarks).length >= MAX_BOOKMARK_COUNT) {
             return buildActionFail("max_bookmark_count", { limit: MAX_BOOKMARK_COUNT });
         }
         const nameValidation = validateBookmarkName(bookmarkName);
-        if (!nameValidation.ok)
-            return nameValidation;
+        if (!nameValidation.ok) return nameValidation;
         const now = Date.now();
         const newId = `p_${now}`;
         data.bookmarks[newId] = {
@@ -254,42 +355,43 @@ export function createStorageController({ data, ui, searchFiltersController, con
         renderBookmarks();
         return buildActionOk({ id: newId });
     }
+
     /**
      * 新規ブックマークを空の状態で作成する。
      * @param {unknown} bookmarkName
      * @returns {StorageActionResult}
      */
-    function createBookmark(bookmarkName) {
+    function createBookmark(bookmarkName: unknown): StorageActionResult {
         return createBookmarkRecord(bookmarkName, []);
     }
+
     /**
      * 新規ブックマークを作成し、指定曲を初期登録する。
      * @param {unknown} bookmarkName
      * @param {string} songKey
      * @returns {StorageActionResult}
      */
-    function createBookmarkAndAdd(bookmarkName, songKey) {
+    function createBookmarkAndAdd(bookmarkName: unknown, songKey: string): StorageActionResult {
         return createBookmarkRecord(bookmarkName, [songKey]);
     }
+
     /**
      * ブックマークを削除し、アクティブ状態と表示を更新する。
      * @param {string} bookmarkId
      * @returns {StorageActionResult}
      */
-    function deleteBookmark(bookmarkId) {
+    function deleteBookmark(bookmarkId: string): StorageActionResult {
         const bookmark = data.bookmarks[bookmarkId];
-        if (!bookmark)
-            return buildActionFail("bookmark_not_found");
+        if (!bookmark) return buildActionFail("bookmark_not_found");
         const wasActive = data.activeBookmark === bookmarkId;
         delete data.bookmarks[bookmarkId];
-        if (wasActive)
-            data.activeBookmark = null;
+        if (wasActive) data.activeBookmark = null;
         saveBookmarks();
         renderBookmarks();
-        if (wasActive)
-            scheduleSearch({ immediate: true });
+        if (wasActive) scheduleSearch({ immediate: true });
         return buildActionOk({ changed: true });
     }
+
     /**
      * ブックマーク名を変更して保存し、一覧を再描画する。
      * 変更対象がアクティブな場合は検索結果表示も即時更新する。
@@ -297,16 +399,16 @@ export function createStorageController({ data, ui, searchFiltersController, con
      * @param {string} newName
      * @returns {StorageActionResult}
      */
-    function renameBookmark(bookmarkId, newName) {
+    function renameBookmark(bookmarkId: string, newName: string): StorageActionResult {
         const bookmark = data.bookmarks[bookmarkId];
-        if (!bookmark)
-            return buildActionFail("bookmark_not_found");
+        if (!bookmark) return buildActionFail("bookmark_not_found");
         const nameValidation = validateBookmarkName(newName);
-        if (!nameValidation.ok)
-            return nameValidation;
+        if (!nameValidation.ok) return nameValidation;
+
         if (bookmark.name === nameValidation.name) {
             return buildActionOk({ changed: false });
         }
+
         bookmark.name = nameValidation.name;
         saveBookmarks();
         renderBookmarks();
@@ -315,10 +417,11 @@ export function createStorageController({ data, ui, searchFiltersController, con
         }
         return buildActionOk({ changed: true });
     }
+
     /**
      * 現在の検索条件をローカルストレージへ保存する。
      */
-    function saveSearchState() {
+    function saveSearchState(): void {
         try {
             const searchBox = ui.el.searchBox;
             const payload = buildStoredSearchStatePayload({
@@ -329,19 +432,18 @@ export function createStorageController({ data, ui, searchFiltersController, con
                 formats: searchFiltersController.getSelectedFormatValues()
             });
             localStorage.setItem(SEARCH_STATE_KEY, JSON.stringify(payload));
-        }
-        catch (e) {
+        } catch (e) {
             console.warn("Failed to save search state", e);
         }
     }
+
     /**
      * 保存済み検索条件をUIとstateへ復元する。
      */
-    function restoreSearchState() {
+    function restoreSearchState(): void {
         try {
             const raw = localStorage.getItem(SEARCH_STATE_KEY);
-            if (!raw)
-                return;
+            if (!raw) return;
             const parsed = parseStoredSearchStatePayload(raw, {
                 defaultFormats: DEFAULT_FORMATS
             });
@@ -360,11 +462,11 @@ export function createStorageController({ data, ui, searchFiltersController, con
             searchUiState.userTouchedQuery = true;
             searchUiState.userTouchedFilters = true;
             searchUiState.hasRestoredSearchState = true;
-        }
-        catch (e) {
+        } catch (e) {
             console.warn("Failed to restore search state", e);
         }
     }
+
     return {
         loadBookmarks,
         saveBookmarks,

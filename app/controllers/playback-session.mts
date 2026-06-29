@@ -1,10 +1,37 @@
-// Generated from app/controllers/playback-session.mts.
-// Do not edit this .mjs file by hand; edit the .mts source and run npm run build:ts.
-
 import { getPlaybackContinuationCandidates } from "../lib/playback-sequence.mjs";
 import { debugPlayback } from "../lib/playback-debug.mjs";
 import { getPlaybackUiState } from "../lib/ui-slices.mjs";
-import { isYoutubePlaybackStarted, isYoutubePlaybackStartUnconfirmed } from "../lib/youtube/playback-start-attempt.mjs";
+import {
+    isYoutubePlaybackStarted,
+    isYoutubePlaybackStartUnconfirmed
+} from "../lib/youtube/playback-start-attempt.mjs";
+import type { PlaybackUiRuntimeState } from "../state.types";
+
+type PlaybackSessionDataState = {
+    currentResults: Song[];
+};
+
+type PlaybackSessionUiState = {
+    playback: PlaybackUiRuntimeState;
+};
+
+type YoutubePlaybackStartStatus = "started" | "failed" | "unconfirmed";
+
+type YoutubePlaybackStartResult = {
+    status: YoutubePlaybackStartStatus;
+};
+
+type PlaybackSessionCallbacks = {
+    playSongByKey: (songKey: string) => Promise<YoutubePlaybackStartResult> | YoutubePlaybackStartResult;
+    scrollSongIntoView: (songKey: string) => void;
+};
+
+type PlaybackSessionControllerInput = {
+    data: PlaybackSessionDataState;
+    ui: PlaybackSessionUiState;
+    callbacks: PlaybackSessionCallbacks;
+};
+
 /** @typedef {import("../state.types").PlaybackUiRuntimeState} PlaybackUiRuntimeState */
 /** @typedef {{ currentResults: Song[] }} PlaybackSessionDataState */
 /** @typedef {{ playback: PlaybackUiRuntimeState }} PlaybackSessionUiState */
@@ -21,24 +48,30 @@ import { isYoutubePlaybackStarted, isYoutubePlaybackStartUnconfirmed } from "../
  *   callbacks: PlaybackSessionCallbacks
  * }} PlaybackSessionControllerInput
  */
+
 /**
  * 再生終了後の継続再生と追従スクロールを制御する。
  * @param {PlaybackSessionControllerInput} input
  */
-export function createPlaybackSessionController({ data, ui, callbacks }) {
+export function createPlaybackSessionController({ data, ui, callbacks }: PlaybackSessionControllerInput) {
     const playbackUi = getPlaybackUiState(ui);
     const playSongByKey = callbacks.playSongByKey;
     const scrollSongIntoView = callbacks.scrollSongIntoView;
+
     /**
      * 現在の再生設定に従い、終了した曲の次候補を順に再生する。
      * @param {string} finishedSongKey
      * @returns {Promise<boolean>}
      */
-    async function continuePlayback(finishedSongKey) {
-        const candidates = getPlaybackContinuationCandidates(data.currentResults, finishedSongKey, {
-            continuousPlayback: playbackUi.continuousPlayback,
-            loopPlayback: playbackUi.loopPlayback
-        });
+    async function continuePlayback(finishedSongKey: string): Promise<boolean> {
+        const candidates = getPlaybackContinuationCandidates(
+            data.currentResults,
+            finishedSongKey,
+            {
+                continuousPlayback: playbackUi.continuousPlayback,
+                loopPlayback: playbackUi.loopPlayback
+            }
+        );
         debugPlayback("playback-session", "continuePlayback candidates", {
             finishedSongKey,
             candidates,
@@ -56,9 +89,11 @@ export function createPlaybackSessionController({ data, ui, callbacks }) {
                 playbackResult,
                 hasActiveThumb: wasPlaybackTakenOver
             });
-            if (didStartPlayback ||
+            if (
+                didStartPlayback ||
                 isStartUnconfirmed ||
-                !wasPlaybackTakenOver) {
+                !wasPlaybackTakenOver
+            ) {
                 scrollSongIntoView(songKey);
             }
             if (didStartPlayback) {
@@ -88,6 +123,7 @@ export function createPlaybackSessionController({ data, ui, callbacks }) {
         });
         return false;
     }
+
     return {
         continuePlayback
     };

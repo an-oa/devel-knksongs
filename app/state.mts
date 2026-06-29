@@ -1,7 +1,6 @@
-// Generated from app/state.mts.
-// Do not edit this .mjs file by hand; edit the .mts source and run npm run build:ts.
-
 import { INITIAL_PLAYBACK_SETTING_VALUES } from "./lib/playback-settings/definitions.mjs";
+import type { AppState, PlaybackUiRuntimeState } from "./state.types";
+
 /**
  * 鐘輝かう 歌サーチ
  */
@@ -24,23 +23,26 @@ export const YT_IFRAME_API_SRC = "https://www.youtube.com/iframe_api";
 export const YT_IFRAME_API_SELECTOR = 'script[data-yt-iframe-api="true"]';
 export const YT_IFRAME_READY_POLL_MS = 50;
 export const STOP_PLAYBACK_ON_SCROLL_OUT = false;
+
 /** @typedef {import("./state.types").PlaybackUiRuntimeState} PlaybackUiRuntimeState */
 /** @typedef {import("./state.types").AppState} AppState */
+
 /**
  * 再生 UI ランタイム状態の初期値を作成する。
  * 本番コードでは appState 初期化に使い、設定 default との同期を
  * 単体テストするため export している。
  * @returns {PlaybackUiRuntimeState}
  */
-export function createInitialPlaybackUiRuntimeState() {
+export function createInitialPlaybackUiRuntimeState(): PlaybackUiRuntimeState {
     return {
         scrollObserver: null,
         ...INITIAL_PLAYBACK_SETTING_VALUES,
         activeThumb: null
     };
 }
+
 /** @type {AppState} */
-export const appState = {
+export const appState: AppState = {
     data: {
         allSongsRaw: [],
         currentResults: [],

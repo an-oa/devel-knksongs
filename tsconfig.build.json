@@ -9,6 +9,8 @@
     "removeComments": false
   },
   "include": [
-    "app/**/*.mts"
+    "app/**/*.mts",
+    "app/**/*.d.ts",
+    "types/**/*.d.ts"
   ]
 }

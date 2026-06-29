@@ -1,9 +1,9 @@
-// Generated from app/lib/playback-settings/definitions.mts.
-// Do not edit this .mjs file by hand; edit the .mts source and run npm run build:ts.
+import type { PlaybackSettingsUiSlice } from "../../state.types";
 
 export const THUMBNAIL_STORAGE_KEY = "showThumbnails";
 export const USE_YOUTUBE_NOCOOKIE_STORAGE_KEY = "useYoutubeNoCookie";
 export const PLAY_ARCHIVE_TO_END_STORAGE_KEY = "playArchiveToEnd";
+
 // 旧バージョンが localStorage に残した個別キー。現行では読み込まず起動時に削除する。
 export const LEGACY_PLAYBACK_SETTINGS_STORAGE_KEYS = Object.freeze([
     "showExperimentalPlaybackSettings",
@@ -12,14 +12,17 @@ export const LEGACY_PLAYBACK_SETTINGS_STORAGE_KEYS = Object.freeze([
     "continuousPlayback",
     "loopPlayback"
 ]);
+
 export const PLAYBACK_SETTING_SCOPES = Object.freeze({
     PERSISTED: "persisted",
     PAGE: "page"
 });
+
 export const PLAYBACK_SETTING_KINDS = Object.freeze({
     VISIBILITY: "visibility",
     BEHAVIOR: "behavior"
 });
+
 export const INITIAL_PLAYBACK_SETTING_VALUES = Object.freeze({
     showThumbnails: false,
     showExperimentalPlaybackSettings: false,
@@ -28,6 +31,43 @@ export const INITIAL_PLAYBACK_SETTING_VALUES = Object.freeze({
     continuousPlayback: false,
     loopPlayback: false
 });
+
+export type PlaybackSettingElementKey =
+    "thumbToggle" |
+    "youtubeNoCookieToggle" |
+    "playArchiveToEndToggle" |
+    "continuousPlaybackToggle" |
+    "loopPlaybackToggle";
+
+export type PlaybackSettingScope = "persisted" | "page";
+
+export type PlaybackSettingKind = "visibility" | "behavior";
+
+/**
+ * 再生設定 1 件の定義。
+ */
+export type PlaybackSettingDefinition = {
+    scope: PlaybackSettingScope;
+    kind: PlaybackSettingKind;
+    stateKey: keyof PlaybackSettingsUiSlice;
+    elementKey?: PlaybackSettingElementKey;
+    storageKey?: string;
+    defaultValue: boolean;
+    hiddenValue?: boolean;
+    effectiveWhenHidden?: boolean;
+    interactive?: boolean;
+    restoreActivePlaybackOnChange?: boolean;
+};
+
+type PlaybackSettingDefinitionSet = {
+    pagePlaybackBehaviorDefinitions: PlaybackSettingDefinition[];
+    youtubeNoCookieDefinition: PlaybackSettingDefinition;
+    archivePlaybackBehaviorDefinition: PlaybackSettingDefinition;
+    experimentalPlaybackVisibilityDefinition: PlaybackSettingDefinition;
+    thumbnailVisibilityDefinition: PlaybackSettingDefinition;
+    playbackSettingDefinitions: PlaybackSettingDefinition[];
+};
+
 /*
  * 以下の JSDoc typedef は emit 後の .mjs に残し、
  * 移行途中の JavaScript 側でも型の参照元を読めるようにする。
@@ -38,6 +78,7 @@ export const INITIAL_PLAYBACK_SETTING_VALUES = Object.freeze({
  * @typedef {"persisted" | "page"} PlaybackSettingScope
  * @typedef {"visibility" | "behavior"} PlaybackSettingKind
  */
+
 /**
  * 再生設定 1 件の定義。
  * @typedef {{
@@ -53,6 +94,7 @@ export const INITIAL_PLAYBACK_SETTING_VALUES = Object.freeze({
  *   restoreActivePlaybackOnChange?: boolean
  * }} PlaybackSettingDefinition
  */
+
 /**
  * 再生設定の定義一覧を作成する。
  * 本番コードでは playback settings controller から使い、
@@ -66,8 +108,8 @@ export const INITIAL_PLAYBACK_SETTING_VALUES = Object.freeze({
  *   playbackSettingDefinitions: PlaybackSettingDefinition[]
  * }}
  */
-export function createPlaybackSettingDefinitions() {
-    const youtubeNoCookieDefinition = {
+export function createPlaybackSettingDefinitions(): PlaybackSettingDefinitionSet {
+    const youtubeNoCookieDefinition: PlaybackSettingDefinition = {
         scope: PLAYBACK_SETTING_SCOPES.PERSISTED,
         kind: PLAYBACK_SETTING_KINDS.BEHAVIOR,
         interactive: true,
@@ -77,7 +119,8 @@ export function createPlaybackSettingDefinitions() {
         defaultValue: INITIAL_PLAYBACK_SETTING_VALUES.useYoutubeNoCookie,
         restoreActivePlaybackOnChange: true
     };
-    const archivePlaybackBehaviorDefinition = {
+
+    const archivePlaybackBehaviorDefinition: PlaybackSettingDefinition = {
         scope: PLAYBACK_SETTING_SCOPES.PERSISTED,
         kind: PLAYBACK_SETTING_KINDS.BEHAVIOR,
         interactive: true,
@@ -87,7 +130,8 @@ export function createPlaybackSettingDefinitions() {
         defaultValue: INITIAL_PLAYBACK_SETTING_VALUES.playArchiveToEnd,
         restoreActivePlaybackOnChange: true
     };
-    const pagePlaybackBehaviorDefinitions = [
+
+    const pagePlaybackBehaviorDefinitions: PlaybackSettingDefinition[] = [
         {
             scope: PLAYBACK_SETTING_SCOPES.PAGE,
             kind: PLAYBACK_SETTING_KINDS.BEHAVIOR,
@@ -105,13 +149,15 @@ export function createPlaybackSettingDefinitions() {
             hiddenValue: false
         }
     ];
-    const experimentalPlaybackVisibilityDefinition = {
+
+    const experimentalPlaybackVisibilityDefinition: PlaybackSettingDefinition = {
         scope: PLAYBACK_SETTING_SCOPES.PAGE,
         kind: PLAYBACK_SETTING_KINDS.VISIBILITY,
         stateKey: "showExperimentalPlaybackSettings",
         defaultValue: INITIAL_PLAYBACK_SETTING_VALUES.showExperimentalPlaybackSettings
     };
-    const thumbnailVisibilityDefinition = {
+
+    const thumbnailVisibilityDefinition: PlaybackSettingDefinition = {
         scope: PLAYBACK_SETTING_SCOPES.PERSISTED,
         kind: PLAYBACK_SETTING_KINDS.VISIBILITY,
         interactive: true,
@@ -120,6 +166,7 @@ export function createPlaybackSettingDefinitions() {
         storageKey: THUMBNAIL_STORAGE_KEY,
         defaultValue: INITIAL_PLAYBACK_SETTING_VALUES.showThumbnails
     };
+
     const playbackSettingDefinitions = [
         thumbnailVisibilityDefinition,
         youtubeNoCookieDefinition,
@@ -127,6 +174,7 @@ export function createPlaybackSettingDefinitions() {
         experimentalPlaybackVisibilityDefinition,
         ...pagePlaybackBehaviorDefinitions
     ];
+
     return {
         pagePlaybackBehaviorDefinitions,
         youtubeNoCookieDefinition,

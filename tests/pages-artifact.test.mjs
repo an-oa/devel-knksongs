@@ -80,7 +80,7 @@ test("pages artifact: reads source site directory from arguments", () => {
 
 test("pages artifact: excludes TypeScript source files from app assets", () => {
     assert.equal(shouldCopyAppAsset("/repo/knksongs/app/bootstrap.mjs"), true);
-    assert.equal(shouldCopyAppAsset("/repo/knksongs/app/state.types.ts"), false);
+    assert.equal(shouldCopyAppAsset("/repo/knksongs/app/state.types.d.ts"), false);
     assert.equal(shouldCopyAppAsset("/repo/knksongs/app/lib/playback-settings/value-reducer.mts"), false);
 });
 
