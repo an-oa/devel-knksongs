@@ -1,27 +1,28 @@
-// Generated from app/ui/core/elements.mts.
-// Do not edit this .mjs file by hand; edit the .mts source and run npm run build:ts.
+import type { AppUiElements } from "../../state.types";
 
 /**
  * 指定 ID の input 要素参照を返す。
  * @param {string} id
  * @returns {HTMLInputElement | null}
  */
-function getInputElementById(id) {
-    return document.getElementById(id);
+function getInputElementById(id: string): HTMLInputElement | null {
+    return document.getElementById(id) as HTMLInputElement | null;
 }
+
 /**
  * 指定 ID の button 要素参照を返す。
  * @param {string} id
  * @returns {HTMLButtonElement | null}
  */
-function getButtonElementById(id) {
-    return document.getElementById(id);
+function getButtonElementById(id: string): HTMLButtonElement | null {
+    return document.getElementById(id) as HTMLButtonElement | null;
 }
+
 /**
  * 初期化時に利用する DOM 要素参照をまとめて取得する。
  * @returns {import("../../state.types").AppUiElements}
  */
-export function collectUiElements() {
+export function collectUiElements(): AppUiElements {
     const sidebar = document.getElementById("sidebar");
     return {
         sidebar,
@@ -42,12 +43,12 @@ export function collectUiElements() {
         collabGuestOnly: getInputElementById("collabGuestOnly"),
         relayOnly: getInputElementById("relayOnly"),
         harmonyOnly: getInputElementById("harmonyOnly"),
-        dateFromYear: document.getElementById("dateFromYear"),
-        dateFromMonth: document.getElementById("dateFromMonth"),
-        dateFromDay: document.getElementById("dateFromDay"),
-        dateToYear: document.getElementById("dateToYear"),
-        dateToMonth: document.getElementById("dateToMonth"),
-        dateToDay: document.getElementById("dateToDay"),
+        dateFromYear: document.getElementById("dateFromYear") as HTMLSelectElement | null,
+        dateFromMonth: document.getElementById("dateFromMonth") as HTMLSelectElement | null,
+        dateFromDay: document.getElementById("dateFromDay") as HTMLSelectElement | null,
+        dateToYear: document.getElementById("dateToYear") as HTMLSelectElement | null,
+        dateToMonth: document.getElementById("dateToMonth") as HTMLSelectElement | null,
+        dateToDay: document.getElementById("dateToDay") as HTMLSelectElement | null,
         clearDateFromBtn: getButtonElementById("clearDateFromBtn"),
         clearDateToBtn: getButtonElementById("clearDateToBtn"),
         themeToggle: getInputElementById("theme-toggle"),
@@ -78,37 +79,39 @@ export function collectUiElements() {
         bookmarkNotificationRegion: document.getElementById("bookmark-notification-region")
     };
 }
+
 /**
  * テーマのクラスとブラウザ標準 UI 向けの色スキームを同期する。
  * @param {boolean} isDarkMode
  */
-export function applyDocumentTheme(isDarkMode) {
+export function applyDocumentTheme(isDarkMode: boolean): void {
     document.documentElement.classList.toggle("dark-theme", isDarkMode);
     document.documentElement.style.colorScheme = isDarkMode ? "dark" : "light";
 }
+
 /** @typedef {import("../../state.types").AppUiElements} AppUiElements */
+
 /**
  * 保存値またはシステム設定からテーマを適用する。
  * @param {{ ui: { el: AppUiElements } }} input
  */
-export function applyThemeFromStorage({ ui }) {
+export function applyThemeFromStorage({ ui }: { ui: { el: AppUiElements } }): void {
     const themeToggle = ui.el.themeToggle;
     const savedTheme = localStorage.getItem("theme");
     const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
     const isDarkMode = savedTheme ? savedTheme === "dark" : systemPrefersDark;
     applyDocumentTheme(isDarkMode);
-    if (themeToggle)
-        themeToggle.checked = isDarkMode;
+    if (themeToggle) themeToggle.checked = isDarkMode;
 }
+
 /**
  * テーマ状態を初期化し、トグル変更を保存する。
  * @param {{ ui: { el: AppUiElements } }} input
  */
-export function setupTheme({ ui }) {
+export function setupTheme({ ui }: { ui: { el: AppUiElements } }): void {
     const themeToggle = ui.el.themeToggle;
     applyThemeFromStorage({ ui });
-    if (!themeToggle)
-        return;
+    if (!themeToggle) return;
     themeToggle.addEventListener("change", () => {
         const isDarkNow = themeToggle.checked;
         applyDocumentTheme(isDarkNow);

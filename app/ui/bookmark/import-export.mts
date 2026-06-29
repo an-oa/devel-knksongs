@@ -1,32 +1,39 @@
-// Generated from app/ui/bookmark/import-export.mts.
-// Do not edit this .mjs file by hand; edit the .mts source and run npm run build:ts.
+type BookmarkImportMessageResult = {
+    reason?: string;
+    limit?: number;
+    bookmarkName?: string;
+    bookmarkCount?: number;
+    songCount?: number;
+} | null | undefined;
 
 /**
  * 数値を 2 桁表記へ整える。
  * @param {number} value
  * @returns {string}
  */
-function padDatePart(value) {
+function padDatePart(value: number): string {
     return String(value).padStart(2, "0");
 }
+
 /**
  * ブックマークエクスポートの既定ファイル名を作る。
  * @param {Date} date
  * @returns {string}
  */
-export function buildBookmarkExportFileName(date) {
+export function buildBookmarkExportFileName(date: Date): string {
     const year = date.getFullYear();
     const month = padDatePart(date.getMonth() + 1);
     const day = padDatePart(date.getDate());
     return `knksongs-bookmarks-${year}${month}${day}.json`;
 }
+
 /**
  * テキストを JSON ファイルとして保存する。
  * @param {string} text
  * @param {string} fileName
  * @param {string} mimeType
  */
-export async function saveTextFile(text, fileName, mimeType) {
+export async function saveTextFile(text: string, fileName: string, mimeType: string): Promise<void> {
     const blob = new Blob([text], { type: mimeType });
     const savePicker = typeof window !== "undefined" && typeof window.showSaveFilePicker === "function"
         ? window.showSaveFilePicker.bind(window)
@@ -48,6 +55,7 @@ export async function saveTextFile(text, fileName, mimeType) {
         await writable.close();
         return;
     }
+
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -57,12 +65,13 @@ export async function saveTextFile(text, fileName, mimeType) {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 }
+
 /**
  * 選択されたファイルのテキスト内容を読み込む。
  * @param {{ text?: () => Promise<string> } | Blob} file
  * @returns {Promise<string>}
  */
-export function readFileText(file) {
+export function readFileText(file: { text?: () => Promise<string> } | Blob): Promise<string> {
     if (file && typeof file.text === "function") {
         return file.text();
     }
@@ -74,15 +83,16 @@ export function readFileText(file) {
         const reader = new FileReader();
         reader.addEventListener("load", () => resolve(String(reader.result || "")));
         reader.addEventListener("error", () => reject(reader.error || new Error("Failed to read file")));
-        reader.readAsText(file);
+        reader.readAsText(file as Blob);
     });
 }
+
 /**
  * インポート失敗時の理由に応じた表示メッセージを返す。
  * @param {BookmarkImportMessageResult} result
  * @returns {string}
  */
-export function getBookmarkImportErrorMessage(result) {
+export function getBookmarkImportErrorMessage(result: BookmarkImportMessageResult): string {
     if (!result || !result.reason) {
         return "ブックマークファイルを読み込めませんでした。";
     }
@@ -115,12 +125,13 @@ export function getBookmarkImportErrorMessage(result) {
     }
     return "ブックマークファイルを読み込めませんでした。";
 }
+
 /**
  * インポート確認メッセージを作る。
  * @param {BookmarkImportMessageResult} preview
  * @returns {string}
  */
-export function buildBookmarkImportConfirmMessage(preview) {
+export function buildBookmarkImportConfirmMessage(preview: BookmarkImportMessageResult): string {
     const bookmarkCount = Number.isFinite(preview && preview.bookmarkCount) ? preview.bookmarkCount : 0;
     const songCount = Number.isFinite(preview && preview.songCount) ? preview.songCount : 0;
     return [

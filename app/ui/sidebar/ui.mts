@@ -1,9 +1,39 @@
-// Generated from app/ui/sidebar/ui.mts.
-// Do not edit this .mjs file by hand; edit the .mts source and run npm run build:ts.
-
 import { getSettingsPanelUiState } from "../../lib/ui-slices.mjs";
 import { getSearchBooleanFilterElements } from "../../lib/search-boolean-filters.mjs";
 import { createSidebarPopoverController } from "./popover.mjs";
+import type { AppUiState } from "../../state.types";
+
+/** @typedef {import("../../state.types").AppUiState} AppUiState */
+
+type SidebarBookmarkUiController = {
+    closeBookmarkModal: (options?: { restoreFocus?: boolean }) => void;
+    openBookmarkBrowser: (options?: { returnFocusEl?: HTMLElement | null }) => void;
+    setupBookmarkHandlers: () => void;
+    openBookmarkModal: (
+        songKey: string,
+        options?: { returnFocusEl?: HTMLElement | null; closeSidebarOnExit?: boolean }
+    ) => void;
+    removeSongFromActiveBookmark: (songKey: string) => void;
+    clearActiveBookmark: (options?: { skipSearch?: boolean }) => void;
+};
+
+type SidebarControllerInput = {
+    data: { displayLimit: number };
+    ui: AppUiState;
+    constants: { resultDisplayBatchSize: number };
+    callbacks: {
+        getBookmarkUiController: () => SidebarBookmarkUiController | null;
+        isIOSWebKit: () => boolean;
+        markFilterTouched: (options?: { immediate?: boolean }) => void;
+        markQueryTouched: () => void;
+        clampDateInputsIfNeeded: () => void;
+        syncDateSelectOptions: (kind?: string) => void;
+        resetDateSelectGroup: (kind: string) => void;
+        updateDisplay: () => void;
+        clearSearch: () => void;
+    };
+};
+
 /**
  * サイドバー関連の UI 操作をまとめるコントローラーを作成する。
  * @param {{
@@ -30,17 +60,28 @@ import { createSidebarPopoverController } from "./popover.mjs";
  *   }
  * }} input
  */
-export function createSidebarController(input) {
+export function createSidebarController(input: SidebarControllerInput) {
     const { data, ui, constants, callbacks } = input;
     const settingsPanelUi = getSettingsPanelUiState(ui);
     const { resultDisplayBatchSize } = constants;
-    const { getBookmarkUiController, isIOSWebKit, markFilterTouched, markQueryTouched, clampDateInputsIfNeeded, syncDateSelectOptions, resetDateSelectGroup, updateDisplay, clearSearch } = callbacks;
-    let closeSidebarMenu = null;
+    const {
+        getBookmarkUiController,
+        isIOSWebKit,
+        markFilterTouched,
+        markQueryTouched,
+        clampDateInputsIfNeeded,
+        syncDateSelectOptions,
+        resetDateSelectGroup,
+        updateDisplay,
+        clearSearch
+    } = callbacks;
+    let closeSidebarMenu: (() => void) | null = null;
+
     /**
      * 表示設定パネルを開く。
      * @param {{ returnFocusEl?: HTMLElement | null } | undefined} options
      */
-    function openSettingsPanel(options) {
+    function openSettingsPanel(options?: { returnFocusEl?: HTMLElement | null }): void {
         settingsPanelUi.returnFocusEl =
             options && options.returnFocusEl instanceof HTMLElement ? options.returnFocusEl : null;
         setSidebarBackgroundInert(true);
@@ -52,11 +93,12 @@ export function createSidebarController(input) {
             ui.el.closeSettingsPanelBtn.focus();
         }
     }
+
     /**
      * 表示設定パネルを閉じる。
      * @param {{ restoreFocus?: boolean } | undefined} options
      */
-    function closeSettingsPanel(options) {
+    function closeSettingsPanel(options?: { restoreFocus?: boolean }): void {
         const shouldRestoreFocus = Boolean(options && options.restoreFocus);
         const returnFocusEl = settingsPanelUi.returnFocusEl;
         settingsPanelUi.returnFocusEl = null;
@@ -66,13 +108,14 @@ export function createSidebarController(input) {
             ui.el.settingsSidebarPanel.setAttribute("aria-hidden", "true");
         }
         setSidebarBackgroundInert(false);
-        if (!shouldRestoreFocus)
-            return;
-        if (returnFocusEl &&
+        if (!shouldRestoreFocus) return;
+        if (
+            returnFocusEl &&
             returnFocusEl.isConnected &&
             typeof returnFocusEl.focus === "function" &&
             ui.el.sidebar &&
-            ui.el.sidebar.contains(returnFocusEl)) {
+            ui.el.sidebar.contains(returnFocusEl)
+        ) {
             returnFocusEl.focus();
             return;
         }
@@ -80,25 +123,25 @@ export function createSidebarController(input) {
             ui.el.openSettingsPanelBtn.focus();
         }
     }
+
     /**
      * ブックマーク UI ハンドラーの初期化を委譲する。
      */
-    function setupBookmarkHandlers() {
+    function setupBookmarkHandlers(): void {
         const bookmarkUiController = getBookmarkUiController();
-        if (!bookmarkUiController)
-            return;
+        if (!bookmarkUiController) return;
         bookmarkUiController.setupBookmarkHandlers();
     }
+
     /**
      * 曲追加用のブックマークモーダル表示を委譲する。
      * @param {string} songKey
      */
-    function openBookmarkModal(songKey) {
+    function openBookmarkModal(songKey: string): void {
         const bookmarkUiController = getBookmarkUiController();
         const sidebar = ui.el.sidebar;
         const openBtn = ui.el.openSidebarBtn;
-        if (!bookmarkUiController || !sidebar || !openBtn)
-            return;
+        if (!bookmarkUiController || !sidebar || !openBtn) return;
         const returnFocusEl = document.activeElement instanceof HTMLElement ? document.activeElement : null;
         const sidebarWasActive = sidebar.classList.contains("active");
         if (!sidebarWasActive) {
@@ -109,30 +152,31 @@ export function createSidebarController(input) {
             closeSidebarOnExit: !sidebarWasActive
         });
     }
+
     /**
      * アクティブブックマークからの曲削除を委譲する。
      * @param {string} songKey
      */
-    function removeSongFromActiveBookmark(songKey) {
+    function removeSongFromActiveBookmark(songKey: string): void {
         const bookmarkUiController = getBookmarkUiController();
-        if (!bookmarkUiController)
-            return;
+        if (!bookmarkUiController) return;
         bookmarkUiController.removeSongFromActiveBookmark(songKey);
     }
+
     /**
      * アクティブブックマーク解除処理を委譲する。
      * @param {{ skipSearch?: boolean } | undefined} options
      */
-    function clearActiveBookmark(options) {
+    function clearActiveBookmark(options?: { skipSearch?: boolean }): void {
         const bookmarkUiController = getBookmarkUiController();
-        if (!bookmarkUiController)
-            return;
+        if (!bookmarkUiController) return;
         bookmarkUiController.clearActiveBookmark(options);
     }
+
     /**
      * 検索 UI・サイドバー・日付入力・各種ボタンのイベントを設定する。
      */
-    function setupUIHandlers() {
+    function setupUIHandlers(): void {
         const sidebar = ui.el.sidebar;
         const openBtn = ui.el.openSidebarBtn;
         const closeBtn = ui.el.closeSidebarBtn;
@@ -145,21 +189,21 @@ export function createSidebarController(input) {
         const dateToYear = ui.el.dateToYear;
         const dateToMonth = ui.el.dateToMonth;
         const dateToDay = ui.el.dateToDay;
-        let lastFocusedElement = null;
-        if (!sidebar || !openBtn || !closeBtn || !overlay || !loadMoreBtn || !clearBtn)
-            return;
+        let lastFocusedElement: HTMLElement | null = null;
+
+        if (!sidebar || !openBtn || !closeBtn || !overlay || !loadMoreBtn || !clearBtn) return;
         const popoverController = createSidebarPopoverController({
             sidebar,
             sidebarSheet: ui.el.sidebarSheet,
             mainContent: ui.el.mainContent,
             openButton: openBtn
         });
+
         /**
          * サイドバーを開き、フォーカスとARIA状態を同期する。
          */
-        function openSidebarMenu() {
-            if (sidebar.classList.contains("active"))
-                return;
+        function openSidebarMenu(): void {
+            if (sidebar.classList.contains("active")) return;
             const bookmarkUiController = getBookmarkUiController();
             closeSettingsPanel({ restoreFocus: false });
             if (bookmarkUiController) {
@@ -168,17 +212,17 @@ export function createSidebarController(input) {
             popoverController.clearPendingHide();
             const usesPopover = popoverController.show();
             sidebar.classList.add("active");
-            if (!usesPopover)
-                overlay.classList.add("show");
+            if (!usesPopover) overlay.classList.add("show");
             lastFocusedElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
             popoverController.setMainContentInert(true);
             popoverController.syncExpandedState(true);
             focusSidebarFirst();
         }
+
         openBtn.addEventListener("click", openSidebarMenu);
-        closeSidebarMenu = () => {
-            if (!sidebar.classList.contains("active"))
-                return;
+
+        closeSidebarMenu = (): void => {
+            if (!sidebar.classList.contains("active")) return;
             const bookmarkUiController = getBookmarkUiController();
             closeSettingsPanel({ restoreFocus: false });
             if (bookmarkUiController) {
@@ -196,11 +240,11 @@ export function createSidebarController(input) {
             }
             openBtn.focus();
         };
+
         closeBtn.addEventListener("click", () => closeSidebarMenu());
         overlay.addEventListener("click", () => closeSidebarMenu());
         sidebar.addEventListener("click", (event) => {
-            if (event.target === sidebar)
-                closeSidebarMenu();
+            if (event.target === sidebar) closeSidebarMenu();
         });
         if (ui.el.openSettingsPanelBtn) {
             ui.el.openSettingsPanelBtn.addEventListener("click", () => {
@@ -260,12 +304,11 @@ export function createSidebarController(input) {
                 }
                 closeSidebarMenu();
             }
-            if (event.key === "Tab")
-                trapSidebarFocus(event, sidebar);
+            if (event.key === "Tab") trapSidebarFocus(event, sidebar);
         });
+
         getSearchBooleanFilterElements(ui).forEach((checkbox) => {
-            if (!checkbox)
-                return;
+            if (!checkbox) return;
             checkbox.addEventListener("change", () => {
                 markFilterTouched();
             });
@@ -275,9 +318,9 @@ export function createSidebarController(input) {
                 markQueryTouched();
             });
         }
+
         [dateFromYear, dateFromMonth, dateFromDay, dateToYear, dateToMonth, dateToDay].forEach((element) => {
-            if (!element)
-                return;
+            if (!element) return;
             element.addEventListener("change", () => {
                 const isIOS = isIOSWebKit();
                 const group = element.closest(".date-select-group");
@@ -287,18 +330,13 @@ export function createSidebarController(input) {
                     group.classList.add("is-updating");
                     const month = element === dateFromYear ? ui.el.dateFromMonth : ui.el.dateToMonth;
                     const day = element === dateFromYear ? ui.el.dateFromDay : ui.el.dateToDay;
-                    if (month)
-                        month.value = "";
-                    if (day)
-                        day.value = "";
-                }
-                else if (isIOS && group && isMonthChange) {
+                    if (month) month.value = "";
+                    if (day) day.value = "";
+                } else if (isIOS && group && isMonthChange) {
                     group.classList.add("is-updating");
                     const day = element === dateFromMonth ? ui.el.dateFromDay : ui.el.dateToDay;
-                    if (day)
-                        day.value = "";
-                }
-                else {
+                    if (day) day.value = "";
+                } else {
                     moveDateFocusIfNeeded(element, dateFromYear, dateFromMonth, dateToYear, dateToMonth);
                 }
                 markFilterTouched({ immediate: true });
@@ -314,29 +352,31 @@ export function createSidebarController(input) {
             });
             element.addEventListener("blur", clampDateInputsIfNeeded);
         });
+
         [ui.el.clearDateFromBtn, ui.el.clearDateToBtn].forEach((button, index) => {
-            if (!button)
-                return;
+            if (!button) return;
             button.addEventListener("click", () => {
                 resetDateSelectGroup(index === 0 ? "from" : "to");
                 markFilterTouched({ immediate: true });
             });
         });
+
         loadMoreBtn.addEventListener("click", () => {
             data.displayLimit += resultDisplayBatchSize;
             updateDisplay();
         });
+
         clearBtn.addEventListener("click", clearSearch);
         setupBookmarkHandlers();
     }
+
     /**
      * サブパネル表示中のみ、背面のサイドバー要素をフォーカス対象外にする。
      * @param {boolean} isInert
      */
     function setSidebarBackgroundInert(isInert) {
         [ui.el.sidebarHeader, ui.el.sidebarScrollArea].forEach((element) => {
-            if (!element)
-                return;
+            if (!element) return;
             if (isInert) {
                 element.setAttribute("inert", "");
                 element.setAttribute("aria-hidden", "true");
@@ -346,6 +386,7 @@ export function createSidebarController(input) {
             element.removeAttribute("aria-hidden");
         });
     }
+
     /**
      * 日付入力時に次のセレクトへフォーカス移動する。
      * @param {HTMLSelectElement} target
@@ -377,42 +418,40 @@ export function createSidebarController(input) {
             }
         }
     }
+
     /**
      * サイドバー内の現在フォーカス要素を外す。
      * @param {HTMLElement} sidebar
      */
     function blurSidebarActiveElement(sidebar) {
         const active = document.activeElement;
-        if (!(active instanceof HTMLElement))
-            return;
-        if (!sidebar.contains(active))
-            return;
+        if (!(active instanceof HTMLElement)) return;
+        if (!sidebar.contains(active)) return;
         if (typeof active.blur === "function") {
             active.blur();
         }
     }
+
     /**
      * サブパネルを隠す前に、内部に残っているフォーカスを外す。
      * @param {HTMLElement} panel
      */
     function blurPanelActiveElement(panel) {
         const active = document.activeElement;
-        if (!(active instanceof HTMLElement))
-            return;
-        if (!panel.contains(active))
-            return;
+        if (!(active instanceof HTMLElement)) return;
+        if (!panel.contains(active)) return;
         if (typeof active.blur === "function") {
             active.blur();
         }
     }
+
     /**
      * サイドバー内でフォーカス可能な要素一覧を取得する。
      * @param {HTMLElement | null} sidebar
      * @returns {HTMLElement[]}
      */
-    function getFocusableInSidebar(sidebar) {
-        if (!sidebar)
-            return [];
+    function getFocusableInSidebar(sidebar: HTMLElement | null): HTMLElement[] {
+        if (!sidebar) return [];
         const focusable = sidebar.querySelectorAll([
             "a[href]",
             "button:not([disabled])",
@@ -421,19 +460,18 @@ export function createSidebarController(input) {
             "textarea:not([disabled])",
             '[tabindex]:not([tabindex="-1"])'
         ].join(","));
-        return Array.from(focusable).filter((element) => {
-            if (!(element instanceof HTMLElement))
-                return false;
-            if (element.hasAttribute("inert") || element.hidden)
-                return false;
+        return Array.from(focusable).filter((element): element is HTMLElement => {
+            if (!(element instanceof HTMLElement)) return false;
+            if (element.hasAttribute("inert") || element.hidden) return false;
             const style = window.getComputedStyle(element);
             return style.display !== "none" && style.visibility !== "hidden";
         });
     }
+
     /**
      * サイドバー内の先頭フォーカス可能要素へフォーカスする。
      */
-    function focusSidebarFirst() {
+    function focusSidebarFirst(): void {
         const sidebar = ui.el.sidebar;
         const focusable = getFocusableInSidebar(sidebar);
         if (focusable.length > 0) {
@@ -445,17 +483,16 @@ export function createSidebarController(input) {
             sidebar.focus();
         }
     }
+
     /**
      * 開いているサイドバー内で Tab フォーカスを循環させる。
      * @param {KeyboardEvent} event
      * @param {HTMLElement | null} sidebar
      */
-    function trapSidebarFocus(event, sidebar) {
-        if (!sidebar || !sidebar.classList.contains("active"))
-            return;
+    function trapSidebarFocus(event: KeyboardEvent, sidebar: HTMLElement | null): void {
+        if (!sidebar || !sidebar.classList.contains("active")) return;
         const focusable = getFocusableInSidebar(sidebar);
-        if (focusable.length === 0)
-            return;
+        if (focusable.length === 0) return;
         const first = focusable[0];
         const last = focusable[focusable.length - 1];
         if (event.shiftKey && document.activeElement === first) {
@@ -468,6 +505,7 @@ export function createSidebarController(input) {
             first.focus();
         }
     }
+
     return {
         setupUIHandlers,
         openBookmarkModal,
