@@ -40,6 +40,7 @@ import {
 } from "./ui/core/elements.mjs";
 import { createUiSyncController } from "./ui/core/sync.mjs";
 import { createDataLoader } from "./ui/core/data.mjs";
+import { createSearchUiActions } from "./ui/core/search-actions.mjs";
 import { createSidebarController } from "./ui/sidebar/ui.mjs";
 import { createSearchFiltersController } from "./ui/search-filters/controller.mjs";
 import { getSearchUiState } from "./lib/ui-slices.mjs";
@@ -244,6 +245,7 @@ function wireYoutubePlaybackHooks({ youtubeController, renderController, playbac
  *   storageController: ReturnType<typeof createStorageController>,
  *   sidebarController: ReturnType<typeof createSidebarController>,
  *   uiSyncController: ReturnType<typeof createUiSyncController>,
+ *   searchUiActions: ReturnType<typeof createSearchUiActions>,
  *   dataLoader: ReturnType<typeof createDataLoader>
  * }}
  */
@@ -276,6 +278,21 @@ function createAppControllers() {
             getRenderController: () => renderController,
             ui: appUiState
         })
+    });
+
+    /**
+     * storageController と sidebarController は検索 UI 操作から遅延参照するため、生成後に代入する。
+     */
+    let storageController: ReturnType<typeof createStorageController>;
+    let sidebarController: ReturnType<typeof createSidebarController>;
+
+    const searchUiActions = createSearchUiActions({
+        ui: appUiState,
+        search: searchUiState,
+        searchFiltersController,
+        getSearchController: () => searchController,
+        getStorageController: () => storageController,
+        getSidebarController: () => sidebarController
     });
 
     /**
@@ -342,17 +359,10 @@ function createAppControllers() {
     let bookmarkUiController = null;
 
     /**
-     * サイドバー UI controller の遅延参照。
-     * ブックマーク UI と検索リセット callback が互いに参照し合うため、生成後に代入する。
-     * @type {ReturnType<typeof createSidebarController> | null}
-     */
-    let sidebarController = null;
-
-    /**
      * localStorage 上の検索状態・ブックマーク保存データを読み書きする controller。
      * bookmark schema version の移行、インポート/エクスポート、保存後の再描画をまとめて扱う。
      */
-    const storageController = createStorageController({
+    storageController = createStorageController({
         data: appDataState,
         ui: appUiState,
         searchFiltersController,
@@ -382,7 +392,7 @@ function createAppControllers() {
             searchController,
             storageController,
             getSidebarController: () => sidebarController,
-            clearSearchDebounce
+            clearSearchDebounce: searchUiActions.clearSearchDebounce
         })
     });
 
@@ -400,10 +410,10 @@ function createAppControllers() {
             youtubeController,
             searchController,
             renderController,
-            markFilterTouched,
-            markQueryTouched,
-            resetDateSelectGroup,
-            clearSearch
+            markFilterTouched: searchUiActions.markFilterTouched,
+            markQueryTouched: searchUiActions.markQueryTouched,
+            resetDateSelectGroup: searchUiActions.resetDateSelectGroup,
+            clearSearch: searchUiActions.clearSearch
         })
     });
 
@@ -412,7 +422,7 @@ function createAppControllers() {
      */
     const uiSyncController = createUiSyncController({
         uiSyncPasses: UI_SYNC_PASSES,
-        syncSearchUI,
+        syncSearchUI: searchUiActions.syncSearchUI,
         applyThemeFromStorage: () => applyThemeFromStorage({ ui: appUiState }),
         applyPlaybackSettingsFromStorage: () => playbackSettingsController.applyPlaybackSettingsFromStorage()
     });
@@ -441,7 +451,7 @@ function createAppControllers() {
             migrateLegacyBookmarkSongRefs: () => storageController.migrateLegacyBookmarkSongRefs(),
             applyDateInputRange: (songs) => searchController.applyDateInputRange(songs),
             clampDateInputsToBounds: (minKey, maxKey) => searchController.clampDateInputsToBounds(minKey, maxKey),
-            resetSearchConditions,
+            resetSearchConditions: searchUiActions.resetSearchConditions,
             scheduleSearch: (options) => searchController.scheduleSearch(options)
         }
     });
@@ -461,19 +471,20 @@ function createAppControllers() {
         storageController,
         sidebarController,
         uiSyncController,
+        searchUiActions,
         dataLoader
     };
 }
 
 const {
     searchFiltersController,
-    searchController,
     renderController,
     playbackSettingsController,
     youtubeController,
     storageController,
     sidebarController,
     uiSyncController,
+    searchUiActions,
     dataLoader
 } = createAppControllers();
 
@@ -485,7 +496,7 @@ async function initUI() {
     if (youtubeController.isIOSWebKit()) document.documentElement.classList.add("ios");
 
     searchFiltersController.setupFilterOptions({
-        onFilterChange: markFilterTouched
+        onFilterChange: searchUiActions.markFilterTouched
     });
     sidebarController.setupUIHandlers();
     storageController.loadBookmarks();
@@ -524,126 +535,4 @@ document.addEventListener("DOMContentLoaded", boot);
  */
 function exposePlaybackSettingsConsoleApi() {
     window.knkPlaybackSettings = playbackSettingsController.createConsoleApi();
-}
-
-/**
- * 指定側の日付セレクトをクリアして候補を同期する。
- * @param {string} kind
- */
-function resetDateSelectGroup(kind) {
-    const isFrom = kind === "from";
-    const year = isFrom ? appUiState.el.dateFromYear : appUiState.el.dateToYear;
-    const month = isFrom ? appUiState.el.dateFromMonth : appUiState.el.dateToMonth;
-    const day = isFrom ? appUiState.el.dateFromDay : appUiState.el.dateToDay;
-    if (year) year.value = "";
-    if (month) month.value = "";
-    if (day) day.value = "";
-    searchController.syncDateSelectOptions();
-}
-
-/**
- * 検索条件とアクティブブックマークをリセットして保存する。
- */
-function clearSearch() {
-    sidebarController.clearActiveBookmark({ skipSearch: true });
-    resetSearchConditions(true);
-    storageController.saveSearchState();
-}
-
-/**
- * フィルタ操作済みフラグを立てて検索・保存を行う。
- * @param {Event | { immediate?: boolean }} [options]
- */
-function markFilterTouched(options) {
-    searchUiState.userTouchedFilters = true;
-    const scheduleOptions = options && "immediate" in options ? options : undefined;
-    searchController.scheduleSearch(scheduleOptions);
-    storageController.saveSearchState();
-}
-
-/**
- * 検索語操作済みフラグを立てて検索・保存を行う。
- */
-function markQueryTouched() {
-    searchUiState.userTouchedQuery = true;
-    searchController.scheduleSearch();
-    storageController.saveSearchState();
-}
-
-/**
- * 保留中の検索デバウンスタイマーを解除する。
- */
-function clearSearchDebounce() {
-    if (searchUiState.debounceId) {
-        clearTimeout(searchUiState.debounceId);
-        searchUiState.debounceId = 0;
-    }
-}
-
-/**
- * 検索語入力を初期化する。
- */
-function resetSearchQuery() {
-    if (appUiState.el.searchBox) appUiState.el.searchBox.value = "";
-    searchUiState.userTouchedQuery = false;
-}
-
-/**
- * フィルタ条件を既定状態へ戻す。
- */
-function resetSearchFilters() {
-    searchFiltersController.resetFiltersToDefault({
-        resetDateSelects: () => searchController.resetDateSelects()
-    });
-}
-
-/**
- * 検索語とフィルタをまとめて初期化し必要なら再検索する。
- * @param {boolean} shouldSearch
- */
-function resetSearchConditions(shouldSearch) {
-    clearSearchDebounce();
-    resetSearchQuery();
-    resetSearchFilters();
-    if (shouldSearch && searchUiState.dataReady) {
-        searchController.scheduleSearch({ immediate: true });
-    }
-}
-
-/**
- * 未操作時に検索語の不整合があればリセットする。
- * @returns {boolean}
- */
-function syncSearchQueryIfNeeded() {
-    if (searchUiState.userTouchedQuery) return false;
-    const searchBox = appUiState.el.searchBox;
-    if (!searchBox || searchBox.value === "") return false;
-    resetSearchQuery();
-    return true;
-}
-
-/**
- * 未操作時にフィルタの不整合があればリセットする。
- * @returns {boolean}
- */
-function syncSearchFiltersIfNeeded() {
-    searchFiltersController.syncFormatCheckboxesFromState();
-    if (searchUiState.userTouchedFilters) return false;
-    if (!searchFiltersController.needsFilterReset({
-        hasDateSelection: () => searchController.hasDateSelection()
-    })) {
-        return false;
-    }
-    resetSearchFilters();
-    return true;
-}
-
-/**
- * 検索語・フィルタ同期の結果に応じて再検索する。
- */
-function syncSearchUI() {
-    const shouldSearch = syncSearchQueryIfNeeded() || syncSearchFiltersIfNeeded();
-    if (shouldSearch && searchUiState.dataReady) {
-        searchController.scheduleSearch({ immediate: true });
-    }
 }
