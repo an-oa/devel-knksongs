@@ -28,6 +28,8 @@ jobs:
 
       - run: npm run typecheck
 
+      - run: npm run check:ts-emit
+
       - run: npm run lint
 
       - run: npm run test:unit

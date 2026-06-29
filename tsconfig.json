@@ -12,6 +12,7 @@
   },
   "include": [
     "app/**/*.mjs",
+    "app/**/*.mts",
     "app/**/*.ts",
     "types/**/*.d.ts"
   ]

@@ -4,7 +4,8 @@ import {
     appendCacheBusterToHtml,
     appendCacheBusterToJavaScriptImports,
     parseArgs,
-    resolvePagesArtifactOutputDir
+    resolvePagesArtifactOutputDir,
+    shouldCopyAppAsset
 } from "../scripts/build-pages-artifact.mjs";
 
 test("pages artifact: adds cache busters to html entry assets", () => {
@@ -62,6 +63,12 @@ test("pages artifact: reads cache buster from deploy environment", () => {
             cacheBuster: "abc123"
         }
     );
+});
+
+test("pages artifact: excludes TypeScript source files from app assets", () => {
+    assert.equal(shouldCopyAppAsset("/repo/knksongs/app/bootstrap.mjs"), true);
+    assert.equal(shouldCopyAppAsset("/repo/knksongs/app/state.types.ts"), false);
+    assert.equal(shouldCopyAppAsset("/repo/knksongs/app/lib/playback-settings/value-reducer.mts"), false);
 });
 
 test("pages artifact: resolves output directories inside the project root", () => {

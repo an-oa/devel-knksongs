@@ -66,6 +66,17 @@ feat: move settings into dedicated sidebar panel
 - `AppState` や UI slice など実装の初期化・更新処理と強く結びつく型は、
   `types/*.d.ts` へ遠ざける前に、実装 module 側へ寄せられないか検討する。
 
+## TypeScript Emit During Migration
+
+- `.mts` は移行中の TypeScript source として扱い、ブラウザ・テスト・既存 import は隣接生成された `.mjs` を読む。
+- `.mts` と同名の `.mjs` がある場合、手編集は `.mts` 側へ行い、`.mjs` は `npm run build:ts` で更新する。
+- 生成 `.mjs` の先頭には `npm run build:ts` が手編集禁止ヘッダーを付ける。
+  ヘッダー付き `.mjs` をレビューするときは、実装意図の確認元を同名 `.mts` に置く。
+- `.mts` または生成 `.mjs` を変更したときは、`npm run check:ts-emit` で生成物の同期漏れがないことを確認する。
+- `tsconfig.build.json` は `app/**/*.mts` だけを emit 対象にし、`allowJs: false` のまま保つ。
+  既存 `.mjs` を TypeScript emit 対象へ巻き込むと、入力ファイル上書き防止で失敗しやすい。
+- Pages artifact は `build:ts` 後の `.mjs` を配布対象にし、`.ts` / `.mts` source は含めない。
+
 ## Naming
 
 - boolean は true の意味がそのまま読める肯定形で命名し、否定形フラグによる二重否定を避ける。
@@ -77,6 +88,7 @@ feat: move settings into dedicated sidebar panel
   `npm install` を実行してから検証する。
 - JavaScript や型定義を変更したときは、静的解析として `npm run typecheck` と
   `npm run lint` を基本の確認手順として実行する。
+- `.mts` または生成 `.mjs` を変更したときは、`npm run check:ts-emit` も実行する。
 - `tests/` 配下に Node のテストがあるため、JavaScript を変更したときは
   `npm run test:unit` も基本の確認手順として実行する。
 - 曲データや生成/検証スクリプトに関わる変更では、`npm run validate:songs-json` も実行する。

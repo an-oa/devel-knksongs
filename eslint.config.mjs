@@ -7,7 +7,8 @@ export default [
             "node_modules/**",
             "coverage/**",
             "playwright-report/**",
-            "test-results/**"
+            "test-results/**",
+            "_site/**"
         ]
     },
     js.configs.recommended,

@@ -7,6 +7,7 @@ import { pathToFileURL } from "node:url";
 const DEFAULT_OUTPUT_DIR = "_site";
 const ROOT_ASSET_FILES = ["index.html", "styles.css", "ogp.png"];
 const DATA_ASSET_FILES = ["songs.json", "songs-meta.json"];
+const TYPESCRIPT_SOURCE_EXTENSIONS = [".ts", ".mts", ".tsx", ".cts"];
 const HTML_CACHE_BUSTER_TARGETS = [
     { attribute: "href", path: "styles.css" },
     { attribute: "src", path: "app/bootstrap.mjs" }
@@ -135,6 +136,16 @@ export function resolvePagesArtifactOutputDir(outputDir, rootDir = process.cwd()
 }
 
 /**
+ * Pages artifact へコピーする app asset かを返す。
+ * TypeScript source は build:ts で生成した .mjs を配布対象にするため除外する。
+ * @param {string} sourcePath
+ * @returns {boolean}
+ */
+export function shouldCopyAppAsset(sourcePath) {
+    return !TYPESCRIPT_SOURCE_EXTENSIONS.some((extension) => sourcePath.endsWith(extension));
+}
+
+/**
  * 公開に必要な静的ファイルを artifact directory へコピーする。
  * @param {string} outputDir
  * @returns {Promise<void>}
@@ -145,7 +156,10 @@ async function copySiteAssets(outputDir) {
     await Promise.all(ROOT_ASSET_FILES.map((fileName) => (
         copyFile(resolve(fileName), join(outputDir, fileName))
     )));
-    await cp(resolve("app"), join(outputDir, "app"), { recursive: true });
+    await cp(resolve("app"), join(outputDir, "app"), {
+        recursive: true,
+        filter: shouldCopyAppAsset
+    });
     await Promise.all(DATA_ASSET_FILES.map((fileName) => (
         copyFile(resolve("data", fileName), join(outputDir, "data", fileName))
     )));
