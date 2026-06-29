@@ -70,6 +70,8 @@ feat: move settings into dedicated sidebar panel
 
 - `.mts` は TypeScript source として扱い、ブラウザ・テスト・Node scripts は `npm run build:ts` が `_build/app/**/*.mjs` に生成した module を読む。
 - `app` 配下は source tree とし、`app/**/*.mjs` を残さない。手編集は `.mts` 側へ行い、必要な `.mjs` は `npm run build:ts` で `_build/app` に作り直す。
+- `.mts` source では TS の `type` / `interface` / `import type` を主に使い、同じ構造を JSDoc `@typedef` と二重管理しない。
+  生成 `.mjs` 側で JSDoc 型を残す必要がある場合だけ、その理由を近接コメントで明示する。
 - 生成 `.mjs` の先頭には `npm run build:ts` が手編集禁止ヘッダーを付ける。
   ヘッダー付き `.mjs` をレビューするときは、実装意図の確認元を対応する `app/**/*.mts` に置く。
 - `.mts` や TypeScript emit 経路を変更したときは、`npm run check:ts-emit` で `_build/app` の生成 `.mjs` が存在し、

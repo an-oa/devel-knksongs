@@ -44,7 +44,7 @@ type PlaybackSettingsSnapshot = {
     loopPlayback: boolean;
 };
 
-type PlaybackSettingsConsoleApi = {
+export type PlaybackSettingsConsoleApi = {
     setExperimentalPlaybackSettings: (value: boolean) => boolean;
     readonly showExperimentalPlaybackSettings: boolean;
     readonly state: PlaybackSettingsSnapshot;
@@ -71,80 +71,6 @@ type PlaybackSettingEffects = {
 };
 
 type PlaybackSettingValueHookName = "afterStorageApply" | "afterToggleChange";
-
-/*
- * 以下の JSDoc typedef は emit 後の .mjs に残し、
- * 移行途中の JavaScript 側でも型の参照元を読めるようにする。
- */
-/**
- * @typedef {import("../state.types").PlaybackUiRuntimeState} PlaybackUiRuntimeState
- * @typedef {import("../state.types").SearchUiRuntimeState} SearchUiRuntimeState
- * @typedef {import("../lib/playback-settings/definitions.mjs").PlaybackSettingDefinition} PlaybackSettingDefinition
- */
-
-/**
- * @typedef {{
- *   playbackSettingsGroup?: HTMLElement | null,
- *   experimentalPlaybackSettingsGroup?: HTMLElement | null,
- *   closeSettingsPanelBtn?: HTMLElement | null,
- *   thumbToggle?: HTMLInputElement | null,
- *   youtubeNoCookieToggle?: HTMLInputElement | null,
- *   playArchiveToEndToggle?: HTMLInputElement | null,
- *   continuousPlaybackToggle?: HTMLInputElement | null,
- *   loopPlaybackToggle?: HTMLInputElement | null
- * }} PlaybackSettingsUiElements
- */
-
-/**
- * @typedef {{
- *   el: PlaybackSettingsUiElements,
- *   playback: PlaybackUiRuntimeState,
- *   search: SearchUiRuntimeState
- * }} PlaybackSettingsUiState
- */
-
-/**
- * @typedef {{
- *   showThumbnails: boolean,
- *   showExperimentalPlaybackSettings: boolean,
- *   useYoutubeNoCookie: boolean,
- *   playArchiveToEnd: boolean,
- *   continuousPlayback: boolean,
- *   loopPlayback: boolean
- * }} PlaybackSettingsSnapshot
- */
-
-/**
- * @typedef {{
- *   setExperimentalPlaybackSettings: (value: boolean) => boolean,
- *   readonly showExperimentalPlaybackSettings: boolean,
- *   readonly state: PlaybackSettingsSnapshot
- * }} PlaybackSettingsConsoleApi
- */
-
-/**
- * @typedef {{
- *   ensureThumbnailPlaybackReady: () => void,
- *   restoreActivePlayback: () => void,
- *   updateDisplay: () => void,
- *   setupScrollObserver: () => void
- * }} PlaybackSettingsCallbacks
- */
-
-/**
- * @typedef {{
- *   ui: PlaybackSettingsUiState,
- *   callbacks: PlaybackSettingsCallbacks
- * }} PlaybackSettingsControllerInput
- */
-
-/**
- * @typedef {{
- *   syncValue?: (value: boolean) => void,
- *   afterStorageApply?: (previousValue: boolean, nextValue: boolean) => void,
- *   afterToggleChange?: (previousValue: boolean, nextValue: boolean) => void
- * }} PlaybackSettingEffects
- */
 
 /**
  * 再生設定の保存値反映とトグル配線を扱うコントローラーを作成する。
