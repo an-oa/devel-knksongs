@@ -1,45 +1,50 @@
-// Generated from app/lib/results-scroll.mts.
-// Do not edit this .mjs file by hand; edit the .mts source and run npm run build:ts.
-
 import { isHtmlElement } from "./dom-utils.mjs";
 import { afterLayoutSettled, findScrollableAncestor } from "./layout-anchor.mjs";
+
+type ScrollElementIntoViewOptions = {
+    topOffset?: number;
+    behavior?: ScrollBehavior;
+    force?: boolean;
+};
+
 /**
  * 結果リストを含むスクロール領域を先頭へ戻す。
  * @param {Element | null | undefined} resultList
  */
-export function scrollResultListToTop(resultList) {
-    if (!isHtmlElement(resultList))
-        return;
+export function scrollResultListToTop(resultList: Element | null | undefined): void {
+    if (!isHtmlElement(resultList)) return;
     const scrollContainer = findScrollableAncestor(resultList);
-    if (!scrollContainer)
-        return;
+    if (!scrollContainer) return;
+
     if (scrollContainer === document.body || scrollContainer === document.documentElement) {
         window.scrollTo({ top: 0, behavior: "auto" });
         return;
     }
     scrollContainer.scrollTo({ top: 0, behavior: "auto" });
 }
+
 /**
  * 指定要素が見える位置まで、必要時または強制指定時にスクロールする。
  * @param {Element | null | undefined} element
  * @param {{ topOffset?: number, behavior?: ScrollBehavior, force?: boolean } | undefined} options
  * @returns {void}
  */
-function scrollElementIntoView(element, options) {
-    if (!isHtmlElement(element) || !element.isConnected)
-        return;
+function scrollElementIntoView(
+    element: Element | null | undefined,
+    options?: ScrollElementIntoViewOptions
+): void {
+    if (!isHtmlElement(element) || !element.isConnected) return;
     const scrollContainer = findScrollableAncestor(element);
-    if (!scrollContainer)
-        return;
+    if (!scrollContainer) return;
     const topOffset = Number.isFinite(options && options.topOffset) ? options.topOffset : 0;
     const behavior = options && options.behavior ? options.behavior : "auto";
     const force = Boolean(options && options.force);
     const elementRect = element.getBoundingClientRect();
+
     if (scrollContainer === document.body || scrollContainer === document.documentElement) {
         const viewTop = topOffset;
         const viewBottom = window.innerHeight || document.documentElement.clientHeight || 0;
-        if (!force && elementRect.top >= viewTop && elementRect.bottom <= viewBottom)
-            return;
+        if (!force && elementRect.top >= viewTop && elementRect.bottom <= viewBottom) return;
         const currentTop = Number.isFinite(document.scrollingElement && document.scrollingElement.scrollTop)
             ? document.scrollingElement.scrollTop
             : 0;
@@ -47,22 +52,26 @@ function scrollElementIntoView(element, options) {
         window.scrollTo({ top: nextTop, behavior });
         return;
     }
+
     const containerRect = scrollContainer.getBoundingClientRect();
     const viewTop = containerRect.top + topOffset;
     const viewBottom = containerRect.bottom;
-    if (!force && elementRect.top >= viewTop && elementRect.bottom <= viewBottom)
-        return;
+    if (!force && elementRect.top >= viewTop && elementRect.bottom <= viewBottom) return;
     const currentTop = Number.isFinite(scrollContainer.scrollTop) ? scrollContainer.scrollTop : 0;
     const nextTop = Math.max(0, currentTop + (elementRect.top - containerRect.top) - topOffset);
     scrollContainer.scrollTo({ top: nextTop, behavior });
 }
+
 /**
  * レイアウト補正が落ち着いた後に、指定要素が見える位置までスクロールする。
  * @param {Element | null | undefined} element
  * @param {{ topOffset?: number, behavior?: "auto" | "smooth", force?: boolean } | undefined} options
  * @returns {Promise<void>}
  */
-export function scheduleScrollElementIntoView(element, options) {
+export function scheduleScrollElementIntoView(
+    element: Element | null | undefined,
+    options?: ScrollElementIntoViewOptions
+): Promise<void> {
     return afterLayoutSettled(() => {
         scrollElementIntoView(element, options);
     });

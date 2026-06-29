@@ -1,19 +1,146 @@
-// Generated from app/controllers/youtube.mts.
-// Do not edit this .mjs file by hand; edit the .mts source and run npm run build:ts.
-
 // @ts-check
+
 import { createLayoutRefreshScheduler } from "../lib/layout-anchor.mjs";
 import { canUseDom, getHeaderHeight, isHtmlElement } from "../lib/dom-utils.mjs";
 import { debugPlayback, tracePlayback } from "../lib/playback-debug.mjs";
 import { getPlaybackUiState } from "../lib/ui-slices.mjs";
-import { applyYoutubePlayerIframeAttributes, buildYoutubeEmbedUrl, createYoutubeIframeApiLoader } from "../lib/youtube/embed.mjs";
-import { destroyYoutubeSharedPlayback, ensureYoutubeSharedPlaybackElements, getYoutubeSharedPlaybackState, getYoutubeSharedPlaybackThumb, setPendingYoutubeSharedPlaybackAttach, setYoutubeSharedPlaybackSessionId, syncYoutubeSharedPlaybackIframe } from "../lib/youtube/shared-playback.mjs";
-import { applyYoutubeThumbnailImage, createYoutubeThumbnailImage, getSongKeyFromYoutubeThumb, revealYoutubePlaybackCardIfNeeded, setYoutubeThumbnailExpandedCardState, setYoutubeThumbnailOrientation, setYoutubeThumbnailPlaybackState, shouldLoadYoutubeThumbnailNow } from "../lib/youtube/thumbnail.mjs";
-import { createYoutubePlaybackState, isYoutubePlaybackSessionActive, reduceYoutubePlaybackState } from "../lib/youtube/playback-state.mjs";
-import { createYoutubePlaybackStartAttemptManager, createYoutubePlaybackStartResult, YOUTUBE_PLAYBACK_START_STATUS } from "../lib/youtube/playback-start-attempt.mjs";
+import {
+    applyYoutubePlayerIframeAttributes,
+    buildYoutubeEmbedUrl,
+    createYoutubeIframeApiLoader
+} from "../lib/youtube/embed.mjs";
+import {
+    destroyYoutubeSharedPlayback,
+    ensureYoutubeSharedPlaybackElements,
+    getYoutubeSharedPlaybackState,
+    getYoutubeSharedPlaybackThumb,
+    setPendingYoutubeSharedPlaybackAttach,
+    setYoutubeSharedPlaybackSessionId,
+    syncYoutubeSharedPlaybackIframe
+} from "../lib/youtube/shared-playback.mjs";
+import {
+    applyYoutubeThumbnailImage,
+    createYoutubeThumbnailImage,
+    getSongKeyFromYoutubeThumb,
+    revealYoutubePlaybackCardIfNeeded,
+    setYoutubeThumbnailExpandedCardState,
+    setYoutubeThumbnailOrientation,
+    setYoutubeThumbnailPlaybackState,
+    shouldLoadYoutubeThumbnailNow
+} from "../lib/youtube/thumbnail.mjs";
+import {
+    createYoutubePlaybackState,
+    isYoutubePlaybackSessionActive,
+    reduceYoutubePlaybackState
+} from "../lib/youtube/playback-state.mjs";
+import {
+    createYoutubePlaybackStartAttemptManager,
+    createYoutubePlaybackStartResult,
+    YOUTUBE_PLAYBACK_START_STATUS
+} from "../lib/youtube/playback-start-attempt.mjs";
 import { createYoutubeUnconfirmedPlaybackStartManager } from "../lib/youtube/unconfirmed-playback-start.mjs";
-import { createYoutubePlayerAdapter } from "../lib/youtube/player-adapter.mjs";
+import {
+    createYoutubePlayerAdapter
+} from "../lib/youtube/player-adapter.mjs";
+import type {
+    AppYoutubeRuntimeState,
+    PlaybackUiRuntimeState,
+    YoutubePlayerLike
+} from "../state.types";
+
 export { extractYoutubeInfo } from "../lib/youtube-url.mjs";
+
+type YoutubeTarget = {
+    videoId: string;
+    startSeconds: number;
+    endSeconds?: number;
+    isVertical: boolean;
+};
+
+type YoutubePlaybackStartStatus = "started" | "failed" | "unconfirmed";
+
+type YoutubePlaybackStartResult = {
+    status: YoutubePlaybackStartStatus;
+};
+
+type YoutubeConstants = {
+    YT_IFRAME_API_SRC: string;
+    YT_IFRAME_API_SELECTOR: string;
+    YT_IFRAME_READY_POLL_MS: number;
+    STOP_PLAYBACK_ON_SCROLL_OUT: boolean;
+};
+
+type YoutubeRuntimeState = AppYoutubeRuntimeState;
+
+type YoutubePlaybackRuntimeState = {
+    sessionSequence: number;
+    transitionGeneration: number;
+    activeSessionId: number;
+    phase: string;
+};
+
+type YoutubeUiState = {
+    playback: PlaybackUiRuntimeState;
+};
+
+type YoutubePlayerStateEvent = {
+    data?: number;
+    target?: YoutubePlayerLike;
+};
+
+type YoutubePlaybackStateEvent = {
+    type: string;
+    sessionId?: number;
+    preserveTransitionGeneration?: boolean;
+};
+
+type YoutubePlaybackError = Error & {
+    code?: string;
+};
+
+type YoutubePlaybackMode = "manual" | "autoplay" | string;
+
+type PlaybackStartFailureOptions = {
+    playbackMode?: YoutubePlaybackMode;
+    reason?: string;
+    errorCode?: unknown;
+    sessionId?: number;
+    wasPlaybackStartUnconfirmed?: boolean;
+};
+
+type PlaybackStartFailedPayload = {
+    songKey: string;
+    playbackMode: YoutubePlaybackMode;
+    wasPlaybackStartUnconfirmed?: boolean;
+};
+
+type YoutubePlaybackOptions = {
+    playbackMode?: YoutubePlaybackMode;
+    revealCard?: boolean;
+};
+
+type YoutubeControllerInput = {
+    ui: YoutubeUiState;
+    youtube: YoutubeRuntimeState;
+    constants: YoutubeConstants;
+};
+
+type YoutubeController = {
+    setLayoutHook: (fn: () => void) => void;
+    setPlaybackEndedHook: (fn: (payload: { songKey: string }) => void) => void;
+    setPlaybackStartFailedHook: (fn: (payload: PlaybackStartFailedPayload) => void) => void;
+    isIOSWebKit: () => boolean;
+    ensureThumbnailPlaybackReady: () => void;
+    setupScrollObserver: () => void;
+    playThumbnail: (
+        thumbDiv: Element | null | undefined,
+        yt: YoutubeTarget | null | undefined,
+        options?: YoutubePlaybackOptions
+    ) => Promise<YoutubePlaybackStartResult>;
+    updateThumbnail: (thumbDiv: HTMLElement, yt: YoutubeTarget) => void;
+    restoreActivePlayback: () => void;
+};
+
 /**
  * @typedef {{
  *   videoId: string,
@@ -22,12 +149,15 @@ export { extractYoutubeInfo } from "../lib/youtube-url.mjs";
  *   isVertical: boolean
  * }} YoutubeTarget
  */
+
 /**
  * @typedef {"started" | "failed" | "unconfirmed"} YoutubePlaybackStartStatus
  */
+
 /**
  * @typedef {{ status: YoutubePlaybackStartStatus }} YoutubePlaybackStartResult
  */
+
 /**
  * @typedef {{
  *   YT_IFRAME_API_SRC: string,
@@ -36,10 +166,13 @@ export { extractYoutubeInfo } from "../lib/youtube-url.mjs";
  *   STOP_PLAYBACK_ON_SCROLL_OUT: boolean
  * }} YoutubeConstants
  */
+
 /** @typedef {import("../state.types").AppYoutubeRuntimeState} AppYoutubeRuntimeState */
+
 /**
  * @typedef {AppYoutubeRuntimeState} YoutubeRuntimeState
  */
+
 /**
  * @typedef {{
  *   sessionSequence: number,
@@ -48,19 +181,24 @@ export { extractYoutubeInfo } from "../lib/youtube-url.mjs";
  *   phase: string
  * }} YoutubePlaybackRuntimeState
  */
+
 /** @typedef {import("../state.types").PlaybackUiRuntimeState} PlaybackUiRuntimeState */
+
 /**
  * @typedef {{
  *   playback: PlaybackUiRuntimeState
  * }} YoutubeUiState
  */
+
 /** @typedef {import("../state.types").YoutubePlayerLike} YoutubePlayerLike */
+
 /**
  * @typedef {{
  *   data?: number,
  *   target?: YoutubePlayerLike
  * }} YoutubePlayerStateEvent
  */
+
 /**
  * @typedef {{
  *   type: string,
@@ -68,12 +206,15 @@ export { extractYoutubeInfo } from "../lib/youtube-url.mjs";
  *   preserveTransitionGeneration?: boolean
  * }} YoutubePlaybackStateEvent
  */
+
 /**
  * @typedef {Error & { code?: string }} YoutubePlaybackError
  */
+
 /**
  * @typedef {"manual" | "autoplay" | string} YoutubePlaybackMode
  */
+
 /**
  * @typedef {{
  *   playbackMode?: YoutubePlaybackMode,
@@ -83,12 +224,15 @@ export { extractYoutubeInfo } from "../lib/youtube-url.mjs";
  *   wasPlaybackStartUnconfirmed?: boolean
  * }} PlaybackStartFailureOptions
  */
+
 /**
  * @typedef {{ songKey: string, playbackMode: YoutubePlaybackMode, wasPlaybackStartUnconfirmed?: boolean }} PlaybackStartFailedPayload
  */
+
 /**
  * @typedef {{ playbackMode?: YoutubePlaybackMode, revealCard?: boolean }} YoutubePlaybackOptions
  */
+
 /**
  * @typedef {{
  *   ui: YoutubeUiState,
@@ -96,6 +240,7 @@ export { extractYoutubeInfo } from "../lib/youtube-url.mjs";
  *   constants: YoutubeConstants
  * }} YoutubeControllerInput
  */
+
 /**
  * @typedef {{
  *   setLayoutHook: (fn: () => void) => void,
@@ -109,18 +254,24 @@ export { extractYoutubeInfo } from "../lib/youtube-url.mjs";
  *   restoreActivePlayback: () => void
  * }} YoutubeController
  */
+
 /**
  * サムネイル表示と埋め込み再生の制御を行うコントローラーを作成する。
  * @param {YoutubeControllerInput} input
  * @returns {YoutubeController}
  */
-export function createYoutubeController({ ui, youtube, constants }) {
-    const { YT_IFRAME_API_SRC, YT_IFRAME_API_SELECTOR, YT_IFRAME_READY_POLL_MS, STOP_PLAYBACK_ON_SCROLL_OUT } = constants;
+export function createYoutubeController({ ui, youtube, constants }: YoutubeControllerInput): YoutubeController {
+    const {
+        YT_IFRAME_API_SRC,
+        YT_IFRAME_API_SELECTOR,
+        YT_IFRAME_READY_POLL_MS,
+        STOP_PLAYBACK_ON_SCROLL_OUT
+    } = constants;
     const playbackUi = getPlaybackUiState(ui);
-    let refreshLayout = () => { };
-    let handlePlaybackEnded = () => { };
-    let handlePlaybackStartFailed = () => { };
-    let playbackState = createYoutubePlaybackState();
+    let refreshLayout: () => void = () => {};
+    let handlePlaybackEnded: (payload: { songKey: string }) => void = () => {};
+    let handlePlaybackStartFailed: (payload: PlaybackStartFailedPayload) => void = () => {};
+    let playbackState: YoutubePlaybackRuntimeState = createYoutubePlaybackState();
     const refreshCardLayoutSoon = createLayoutRefreshScheduler(() => refreshLayout);
     const youtubeIframeApiLoader = createYoutubeIframeApiLoader({
         youtube,
@@ -128,6 +279,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
         iframeApiSelector: YT_IFRAME_API_SELECTOR,
         readyPollMs: YT_IFRAME_READY_POLL_MS
     });
+
     /**
      * 共有埋め込みプレーヤーの保持領域を返す。
      * @returns {import("../state.types").YoutubeSharedPlaybackState}
@@ -135,6 +287,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
     function getSharedPlaybackState() {
         return getYoutubeSharedPlaybackState(youtube);
     }
+
     /**
      * 共有プレーヤーが内部で置き換えた最新の iframe 要素を同期する。
      * @returns {HTMLIFrameElement | null}
@@ -142,6 +295,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
     function syncSharedPlaybackIframe() {
         return syncYoutubeSharedPlaybackIframe(youtube);
     }
+
     /**
      * 共有プレーヤーに紐づく再生セッション ID を設定する。
      * @param {number} sessionId
@@ -149,6 +303,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
     function setSharedPlaybackSessionId(sessionId) {
         setYoutubeSharedPlaybackSessionId(youtube, sessionId);
     }
+
     /**
      * 共有プレーヤー初期化待ち中に使う最新の紐付け要求を保存する。
      * @param {HTMLIFrameElement | null | undefined} iframe
@@ -157,6 +312,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
     function setPendingSharedPlaybackAttach(iframe, playbackSessionId) {
         setPendingYoutubeSharedPlaybackAttach(youtube, iframe, playbackSessionId);
     }
+
     /**
      * 指定セッションの現在の再生サムネイルを返す。
      * @param {number} sessionId
@@ -165,6 +321,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
     function getSharedPlaybackThumb(sessionId) {
         return getYoutubeSharedPlaybackThumb(youtube, sessionId);
     }
+
     /**
      * 再生開始方法を返す。
      * @param {Element | null | undefined} thumbDiv
@@ -173,6 +330,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
     function getPlaybackMode(thumbDiv) {
         return isHtmlElement(thumbDiv) ? (thumbDiv.dataset.playbackMode || "manual") : "manual";
     }
+
     /**
      * 再生開始方法をサムネイルへ保存または解除する。
      * @param {HTMLElement} thumbDiv
@@ -185,6 +343,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
         }
         delete thumbDiv.dataset.playbackMode;
     }
+
     /**
      * 再生状態機械へイベントを適用し、最新 state を返す。
      * @param {YoutubePlaybackStateEvent} event
@@ -194,6 +353,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
         playbackState = reduceYoutubePlaybackState(playbackState, event);
         return playbackState;
     }
+
     /**
      * 再生開始結果オブジェクトを作成する。
      * @param {string} status
@@ -202,6 +362,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
     function buildPlaybackStartResult(status) {
         return createYoutubePlaybackStartResult(status);
     }
+
     /**
      * state change event が示す状態と、プレーヤーが現在返す状態の不一致を検出する。
      * 古い再生から遅れて届いたイベントを誤処理しないために使う。
@@ -210,18 +371,18 @@ export function createYoutubeController({ ui, youtube, constants }) {
      */
     function isStalePlayerStateEvent(event) {
         const target = event && event.target;
-        if (!target || typeof target.getPlayerState !== "function")
-            return false;
+        if (!target || typeof target.getPlayerState !== "function") return false;
         try {
             return target.getPlayerState() !== event.data;
-        }
-        catch {
+        } catch {
             return false;
         }
     }
+
     const unconfirmedPlaybackStarts = createYoutubeUnconfirmedPlaybackStartManager({
         getSharedPlaybackState
     });
+
     const playbackStartAttempts = createYoutubePlaybackStartAttemptManager({
         getSharedPlaybackState,
         getThumbForSession: (sessionId) => getSharedPlaybackThumb(sessionId),
@@ -231,6 +392,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
         markUnconfirmedStart: (sessionId) => unconfirmedPlaybackStarts.mark(sessionId),
         clearUnconfirmedStart: (sessionId) => unconfirmedPlaybackStarts.clear(sessionId)
     });
+
     /**
      * レイアウト再計算フックを登録する。
      * @param {() => void} fn
@@ -240,6 +402,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
             refreshLayout = fn;
         }
     }
+
     /**
      * 再生終了時の継続再生フックを登録する。
      * @param {(payload: { songKey: string }) => void} fn
@@ -249,6 +412,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
             handlePlaybackEnded = fn;
         }
     }
+
     /**
      * 再生開始失敗時のフックを登録する。
      * @param {(payload: PlaybackStartFailedPayload) => void} fn
@@ -258,6 +422,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
             handlePlaybackStartFailed = fn;
         }
     }
+
     /**
      * 実行環境がiOS系WebKitかどうかを判定する。
      */
@@ -268,6 +433,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
         const isWebKit = webkitTouchCallout || webkitOverflowScrolling;
         return hasTouch && isWebKit;
     }
+
     const youtubeApi = {
         ensureReady() {
             return youtubeIframeApiLoader.ensureReady();
@@ -298,10 +464,8 @@ export function createYoutubeController({ ui, youtube, constants }) {
                 hasThumb: isHtmlElement(thumbDiv),
                 activeSongKey: isHtmlElement(thumbDiv) ? getSongKeyFromYoutubeThumb(thumbDiv) : ""
             });
-            if (!isHtmlElement(thumbDiv))
-                return;
-            if (!isCurrentPlaybackSession(thumbDiv, playbackSessionId))
-                return;
+            if (!isHtmlElement(thumbDiv)) return;
+            if (!isCurrentPlaybackSession(thumbDiv, playbackSessionId)) return;
             if (event.data !== window.YT.PlayerState.PLAYING && isStalePlayerStateEvent(event)) {
                 debugPlayback("youtube", "ignored stale player state event", {
                     playbackSessionId,
@@ -313,7 +477,10 @@ export function createYoutubeController({ ui, youtube, constants }) {
             if (event.data === window.YT.PlayerState.ENDED) {
                 const shouldNotifyPlaybackEnded = playbackState.phase === "playing";
                 const wasPlaybackStartUnconfirmed = unconfirmedPlaybackStarts.consume(playbackSessionId);
-                playbackStartAttempts.settle(playbackSessionId, buildPlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.FAILED));
+                playbackStartAttempts.settle(
+                    playbackSessionId,
+                    buildPlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.FAILED)
+                );
                 const endedSongKey = getSongKeyFromYoutubeThumb(thumbDiv);
                 const endedPlaybackMode = getPlaybackMode(thumbDiv);
                 const endedGeneration = applyPlaybackStateEvent({
@@ -323,10 +490,8 @@ export function createYoutubeController({ ui, youtube, constants }) {
                 Promise.resolve(restoreThumbnail(thumbDiv, thumbDiv.dataset.videoId || "", {
                     preserveTransitionGeneration: true
                 })).then((restored) => {
-                    if (!restored)
-                        return;
-                    if (endedGeneration !== playbackState.transitionGeneration)
-                        return;
+                    if (!restored) return;
+                    if (endedGeneration !== playbackState.transitionGeneration) return;
                     if (shouldNotifyPlaybackEnded && endedSongKey) {
                         handlePlaybackEnded({ songKey: endedSongKey });
                         return;
@@ -345,7 +510,10 @@ export function createYoutubeController({ ui, youtube, constants }) {
             }
             if (event.data === window.YT.PlayerState.PLAYING) {
                 unconfirmedPlaybackStarts.clear(playbackSessionId);
-                playbackStartAttempts.settle(playbackSessionId, buildPlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.STARTED));
+                playbackStartAttempts.settle(
+                    playbackSessionId,
+                    buildPlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.STARTED)
+                );
                 applyPlaybackStateEvent({
                     type: "PLAYBACK_STARTED",
                     sessionId: playbackSessionId
@@ -360,12 +528,13 @@ export function createYoutubeController({ ui, youtube, constants }) {
          */
         handlePlayerError(event, playbackSessionId) {
             const thumbDiv = getSharedPlaybackThumb(playbackSessionId);
-            if (!isHtmlElement(thumbDiv))
-                return;
-            if (!isCurrentPlaybackSession(thumbDiv, playbackSessionId))
-                return;
+            if (!isHtmlElement(thumbDiv)) return;
+            if (!isCurrentPlaybackSession(thumbDiv, playbackSessionId)) return;
             const wasPlaybackStartUnconfirmed = unconfirmedPlaybackStarts.consume(playbackSessionId);
-            playbackStartAttempts.settle(playbackSessionId, buildPlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.FAILED));
+            playbackStartAttempts.settle(
+                playbackSessionId,
+                buildPlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.FAILED)
+            );
             handlePlaybackStartFailure(thumbDiv, {
                 sessionId: playbackSessionId,
                 playbackMode: getPlaybackMode(thumbDiv),
@@ -375,6 +544,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
             });
         }
     };
+
     const youtubePlayerAdapter = createYoutubePlayerAdapter({
         getSharedPlaybackState,
         setPendingAttach: (iframe, playbackSessionId) => {
@@ -391,6 +561,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
         handleAttachFailure: (_error, playbackSessionId) => handleYoutubePlayerAttachFailure(playbackSessionId),
         debug: (message, details) => debugPlayback("youtube", message, details)
     });
+
     /**
      * YouTube Iframe API への接続失敗時に再生方針を適用する。
      * @param {number} playbackSessionId
@@ -403,21 +574,24 @@ export function createYoutubeController({ ui, youtube, constants }) {
         });
         const thumbDiv = getSharedPlaybackThumb(playbackSessionId);
         if (getPlaybackMode(thumbDiv) === "autoplay") {
-            const error = new Error("iframe api unavailable for autoplay");
+            const error = new Error("iframe api unavailable for autoplay") as YoutubePlaybackError;
             error.code = "iframe-api-load-failed";
             throw error;
         }
-        playbackStartAttempts.settle(playbackSessionId, buildPlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.STARTED));
+        playbackStartAttempts.settle(
+            playbackSessionId,
+            buildPlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.STARTED)
+        );
         return null;
     }
+
     /**
      * Player 接続前に始まった再生状態を取りこぼさないよう、現在状態を反映する。
      * @param {YoutubePlayerLike | null | undefined} player
      * @param {number} playbackSessionId
      */
     function syncAttachedPlayerState(player, playbackSessionId) {
-        if (!player || typeof player.getPlayerState !== "function")
-            return;
+        if (!player || typeof player.getPlayerState !== "function") return;
         try {
             const currentState = player.getPlayerState();
             if (currentState === window.YT.PlayerState.PLAYING) {
@@ -426,31 +600,30 @@ export function createYoutubeController({ ui, youtube, constants }) {
                     target: player
                 }, playbackSessionId);
             }
-        }
-        catch {
+        } catch {
             debugPlayback("youtube", "failed to read attached player state", {
                 playbackSessionId
             });
         }
     }
+
     /**
      * 共有プレイヤーを停止できたか返す。
      * @returns {boolean}
      */
     function stopSharedPlaybackPlayer() {
         const player = getSharedPlaybackState().player;
-        if (!player || typeof player.stopVideo !== "function")
-            return false;
+        if (!player || typeof player.stopVideo !== "function") return false;
         try {
             player.stopVideo();
             debugPlayback("youtube", "stopPlayer called", undefined);
             return true;
-        }
-        catch {
+        } catch {
             debugPlayback("youtube", "stopPlayer failed", undefined);
             return false;
         }
     }
+
     /**
      * 再生開始方法に応じて埋め込みプレイヤーを自動開始するか返す。
      * 手動クリックは連続再生設定中でも autoplay へ昇格させない。
@@ -460,24 +633,24 @@ export function createYoutubeController({ ui, youtube, constants }) {
     function isEmbeddedPlayerAutoplayEnabled(playbackMode) {
         return playbackMode === "autoplay";
     }
+
     /**
      * 共有再生に使う iframe 要素を生成する。
      * @returns {HTMLIFrameElement | null}
      */
     function createSharedPlaybackFrame() {
-        if (!canUseDom())
-            return null;
+        if (!canUseDom()) return null;
         const iframe = document.createElement("iframe");
         applyYoutubePlayerIframeAttributes(iframe);
         return iframe;
     }
+
     /**
      * 共有再生に使う閉じるボタンを生成する。
      * @returns {HTMLButtonElement | null}
      */
     function createSharedPlaybackCloseButton() {
-        if (!canUseDom())
-            return null;
+        if (!canUseDom()) return null;
         const close = document.createElement("button");
         close.type = "button";
         close.className = "thumb-close-btn";
@@ -486,12 +659,12 @@ export function createYoutubeController({ ui, youtube, constants }) {
         close.addEventListener("click", (event) => {
             event.stopPropagation();
             const activeThumb = playbackUi.activeThumb;
-            if (!activeThumb)
-                return;
+            if (!activeThumb) return;
             restoreThumbnail(activeThumb, activeThumb.dataset.videoId || "");
         });
         return close;
     }
+
     /**
      * autoplay 開始失敗のデバッグ用詳細を組み立てる。
      * @param {Element | null | undefined} thumbDiv
@@ -499,7 +672,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
      * @returns {{ songKey: string, videoId: string, reason: string, errorCode?: unknown }}
      */
     function buildAutoplayFailureDebugDetails(thumbDiv, options) {
-        const details = {
+        const details: { songKey: string, videoId: string, reason: string, errorCode?: unknown } = {
             songKey: getSongKeyFromYoutubeThumb(thumbDiv),
             videoId: isHtmlElement(thumbDiv) ? (thumbDiv.dataset.videoId || "") : "",
             reason: options && options.reason ? options.reason : "unknown"
@@ -509,14 +682,20 @@ export function createYoutubeController({ ui, youtube, constants }) {
         }
         return details;
     }
+
     /**
      * autoplay 開始失敗を opt-in デバッグログへ出力する。
      * @param {Element | null | undefined} thumbDiv
      * @param {PlaybackStartFailureOptions | undefined} options
      */
     function logAutoplayPlaybackFailure(thumbDiv, options) {
-        debugPlayback("youtube", "autoplay playback start failed; skipping candidate", buildAutoplayFailureDebugDetails(thumbDiv, options));
+        debugPlayback(
+            "youtube",
+            "autoplay playback start failed; skipping candidate",
+            buildAutoplayFailureDebugDetails(thumbDiv, options)
+        );
     }
+
     /**
      * 再生開始失敗フックへ渡す payload を組み立てる。
      * @param {string} songKey
@@ -525,7 +704,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
      * @returns {PlaybackStartFailedPayload}
      */
     function buildPlaybackStartFailedPayload(songKey, playbackMode, options = undefined) {
-        const payload = {
+        const payload: PlaybackStartFailedPayload = {
             songKey,
             playbackMode
         };
@@ -534,6 +713,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
         }
         return payload;
     }
+
     /**
      * 再生開始失敗時の後始末を行い、通常サムネイル表示へ戻す。
      * @param {HTMLElement} thumbDiv
@@ -543,19 +723,17 @@ export function createYoutubeController({ ui, youtube, constants }) {
         const playbackMode = options && options.playbackMode ? options.playbackMode : getPlaybackMode(thumbDiv);
         const failedSongKey = getSongKeyFromYoutubeThumb(thumbDiv);
         const failedSessionId = Number.isFinite(options && options.sessionId) ? options.sessionId : 0;
-        const shouldNotifyStartFailure = Boolean(failedSongKey) &&
+        const shouldNotifyStartFailure =
+            Boolean(failedSongKey) &&
             (!failedSessionId || isCurrentPlaybackSession(thumbDiv, failedSessionId));
         if (playbackMode === "autoplay") {
             logAutoplayPlaybackFailure(thumbDiv, options);
         }
         const expectedGeneration = playbackState.transitionGeneration + 1;
         Promise.resolve(restoreThumbnail(thumbDiv, thumbDiv.dataset.videoId || "")).then((restored) => {
-            if (!restored)
-                return;
-            if (expectedGeneration !== playbackState.transitionGeneration)
-                return;
-            if (!shouldNotifyStartFailure)
-                return;
+            if (!restored) return;
+            if (expectedGeneration !== playbackState.transitionGeneration) return;
+            if (!shouldNotifyStartFailure) return;
             debugPlayback("youtube", "playback start failed hook", {
                 songKey: failedSongKey,
                 playbackMode,
@@ -565,6 +743,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
             handlePlaybackStartFailed(buildPlaybackStartFailedPayload(failedSongKey, playbackMode, options));
         });
     }
+
     /**
      * 共有 iframe と閉じるボタンを必要に応じて生成する。
      * @returns {import("../state.types").YoutubeSharedPlaybackState}
@@ -577,6 +756,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
             createCloseButton: () => createSharedPlaybackCloseButton()
         });
     }
+
     /**
      * 共有プレーヤー実体を破棄し、再生成できる初期状態へ戻す。
      */
@@ -584,9 +764,10 @@ export function createYoutubeController({ ui, youtube, constants }) {
         destroyYoutubeSharedPlayback({
             youtube,
             syncIframe: () => syncSharedPlaybackIframe(),
-            debug: (message, details) => debugPlayback("youtube", message, details)
+                debug: (message, details) => debugPlayback("youtube", message, details)
         });
     }
+
     /**
      * 指定サムネイルに共有プレーヤーが載っているか判定する。
      * @param {Element | null | undefined} thumbDiv
@@ -594,10 +775,13 @@ export function createYoutubeController({ ui, youtube, constants }) {
      */
     function isSharedPlaybackMountedInThumb(thumbDiv) {
         const iframe = syncSharedPlaybackIframe();
-        return Boolean(isHtmlElement(thumbDiv) &&
+        return Boolean(
+            isHtmlElement(thumbDiv) &&
             isHtmlElement(iframe) &&
-            iframe.parentElement === thumbDiv);
+            iframe.parentElement === thumbDiv
+        );
     }
+
     /**
      * 指定サムネイルから共有プレーヤーを外して破棄する。
      * @param {Element | null | undefined} thumbDiv
@@ -624,7 +808,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
         });
         const stopped = shouldStopPlayback ? stopSharedPlaybackPlayer() : false;
         if (shouldStopPlayback && !stopped && isHtmlElement(iframe)) {
-            const iframeElement = iframe;
+            const iframeElement = iframe as HTMLIFrameElement;
             iframeElement.src = "about:blank";
             debugPlayback("youtube", "detachSharedPlayback fell back to about:blank", {
                 songKey: getSongKeyFromYoutubeThumb(thumbDiv)
@@ -634,6 +818,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
         clearActiveThumb(thumbDiv);
         return true;
     }
+
     /**
      * 指定サムネイルへ共有プレーヤーを差し込み、iframe src から再生開始する。
      * @param {HTMLElement} thumbDiv
@@ -654,11 +839,11 @@ export function createYoutubeController({ ui, youtube, constants }) {
             destroySharedPlayback();
         }
         sharedPlayback = ensureSharedPlaybackElements();
-        const iframe = (syncSharedPlaybackIframe() || sharedPlayback.iframe);
+        const iframe = (syncSharedPlaybackIframe() || sharedPlayback.iframe) as HTMLIFrameElement | null;
         if (!isHtmlElement(iframe)) {
             return Promise.resolve(false);
         }
-        const iframeElement = iframe;
+        const iframeElement = iframe as HTMLIFrameElement;
         iframeElement.src = youtubeApi.buildEmbedUrl(yt, playbackMode);
         thumbDiv.replaceChildren(iframeElement, sharedPlayback.closeButton);
         sharedPlayback.hostThumb = thumbDiv;
@@ -671,18 +856,19 @@ export function createYoutubeController({ ui, youtube, constants }) {
         });
         return youtubePlayerAdapter.attach(iframeElement, playbackSessionId)
             .then((player) => {
-            syncAttachedPlayerState(player, playbackSessionId);
-            return Boolean(thumbDiv.querySelector("iframe"));
-        });
+                syncAttachedPlayerState(player, playbackSessionId);
+                return Boolean(thumbDiv.querySelector("iframe"));
+            });
     }
+
     /**
      * サムネイル表示時にYouTube APIの事前読み込みを行う。
      */
     function ensureYoutubeApiForThumbnails() {
-        if (!playbackUi.showThumbnails)
-            return;
-        requestAnimationFrame(() => youtubeApi.ensureReady().catch(() => { }));
+        if (!playbackUi.showThumbnails) return;
+        requestAnimationFrame(() => youtubeApi.ensureReady().catch(() => {}));
     }
+
     /**
      * サムネイルに紐づく再生セッションIDを返す。
      * @param {Element | null | undefined} thumbDiv
@@ -693,20 +879,21 @@ export function createYoutubeController({ ui, youtube, constants }) {
         const sessionId = Number.parseInt(String(value || ""), 10);
         return Number.isFinite(sessionId) ? sessionId : 0;
     }
+
     /**
      * サムネイルに再生セッションIDを設定または解除する。
      * @param {Element | null | undefined} thumbDiv
      * @param {number} sessionId
      */
     function setPlaybackSessionId(thumbDiv, sessionId) {
-        if (!isHtmlElement(thumbDiv))
-            return;
+        if (!isHtmlElement(thumbDiv)) return;
         if (Number.isFinite(sessionId) && sessionId > 0) {
             thumbDiv.dataset.playbackSessionId = String(sessionId);
             return;
         }
         delete thumbDiv.dataset.playbackSessionId;
     }
+
     /**
      * イベントが現在有効な再生セッションに属するか判定する。
      * @param {Element | null | undefined} thumbDiv
@@ -717,16 +904,17 @@ export function createYoutubeController({ ui, youtube, constants }) {
         return isYoutubePlaybackSessionActive(playbackState, sessionId) &&
             getPlaybackSessionId(thumbDiv) === sessionId;
     }
+
     /**
      * 実際に再生へ使う終了秒数を返す。
      * @param {YoutubeTarget | null | undefined} yt
      * @returns {number | null}
      */
     function getEffectiveEndSeconds(yt) {
-        if (playbackUi.playArchiveToEnd)
-            return null;
+        if (playbackUi.playArchiveToEnd) return null;
         return Number.isFinite(yt && yt.endSeconds) ? yt.endSeconds : null;
     }
+
     /**
      * サムネイルコンテナを再生状態から初期表示へリセットする。
      * @param {HTMLElement} thumbDiv
@@ -751,18 +939,19 @@ export function createYoutubeController({ ui, youtube, constants }) {
         thumbDiv.onclick = null;
         thumbDiv.replaceChildren();
     }
+
     /**
      * 再生対象の同一性判定に使うキーを生成する。
      * @param {YoutubeTarget} yt
      * @returns {string}
      */
     function buildPlaybackKey(yt) {
-        if (!yt.videoId)
-            return "";
+        if (!yt.videoId) return "";
         const endSeconds = getEffectiveEndSeconds(yt);
         const endPart = Number.isFinite(endSeconds) ? String(endSeconds) : "";
         return `${yt.videoId}:${yt.startSeconds}:${endPart}`;
     }
+
     /**
      * 現在表示中の再生対象と次の対象が同一か判定する。
      * @param {HTMLElement} thumbDiv
@@ -770,12 +959,11 @@ export function createYoutubeController({ ui, youtube, constants }) {
      * @returns {boolean}
      */
     function isSamePlaybackTarget(thumbDiv, nextPlaybackKey) {
-        if (!playbackUi.showThumbnails)
-            return false;
-        if (!isSharedPlaybackMountedInThumb(thumbDiv))
-            return false;
+        if (!playbackUi.showThumbnails) return false;
+        if (!isSharedPlaybackMountedInThumb(thumbDiv)) return false;
         return (thumbDiv.dataset.playbackKey || "") === nextPlaybackKey;
     }
+
     /**
      * アクティブなサムネイルを切り替える。
      * @param {HTMLElement} thumbDiv
@@ -789,14 +977,15 @@ export function createYoutubeController({ ui, youtube, constants }) {
         }
         playbackUi.activeThumb = thumbDiv;
     }
+
     /**
      * 指定サムネイルがアクティブなら参照を解除する。
      * @param {Element | null | undefined} thumbDiv
      */
     function clearActiveThumb(thumbDiv) {
-        if (playbackUi.activeThumb === thumbDiv)
-            playbackUi.activeThumb = null;
+        if (playbackUi.activeThumb === thumbDiv) playbackUi.activeThumb = null;
     }
+
     /**
      * スクロール監視結果に応じて画像読み込みや再生停止を処理する。
      * @param {IntersectionObserverEntry[]} entries
@@ -804,24 +993,20 @@ export function createYoutubeController({ ui, youtube, constants }) {
     function handleScrollObserver(entries) {
         entries.forEach((entry) => {
             const thumb = entry.target;
-            if (!isHtmlElement(thumb))
-                return;
+            if (!isHtmlElement(thumb)) return;
             if (entry.isIntersecting) {
                 const img = thumb.querySelector("img");
                 const srcAttr = img ? img.getAttribute("src") : null;
                 if (img && (!srcAttr || srcAttr === "about:blank")) {
                     const dataSrc = img.dataset.src;
-                    if (dataSrc)
-                        img.src = dataSrc;
+                    if (dataSrc) img.src = dataSrc;
                 }
                 return;
             }
             if (!entry.isIntersecting) {
-                if (!STOP_PLAYBACK_ON_SCROLL_OUT)
-                    return;
+                if (!STOP_PLAYBACK_ON_SCROLL_OUT) return;
                 playbackStartAttempts.cancelForThumb(thumb);
-                if (!detachSharedPlayback(thumb))
-                    return;
+                if (!detachSharedPlayback(thumb)) return;
                 const videoId = thumb.dataset.videoId;
                 setPlaybackSessionId(thumb, 0);
                 thumb.classList.remove("playing");
@@ -829,31 +1014,30 @@ export function createYoutubeController({ ui, youtube, constants }) {
                 setYoutubeThumbnailExpandedCardState(thumb, false);
                 if (videoId) {
                     applyYoutubeThumbnailImage(thumb, videoId, undefined);
-                }
-                else {
+                } else {
                     thumb.replaceChildren();
                 }
                 refreshCardLayoutSoon(thumb);
             }
         });
     }
+
     /**
      * サムネイル可視判定用のIntersectionObserverを再設定する。
      */
     function setupScrollObserver() {
         const headerHeight = getHeaderHeight();
-        if (playbackUi.scrollObserver)
-            playbackUi.scrollObserver.disconnect();
+        if (playbackUi.scrollObserver) playbackUi.scrollObserver.disconnect();
         playbackUi.scrollObserver = new IntersectionObserver(handleScrollObserver, {
             threshold: 0,
             rootMargin: `-${headerHeight}px 0px 0px 0px`
         });
-        if (!playbackUi.showThumbnails)
-            return;
+        if (!playbackUi.showThumbnails) return;
         document.querySelectorAll(".thumb").forEach((thumb) => {
             playbackUi.scrollObserver.observe(thumb);
         });
     }
+
     /**
      * 埋め込み再生を解除して通常サムネイル表示へ戻す。
      * @param {HTMLElement} thumbDiv
@@ -885,19 +1069,18 @@ export function createYoutubeController({ ui, youtube, constants }) {
         setYoutubeThumbnailExpandedCardState(thumbDiv, false);
         if (videoId) {
             applyYoutubeThumbnailImage(thumbDiv, videoId, { eager: true });
-        }
-        else {
+        } else {
             thumbDiv.replaceChildren();
         }
         return refreshCardLayoutSoon(thumbDiv);
     }
+
     /**
      * 現在アクティブな再生サムネイルを通常表示へ復元する。
      */
     function restoreActivePlayback() {
         const activeThumb = playbackUi.activeThumb;
-        if (!activeThumb)
-            return;
+        if (!activeThumb) return;
         if (!activeThumb.isConnected) {
             playbackUi.activeThumb = null;
             applyPlaybackStateEvent({ type: "CLEAR_PLAYBACK" });
@@ -911,6 +1094,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
         });
         restoreThumbnail(activeThumb, activeThumb.dataset.videoId || "");
     }
+
     /**
      * サムネイルを埋め込みプレイヤーへ切り替えて再生開始する。
      * @param {HTMLElement} thumbDiv
@@ -940,14 +1124,20 @@ export function createYoutubeController({ ui, youtube, constants }) {
                 playbackStartAttempts.armStartTimeout(playbackSessionId);
                 return;
             }
-            playbackStartAttempts.settle(playbackSessionId, buildPlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.FAILED));
+            playbackStartAttempts.settle(
+                playbackSessionId,
+                buildPlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.FAILED)
+            );
             handlePlaybackStartFailure(thumbDiv, {
                 sessionId: playbackSessionId,
                 playbackMode,
                 reason: "mount-failed"
             });
         }).catch((error) => {
-            playbackStartAttempts.settle(playbackSessionId, buildPlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.FAILED));
+            playbackStartAttempts.settle(
+                playbackSessionId,
+                buildPlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.FAILED)
+            );
             handlePlaybackStartFailure(thumbDiv, {
                 sessionId: playbackSessionId,
                 playbackMode,
@@ -964,6 +1154,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
         }
         return playbackStartPromise;
     }
+
     /**
      * 指定サムネイルを即座に埋め込み再生へ切り替える。
      * @param {Element | null | undefined} thumbDiv
@@ -973,14 +1164,12 @@ export function createYoutubeController({ ui, youtube, constants }) {
      */
     function playThumbnail(thumbDiv, yt, options) {
         const failedResult = createYoutubePlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.FAILED);
-        if (!isHtmlElement(thumbDiv))
-            return Promise.resolve(failedResult);
-        if (!playbackUi.showThumbnails)
-            return Promise.resolve(failedResult);
-        if (!yt || !yt.videoId)
-            return Promise.resolve(failedResult);
+        if (!isHtmlElement(thumbDiv)) return Promise.resolve(failedResult);
+        if (!playbackUi.showThumbnails) return Promise.resolve(failedResult);
+        if (!yt || !yt.videoId) return Promise.resolve(failedResult);
         return startEmbeddedPlayback(thumbDiv, yt, options);
     }
+
     /**
      * 曲情報に合わせてサムネイル表示内容を更新する。
      * @param {HTMLElement} thumbDiv
@@ -995,14 +1184,13 @@ export function createYoutubeController({ ui, youtube, constants }) {
         }
         resetThumbnailContainer(thumbDiv, yt.videoId, nextPlaybackKey);
         setYoutubeThumbnailOrientation(thumbDiv, "landscape");
-        if (!playbackUi.showThumbnails)
-            return;
-        if (!yt.videoId)
-            return;
+
+        if (!playbackUi.showThumbnails) return;
+        if (!yt.videoId) return;
+
         const img = createYoutubeThumbnailImage(yt.videoId);
         thumbDiv.onclick = () => {
-            if (thumbDiv.classList.contains("playing"))
-                return;
+            if (thumbDiv.classList.contains("playing")) return;
             startEmbeddedPlayback(thumbDiv, yt, {
                 revealCard: true,
                 playbackMode: "manual"
@@ -1013,6 +1201,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
             img.src = img.dataset.src;
         }
     }
+
     return {
         setLayoutHook,
         setPlaybackEndedHook,

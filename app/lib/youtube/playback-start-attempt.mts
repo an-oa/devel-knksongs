@@ -1,8 +1,9 @@
-// Generated from app/lib/youtube/playback-start-attempt.mts.
-// Do not edit this .mjs file by hand; edit the .mts source and run npm run build:ts.
-
 import { isHtmlElement } from "../dom-utils.mjs";
-import { debugPlayback, isAutoplayStartFallbackEnabled } from "../playback-debug.mjs";
+import {
+    debugPlayback,
+    isAutoplayStartFallbackEnabled
+} from "../playback-debug.mjs";
+
 export const DEFAULT_PLAYBACK_START_TIMEOUT_MS = 5000;
 export const DEFAULT_PLAYBACK_SETUP_TIMEOUT_MS = 10000;
 export const YOUTUBE_PLAYBACK_START_STATUS = Object.freeze({
@@ -10,15 +11,45 @@ export const YOUTUBE_PLAYBACK_START_STATUS = Object.freeze({
     FAILED: "failed",
     UNCONFIRMED: "unconfirmed"
 });
+
+type YoutubePlaybackStartStatus = "started" | "failed" | "unconfirmed";
+
+type YoutubePlaybackStartResult = {
+    status: YoutubePlaybackStartStatus;
+};
+
+type YoutubePlaybackStartAttemptManager = {
+    create: (
+        sessionId: number,
+        inputContext?: { thumbDiv?: unknown, playbackMode?: string }
+    ) => Promise<YoutubePlaybackStartResult>;
+    armStartTimeout: (sessionId: number) => boolean;
+    settle: (sessionId: number | undefined, playbackResult: YoutubePlaybackStartResult) => boolean;
+    cancelForThumb: (thumbDiv: unknown) => boolean;
+};
+
+type PlaybackStartFailureOptions = {
+    playbackMode?: string;
+    reason: string;
+    wasPlaybackStartUnconfirmed?: boolean;
+};
+
+type PlaybackStartTimeoutHandle = ReturnType<typeof setTimeout> & {
+    unref?: () => void;
+};
+
 /**
  * @typedef {"started" | "failed" | "unconfirmed"} YoutubePlaybackStartStatus
  */
+
 /**
  * @typedef {{ status: YoutubePlaybackStartStatus }} YoutubePlaybackStartResult
  */
+
 /**
  * @typedef {ReturnType<typeof setTimeout> & { unref?: () => void }} PlaybackStartTimeoutHandle
  */
+
 /**
  * 再生開始結果を表すオブジェクトを作成する。
  * @param {string} status
@@ -26,13 +57,14 @@ export const YOUTUBE_PLAYBACK_START_STATUS = Object.freeze({
  */
 export function createYoutubePlaybackStartResult(status) {
     switch (status) {
-        case YOUTUBE_PLAYBACK_START_STATUS.STARTED:
-        case YOUTUBE_PLAYBACK_START_STATUS.UNCONFIRMED:
-            return { status };
-        default:
-            return { status: YOUTUBE_PLAYBACK_START_STATUS.FAILED };
+    case YOUTUBE_PLAYBACK_START_STATUS.STARTED:
+    case YOUTUBE_PLAYBACK_START_STATUS.UNCONFIRMED:
+        return { status };
+    default:
+        return { status: YOUTUBE_PLAYBACK_START_STATUS.FAILED };
     }
 }
+
 /**
  * 再生開始結果から status を返す。
  * @param {YoutubePlaybackStartResult | boolean | null | undefined} playbackResult
@@ -46,6 +78,7 @@ function getYoutubePlaybackStartStatus(playbackResult) {
         ? YOUTUBE_PLAYBACK_START_STATUS.STARTED
         : YOUTUBE_PLAYBACK_START_STATUS.FAILED;
 }
+
 /**
  * 再生開始結果をオブジェクト形式へ正規化する。
  * @param {YoutubePlaybackStartResult | boolean | null | undefined} playbackResult
@@ -54,6 +87,7 @@ function getYoutubePlaybackStartStatus(playbackResult) {
 function normalizeYoutubePlaybackStartResult(playbackResult) {
     return createYoutubePlaybackStartResult(getYoutubePlaybackStartStatus(playbackResult));
 }
+
 /**
  * 再生開始結果が開始済みか返す。
  * @param {YoutubePlaybackStartResult | boolean | undefined} playbackResult
@@ -62,6 +96,7 @@ function normalizeYoutubePlaybackStartResult(playbackResult) {
 export function isYoutubePlaybackStarted(playbackResult) {
     return getYoutubePlaybackStartStatus(playbackResult) === YOUTUBE_PLAYBACK_START_STATUS.STARTED;
 }
+
 /**
  * 再生開始結果が未確定か返す。
  * @param {YoutubePlaybackStartResult | boolean | undefined} playbackResult
@@ -70,6 +105,7 @@ export function isYoutubePlaybackStarted(playbackResult) {
 export function isYoutubePlaybackStartUnconfirmed(playbackResult) {
     return getYoutubePlaybackStartStatus(playbackResult) === YOUTUBE_PLAYBACK_START_STATUS.UNCONFIRMED;
 }
+
 /**
  * YouTube 埋め込み再生の開始待ちを管理する。
  * @param {{
@@ -90,14 +126,23 @@ export function isYoutubePlaybackStartUnconfirmed(playbackResult) {
  *   cancelForThumb: (thumbDiv: *) => boolean
  * }}
  */
-export function createYoutubePlaybackStartAttemptManager(input) {
-    const { getSharedPlaybackState, getThumbForSession, getSessionIdForThumb, isCurrentSession, handleStartFailure, markUnconfirmedStart, clearUnconfirmedStart } = input;
+export function createYoutubePlaybackStartAttemptManager(input): YoutubePlaybackStartAttemptManager {
+    const {
+        getSharedPlaybackState,
+        getThumbForSession,
+        getSessionIdForThumb,
+        isCurrentSession,
+        handleStartFailure,
+        markUnconfirmedStart,
+        clearUnconfirmedStart
+    } = input;
     const timeoutMs = Number.isFinite(input.timeoutMs)
         ? input.timeoutMs
         : DEFAULT_PLAYBACK_START_TIMEOUT_MS;
     const setupTimeoutMs = Number.isFinite(input.setupTimeoutMs)
         ? input.setupTimeoutMs
         : DEFAULT_PLAYBACK_SETUP_TIMEOUT_MS;
+
     /**
      * 再生開始待ちのタイムアウトを開始する。
      * @param {import("../../state.types").YoutubePlaybackStartAttempt} attempt
@@ -107,31 +152,28 @@ export function createYoutubePlaybackStartAttemptManager(input) {
      */
     function startTimeout(attempt, timeoutDurationMs, reason) {
         const timeoutId = setTimeout(() => {
-            const shouldUseAutoplayStartFallback = reason === "start-timeout" &&
+            const shouldUseAutoplayStartFallback =
+                reason === "start-timeout" &&
                 attempt.context.playbackMode === "autoplay" &&
                 isAutoplayStartFallbackEnabled();
             const timeoutResult = reason === "start-timeout" && !shouldUseAutoplayStartFallback
                 ? createYoutubePlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.UNCONFIRMED)
                 : createYoutubePlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.FAILED);
             const didSettle = settle(attempt.sessionId, timeoutResult);
-            if (!didSettle)
-                return;
-            if (isYoutubePlaybackStartUnconfirmed(timeoutResult))
-                return;
+            if (!didSettle) return;
+            if (isYoutubePlaybackStartUnconfirmed(timeoutResult)) return;
             const thumbDiv = isHtmlElement(attempt.context.thumbDiv)
                 ? attempt.context.thumbDiv
                 : getThumbForSession(attempt.sessionId);
-            if (!isHtmlElement(thumbDiv))
-                return;
-            if (!isCurrentSession(thumbDiv, attempt.sessionId))
-                return;
+            if (!isHtmlElement(thumbDiv)) return;
+            if (!isCurrentSession(thumbDiv, attempt.sessionId)) return;
             if (shouldUseAutoplayStartFallback) {
                 debugPlayback("youtube", "debug autoplay start fallback", {
                     reason,
                     playbackMode: attempt.context.playbackMode
                 });
             }
-            const failureOptions = {
+            const failureOptions: PlaybackStartFailureOptions = {
                 playbackMode: attempt.context.playbackMode,
                 reason: shouldUseAutoplayStartFallback ? "debug-autoplay-start-fallback" : reason
             };
@@ -140,12 +182,13 @@ export function createYoutubePlaybackStartAttemptManager(input) {
             }
             handleStartFailure(thumbDiv, failureOptions);
         }, timeoutDurationMs);
-        const timeoutHandle = timeoutId;
+        const timeoutHandle = timeoutId as PlaybackStartTimeoutHandle;
         if (timeoutHandle && typeof timeoutHandle.unref === "function") {
             timeoutHandle.unref();
         }
         return timeoutId;
     }
+
     /**
      * 指定セッションの再生開始待ちを完了扱いにする。
      * @param {number | undefined} sessionId
@@ -155,8 +198,7 @@ export function createYoutubePlaybackStartAttemptManager(input) {
     function settle(sessionId, playbackResult) {
         const sharedPlayback = getSharedPlaybackState();
         const attempt = sharedPlayback.playbackStartAttempt;
-        if (!attempt)
-            return false;
+        if (!attempt) return false;
         if (Number.isFinite(sessionId) && sessionId > 0 && attempt.sessionId !== sessionId) {
             return false;
         }
@@ -174,6 +216,7 @@ export function createYoutubePlaybackStartAttemptManager(input) {
         attempt.resolve(normalizedResult);
         return true;
     }
+
     /**
      * 指定セッションの再生開始待ち Promise を作成する。
      * @param {number} sessionId
@@ -184,12 +227,13 @@ export function createYoutubePlaybackStartAttemptManager(input) {
         const context = inputContext || {};
         settle(undefined, createYoutubePlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.FAILED));
         clearUnconfirmedStart();
-        return new Promise((resolve) => {
+        return new Promise<YoutubePlaybackStartResult>((resolve) => {
             /** @type {import("../../state.types").YoutubePlaybackStartAttempt} */
             const attempt = {
                 sessionId,
                 resolve: (result) => resolve(normalizeYoutubePlaybackStartResult(
-                /** @type {YoutubePlaybackStartResult} */ (result))),
+                    /** @type {YoutubePlaybackStartResult} */ (result)
+                )),
                 timeoutId: null,
                 context
             };
@@ -197,6 +241,7 @@ export function createYoutubePlaybackStartAttemptManager(input) {
             getSharedPlaybackState().playbackStartAttempt = attempt;
         });
     }
+
     /**
      * プレーヤー接続後の再生開始タイムアウトへ切り替える。
      * @param {number} sessionId
@@ -205,8 +250,7 @@ export function createYoutubePlaybackStartAttemptManager(input) {
     function armStartTimeout(sessionId) {
         const sharedPlayback = getSharedPlaybackState();
         const attempt = sharedPlayback.playbackStartAttempt;
-        if (!attempt)
-            return false;
+        if (!attempt) return false;
         if (Number.isFinite(sessionId) && sessionId > 0 && attempt.sessionId !== sessionId) {
             return false;
         }
@@ -216,6 +260,7 @@ export function createYoutubePlaybackStartAttemptManager(input) {
         attempt.timeoutId = startTimeout(attempt, timeoutMs, "start-timeout");
         return true;
     }
+
     /**
      * 指定サムネイルに紐づく再生開始待ちを失敗扱いで閉じる。
      * @param {*} thumbDiv
@@ -227,6 +272,7 @@ export function createYoutubePlaybackStartAttemptManager(input) {
         return settle(sessionId, createYoutubePlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.FAILED)) ||
             didClearUnconfirmedStart;
     }
+
     return {
         create,
         armStartTimeout,

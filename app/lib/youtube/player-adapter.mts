@@ -1,8 +1,6 @@
-// Generated from app/lib/youtube/player-adapter.mts.
-// Do not edit this .mjs file by hand; edit the .mts source and run npm run build:ts.
-
 import { isHtmlElement } from "../dom-utils.mjs";
 import { resolveYoutubeEmbedHostFromUrl } from "./embed.mjs";
+
 /**
  * 共有 iframe に YouTube Iframe API の Player を紐付ける adapter を作成する。
  * @param {{
@@ -20,7 +18,19 @@ import { resolveYoutubeEmbedHostFromUrl } from "./embed.mjs";
  * @returns {{ attach: Function }}
  */
 export function createYoutubePlayerAdapter(input) {
-    const { getSharedPlaybackState, setPendingAttach, setSessionId, ensureReady, applyIframeAttributes, syncIframe, handleStateChange, handlePlayerError, handleAttachFailure, debug } = input;
+    const {
+        getSharedPlaybackState,
+        setPendingAttach,
+        setSessionId,
+        ensureReady,
+        applyIframeAttributes,
+        syncIframe,
+        handleStateChange,
+        handlePlayerError,
+        handleAttachFailure,
+        debug
+    } = input;
+
     /**
      * 生成済み iframe へ YouTube プレイヤーを紐付ける。
      * @param {*} iframe
@@ -44,28 +54,26 @@ export function createYoutubePlayerAdapter(input) {
         sharedPlayback.playerPromise = ensureReady().then(() => {
             const latestSharedPlayback = getSharedPlaybackState();
             const pendingAttach = latestSharedPlayback.pendingAttach;
-            if (!pendingAttach)
-                return null;
+            if (!pendingAttach) return null;
             const nextIframe = pendingAttach.iframe;
             const nextPlaybackSessionId = pendingAttach.playbackSessionId;
             setSessionId(nextPlaybackSessionId);
-            if (!isHtmlElement(nextIframe))
-                return null;
-            const nextIframeElement = nextIframe;
-            if (!document.body.contains(nextIframe))
-                return null;
+            if (!isHtmlElement(nextIframe)) return null;
+            const nextIframeElement = nextIframe as HTMLIFrameElement;
+            if (!document.body.contains(nextIframe)) return null;
             if (latestSharedPlayback.parkingNode && nextIframe.parentElement === latestSharedPlayback.parkingNode) {
                 return null;
             }
-            if (latestSharedPlayback.player)
-                return latestSharedPlayback.player;
+            if (latestSharedPlayback.player) return latestSharedPlayback.player;
             latestSharedPlayback.player = new window.YT.Player(nextIframe, {
                 host: resolveYoutubeEmbedHostFromUrl(nextIframeElement.src),
                 events: {
                     onReady: (event) => {
-                        applyIframeAttributes(event && event.target && typeof event.target.getIframe === "function"
-                            ? event.target.getIframe()
-                            : nextIframe);
+                        applyIframeAttributes(
+                            event && event.target && typeof event.target.getIframe === "function"
+                                ? event.target.getIframe()
+                                : nextIframe
+                        );
                     },
                     onStateChange: (event) => handleStateChange(event, nextPlaybackSessionId),
                     onError: (event) => handlePlayerError(event, nextPlaybackSessionId)
@@ -87,5 +95,6 @@ export function createYoutubePlayerAdapter(input) {
         });
         return sharedPlayback.playerPromise;
     }
+
     return { attach };
 }

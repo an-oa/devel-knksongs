@@ -1,8 +1,6 @@
-// Generated from app/lib/youtube/thumbnail.mts.
-// Do not edit this .mjs file by hand; edit the .mts source and run npm run build:ts.
-
 import { canUseDom, getHeaderHeight, isHtmlElement } from "../dom-utils.mjs";
 import { scheduleScrollElementIntoView } from "../results-scroll.mjs";
+
 /**
  * サムネイル上のブラウザ標準保存導線をキャンセルする。
  * 本番コードではこの module 内の設定関数から使い、境界条件を単体テストするために export している。
@@ -13,40 +11,41 @@ export function preventYoutubeThumbnailDefaultAction(event) {
         event.preventDefault();
     }
 }
+
 /**
  * サムネイルコンテナの右クリックメニューを抑止する。
  * @param {Element | null | undefined} thumbDiv
  */
 export function suppressYoutubeThumbnailContextMenu(thumbDiv) {
-    if (!isHtmlElement(thumbDiv))
-        return;
+    if (!isHtmlElement(thumbDiv)) return;
     thumbDiv.addEventListener("contextmenu", preventYoutubeThumbnailDefaultAction);
 }
+
 /**
  * サムネイル画像の右クリックメニューとドラッグ保存を抑止する。
  * @param {Element | null | undefined} img
  */
 export function suppressYoutubeThumbnailImageSaveActions(img) {
-    if (!isHtmlElement(img))
-        return;
+    if (!isHtmlElement(img)) return;
     img.draggable = false;
     img.setAttribute("draggable", "false");
     img.addEventListener("contextmenu", preventYoutubeThumbnailDefaultAction);
     img.addEventListener("dragstart", preventYoutubeThumbnailDefaultAction);
 }
+
 /**
  * 遅延読み込み用のサムネイル画像要素を生成する。
  * @param {string} videoId
  * @returns {HTMLImageElement | null}
  */
 export function createYoutubeThumbnailImage(videoId) {
-    if (!canUseDom())
-        return null;
+    if (!canUseDom()) return null;
     const img = document.createElement("img");
     img.dataset.src = `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
     suppressYoutubeThumbnailImageSaveActions(img);
     return img;
 }
+
 /**
  * サムネイル画像をコンテナへ適用する。
  * @param {*} thumbDiv
@@ -55,12 +54,11 @@ export function createYoutubeThumbnailImage(videoId) {
  */
 export function applyYoutubeThumbnailImage(thumbDiv, videoId, options) {
     const img = createYoutubeThumbnailImage(videoId);
-    if (!isHtmlElement(img))
-        return;
-    if (options && options.eager)
-        img.src = img.dataset.src;
+    if (!isHtmlElement(img)) return;
+    if (options && options.eager) img.src = img.dataset.src;
     thumbDiv.replaceChildren(img);
 }
+
 /**
  * サムネイルを即時読み込みすべき可視領域内か判定する。
  * @param {*} thumbDiv
@@ -71,6 +69,7 @@ export function shouldLoadYoutubeThumbnailNow(thumbDiv) {
     const viewHeight = window.innerHeight || document.documentElement.clientHeight;
     return rect.bottom > 0 && rect.top < viewHeight;
 }
+
 /**
  * サムネイル要素の再生状態クラスを更新する。
  * @param {*} thumbDiv
@@ -82,6 +81,7 @@ export function setYoutubeThumbnailPlaybackState(thumbDiv, state) {
         thumbDiv.classList.add("playing");
     }
 }
+
 /**
  * サムネイル/プレイヤー枠の向きをデータ属性へ反映する。
  * @param {*} thumbDiv
@@ -90,6 +90,7 @@ export function setYoutubeThumbnailPlaybackState(thumbDiv, state) {
 export function setYoutubeThumbnailOrientation(thumbDiv, orientation) {
     thumbDiv.dataset.videoOrientation = orientation === "vertical" ? "vertical" : "landscape";
 }
+
 /**
  * 縦再生で前面表示が必要なカード状態を切り替える。
  * @param {*} thumbDiv
@@ -97,10 +98,10 @@ export function setYoutubeThumbnailOrientation(thumbDiv, orientation) {
  */
 export function setYoutubeThumbnailExpandedCardState(thumbDiv, isExpanded) {
     const card = isHtmlElement(thumbDiv) ? thumbDiv.closest(".song-card") : null;
-    if (!isHtmlElement(card))
-        return;
+    if (!isHtmlElement(card)) return;
     card.classList.toggle("song-card-expanded", Boolean(isExpanded));
 }
+
 /**
  * サムネイルに対応する曲キーを返す。
  * @param {*} thumbDiv
@@ -110,14 +111,14 @@ export function getSongKeyFromYoutubeThumb(thumbDiv) {
     const card = isHtmlElement(thumbDiv) ? thumbDiv.closest(".song-card") : null;
     return isHtmlElement(card) ? (card.dataset.songKey || "") : "";
 }
+
 /**
  * 再生開始したカードが見切れている場合は見える位置まで寄せる。
  * @param {*} thumbDiv
  */
 export function revealYoutubePlaybackCardIfNeeded(thumbDiv) {
     const card = isHtmlElement(thumbDiv) ? thumbDiv.closest(".song-card") : null;
-    if (!isHtmlElement(card))
-        return;
+    if (!isHtmlElement(card)) return;
     scheduleScrollElementIntoView(card, {
         topOffset: getHeaderHeight(),
         behavior: "smooth"

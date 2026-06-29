@@ -1,9 +1,8 @@
-// Generated from app/lib/youtube/embed.mts.
-// Do not edit this .mjs file by hand; edit the .mts source and run npm run build:ts.
-
 import { isHtmlElement } from "../dom-utils.mjs";
+
 const YT_EMBED_HOST = "https://www.youtube.com";
 const YT_NOCOOKIE_EMBED_HOST = "https://www.youtube-nocookie.com";
+
 /**
  * @typedef {{
  *   videoId: string,
@@ -12,11 +11,17 @@ const YT_NOCOOKIE_EMBED_HOST = "https://www.youtube-nocookie.com";
  *   isVertical: boolean
  * }} YoutubeTarget
  */
+
 /**
  * YouTube Iframe API の読み込み完了を扱うローダーを作成する。
  * @param {{ youtube: *, iframeApiSrc: string, iframeApiSelector: string, readyPollMs: number }} input
  */
-export function createYoutubeIframeApiLoader({ youtube, iframeApiSrc, iframeApiSelector, readyPollMs }) {
+export function createYoutubeIframeApiLoader({
+    youtube,
+    iframeApiSrc,
+    iframeApiSelector,
+    readyPollMs
+}) {
     /**
      * YouTube Iframe API が利用可能か返す。
      * @returns {boolean}
@@ -24,6 +29,7 @@ export function createYoutubeIframeApiLoader({ youtube, iframeApiSrc, iframeApiS
     function isReady() {
         return Boolean(window.YT && window.YT.Player);
     }
+
     /**
      * Iframe API が利用可能になるまでポーリングで待機する。
      * @param {Function} resolve
@@ -35,18 +41,18 @@ export function createYoutubeIframeApiLoader({ youtube, iframeApiSrc, iframeApiS
         }
         setTimeout(() => waitForReady(resolve), readyPollMs);
     }
+
     /**
      * Iframe API スクリプトの読み込みと初期化完了を保証する。
      * @returns {Promise<void>}
      */
     function ensureReady() {
-        if (isReady())
-            return Promise.resolve();
-        if (youtube.apiPromise)
-            return youtube.apiPromise;
+        if (isReady()) return Promise.resolve();
+        if (youtube.apiPromise) return youtube.apiPromise;
         let script = null;
-        let resolveReady = () => { };
+        let resolveReady: (value?: void | PromiseLike<void>) => void = () => {};
         const prevCallback = window.onYouTubeIframeAPIReady;
+
         /**
          * このローダーが差し替えた ready callback を失敗時に戻す。
          */
@@ -55,6 +61,7 @@ export function createYoutubeIframeApiLoader({ youtube, iframeApiSrc, iframeApiS
                 window.onYouTubeIframeAPIReady = prevCallback;
             }
         }
+
         /**
          * 読み込みに失敗した Iframe API script を再試行前に取り除く。
          */
@@ -63,15 +70,16 @@ export function createYoutubeIframeApiLoader({ youtube, iframeApiSrc, iframeApiS
                 script.parentElement.removeChild(script);
             }
         }
+
         /**
          * YouTube Iframe API の ready callback を処理する。
          */
         function readyCallback() {
-            if (typeof prevCallback === "function")
-                prevCallback();
+            if (typeof prevCallback === "function") prevCallback();
             resolveReady();
         }
-        const apiPromise = new Promise((resolve, reject) => {
+
+        const apiPromise = new Promise<void>((resolve, reject) => {
             const existing = document.querySelector(iframeApiSelector);
             resolveReady = resolve;
             window.onYouTubeIframeAPIReady = readyCallback;
@@ -99,10 +107,12 @@ export function createYoutubeIframeApiLoader({ youtube, iframeApiSrc, iframeApiS
         youtube.apiPromise = apiPromise;
         return youtube.apiPromise;
     }
+
     return {
         ensureReady
     };
 }
+
 /**
  * YouTube 埋め込みに使う host を設定値から返す。
  * @param {{ useYoutubeNoCookie?: boolean } | undefined} options
@@ -113,6 +123,7 @@ export function resolveYoutubeEmbedHost(options) {
         ? YT_NOCOOKIE_EMBED_HOST
         : YT_EMBED_HOST;
 }
+
 /**
  * iframe の URL から YouTube Player API に渡す host を返す。
  * @param {string | null | undefined} iframeSrc
@@ -124,6 +135,7 @@ export function resolveYoutubeEmbedHostFromUrl(iframeSrc) {
         useYoutubeNoCookie: src.startsWith(`${YT_NOCOOKIE_EMBED_HOST}/`)
     });
 }
+
 /**
  * 埋め込み再生用の標準 YouTube URL を生成する。
  * @param {YoutubeTarget} yt
@@ -153,16 +165,17 @@ export function buildYoutubeEmbedUrl(yt, options) {
     }
     return `${embedHost}/embed/${yt.videoId}?${params.toString()}`;
 }
+
 /**
  * YouTube が生成した iframe へ必要な属性を反映する。
  * @param {Element | null | undefined} iframe
  */
 export function applyYoutubePlayerIframeAttributes(iframe) {
-    if (!isHtmlElement(iframe))
-        return;
-    const iframeElement = iframe;
+    if (!isHtmlElement(iframe)) return;
+    const iframeElement = iframe as HTMLIFrameElement;
     iframeElement.allow = "autoplay; encrypted-media";
     iframeElement.referrerPolicy = "strict-origin-when-cross-origin";
     iframeElement.allowFullscreen = true;
 }
+
 export { YT_EMBED_HOST, YT_NOCOOKIE_EMBED_HOST };

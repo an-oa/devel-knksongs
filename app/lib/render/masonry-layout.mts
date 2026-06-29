@@ -1,13 +1,23 @@
-// Generated from app/lib/render/masonry-layout.mts.
-// Do not edit this .mjs file by hand; edit the .mts source and run npm run build:ts.
-
 import { isHtmlElement } from "../dom-utils.mjs";
+
 export const DEFAULT_MASONRY_GAP_PX = 12;
+
+type MasonryBreakpoint = {
+    minWidth: number;
+    columns: number;
+};
+
+type MasonryLayoutOptions = {
+    gapPx?: number;
+    breakpoints?: MasonryBreakpoint[];
+};
+
 export const DEFAULT_MASONRY_BREAKPOINTS = [
     { minWidth: 1400, columns: 4 },
     { minWidth: 1000, columns: 3 },
     { minWidth: 600, columns: 2 }
 ];
+
 /**
  * コンテナ幅に対応する masonry の列数を返す。
  * レイアウト breakpoint の境界条件を単体テストするため export している。
@@ -15,36 +25,39 @@ export const DEFAULT_MASONRY_BREAKPOINTS = [
  * @param {Array<{ minWidth: number, columns: number }>} breakpoints
  * @returns {number}
  */
-export function getMasonryColumnCount(containerWidth, breakpoints = DEFAULT_MASONRY_BREAKPOINTS) {
+export function getMasonryColumnCount(
+    containerWidth: number,
+    breakpoints: MasonryBreakpoint[] = DEFAULT_MASONRY_BREAKPOINTS
+): number {
     for (const rule of breakpoints) {
-        if (containerWidth >= rule.minWidth)
-            return rule.columns;
+        if (containerWidth >= rule.minWidth) return rule.columns;
     }
     return 1;
 }
+
 /**
  * DOM順を列固定で保ちつつカードを絶対配置する。
  * @param {unknown} container
  * @param {{ gapPx?: number, breakpoints?: Array<{ minWidth: number, columns: number }> }} [options]
  */
-export function applyMasonryLayout(container, options = {}) {
-    if (!isHtmlElement(container))
-        return;
-    const masonryContainer = container;
+export function applyMasonryLayout(container: unknown, options: MasonryLayoutOptions = {}): void {
+    if (!isHtmlElement(container)) return;
+    const masonryContainer = container as HTMLElement;
     const gapPx = Number.isFinite(options.gapPx) ? options.gapPx : DEFAULT_MASONRY_GAP_PX;
     const breakpoints = Array.isArray(options.breakpoints)
         ? options.breakpoints
         : DEFAULT_MASONRY_BREAKPOINTS;
-    const cards = Array.from(masonryContainer.children).filter((node) => (isHtmlElement(node) &&
-        node.classList.contains("song-card")));
+    const cards = Array.from(masonryContainer.children).filter((node): node is HTMLElement => (
+        isHtmlElement(node) &&
+        (node as HTMLElement).classList.contains("song-card")
+    ));
     if (cards.length === 0) {
         masonryContainer.style.height = "";
         return;
     }
     const containerRect = masonryContainer.getBoundingClientRect();
     const containerWidth = masonryContainer.clientWidth || containerRect.width || 0;
-    if (containerWidth <= 0)
-        return;
+    if (containerWidth <= 0) return;
     const columnCount = getMasonryColumnCount(containerWidth, breakpoints);
     const totalGap = gapPx * (columnCount - 1);
     const columnWidth = Math.max(0, (containerWidth - totalGap) / columnCount);

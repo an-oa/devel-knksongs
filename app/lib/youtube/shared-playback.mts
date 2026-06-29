@@ -1,7 +1,5 @@
-// Generated from app/lib/youtube/shared-playback.mts.
-// Do not edit this .mjs file by hand; edit the .mts source and run npm run build:ts.
-
 import { canUseDom, isHtmlElement } from "../dom-utils.mjs";
+
 /**
  * 共有埋め込みプレーヤーの保持領域を返す。
  * @param {*} youtube
@@ -24,6 +22,7 @@ export function getYoutubeSharedPlaybackState(youtube) {
     }
     return youtube.sharedPlayback;
 }
+
 /**
  * 共有プレーヤーが内部で置き換えた最新の iframe 要素を同期する。
  * @param {*} youtube
@@ -40,6 +39,7 @@ export function syncYoutubeSharedPlaybackIframe(youtube) {
     }
     return sharedPlayback.iframe;
 }
+
 /**
  * 共有プレーヤーに紐づく再生セッション ID を設定する。
  * @param {*} youtube
@@ -49,6 +49,7 @@ export function setYoutubeSharedPlaybackSessionId(youtube, sessionId) {
     const sharedPlayback = getYoutubeSharedPlaybackState(youtube);
     sharedPlayback.sessionId = Number.isFinite(sessionId) && sessionId > 0 ? sessionId : 0;
 }
+
 /**
  * 共有プレーヤー初期化待ち中に使う最新の紐付け要求を保存する。
  * @param {*} youtube
@@ -62,6 +63,7 @@ export function setPendingYoutubeSharedPlaybackAttach(youtube, iframe, playbackS
         playbackSessionId
     };
 }
+
 /**
  * 指定セッションの現在の再生サムネイルを返す。
  * @param {*} youtube
@@ -70,18 +72,22 @@ export function setPendingYoutubeSharedPlaybackAttach(youtube, iframe, playbackS
  */
 export function getYoutubeSharedPlaybackThumb(youtube, sessionId) {
     const sharedPlayback = getYoutubeSharedPlaybackState(youtube);
-    if (!(Number.isFinite(sessionId) && sessionId > 0))
-        return null;
-    if (sharedPlayback.sessionId !== sessionId)
-        return null;
+    if (!(Number.isFinite(sessionId) && sessionId > 0)) return null;
+    if (sharedPlayback.sessionId !== sessionId) return null;
     return isHtmlElement(sharedPlayback.hostThumb) ? sharedPlayback.hostThumb : null;
 }
+
 /**
  * 共有 iframe と閉じるボタンを必要に応じて生成する。
  * @param {{ youtube: *, syncIframe: Function, createFrame: Function, createCloseButton: Function }} input
  * @returns {*}
  */
-export function ensureYoutubeSharedPlaybackElements({ youtube, syncIframe, createFrame, createCloseButton }) {
+export function ensureYoutubeSharedPlaybackElements({
+    youtube,
+    syncIframe,
+    createFrame,
+    createCloseButton
+}) {
     const sharedPlayback = getYoutubeSharedPlaybackState(youtube);
     if (typeof syncIframe === "function") {
         syncIframe();
@@ -96,6 +102,7 @@ export function ensureYoutubeSharedPlaybackElements({ youtube, syncIframe, creat
     }
     return sharedPlayback;
 }
+
 /**
  * 共有プレーヤーの退避先ノードを返す。
  * DOM 退避先の生成と再利用を単体テストするため export している。
@@ -103,8 +110,7 @@ export function ensureYoutubeSharedPlaybackElements({ youtube, syncIframe, creat
  * @returns {HTMLElement | null}
  */
 export function ensureYoutubeSharedPlaybackParkingNode(youtube) {
-    if (!canUseDom())
-        return null;
+    if (!canUseDom()) return null;
     const sharedPlayback = getYoutubeSharedPlaybackState(youtube);
     if (isHtmlElement(sharedPlayback.parkingNode) && document.body.contains(sharedPlayback.parkingNode)) {
         return sharedPlayback.parkingNode;
@@ -116,6 +122,7 @@ export function ensureYoutubeSharedPlaybackParkingNode(youtube) {
     sharedPlayback.parkingNode = parkingNode;
     return parkingNode;
 }
+
 /**
  * 共有プレーヤー実体を破棄し、再生成できる初期状態へ戻す。
  * @param {{ youtube: *, syncIframe?: Function, debug?: Function }} input
@@ -132,8 +139,7 @@ export function destroyYoutubeSharedPlayback({ youtube, syncIframe, debug }) {
     if (sharedPlayback.player && typeof sharedPlayback.player.destroy === "function") {
         try {
             sharedPlayback.player.destroy();
-        }
-        catch {
+        } catch {
             if (typeof debug === "function") {
                 debug("destroySharedPlayback failed");
             }
