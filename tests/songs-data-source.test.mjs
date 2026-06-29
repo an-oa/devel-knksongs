@@ -1,12 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createSongsDataSource } from "../app/lib/songs-data-source.mjs";
+import { createSongsDataSource } from "../_build/app/lib/songs-data-source.mjs";
 import {
     createLegacyLocalStorageSongsJsonCacheAdapter,
     createLegacyLocalStorageTextCacheAdapter
-} from "../app/lib/storage/songs-json-cache.mjs";
-import { buildSongsJsonMetaPayload, buildSongsJsonPayload } from "../app/lib/songs-json.mjs";
-import { CSV_CACHE_KEY, LEGACY_CSV_CACHE_KEY } from "../app/config.mjs";
+} from "../_build/app/lib/storage/songs-json-cache.mjs";
+import { buildSongsJsonMetaPayload, buildSongsJsonPayload } from "../_build/app/lib/songs-json.mjs";
+import { CSV_CACHE_KEY, LEGACY_CSV_CACHE_KEY } from "../_build/app/config.mjs";
 
 function createFakeLocalStorage() {
     const store = new Map();

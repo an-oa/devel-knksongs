@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createYoutubeUnconfirmedPlaybackStartManager } from "../app/lib/youtube/unconfirmed-playback-start.mjs";
+import { createYoutubeUnconfirmedPlaybackStartManager } from "../_build/app/lib/youtube/unconfirmed-playback-start.mjs";
 
 /**
  * 未確定再生開始 manager のテスト用状態を作る。

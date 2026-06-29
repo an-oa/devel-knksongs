@@ -5,8 +5,8 @@ import {
     createYoutubePlaybackStartResult,
     YOUTUBE_PLAYBACK_START_STATUS,
     createYoutubePlaybackStartAttemptManager
-} from "../app/lib/youtube/playback-start-attempt.mjs";
-import { createYoutubeUnconfirmedPlaybackStartManager } from "../app/lib/youtube/unconfirmed-playback-start.mjs";
+} from "../_build/app/lib/youtube/playback-start-attempt.mjs";
+import { createYoutubeUnconfirmedPlaybackStartManager } from "../_build/app/lib/youtube/unconfirmed-playback-start.mjs";
 import { installFakeDom, setGlobalValue } from "./test-helpers.mjs";
 
 /**

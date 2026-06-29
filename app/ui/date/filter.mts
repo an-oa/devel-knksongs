@@ -32,8 +32,6 @@ type DateSelectValue = {
     precision: DateSelectPrecision;
 };
 
-type DateSelectBounds = SearchDateRange;
-
 type DateFilterUiElements = Pick<
     AppUiElements,
     "dateFromYear" |

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createBookmarkNotificationController } from "../app/ui/bookmark/notifications.mjs";
+import { createBookmarkNotificationController } from "../_build/app/ui/bookmark/notifications.mjs";
 import { installFakeDom, invokeListener, setGlobalValue } from "./test-helpers.mjs";
 
 /**

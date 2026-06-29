@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createSidebarController } from "../app/ui/sidebar/ui.mjs";
+import { createSidebarController } from "../_build/app/ui/sidebar/ui.mjs";
 import { installFakeDom, invokeListener } from "./test-helpers.mjs";
 
 /**

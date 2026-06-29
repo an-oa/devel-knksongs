@@ -6,7 +6,9 @@
     "noEmit": false,
     "declaration": false,
     "sourceMap": false,
-    "removeComments": false
+    "removeComments": false,
+    "rootDir": ".",
+    "outDir": "_build"
   },
   "include": [
     "app/**/*.mts",

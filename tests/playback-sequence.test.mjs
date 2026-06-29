@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
     getPlaybackContinuationCandidates,
     getSequentialPlaybackCandidates
-} from "../app/lib/playback-sequence.mjs";
+} from "../_build/app/lib/playback-sequence.mjs";
 
 test("playback sequence: returns following songs without loop", () => {
     const results = [

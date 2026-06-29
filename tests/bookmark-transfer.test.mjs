@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
     exportBookmarksAsJsonText,
     parseBookmarkImportText
-} from "../app/lib/storage/bookmark-transfer.mjs";
+} from "../_build/app/lib/storage/bookmark-transfer.mjs";
 
 test("bookmark transfer: exports a versioned bookmark JSON payload", () => {
     const result = exportBookmarksAsJsonText({

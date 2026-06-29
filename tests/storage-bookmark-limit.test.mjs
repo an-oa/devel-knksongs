@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createStorageController } from "../app/controllers/storage.mjs";
-import { createSearchFiltersController } from "../app/ui/search-filters/controller.mjs";
+import { createStorageController } from "../_build/app/controllers/storage.mjs";
+import { createSearchFiltersController } from "../_build/app/ui/search-filters/controller.mjs";
 import { installFakeDom } from "./test-helpers.mjs";
 
 function createFakeLocalStorage() {

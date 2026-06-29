@@ -6,7 +6,7 @@ import {
     normalizeLegacySongRefToCurrent,
     parseStoredBookmarksPayload,
     sanitizeBookmarks
-} from "../app/lib/storage/bookmark-schema.mjs";
+} from "../_build/app/lib/storage/bookmark-schema.mjs";
 
 test("bookmark storage schema: parses legacy and versioned payloads with sanitization", () => {
     assert.deepEqual(

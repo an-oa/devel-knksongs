@@ -1,13 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createDateFilterController } from "../app/ui/date/filter.mjs";
-import { createSearchFiltersController } from "../app/ui/search-filters/controller.mjs";
-import { pickRecommendedSongs } from "../app/lib/search-recommendation.mjs";
-import { isWithinDateRange, parseDateKey } from "../app/lib/date-key.mjs";
-import { filterSongsByCriteria, normalizeForSearch } from "../app/lib/search-filters.mjs";
+import { createDateFilterController } from "../_build/app/ui/date/filter.mjs";
+import { createSearchFiltersController } from "../_build/app/ui/search-filters/controller.mjs";
+import { pickRecommendedSongs } from "../_build/app/lib/search-recommendation.mjs";
+import { isWithinDateRange, parseDateKey } from "../_build/app/lib/date-key.mjs";
+import { filterSongsByCriteria, normalizeForSearch } from "../_build/app/lib/search-filters.mjs";
 import {
     createSearchController
-} from "../app/controllers/search.mjs";
+} from "../_build/app/controllers/search.mjs";
 import { installFakeDom } from "./test-helpers.mjs";
 
 let autoSongId = 0;

@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import {
     appState,
     createInitialPlaybackUiRuntimeState
-} from "../app/state.mjs";
-import { INITIAL_PLAYBACK_SETTING_VALUES } from "../app/lib/playback-settings/definitions.mjs";
+} from "../_build/app/state.mjs";
+import { INITIAL_PLAYBACK_SETTING_VALUES } from "../_build/app/lib/playback-settings/definitions.mjs";
 
 /** @typedef {import("../app/state.types").PlaybackUiRuntimeState} PlaybackUiRuntimeState */
 

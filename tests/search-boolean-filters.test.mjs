@@ -8,7 +8,7 @@ import {
     hasSelectedSearchBooleanFilterState,
     resetSearchBooleanFilters,
     SEARCH_BOOLEAN_FILTER_KEYS
-} from "../app/lib/search-boolean-filters.mjs";
+} from "../_build/app/lib/search-boolean-filters.mjs";
 
 function createBooleanFilterUi() {
     return {

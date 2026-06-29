@@ -8,10 +8,11 @@
     "moduleResolution": "Bundler",
     "lib": ["DOM", "ES2024"],
     "strict": false,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "skipLibCheck": true
   },
   "include": [
-    "app/**/*.mjs",
     "app/**/*.mts",
     "app/**/*.ts",
     "types/**/*.d.ts"

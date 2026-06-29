@@ -1,10 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createPlaybackSessionController } from "../app/controllers/playback-session.mjs";
+import { createPlaybackSessionController } from "../_build/app/controllers/playback-session.mjs";
 import {
     createYoutubePlaybackStartResult,
     YOUTUBE_PLAYBACK_START_STATUS
-} from "../app/lib/youtube/playback-start-attempt.mjs";
+} from "../_build/app/lib/youtube/playback-start-attempt.mjs";
 
 /**
  * 再生セッション制御テスト用の UI 状態を作る。

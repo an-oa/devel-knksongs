@@ -349,7 +349,7 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
      * @param {YoutubePlaybackStateEvent} event
      * @returns {YoutubePlaybackRuntimeState}
      */
-    function applyPlaybackStateEvent(event) {
+    function applyPlaybackStateEvent(event: YoutubePlaybackStateEvent): YoutubePlaybackRuntimeState {
         playbackState = reduceYoutubePlaybackState(playbackState, event);
         return playbackState;
     }
@@ -369,7 +369,7 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
      * @param {YoutubePlayerStateEvent | null | undefined} event
      * @returns {boolean}
      */
-    function isStalePlayerStateEvent(event) {
+    function isStalePlayerStateEvent(event: YoutubePlayerStateEvent | null | undefined): boolean {
         const target = event && event.target;
         if (!target || typeof target.getPlayerState !== "function") return false;
         try {
@@ -456,7 +456,7 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
          * @param {YoutubePlayerStateEvent} event
          * @param {number} playbackSessionId
          */
-        handleStateChange(event, playbackSessionId) {
+        handleStateChange(event: YoutubePlayerStateEvent, playbackSessionId: number) {
             const thumbDiv = getSharedPlaybackThumb(playbackSessionId);
             debugPlayback("youtube", "player state change", {
                 playbackSessionId,
@@ -526,7 +526,7 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
          * @param {YoutubePlayerStateEvent} event
          * @param {number} playbackSessionId
          */
-        handlePlayerError(event, playbackSessionId) {
+        handlePlayerError(event: YoutubePlayerStateEvent, playbackSessionId: number) {
             const thumbDiv = getSharedPlaybackThumb(playbackSessionId);
             if (!isHtmlElement(thumbDiv)) return;
             if (!isCurrentPlaybackSession(thumbDiv, playbackSessionId)) return;
@@ -671,7 +671,10 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
      * @param {PlaybackStartFailureOptions | undefined} options
      * @returns {{ songKey: string, videoId: string, reason: string, errorCode?: unknown }}
      */
-    function buildAutoplayFailureDebugDetails(thumbDiv, options) {
+    function buildAutoplayFailureDebugDetails(
+        thumbDiv: Element | null | undefined,
+        options: PlaybackStartFailureOptions | undefined
+    ) {
         const details: { songKey: string, videoId: string, reason: string, errorCode?: unknown } = {
             songKey: getSongKeyFromYoutubeThumb(thumbDiv),
             videoId: isHtmlElement(thumbDiv) ? (thumbDiv.dataset.videoId || "") : "",
@@ -688,7 +691,10 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
      * @param {Element | null | undefined} thumbDiv
      * @param {PlaybackStartFailureOptions | undefined} options
      */
-    function logAutoplayPlaybackFailure(thumbDiv, options) {
+    function logAutoplayPlaybackFailure(
+        thumbDiv: Element | null | undefined,
+        options: PlaybackStartFailureOptions | undefined
+    ) {
         debugPlayback(
             "youtube",
             "autoplay playback start failed; skipping candidate",
@@ -719,7 +725,10 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
      * @param {HTMLElement} thumbDiv
      * @param {PlaybackStartFailureOptions | undefined} [options]
      */
-    function handlePlaybackStartFailure(thumbDiv, options = undefined) {
+    function handlePlaybackStartFailure(
+        thumbDiv: HTMLElement,
+        options: PlaybackStartFailureOptions | undefined = undefined
+    ) {
         const playbackMode = options && options.playbackMode ? options.playbackMode : getPlaybackMode(thumbDiv);
         const failedSongKey = getSongKeyFromYoutubeThumb(thumbDiv);
         const failedSessionId = Number.isFinite(options && options.sessionId) ? options.sessionId : 0;

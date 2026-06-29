@@ -1,4 +1,4 @@
-import { createYoutubeController } from "../app/controllers/youtube.mjs";
+import { createYoutubeController } from "../_build/app/controllers/youtube.mjs";
 
 export const YOUTUBE_PLAYER_STATES = {
     ENDED: 0,

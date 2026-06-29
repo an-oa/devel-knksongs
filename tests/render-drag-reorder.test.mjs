@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createBookmarkDragReorderController } from "../app/lib/render/drag-reorder.mjs";
+import { createBookmarkDragReorderController } from "../_build/app/lib/render/drag-reorder.mjs";
 import {
     createDataTransferMock,
     installFakeDom,

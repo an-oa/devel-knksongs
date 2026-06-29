@@ -3,8 +3,8 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { parseSongsJsonPayload } from "../app/lib/songs-json.mjs";
-import { extractYoutubeInfo } from "../app/lib/youtube-url.mjs";
+import { parseSongsJsonPayload } from "../_build/app/lib/songs-json.mjs";
+import { extractYoutubeInfo } from "../_build/app/lib/youtube-url.mjs";
 
 const DEFAULT_INPUT_PATH = "data/songs.json";
 const ALLOWED_YOUTUBE_HOSTS = new Set([

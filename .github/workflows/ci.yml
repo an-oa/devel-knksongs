@@ -24,14 +24,14 @@ jobs:
 
       - run: npm ci
 
-      - run: npm run validate:songs-json
-
-      - run: npm run typecheck
-
-      - run: npm run check:ts-emit
-
       - run: npm run build
 
-      - run: npm run lint
+      - run: npm run validate:songs-json:raw
 
-      - run: npm run test:unit
+      - run: npm run typecheck:raw
+
+      - run: npm run check:ts-emit:raw
+
+      - run: npm run lint:raw
+
+      - run: npm run test:unit:raw

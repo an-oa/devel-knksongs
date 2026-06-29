@@ -488,7 +488,7 @@ export function createRenderController({
      * 現在状態に応じた空結果メッセージ種別を決定する。
      * @returns {EmptyStateDescriptor}
      */
-    function getEmptyStateDescriptor() {
+    function getEmptyStateDescriptor(): EmptyStateDescriptor {
         if (!searchUiState.dataReady) {
             return { kind: "loading", message: "読み込み中..." };
         }
@@ -586,7 +586,7 @@ export function createRenderController({
      * @param {HTMLElement[]} nodes
      * @returns {ActiveCardRenderState}
      */
-    function collectActiveCardRenderState(container, nodes) {
+    function collectActiveCardRenderState(container: HTMLElement, nodes: HTMLElement[]): ActiveCardRenderState {
         const activeThumb = playbackUi.activeThumb;
         const activeCard = activeThumb ? activeThumb.closest(".song-card") : null;
         const activeCardElement = activeCard instanceof HTMLElement ? activeCard : null;
@@ -602,7 +602,7 @@ export function createRenderController({
      * アクティブ再生カードが次表示に含まれない場合は再生を停止する。
      * @param {ActiveCardRenderState} activeState
      */
-    function stopActivePlaybackIfHidden(activeState) {
+    function stopActivePlaybackIfHidden(activeState: ActiveCardRenderState) {
         if (!activeState.activeThumb) return;
         if (activeState.isActiveCardInNextNodes) return;
         tracePlayback("render", "stopActivePlaybackIfHidden", {
@@ -619,7 +619,7 @@ export function createRenderController({
      * @param {Song[]} results
      * @returns {ResultNodeBuildResult}
      */
-    function buildResultNodes(results) {
+    function buildResultNodes(results: Song[]): ResultNodeBuildResult {
         const nextEntriesBySourceKey = new Map();
         const entries = [];
         const nodes = [];
@@ -652,7 +652,7 @@ export function createRenderController({
      * @param {ActiveCardRenderState} activeState
      * @returns {HTMLElement | null}
      */
-    function getPinnedActiveCard(activeState) {
+    function getPinnedActiveCard(activeState: ActiveCardRenderState): HTMLElement | null {
         if (!activeState.isActiveCardInNextNodes) return null;
         if (!activeState.hasEmbeddedPlayer) return null;
         return activeState.activeCard;
@@ -764,7 +764,7 @@ export function createRenderController({
      * 描画に必要なコンテナ・結果・モード情報をまとめる。
      * @returns {DisplayState}
      */
-    function collectDisplayState() {
+    function collectDisplayState(): DisplayState {
         return {
             container: ui.el.resultList,
             results: getVisibleResults(),
@@ -785,7 +785,7 @@ export function createRenderController({
      * @param {DisplayState} displayState
      * @returns {RenderedDisplayState | null}
      */
-    function renderDisplayState(displayState) {
+    function renderDisplayState(displayState: DisplayState): RenderedDisplayState | null {
         const { container, results } = displayState;
         if (results.length === 0) {
             renderEmptyResults(container, ui.el.loadMoreContainer);
@@ -802,7 +802,7 @@ export function createRenderController({
      * @param {RenderedDisplayState} rendered
      * @param {DisplayState} displayState
      */
-    function monitorDisplayState(rendered, displayState) {
+    function monitorDisplayState(rendered: RenderedDisplayState, displayState: DisplayState) {
         observeVisibleThumbnails(rendered.entries);
         updateLoadMoreVisibility(displayState.recommendedMode);
     }

@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 
-import { copyFile, cp, mkdir, rm } from "node:fs/promises";
-import { isAbsolute, join, relative, resolve } from "node:path";
+import { copyFile, mkdir, rm } from "node:fs/promises";
+import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { shouldCopyAppAsset } from "./build-pages-artifact.mjs";
+import { buildTypeScriptModules } from "./build-ts.mjs";
+import { resolveProjectPath } from "./lib/paths.mjs";
+import { DATA_ASSET_FILES, ROOT_ASSET_FILES } from "./lib/site-assets.mjs";
 
 const DEFAULT_BUILD_DIR = "_build";
-const ROOT_ASSET_FILES = ["index.html", "styles.css", "ogp.png"];
-const DATA_ASSET_FILES = ["songs.json", "songs-meta.json"];
 
 /**
  * CLI 引数から build option を作る。
@@ -39,27 +39,16 @@ export function parseArgs(args) {
  * @returns {string}
  */
 export function resolveSiteBuildOutputDir(outputDir, rootDir = process.cwd()) {
-    const projectRoot = resolve(rootDir);
-    const resolvedOutputDir = resolve(projectRoot, outputDir);
-    const relativeOutputDir = relative(projectRoot, resolvedOutputDir);
-    if (!relativeOutputDir) {
-        throw new Error("Site build output directory must not target the project root");
-    }
-    if (relativeOutputDir.startsWith("..") || isAbsolute(relativeOutputDir)) {
-        throw new Error("Site build output directory must stay inside the project root");
-    }
-    const outputPathSegments = relativeOutputDir.split(/[\\/]+/).filter(Boolean);
-    if (outputPathSegments[0] !== DEFAULT_BUILD_DIR) {
-        throw new Error(`Site build output directory must be ${DEFAULT_BUILD_DIR} or its child directory`);
-    }
-    if (outputPathSegments.some((segment) => segment.startsWith("."))) {
-        throw new Error("Site build output directory must not include dot directories");
-    }
-    return resolvedOutputDir;
+    return resolveProjectPath({
+        targetPath: outputDir,
+        rootDir,
+        pathLabel: "Site build output directory",
+        requiredTopLevelDirectory: DEFAULT_BUILD_DIR
+    });
 }
 
 /**
- * TypeScript 生成済みの JavaScript を含む静的 site build を作る。
+ * 静的 asset と TypeScript 生成 JavaScript を含む site build を作る。
  * @param {{ outputDir: string }} options
  * @returns {Promise<string>}
  */
@@ -70,13 +59,10 @@ export async function buildSite(options) {
     await Promise.all(ROOT_ASSET_FILES.map((fileName) => (
         copyFile(resolve(fileName), join(outputDir, fileName))
     )));
-    await cp(resolve("app"), join(outputDir, "app"), {
-        recursive: true,
-        filter: shouldCopyAppAsset
-    });
     await Promise.all(DATA_ASSET_FILES.map((fileName) => (
         copyFile(resolve("data", fileName), join(outputDir, "data", fileName))
     )));
+    await buildTypeScriptModules({ outputDir });
     return outputDir;
 }
 

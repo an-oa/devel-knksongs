@@ -6,7 +6,7 @@ import {
     parseSongsJsonMetaPayload,
     parseSongsJsonPayload,
     SONGS_JSON_SCHEMA_VERSION
-} from "../app/lib/songs-json.mjs";
+} from "../_build/app/lib/songs-json.mjs";
 
 test("songs json: builds and parses current schema payload", () => {
     const songs = [{ songKey: "archive-1::1" }];

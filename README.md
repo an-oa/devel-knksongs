@@ -105,14 +105,14 @@ flowchart TD
 
 - 通常の起動時は、事前生成された `data/songs.json` と `data/songs-meta.json` を優先して読み込みます。
 - `songs-meta.json` の `contentHash` で手元のJSONキャッシュが最新かを確認し、変化がなければ大きい `songs.json` の再取得を避けます。
-- 公開スプレッドシートのCSVは、事前生成JSONの元データかつJSON取得失敗時のフォールバックとして参照します(`app/config.mjs` の `PUBLIC_CSV_URL` で指定します)。
+- 公開スプレッドシートのCSVは、事前生成JSONの元データかつJSON取得失敗時のフォールバックとして参照します(`app/config.mts` の `PUBLIC_CSV_URL` で指定し、実行時は `_build/app/config.mjs` に生成された module を読みます)。
 - CSVの `配信上の立場` は曲データの `streamRole` としてJSONへ保持します。
 - `.github/workflows/update-songs-json-and-deploy.yml` は GitHub Actions 上で `npm run build:songs-json` と `npm run validate:songs-json` を実行し、`data/songs.json` / `data/songs-meta.json` に差分があればコミットします。その後 `npm run build:pages-artifact` で `_build` から `_site` を作成し、Pages へ deploy します。
 - `.github/workflows/ci.yml` は push / pull request / 手動実行で `npm run validate:songs-json`、`npm run typecheck`、`npm run check:ts-emit`、`npm run build`、`npm run lint`、`npm run test:unit` を実行します。
-- Pages artifact 生成時は `DEPLOY_CACHE_BUSTER` または `GITHUB_SHA` を使い、`index.html` の `styles.css` / `app/bootstrap.mjs` と、`app/**/*.mjs` 内の相対 `.mjs` 参照へ `?v=...` を付与します。ソースの `index.html` や import には通常 `?v=...` を書きません。
+- Pages artifact 生成時は `DEPLOY_CACHE_BUSTER` または `GITHUB_SHA` を使い、`index.html` の `styles.css` / `app/bootstrap.mjs` と、配布用 `app/**/*.mjs` 内の相対 `.mjs` 参照へ `?v=...` を付与します。ソースの `index.html` や import には通常 `?v=...` を書きません。
 - フロントエンドのみで動作します(静的ホスティング想定)。
 - 配布物はHTML/CSS/JavaScriptのみで、実行時にnpm等の同梱依存はありません。
-- TypeScript 移行中の `.mts` は source として扱い、ブラウザやテストは隣接生成された `.mjs` を読みます。`.mts` を変更した場合は `npm run build:ts` で `.mjs` を更新します。`npm run check:ts-emit` は生成 `.mjs` の同期漏れを検出します。`npm run build` は TypeScript 生成済みの静的サイトを `_build` へ作成し、`npm run build:pages-artifact` は `_build` を元に `_site` を作成します。`npm run test:unit` / `npm run test:e2e` / `npm run build:pages-artifact` は事前に `build:ts` を実行します。
+- `app/**/*.mts` は source として扱い、ブラウザ・テスト・Node scripts は `npm run build:ts` で `_build/app/**/*.mjs` に生成された module を読みます。生成 `.mjs` は Git 管理対象外です。fresh checkout 後や `.mts` 変更後は、ローカル確認前に `npm run build:ts` を実行してください。`npm run check:ts-emit` は `_build/app` の生成 `.mjs` が存在し、`app` source tree に `.mjs` が残っていないことを確認します。`npm run build` は静的 asset と TypeScript 生成 module を `_build` へ作成し、`npm run build:pages-artifact` は `_build` を元に `_site` を作成します。`npm run typecheck` / `npm run lint` / `npm run test:unit` / `npm run build:songs-json` / `npm run validate:songs-json` は事前に `build:ts` を実行します。`npm run test:e2e` / `npm run build:pages-artifact` は事前に `npm run build` を実行します。
 - サムネイル表示/埋め込み再生まわりでは YouTube Iframe API を動的に利用します。
 - 開発時の静的解析は TypeScript noEmit typecheck と ESLint を利用します。
 - 開発時テストは Node.js 標準の `node:test` を利用します。
@@ -179,7 +179,7 @@ flowchart TD
   - `npx playwright install chromium`
   - `python3` が PATH 上で利用できること
 - Playwright のスモークテストでは、静的サイトはローカル配信し、CSV と YouTube Iframe API は mock / fixture に差し替えて回帰確認します。
-- `npm run test:e2e` は Playwright 側で `python3 -m http.server 4173 --bind 127.0.0.1` を起動して静的サイトを配信します。
+- `npm run test:e2e` は事前に `npm run build` で `_build` を作り、Playwright 側で `python3 -m http.server 4173 --bind 127.0.0.1 --directory _build` を起動して静的サイトを配信します。
 - 現時点の Playwright 対象は Chromium です。iOS Safari は別途、実機または手動スモーク確認を想定します。
 
 ---

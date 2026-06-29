@@ -1,13 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createRenderController } from "../app/controllers/render.mjs";
-import { createSearchController } from "../app/controllers/search.mjs";
-import { extractYoutubeInfo } from "../app/controllers/youtube.mjs";
-import { createSearchFiltersController } from "../app/ui/search-filters/controller.mjs";
+import { createRenderController } from "../_build/app/controllers/render.mjs";
+import { createSearchController } from "../_build/app/controllers/search.mjs";
+import { extractYoutubeInfo } from "../_build/app/controllers/youtube.mjs";
+import { createSearchFiltersController } from "../_build/app/ui/search-filters/controller.mjs";
 import {
     createYoutubePlaybackStartResult,
     YOUTUBE_PLAYBACK_START_STATUS
-} from "../app/lib/youtube/playback-start-attempt.mjs";
+} from "../_build/app/lib/youtube/playback-start-attempt.mjs";
 import {
     installFakeDom,
     makeRenderRow,

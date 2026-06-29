@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { createPlaybackSettingsController } from "../../app/controllers/playback-settings.mjs";
-import { LEGACY_PLAYBACK_SETTINGS_STORAGE_KEYS } from "../../app/lib/playback-settings/definitions.mjs";
+import { createPlaybackSettingsController } from "../../_build/app/controllers/playback-settings.mjs";
+import { LEGACY_PLAYBACK_SETTINGS_STORAGE_KEYS } from "../../_build/app/lib/playback-settings/definitions.mjs";
 
 /**
  * @typedef {{

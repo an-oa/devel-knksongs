@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createSearchFiltersController } from "../app/ui/search-filters/controller.mjs";
+import { createSearchFiltersController } from "../_build/app/ui/search-filters/controller.mjs";
 import { installFakeDom, invokeListener } from "./test-helpers.mjs";
 
 function createFormatCheckbox(value, checked = false) {

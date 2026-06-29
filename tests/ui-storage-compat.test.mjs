@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { applyThemeFromStorage, setupTheme } from "../app/ui/core/elements.mjs";
+import { applyThemeFromStorage, setupTheme } from "../_build/app/ui/core/elements.mjs";
 import { installFakeDom, invokeListener } from "./test-helpers.mjs";
 import {
     assertExperimentalPlaybackSettingsHidden,

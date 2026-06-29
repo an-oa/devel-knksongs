@@ -4,7 +4,7 @@ import {
     canUseDom,
     getHeaderHeight,
     isHtmlElement
-} from "../app/lib/dom-utils.mjs";
+} from "../_build/app/lib/dom-utils.mjs";
 import { installFakeDom } from "./test-helpers.mjs";
 
 test("dom utils: isHtmlElement and canUseDom reflect fake dom environment", () => {

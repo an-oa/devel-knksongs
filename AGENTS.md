@@ -37,13 +37,13 @@ feat: move settings into dedicated sidebar panel
   ブックマークの下に表示される順序へ調整した。
 ```
 
-## JavaScript Function Docs
+## JavaScript / TypeScript Function Docs
 
-- 実装側の `.js` / `.mjs` では、関数の直前に `/** ... */` の JSDoc を置いて機能を説明する書き方が広く使われている。
-- 特に `app/bootstrap.mjs` `app/ui/bookmark/ui.mjs` `app/controllers/search.mjs`
-  `app/controllers/storage.mjs` `app/controllers/render.mjs`
-  `app/controllers/youtube.mjs` では、この形式が主流になっている。
-- 短い委譲関数や一部テスト補助関数では省略されている箇所もあるが、新しく JavaScript の関数を追加するときは、関数の先頭に JSDoc を付けて機能を説明する。
+- 実装側の `app/**/*.mts` では、関数の直前に `/** ... */` の JSDoc を置いて機能を説明する書き方が広く使われている。
+- 特に `app/bootstrap.mts` `app/ui/bookmark/ui.mts` `app/controllers/search.mts`
+  `app/controllers/storage.mts` `app/controllers/render.mts`
+  `app/controllers/youtube.mts` では、この形式が主流になっている。
+- 短い委譲関数や一部テスト補助関数では省略されている箇所もあるが、新しく関数を追加するときは、関数の先頭に JSDoc を付けて機能を説明する。
 - 必要に応じて `@param` `@returns` を付け、既存コードの粒度に合わせて簡潔に書く。
 - JSDoc の `@param {*} ` は既存コードでは残っているが、新規関数や触った関数では可能な範囲で具体的な型へ寄せる。
   例: `Element | null | undefined`、`string`、`number`、`Record<string, *>`。
@@ -68,14 +68,15 @@ feat: move settings into dedicated sidebar panel
 
 ## TypeScript Emit During Migration
 
-- `.mts` は移行中の TypeScript source として扱い、ブラウザ・テスト・既存 import は隣接生成された `.mjs` を読む。
-- `.mts` と同名の `.mjs` がある場合、手編集は `.mts` 側へ行い、`.mjs` は `npm run build:ts` で更新する。
+- `.mts` は TypeScript source として扱い、ブラウザ・テスト・Node scripts は `npm run build:ts` が `_build/app/**/*.mjs` に生成した module を読む。
+- `app` 配下は source tree とし、`app/**/*.mjs` を残さない。手編集は `.mts` 側へ行い、必要な `.mjs` は `npm run build:ts` で `_build/app` に作り直す。
 - 生成 `.mjs` の先頭には `npm run build:ts` が手編集禁止ヘッダーを付ける。
-  ヘッダー付き `.mjs` をレビューするときは、実装意図の確認元を同名 `.mts` に置く。
-- `.mts` または生成 `.mjs` を変更したときは、`npm run check:ts-emit` で生成物の同期漏れがないことを確認する。
+  ヘッダー付き `.mjs` をレビューするときは、実装意図の確認元を対応する `app/**/*.mts` に置く。
+- `.mts` や TypeScript emit 経路を変更したときは、`npm run check:ts-emit` で `_build/app` の生成 `.mjs` が存在し、
+  `app` source tree に `.mjs` が残っていないことを確認する。
 - `tsconfig.build.json` は `app/**/*.mts` だけを emit 対象にし、`allowJs: false` のまま保つ。
   既存 `.mjs` を TypeScript emit 対象へ巻き込むと、入力ファイル上書き防止で失敗しやすい。
-- `npm run build` は `build:ts` 後の静的 site を `_build` へ作り、`.ts` / `.mts` source を含めない。
+- `npm run build` は静的 asset と TypeScript 生成 module を `_build` へ作り、`.ts` / `.mts` source を含めない。
 - Pages artifact は `_build` を入力元にして `_site` を作り、cache buster を付与する。
 
 ## Naming
@@ -89,7 +90,7 @@ feat: move settings into dedicated sidebar panel
   `npm install` を実行してから検証する。
 - JavaScript や型定義を変更したときは、静的解析として `npm run typecheck` と
   `npm run lint` を基本の確認手順として実行する。
-- `.mts` または生成 `.mjs` を変更したときは、`npm run check:ts-emit` も実行する。
+- `.mts` や TypeScript emit 経路を変更したときは、`npm run check:ts-emit` も実行する。
 - TypeScript build や Pages artifact の入力経路に関わる変更では、`npm run build` も実行する。
 - `tests/` 配下に Node のテストがあるため、JavaScript を変更したときは
   `npm run test:unit` も基本の確認手順として実行する。
@@ -154,7 +155,7 @@ feat: move settings into dedicated sidebar panel
 | `WORKFLOW.md` | UTF-8 BOMなし | LF |
 | `index.html` | UTF-8 BOMなし | LF |
 | `styles.css` | UTF-8 BOMなし | LF |
-| `app/**/*.js` / `app/**/*.mjs` | UTF-8 BOMなし | LF |
+| `app/**/*.mts` / 生成 `_build/app/**/*.mjs` | UTF-8 BOMなし | LF |
 | `tests/**/*.mjs` | UTF-8 BOMなし | LF |
 | `.github/workflows/*.yml` | UTF-8 BOMなし | LF |
 | `playwright.config.mjs` | UTF-8 BOMなし | LF |

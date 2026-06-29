@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
     applyMasonryLayout,
     getMasonryColumnCount
-} from "../app/lib/render/masonry-layout.mjs";
+} from "../_build/app/lib/render/masonry-layout.mjs";
 import { installFakeDom } from "./test-helpers.mjs";
 
 test("render masonry: column count follows breakpoints", () => {

@@ -1,10 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { extractYoutubeInfo } from "../app/controllers/youtube.mjs";
+import { extractYoutubeInfo } from "../_build/app/controllers/youtube.mjs";
 import {
     createYoutubePlaybackStartResult,
     YOUTUBE_PLAYBACK_START_STATUS
-} from "../app/lib/youtube/playback-start-attempt.mjs";
+} from "../_build/app/lib/youtube/playback-start-attempt.mjs";
 import {
     installFakeDom,
     invokeListener,

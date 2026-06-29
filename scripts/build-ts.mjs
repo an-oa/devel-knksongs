@@ -2,13 +2,16 @@
 
 import { spawnSync } from "node:child_process";
 import { constants } from "node:fs";
-import { access, readdir, readFile, writeFile } from "node:fs/promises";
+import { access, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join, relative, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { resolveProjectPath } from "./lib/paths.mjs";
 
 const PROJECT_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const APP_DIR = join(PROJECT_ROOT, "app");
+const DEFAULT_BUILD_DIR = "_build";
 const GENERATED_HEADER_PATTERN = /^\/\/ Generated from .+\.\r?\n\/\/ Do not edit this \.mjs file by hand; edit the \.mts source and run npm run build:ts\.\r?\n\r?\n/;
+const TS_CHECK_COMMENT_PATTERN = /^\/\/ @ts-check\r?\n\r?\n?/;
 
 /**
  * OS ごとの差を吸収して npm executable 名を返す。
@@ -68,28 +71,69 @@ function readCommand(command, args) {
 }
 
 /**
- * directory 配下の .mts source を再帰的に列挙する。
+ * build 出力先を安全な project root 配下の directory に解決する。
+ * @param {string | undefined} outputDir
+ * @param {string} [rootDir]
+ * @returns {string}
+ */
+export function resolveTypeScriptBuildOutputDir(outputDir, rootDir = PROJECT_ROOT) {
+    return resolveProjectPath({
+        targetPath: outputDir || DEFAULT_BUILD_DIR,
+        rootDir,
+        pathLabel: "TypeScript build output directory",
+        requiredTopLevelDirectory: DEFAULT_BUILD_DIR
+    });
+}
+
+/**
+ * directory 配下の指定拡張子の file を再帰的に列挙する。
  * @param {string} directory
+ * @param {string} extension
  * @returns {Promise<string[]>}
  */
-async function listTypeScriptModuleSources(directory) {
+async function listFilesByExtension(directory, extension) {
     const entries = await readdir(directory, { withFileTypes: true });
     const nestedFiles = await Promise.all(entries.map(async (entry) => {
         const entryPath = join(directory, entry.name);
-        if (entry.isDirectory()) return listTypeScriptModuleSources(entryPath);
-        if (entry.isFile() && entry.name.endsWith(".mts")) return [entryPath];
+        if (entry.isDirectory()) return listFilesByExtension(entryPath, extension);
+        if (entry.isFile() && entry.name.endsWith(extension)) return [entryPath];
         return [];
     }));
     return nestedFiles.flat().sort();
 }
 
 /**
- * .mts source に対応する隣接生成 .mjs の path を返す。
+ * directory 配下の指定拡張子の file を再帰的に列挙する。directory がない場合は空配列を返す。
+ * @param {string} directory
+ * @param {string} extension
+ * @returns {Promise<string[]>}
+ */
+async function listExistingFilesByExtension(directory, extension) {
+    try {
+        await access(directory, constants.F_OK);
+    } catch {
+        return [];
+    }
+    return listFilesByExtension(directory, extension);
+}
+
+/**
+ * app 配下の .mts source を再帰的に列挙する。
+ * @returns {Promise<string[]>}
+ */
+async function listTypeScriptModuleSources() {
+    return listFilesByExtension(APP_DIR, ".mts");
+}
+
+/**
+ * .mts source に対応する _build/app 生成 .mjs の path を返す。
  * @param {string} sourcePath
+ * @param {string} outputDir
  * @returns {string}
  */
-function getEmittedModulePath(sourcePath) {
-    return sourcePath.replace(/\.mts$/, ".mjs");
+function getEmittedModulePath(sourcePath, outputDir) {
+    const relativeSourcePath = relative(APP_DIR, sourcePath);
+    return join(outputDir, "app", relativeSourcePath).replace(/\.mts$/, ".mjs");
 }
 
 /**
@@ -114,7 +158,9 @@ function createGeneratedHeader(sourcePath) {
  */
 async function writeGeneratedHeader(sourcePath, emittedPath) {
     const source = await readFile(emittedPath, "utf8");
-    const sourceWithoutHeader = source.replace(GENERATED_HEADER_PATTERN, "");
+    const sourceWithoutHeader = source
+        .replace(GENERATED_HEADER_PATTERN, "")
+        .replace(TS_CHECK_COMMENT_PATTERN, "");
     const nextSource = `${createGeneratedHeader(sourcePath)}\n${sourceWithoutHeader}`;
     if (nextSource !== source) {
         await writeFile(emittedPath, nextSource, "utf8");
@@ -145,65 +191,141 @@ async function assertEmittedModulesExist(emittedPaths) {
 }
 
 /**
- * 生成 .mjs が git 管理対象になっていることを確認する。
- * @param {string[]} emittedPaths
- * @returns {void}
+ * 旧方式で app 配下に生成されていた .mjs を削除する。
+ * 生成ヘッダーがない .mjs は手編集の可能性があるため削除せず停止する。
+ * @param {string[]} sourcePaths
+ * @returns {Promise<void>}
  */
-function assertEmittedModulesTracked(emittedPaths) {
-    const emittedGitPaths = emittedPaths.map(toGitPath);
-    const trackedPaths = new Set(
-        readCommand("git", ["ls-files", "--", ...emittedGitPaths])
-            .split(/\r?\n/)
-            .filter(Boolean)
-    );
-    const untrackedPaths = emittedGitPaths.filter((emittedPath) => !trackedPaths.has(emittedPath));
-    if (untrackedPaths.length > 0) {
-        console.error("Generated .mjs files must be committed while app imports still read .mjs:");
-        for (const untrackedPath of untrackedPaths) {
-            console.error(`- ${untrackedPath}`);
+async function removeGeneratedAdjacentModules(sourcePaths) {
+    const unsafePaths = [];
+    await Promise.all(sourcePaths.map(async (sourcePath) => {
+        const adjacentPath = sourcePath.replace(/\.mts$/, ".mjs");
+        let source;
+        try {
+            source = await readFile(adjacentPath, "utf8");
+        } catch (error) {
+            if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+                return;
+            }
+            throw error;
+        }
+        if (!GENERATED_HEADER_PATTERN.test(source)) {
+            unsafePaths.push(toGitPath(adjacentPath));
+            return;
+        }
+        await rm(adjacentPath);
+    }));
+    if (unsafePaths.length > 0) {
+        console.error("Refusing to remove app .mjs files without the generated header:");
+        for (const unsafePath of unsafePaths.sort()) {
+            console.error(`- ${unsafePath}`);
         }
         process.exit(1);
     }
 }
 
 /**
- * 生成 .mjs に未同期の差分が残っていないことを確認する。
- * @param {string[]} emittedPaths
- * @returns {void}
- */
-function assertEmittedModulesClean(emittedPaths) {
-    runCommand("git", ["diff", "--exit-code", "--", ...emittedPaths.map(toGitPath)]);
-}
-
-/**
- * TypeScript module を emit し、生成 .mjs にヘッダーを付ける。
- * @param {{ check: boolean }} options
+ * app 配下に .mjs が残っていないことを確認する。
  * @returns {Promise<void>}
  */
-async function buildTypeScriptModules(options) {
-    runCommand(getNpmExecutable(), ["exec", "tsc", "--", "--project", "tsconfig.build.json"]);
-    const sourcePaths = await listTypeScriptModuleSources(APP_DIR);
-    const emittedPaths = sourcePaths.map(getEmittedModulePath);
-    await assertEmittedModulesExist(emittedPaths);
-    await Promise.all(sourcePaths.map((sourcePath) => (
-        writeGeneratedHeader(sourcePath, getEmittedModulePath(sourcePath))
-    )));
-    if (options.check) {
-        assertEmittedModulesTracked(emittedPaths);
-        assertEmittedModulesClean(emittedPaths);
+async function assertAppModulesAbsent() {
+    const modulePaths = await listExistingFilesByExtension(APP_DIR, ".mjs");
+    if (modulePaths.length === 0) return;
+    console.error("app .mjs files must not remain in the TypeScript source tree:");
+    for (const modulePath of modulePaths.map(toGitPath)) {
+        console.error(`- ${modulePath}`);
     }
-}
-
-const args = process.argv.slice(2);
-const unknownArgs = args.filter((arg) => arg !== "--check");
-if (unknownArgs.length > 0) {
-    console.error(`Unknown argument: ${unknownArgs[0]}`);
     process.exit(1);
 }
 
-try {
-    await buildTypeScriptModules({ check: args.includes("--check") });
-} catch (error) {
-    console.error(error instanceof Error ? error.message : error);
-    process.exitCode = 1;
+/**
+ * 生成 .mjs が git 管理対象になっていないことを確認する。
+ * @param {string[]} emittedPaths
+ * @returns {void}
+ */
+function assertEmittedModulesUntracked(emittedPaths) {
+    const emittedGitPaths = emittedPaths.map(toGitPath);
+    const trackedPaths = new Set(
+        readCommand("git", ["ls-files", "--", ...emittedGitPaths])
+            .split(/\r?\n/)
+            .filter(Boolean)
+    );
+    const trackedEmittedPaths = emittedGitPaths.filter((emittedPath) => trackedPaths.has(emittedPath));
+    if (trackedEmittedPaths.length > 0) {
+        console.error("Generated app .mjs files must stay out of git tracking:");
+        for (const trackedPath of trackedEmittedPaths) {
+            console.error(`- ${trackedPath}`);
+        }
+        process.exit(1);
+    }
+}
+
+/**
+ * TypeScript module を _build/app へ emit し、生成 .mjs にヘッダーを付ける。
+ * @param {{ check?: boolean, outputDir?: string }} [options]
+ * @returns {Promise<void>}
+ */
+export async function buildTypeScriptModules(options = {}) {
+    const outputDir = resolveTypeScriptBuildOutputDir(options.outputDir);
+    await rm(join(outputDir, "app"), { recursive: true, force: true });
+    runCommand(getNpmExecutable(), [
+        "exec",
+        "tsc",
+        "--",
+        "--project",
+        "tsconfig.build.json",
+        "--outDir",
+        outputDir
+    ]);
+    const sourcePaths = await listTypeScriptModuleSources();
+    const emittedPaths = sourcePaths.map((sourcePath) => getEmittedModulePath(sourcePath, outputDir));
+    await assertEmittedModulesExist(emittedPaths);
+    await Promise.all(sourcePaths.map((sourcePath) => (
+        writeGeneratedHeader(sourcePath, getEmittedModulePath(sourcePath, outputDir))
+    )));
+    await removeGeneratedAdjacentModules(sourcePaths);
+    await assertAppModulesAbsent();
+    if (options.check) {
+        await checkTypeScriptEmit({ outputDir });
+    }
+}
+
+/**
+ * 既存の TypeScript emit 結果を検査する。CI など、直前に build 済みの経路で使う。
+ * @param {{ outputDir?: string }} [options]
+ * @returns {Promise<void>}
+ */
+export async function checkTypeScriptEmit(options = {}) {
+    const outputDir = resolveTypeScriptBuildOutputDir(options.outputDir);
+    const sourcePaths = await listTypeScriptModuleSources();
+    const emittedPaths = sourcePaths.map((sourcePath) => getEmittedModulePath(sourcePath, outputDir));
+    await assertEmittedModulesExist(emittedPaths);
+    await assertAppModulesAbsent();
+    assertEmittedModulesUntracked(emittedPaths);
+}
+
+const entryPointUrl = process.argv[1] ? pathToFileURL(process.argv[1]).href : "";
+
+if (import.meta.url === entryPointUrl) {
+    const args = process.argv.slice(2);
+    const knownArgs = new Set(["--check", "--check-only"]);
+    const unknownArgs = args.filter((arg) => !knownArgs.has(arg));
+    if (unknownArgs.length > 0) {
+        console.error(`Unknown argument: ${unknownArgs[0]}`);
+        process.exit(1);
+    }
+    if (args.includes("--check") && args.includes("--check-only")) {
+        console.error("--check and --check-only cannot be used together");
+        process.exit(1);
+    }
+    try {
+        if (args.includes("--check-only")) {
+            await checkTypeScriptEmit();
+        } else {
+            await buildTypeScriptModules({ check: args.includes("--check") });
+        }
+    } catch (error) {
+        console.error(error instanceof Error ? error.message : error);
+        process.exitCode = 1;
+    }
 }

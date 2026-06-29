@@ -1,14 +1,17 @@
 #!/usr/bin/env node
 
 import { copyFile, cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
-import { isAbsolute, join, relative, resolve } from "node:path";
+import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { resolveProjectPath } from "./lib/paths.mjs";
+import {
+    DATA_ASSET_FILES,
+    ROOT_ASSET_FILES,
+    shouldCopyAppAsset
+} from "./lib/site-assets.mjs";
 
 const DEFAULT_OUTPUT_DIR = "_site";
 const DEFAULT_SITE_DIR = ".";
-const ROOT_ASSET_FILES = ["index.html", "styles.css", "ogp.png"];
-const DATA_ASSET_FILES = ["songs.json", "songs-meta.json"];
-const TYPESCRIPT_SOURCE_EXTENSIONS = [".ts", ".mts", ".tsx", ".cts"];
 const HTML_CACHE_BUSTER_TARGETS = [
     { attribute: "href", path: "styles.css" },
     { attribute: "src", path: "app/bootstrap.mjs" }
@@ -124,23 +127,12 @@ export function parseArgs(args, env = process.env) {
  * @returns {string}
  */
 export function resolvePagesArtifactOutputDir(outputDir, rootDir = process.cwd()) {
-    const projectRoot = resolve(rootDir);
-    const resolvedOutputDir = resolve(projectRoot, outputDir);
-    const relativeOutputDir = relative(projectRoot, resolvedOutputDir);
-    if (!relativeOutputDir) {
-        throw new Error("Pages artifact output directory must not target the project root");
-    }
-    if (relativeOutputDir.startsWith("..") || isAbsolute(relativeOutputDir)) {
-        throw new Error("Pages artifact output directory must stay inside the project root");
-    }
-    const outputPathSegments = relativeOutputDir.split(/[\\/]+/).filter(Boolean);
-    if (outputPathSegments[0] !== DEFAULT_OUTPUT_DIR) {
-        throw new Error(`Pages artifact output directory must be ${DEFAULT_OUTPUT_DIR} or its child directory`);
-    }
-    if (outputPathSegments.some((segment) => segment.startsWith("."))) {
-        throw new Error("Pages artifact output directory must not include dot directories");
-    }
-    return resolvedOutputDir;
+    return resolveProjectPath({
+        targetPath: outputDir,
+        rootDir,
+        pathLabel: "Pages artifact output directory",
+        requiredTopLevelDirectory: DEFAULT_OUTPUT_DIR
+    });
 }
 
 /**
@@ -150,31 +142,15 @@ export function resolvePagesArtifactOutputDir(outputDir, rootDir = process.cwd()
  * @returns {string}
  */
 export function resolvePagesArtifactSiteDir(siteDir, rootDir = process.cwd()) {
-    const projectRoot = resolve(rootDir);
-    const resolvedSiteDir = resolve(projectRoot, siteDir);
-    const relativeSiteDir = relative(projectRoot, resolvedSiteDir);
-    if (!relativeSiteDir) {
-        return projectRoot;
-    }
-    if (relativeSiteDir.startsWith("..") || isAbsolute(relativeSiteDir)) {
-        throw new Error("Pages artifact site directory must stay inside the project root");
-    }
-    const sitePathSegments = relativeSiteDir.split(/[\\/]+/).filter(Boolean);
-    if (sitePathSegments.some((segment) => segment.startsWith("."))) {
-        throw new Error("Pages artifact site directory must not include dot directories");
-    }
-    return resolvedSiteDir;
+    return resolveProjectPath({
+        targetPath: siteDir,
+        rootDir,
+        pathLabel: "Pages artifact site directory",
+        allowProjectRoot: true
+    });
 }
 
-/**
- * Pages artifact へコピーする app asset かを返す。
- * TypeScript source は build:ts で生成した .mjs を配布対象にするため除外する。
- * @param {string} sourcePath
- * @returns {boolean}
- */
-export function shouldCopyAppAsset(sourcePath) {
-    return !TYPESCRIPT_SOURCE_EXTENSIONS.some((extension) => sourcePath.endsWith(extension));
-}
+export { shouldCopyAppAsset };
 
 /**
  * 公開に必要な静的ファイルを artifact directory へコピーする。

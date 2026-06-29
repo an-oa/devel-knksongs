@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createBookmarkUiController } from "../app/ui/bookmark/ui.mjs";
+import { createBookmarkUiController } from "../_build/app/ui/bookmark/ui.mjs";
 import { installFakeDom, invokeListener } from "./test-helpers.mjs";
 
 /**

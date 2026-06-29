@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createUiSyncController } from "../app/ui/core/sync.mjs";
+import { createUiSyncController } from "../_build/app/ui/core/sync.mjs";
 import { installFakeDom } from "./test-helpers.mjs";
 
 /**

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createDataLoader } from "../app/ui/core/data.mjs";
+import { createDataLoader } from "../_build/app/ui/core/data.mjs";
 import { installFakeDom } from "./test-helpers.mjs";
 
 /**

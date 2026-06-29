@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import {
     YT_EMBED_HOST,
     YT_NOCOOKIE_EMBED_HOST
-} from "../app/lib/youtube/embed.mjs";
-import { createYoutubePlayerAdapter } from "../app/lib/youtube/player-adapter.mjs";
+} from "../_build/app/lib/youtube/embed.mjs";
+import { createYoutubePlayerAdapter } from "../_build/app/lib/youtube/player-adapter.mjs";
 import { installFakeDom } from "./test-helpers.mjs";
 
 /**

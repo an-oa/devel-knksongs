@@ -10,7 +10,7 @@ import {
     setYoutubeThumbnailPlaybackState,
     shouldLoadYoutubeThumbnailNow,
     suppressYoutubeThumbnailContextMenu
-} from "../app/lib/youtube/thumbnail.mjs";
+} from "../_build/app/lib/youtube/thumbnail.mjs";
 import { installFakeDom } from "./test-helpers.mjs";
 
 test("youtube thumbnail: create/apply image keeps mqdefault source and eager load", () => {

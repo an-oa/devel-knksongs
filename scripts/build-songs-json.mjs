@@ -2,9 +2,9 @@
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import { parseCsvToSongs } from "../app/lib/csv-parser.mjs";
-import { buildSongsJsonMetaPayload, buildSongsJsonPayload } from "../app/lib/songs-json.mjs";
-import { PUBLIC_CSV_URL } from "../app/config.mjs";
+import { parseCsvToSongs } from "../_build/app/lib/csv-parser.mjs";
+import { buildSongsJsonMetaPayload, buildSongsJsonPayload } from "../_build/app/lib/songs-json.mjs";
+import { PUBLIC_CSV_URL } from "../_build/app/config.mjs";
 import { createSongsContentHash } from "./songs-content-hash.mjs";
 
 const DEFAULT_OUTPUT_PATH = "data/songs.json";

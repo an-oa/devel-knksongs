@@ -1,14 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { dateKeyToParts, isWithinDateRange, parseDateKey } from "../app/lib/date-key.mjs";
-import { matchesCollabRoleFilters } from "../app/lib/search-filters.mjs";
+import { dateKeyToParts, isWithinDateRange, parseDateKey } from "../_build/app/lib/date-key.mjs";
+import { matchesCollabRoleFilters } from "../_build/app/lib/search-filters.mjs";
 import {
     isOriginalSongFormat,
     isShortFormat,
     isStreamFormat,
     isUtamitaEquivalentFormat,
     matchesSelectedFormat
-} from "../app/lib/song-format.mjs";
+} from "../_build/app/lib/song-format.mjs";
 
 test("date key helpers: parse, split, and range checks", () => {
     assert.equal(parseDateKey("2024-02-29"), 20240229);

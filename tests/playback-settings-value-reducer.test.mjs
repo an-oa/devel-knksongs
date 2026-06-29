@@ -4,13 +4,13 @@ import {
     PLAYBACK_SETTING_KINDS,
     PLAYBACK_SETTING_SCOPES,
     createPlaybackSettingDefinitions
-} from "../app/lib/playback-settings/definitions.mjs";
+} from "../_build/app/lib/playback-settings/definitions.mjs";
 import {
     createInitialPlaybackBehaviorPageValues,
     getPlaybackBehaviorEffectiveValue,
     isPagePlaybackBehaviorDefinition,
     reducePlaybackSettingChange
-} from "../app/lib/playback-settings/value-reducer.mjs";
+} from "../_build/app/lib/playback-settings/value-reducer.mjs";
 
 test("playback settings reducer: initializes page behavior values from definitions", () => {
     const { pagePlaybackBehaviorDefinitions } = createPlaybackSettingDefinitions();

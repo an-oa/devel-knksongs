@@ -8,13 +8,12 @@ export default [
             "coverage/**",
             "playwright-report/**",
             "test-results/**",
-            "_site/**",
-            "_build/**"
+            "_site/**"
         ]
     },
     js.configs.recommended,
     {
-        files: ["app/**/*.js", "app/**/*.mjs"],
+        files: ["app/**/*.js", "app/**/*.mjs", "_build/app/**/*.mjs"],
         languageOptions: {
             ecmaVersion: "latest",
             sourceType: "module",

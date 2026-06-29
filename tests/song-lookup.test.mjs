@@ -4,7 +4,7 @@ import {
     ensureSongLookupMaps,
     resolveSongRef,
     resolveSongRefs
-} from "../app/lib/song-lookup.mjs";
+} from "../_build/app/lib/song-lookup.mjs";
 
 /**
  * 曲 lookup テスト用の UI slice を作る。

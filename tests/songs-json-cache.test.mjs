@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
     createLegacyLocalStorageSongsJsonCacheAdapter,
     createLegacyLocalStorageTextCacheAdapter
-} from "../app/lib/storage/songs-json-cache.mjs";
+} from "../_build/app/lib/storage/songs-json-cache.mjs";
 
 /**
  * songs json cache adapter テスト用の localStorage を作る。

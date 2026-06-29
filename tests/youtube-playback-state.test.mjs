@@ -4,7 +4,7 @@ import {
     createYoutubePlaybackState,
     isYoutubePlaybackSessionActive,
     reduceYoutubePlaybackState
-} from "../app/lib/youtube/playback-state.mjs";
+} from "../_build/app/lib/youtube/playback-state.mjs";
 
 test("youtube playback state: request playback creates next session and enters starting", () => {
     const initialState = createYoutubePlaybackState();

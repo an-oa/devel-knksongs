@@ -1,8 +1,8 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { readFile } from "node:fs/promises";
-import { parseCsvToSongs } from "../../../app/lib/csv-parser.mjs";
-import { buildSongsJsonMetaPayload, buildSongsJsonPayload } from "../../../app/lib/songs-json.mjs";
+import { parseCsvToSongs } from "../../../_build/app/lib/csv-parser.mjs";
+import { buildSongsJsonMetaPayload, buildSongsJsonPayload } from "../../../_build/app/lib/songs-json.mjs";
 import { createSongsContentHash } from "../../../scripts/songs-content-hash.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

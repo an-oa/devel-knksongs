@@ -5,7 +5,7 @@ import {
     buildBookmarkImportConfirmMessage,
     getBookmarkImportErrorMessage,
     readFileText
-} from "../app/ui/bookmark/import-export.mjs";
+} from "../_build/app/ui/bookmark/import-export.mjs";
 
 test("bookmark import export ui: builds dated export filenames", () => {
     const fileName = buildBookmarkExportFileName(new Date(2026, 3, 9));
