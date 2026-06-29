@@ -8,15 +8,16 @@
 - PC/スマホの両方から利用するユーザー
 
 ## 全体構成
-- 静的フロントエンドのみ（HTML/CSS/JS, ES Modules）
+- 静的フロントエンドのみ（HTML/CSS/JavaScript, ES Modules）。
+  `app/**/*.mts` を source とし、`npm run build:ts` で `_build/app/**/*.mjs` へ生成した JavaScript をブラウザ・テスト・Node scripts が読む
 - データ取得：事前生成JSON（`data/songs.json` / `data/songs-meta.json`）を優先し、公開スプレッドシートのCSVは生成元とフォールバックに使う
 - データ生成/公開：GitHub Actions でCSVからJSONを生成・検証し、Pages artifact を生成して deploy する
-- CI：GitHub Actions で曲データ検証、typecheck、lint、unit test を実行する
+- CI：GitHub Actions で TypeScript emit、曲データ検証、typecheck、lint、unit test、静的 site build を実行する
 - 実行時の同梱外部ライブラリ依存：なし
 - 埋め込み再生まわりでは YouTube Iframe API を動的に利用し、標準では `youtube.com`、プライバシー強化設定ON時は `youtube-nocookie.com` の埋め込みURLを使う
-- 開発時確認：曲データJSON検証、TypeScript noEmit typecheck、ESLint、Node.js 標準 `node:test`、Playwright Chromium smoke を利用
-- 型安全性は JavaScript + JSDoc + ESLint を基本に段階的に高める。
-  TypeScript 化は全面移行ではなく、必要性が高まった時点で別途検討する。
+- 開発時確認：TypeScript emit 同期、曲データJSON検証、TypeScript noEmit typecheck、ESLint、Node.js 標準 `node:test`、Playwright Chromium smoke を利用
+- 型安全性は `app/**/*.mts` の TypeScript source を中心に高め、生成 JavaScript は `_build/app` に限定する。
+  実行時に npm 等の同梱依存は持たず、配布物は HTML/CSS/JavaScript の静的 asset とする。
 
 ## テスト方針（現状）
 - 対象: 検索ロジック、日付フィルタ、ブックマーク検索、描画/再生/保存/サイドバーまわりの回帰
@@ -73,7 +74,10 @@
   - `tests/e2e/support/ui-helpers.mjs`
 - 実行コマンド:
   - `npm run validate:songs-json`
+  - `npm run build:ts`
   - `npm run typecheck`
+  - `npm run check:ts-emit`
+  - `npm run build`
   - `npm run lint`
   - `npm run test:unit` (`node --test tests/*.mjs`)
   - `npm run test:e2e`
@@ -321,8 +325,10 @@ IndexedDB保存：
 ## 制約・注意点
 - iOSでは埋め込み再生に制約あり
 - Safari等でCSS/JSキャッシュが残ることがあるため、公開 artifact 生成時に cache buster を付与する
-- ソースの `index.html` と `app/**/*.mjs` の参照には通常 `?v=...` を書かない
-- `scripts/build-pages-artifact.mjs` が `_site` へコピーした `index.html` の `styles.css` / `app/bootstrap.mjs` と、相対 `.mjs` import/export/dynamic import に `?v=<DEPLOY_CACHE_BUSTER or GITHUB_SHA>` を付与する
+- source の `index.html` や `app/**/*.mts` 内の `.mjs` import specifier には通常 `?v=...` を書かない
+- `scripts/build-pages-artifact.mjs` が `_build` から `_site` へコピーした配布用 `index.html` の
+  `styles.css` / `app/bootstrap.mjs` と、生成済み `app/**/*.mjs` の相対 import/export/dynamic import に
+  `?v=<DEPLOY_CACHE_BUSTER or GITHUB_SHA>` を付与する
 - cache buster の仕様を変える場合は `scripts/build-pages-artifact.mjs` と `tests/pages-artifact.test.mjs` を合わせて更新する
 - `songs.json` / `songs-meta.json` の内容更新だけでは cache buster を上げず、`contentHash` による鮮度確認で反映する
 - 日付入力はセレクト方式（ブラウザ互換性優先）

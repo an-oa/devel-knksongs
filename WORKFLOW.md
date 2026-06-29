@@ -18,10 +18,14 @@
    - 既存テストを回すだけでなく、バグ修正や仕様追加に対応する回帰テストを必要に応じて追加
    - 初回または `node_modules` がない環境では、README.md の開発者向け準備に従い
      `npm install` を実行してから検証する。
-   - JavaScript / 型定義変更時の基本コマンド:
+   - `app/**/*.mts` / 型定義 / JavaScript 変更時の基本コマンド:
+     - `npm run build:ts`
      - `npm run typecheck`
+     - `npm run check:ts-emit`
      - `npm run lint`
      - `npm run test:unit`
+   - TypeScript emit や静的 site build の入力経路に関わる変更では、
+     `npm run build` も実行する。
    - 曲データや生成/検証スクリプトに関わる変更では、
      `npm run validate:songs-json` も実行する。
    - YouTube 再生やサイドバー操作などブラウザ上の回帰に関わる変更では、
@@ -91,7 +95,8 @@ flowchart TD
 - 置換後は、壊れやすいファイルを優先して目視確認する。
   例:
   `index.html`
-  エントリーポイントの `app/bootstrap.mjs`
+  source entrypoint の `app/bootstrap.mts`
+  生成後 entrypoint の `_build/app/bootstrap.mjs`
   import を多く持つコントローラー
   テストの先頭 import 群
 
