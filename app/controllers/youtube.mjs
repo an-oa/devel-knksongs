@@ -71,15 +71,30 @@ export { extractYoutubeInfo } from "../lib/youtube-url.mjs";
  * }} YoutubeConstants
  */
 
+/** @typedef {import("../state.types").AppYoutubeRuntimeState} AppYoutubeRuntimeState */
+
 /**
  * @typedef {AppYoutubeRuntimeState} YoutubeRuntimeState
  */
 
 /**
  * @typedef {{
+ *   sessionSequence: number,
+ *   transitionGeneration: number,
+ *   activeSessionId: number,
+ *   phase: string
+ * }} YoutubePlaybackRuntimeState
+ */
+
+/** @typedef {import("../state.types").PlaybackUiRuntimeState} PlaybackUiRuntimeState */
+
+/**
+ * @typedef {{
  *   playback: PlaybackUiRuntimeState
  * }} YoutubeUiState
  */
+
+/** @typedef {import("../state.types").YoutubePlayerLike} YoutubePlayerLike */
 
 /**
  * @typedef {{
@@ -158,7 +173,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
 
     /**
      * 共有埋め込みプレーヤーの保持領域を返す。
-     * @returns {YoutubeSharedPlaybackState}
+     * @returns {import("../state.types").YoutubeSharedPlaybackState}
      */
     function getSharedPlaybackState() {
         return getYoutubeSharedPlaybackState(youtube);
@@ -622,7 +637,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
 
     /**
      * 共有 iframe と閉じるボタンを必要に応じて生成する。
-     * @returns {YoutubeSharedPlaybackState}
+     * @returns {import("../state.types").YoutubeSharedPlaybackState}
      */
     function ensureSharedPlaybackElements() {
         return ensureYoutubeSharedPlaybackElements({
@@ -714,7 +729,7 @@ export function createYoutubeController({ ui, youtube, constants }) {
             destroySharedPlayback();
         }
         sharedPlayback = ensureSharedPlaybackElements();
-        const iframe = syncSharedPlaybackIframe() || sharedPlayback.iframe;
+        const iframe = /** @type {HTMLIFrameElement | null} */ (syncSharedPlaybackIframe() || sharedPlayback.iframe);
         if (!isHtmlElement(iframe)) {
             return Promise.resolve(false);
         }

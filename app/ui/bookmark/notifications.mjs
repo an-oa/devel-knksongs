@@ -4,6 +4,11 @@ import { getLookupUiState } from "../../lib/ui-slices.mjs";
 export const BOOKMARK_NOTIFICATION_TIMEOUT_MS = 4000;
 
 /**
+ * @typedef {import("../../state.types").AppDataState} AppDataState
+ * @typedef {import("../../state.types").AppUiState} AppUiState
+ */
+
+/**
  * timeout handle が Node 互換の unref を持つ場合だけ解放する。
  * @param {ReturnType<typeof setTimeout>} timerId
  */

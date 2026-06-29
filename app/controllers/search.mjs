@@ -21,8 +21,8 @@ export function createSearchController({ data, ui, searchFiltersController, cons
         RESULT_DISPLAY_BATCH_SIZE,
         SEARCH_DEBOUNCE_MS
     } = constants;
-    const searchUiState = /** @type {SearchUiRuntimeState} */ (getSearchUiState(ui));
-    const lookupUi = /** @type {LookupUiRuntimeState} */ (getLookupUiState(ui));
+    const searchUiState = /** @type {import("../state.types").SearchUiRuntimeState} */ (getSearchUiState(ui));
+    const lookupUi = /** @type {import("../state.types").LookupUiRuntimeState} */ (getLookupUiState(ui));
     const dateFilterController = createDateFilterController({ ui });
     const updateDisplay = callbacks.updateDisplay;
     const scrollResultsPaneToTop = callbacks.scrollResultsPaneToTop;
@@ -116,7 +116,7 @@ export function createSearchController({ data, ui, searchFiltersController, cons
 
     /**
      * ブックマーク内の参照 ID を曲データ配列へ解決する。
-     * @param {BookmarkRecord} bookmark
+     * @param {import("../state.types").BookmarkRecord} bookmark
      * @returns {Song[]}
      */
     function resolveBookmarkRows(bookmark) {

@@ -3,6 +3,8 @@ import {
     PLAYBACK_SETTING_SCOPES
 } from "./definitions.mjs";
 
+/** @typedef {import("./definitions.mjs").PlaybackSettingDefinition} PlaybackSettingDefinition */
+
 /**
  * ページ内だけで保持する再生挙動設定かを返す。
  * @param {PlaybackSettingDefinition} definition

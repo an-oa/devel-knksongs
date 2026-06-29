@@ -10,10 +10,10 @@ type SearchState = {
 };
 
 type SearchUiState = {
-  el: AppUiElements;
-  search: SearchUiRuntimeState;
-  date: DateUiRuntimeState;
-  lookup: LookupUiRuntimeState;
+  el: import("../app/state.types").AppUiElements;
+  search: import("../app/state.types").SearchUiRuntimeState;
+  date: import("../app/state.types").DateUiRuntimeState;
+  lookup: import("../app/state.types").LookupUiRuntimeState;
 };
 
 type SearchFiltersController = {
@@ -26,7 +26,7 @@ type SearchControllerCallbacks = {
   scrollResultsPaneToTop: () => void;
 };
 
-type SearchDataState = AppDataState;
+type SearchDataState = import("../app/state.types").AppDataState;
 
 type SearchConstants = {
   RANDOM_DISPLAY_COUNT: number;

@@ -47,6 +47,8 @@ import { debugPlayback } from "./lib/playback-debug.mjs";
 import { createBrowserSongsDataSource } from "./ui/core/data-source.mjs";
 
 const appDataState = appState.data;
+
+/** @typedef {import("./state.types").AppUiState} AppUiState */
 const appUiState = appState.ui;
 const searchUiState = getSearchUiState(appUiState);
 const youtubeRuntimeState = appState.youtube;

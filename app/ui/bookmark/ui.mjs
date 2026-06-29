@@ -9,6 +9,11 @@ import {
 import { createBookmarkNotificationController } from "./notifications.mjs";
 
 /**
+ * @typedef {import("../../state.types").AppDataState} AppDataState
+ * @typedef {import("../../state.types").AppUiState} AppUiState
+ */
+
+/**
  * @typedef {{
  *   ok: boolean,
  *   reason?: string,

@@ -1,3 +1,5 @@
+/** @typedef {import("../state.types").LookupUiRuntimeState} LookupUiRuntimeState */
+
 /**
  * 曲参照用の検索マップが最新の曲配列を指しているかを返す。
  * @param {LookupUiRuntimeState} lookupUi

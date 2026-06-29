@@ -17,6 +17,12 @@ import {
 import { collectSearchBooleanFilterState } from "../lib/search-boolean-filters.mjs";
 
 /**
+ * @typedef {import("../state.types").BookmarkRecord} BookmarkRecord
+ * @typedef {import("../state.types").SearchUiRuntimeState} SearchUiRuntimeState
+ * @typedef {import("../state.types").DateUiRuntimeState} DateUiRuntimeState
+ */
+
+/**
  * @typedef {{
  *   allSongsRaw: Song[],
  *   bookmarks: Record<string, BookmarkRecord>,

@@ -114,7 +114,7 @@ export function createYoutubePlaybackStartAttemptManager(input) {
 
     /**
      * 再生開始待ちのタイムアウトを開始する。
-     * @param {*} attempt
+     * @param {import("../../state.types").YoutubePlaybackStartAttempt} attempt
      * @param {number} timeoutDurationMs
      * @param {string} reason
      * @returns {*}
@@ -197,7 +197,7 @@ export function createYoutubePlaybackStartAttemptManager(input) {
         settle(undefined, createYoutubePlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.FAILED));
         clearUnconfirmedStart();
         return new Promise((resolve) => {
-            /** @type {YoutubePlaybackStartAttempt} */
+            /** @type {import("../../state.types").YoutubePlaybackStartAttempt} */
             const attempt = {
                 sessionId,
                 resolve: (result) => resolve(normalizeYoutubePlaybackStartResult(

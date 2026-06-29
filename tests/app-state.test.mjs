@@ -6,6 +6,8 @@ import {
 } from "../app/state.mjs";
 import { INITIAL_PLAYBACK_SETTING_VALUES } from "../app/lib/playback-settings/definitions.mjs";
 
+/** @typedef {import("../app/state.types").PlaybackUiRuntimeState} PlaybackUiRuntimeState */
+
 /**
  * 再生設定値だけを playback runtime state から抜き出す。
  * @param {PlaybackUiRuntimeState} playback

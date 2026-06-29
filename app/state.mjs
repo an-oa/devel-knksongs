@@ -29,7 +29,7 @@ export const STOP_PLAYBACK_ON_SCROLL_OUT = false;
  * 再生 UI ランタイム状態の初期値を作成する。
  * 本番コードでは appState 初期化に使い、設定 default との同期を
  * 単体テストするため export している。
- * @returns {PlaybackUiRuntimeState}
+ * @returns {import("./state.types").PlaybackUiRuntimeState}
  */
 export function createInitialPlaybackUiRuntimeState() {
     return {
@@ -39,7 +39,7 @@ export function createInitialPlaybackUiRuntimeState() {
     };
 }
 
-/** @type {AppState} */
+/** @type {import("./state.types").AppState} */
 export const appState = {
     data: {
         allSongsRaw: [],

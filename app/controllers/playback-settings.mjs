@@ -14,6 +14,12 @@ import {
 } from "../lib/playback-settings/value-reducer.mjs";
 
 /**
+ * @typedef {import("../state.types").PlaybackUiRuntimeState} PlaybackUiRuntimeState
+ * @typedef {import("../state.types").SearchUiRuntimeState} SearchUiRuntimeState
+ * @typedef {import("../lib/playback-settings/definitions.mjs").PlaybackSettingDefinition} PlaybackSettingDefinition
+ */
+
+/**
  * @typedef {{
  *   playbackSettingsGroup?: HTMLElement | null,
  *   experimentalPlaybackSettingsGroup?: HTMLElement | null,

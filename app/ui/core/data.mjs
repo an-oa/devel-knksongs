@@ -1,5 +1,7 @@
 import { getDateUiState, getSearchUiState } from "../../lib/ui-slices.mjs";
 
+/** @typedef {import("../../state.types").AppUiState} AppUiState */
+
 /**
  * 曲データの読込と初期データ反映を扱うコントローラーを作成する。
  * @param {{

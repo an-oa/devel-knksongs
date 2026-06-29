@@ -33,6 +33,29 @@ export const INITIAL_PLAYBACK_SETTING_VALUES = Object.freeze({
 });
 
 /**
+ * @typedef {import("../../state.types").PlaybackSettingsUiSlice} PlaybackSettingsUiSlice
+ * @typedef {"thumbToggle" | "youtubeNoCookieToggle" | "playArchiveToEndToggle" | "continuousPlaybackToggle" | "loopPlaybackToggle"} PlaybackSettingElementKey
+ * @typedef {"persisted" | "page"} PlaybackSettingScope
+ * @typedef {"visibility" | "behavior"} PlaybackSettingKind
+ */
+
+/**
+ * 再生設定 1 件の定義。
+ * @typedef {{
+ *   scope: PlaybackSettingScope,
+ *   kind: PlaybackSettingKind,
+ *   stateKey: keyof PlaybackSettingsUiSlice,
+ *   elementKey?: PlaybackSettingElementKey,
+ *   storageKey?: string,
+ *   defaultValue: boolean,
+ *   hiddenValue?: boolean,
+ *   effectiveWhenHidden?: boolean,
+ *   interactive?: boolean,
+ *   restoreActivePlaybackOnChange?: boolean
+ * }} PlaybackSettingDefinition
+ */
+
+/**
  * 再生設定の定義一覧を作成する。
  * 本番コードでは playback settings controller から使い、
  * 設定 metadata の境界条件を単体テストするため export している。

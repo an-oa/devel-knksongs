@@ -14,6 +14,13 @@ import {
 import { suppressYoutubeThumbnailContextMenu } from "../lib/youtube/thumbnail.mjs";
 
 /**
+ * @typedef {import("../state.types").BookmarkRecord} BookmarkRecord
+ * @typedef {import("../state.types").SearchUiRuntimeState} SearchUiRuntimeState
+ * @typedef {import("../state.types").PlaybackUiRuntimeState} PlaybackUiRuntimeState
+ * @typedef {import("../state.types").RenderUiRuntimeState} RenderUiRuntimeState
+ */
+
+/**
  * @typedef {{
  *   videoId: string,
  *   startSeconds: number,

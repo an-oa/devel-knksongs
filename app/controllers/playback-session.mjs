@@ -8,6 +8,8 @@ import {
     isYoutubePlaybackStartUnconfirmed
 } from "../lib/youtube/playback-start-attempt.mjs";
 
+/** @typedef {import("../state.types").PlaybackUiRuntimeState} PlaybackUiRuntimeState */
+
 /**
  * @typedef {{
  *   currentResults: Song[]

@@ -69,6 +69,8 @@ export function applyDocumentTheme(isDarkMode) {
     document.documentElement.style.colorScheme = isDarkMode ? "dark" : "light";
 }
 
+/** @typedef {import("../../state.types").AppUiElements} AppUiElements */
+
 /**
  * 保存値またはシステム設定からテーマを適用する。
  * @param {{ ui: { el: AppUiElements } }} input
