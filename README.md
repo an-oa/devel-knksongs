@@ -107,12 +107,12 @@ flowchart TD
 - `songs-meta.json` の `contentHash` で手元のJSONキャッシュが最新かを確認し、変化がなければ大きい `songs.json` の再取得を避けます。
 - 公開スプレッドシートのCSVは、事前生成JSONの元データかつJSON取得失敗時のフォールバックとして参照します(`app/config.mjs` の `PUBLIC_CSV_URL` で指定します)。
 - CSVの `配信上の立場` は曲データの `streamRole` としてJSONへ保持します。
-- `.github/workflows/update-songs-json-and-deploy.yml` は GitHub Actions 上で `npm run build:songs-json` と `npm run validate:songs-json` を実行し、`data/songs.json` / `data/songs-meta.json` に差分があればコミットします。その後 `npm run build:pages-artifact` で `_site` を作成し、Pages へ deploy します。
-- `.github/workflows/ci.yml` は push / pull request / 手動実行で `npm run validate:songs-json`、`npm run typecheck`、`npm run check:ts-emit`、`npm run lint`、`npm run test:unit` を実行します。
+- `.github/workflows/update-songs-json-and-deploy.yml` は GitHub Actions 上で `npm run build:songs-json` と `npm run validate:songs-json` を実行し、`data/songs.json` / `data/songs-meta.json` に差分があればコミットします。その後 `npm run build:pages-artifact` で `_build` から `_site` を作成し、Pages へ deploy します。
+- `.github/workflows/ci.yml` は push / pull request / 手動実行で `npm run validate:songs-json`、`npm run typecheck`、`npm run check:ts-emit`、`npm run build`、`npm run lint`、`npm run test:unit` を実行します。
 - Pages artifact 生成時は `DEPLOY_CACHE_BUSTER` または `GITHUB_SHA` を使い、`index.html` の `styles.css` / `app/bootstrap.mjs` と、`app/**/*.mjs` 内の相対 `.mjs` 参照へ `?v=...` を付与します。ソースの `index.html` や import には通常 `?v=...` を書きません。
 - フロントエンドのみで動作します(静的ホスティング想定)。
 - 配布物はHTML/CSS/JavaScriptのみで、実行時にnpm等の同梱依存はありません。
-- TypeScript 移行中の `.mts` は source として扱い、ブラウザやテストは隣接生成された `.mjs` を読みます。`.mts` を変更した場合は `npm run build:ts` で `.mjs` を更新します。`npm run check:ts-emit` は生成 `.mjs` の同期漏れを検出します。`npm run test:unit` / `npm run test:e2e` / `npm run build:pages-artifact` は事前に `build:ts` を実行します。
+- TypeScript 移行中の `.mts` は source として扱い、ブラウザやテストは隣接生成された `.mjs` を読みます。`.mts` を変更した場合は `npm run build:ts` で `.mjs` を更新します。`npm run check:ts-emit` は生成 `.mjs` の同期漏れを検出します。`npm run build` は TypeScript 生成済みの静的サイトを `_build` へ作成し、`npm run build:pages-artifact` は `_build` を元に `_site` を作成します。`npm run test:unit` / `npm run test:e2e` / `npm run build:pages-artifact` は事前に `build:ts` を実行します。
 - サムネイル表示/埋め込み再生まわりでは YouTube Iframe API を動的に利用します。
 - 開発時の静的解析は TypeScript noEmit typecheck と ESLint を利用します。
 - 開発時テストは Node.js 標準の `node:test` を利用します。
@@ -166,6 +166,7 @@ flowchart TD
   - `npm run build:ts`
   - `npm run typecheck`
   - `npm run check:ts-emit`
+  - `npm run build`
   - `npm run lint`
   - `npm run test:unit` (`node --test tests/*.mjs`)
   - `npm run test:e2e`

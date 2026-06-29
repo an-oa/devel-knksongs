@@ -8,7 +8,8 @@ export default [
             "coverage/**",
             "playwright-report/**",
             "test-results/**",
-            "_site/**"
+            "_site/**",
+            "_build/**"
         ]
     },
     js.configs.recommended,

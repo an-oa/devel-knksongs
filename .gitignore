@@ -57,6 +57,9 @@ test-results/
 # GitHub Pages artifact
 _site/
 
+# Static site build output
+_build/
+
 # Optional eslint cache
 .eslintcache
 

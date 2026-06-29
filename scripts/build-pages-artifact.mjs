@@ -5,6 +5,7 @@ import { isAbsolute, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const DEFAULT_OUTPUT_DIR = "_site";
+const DEFAULT_SITE_DIR = ".";
 const ROOT_ASSET_FILES = ["index.html", "styles.css", "ogp.png"];
 const DATA_ASSET_FILES = ["songs.json", "songs-meta.json"];
 const TYPESCRIPT_SOURCE_EXTENSIONS = [".ts", ".mts", ".tsx", ".cts"];
@@ -77,11 +78,12 @@ export function appendCacheBusterToJavaScriptImports(source, cacheBuster) {
  * CLI 引数と環境変数から artifact 生成オプションを作る。
  * @param {string[]} args
  * @param {Record<string, string | undefined>} env
- * @returns {{ outputDir: string, cacheBuster: string }}
+ * @returns {{ outputDir: string, siteDir: string, cacheBuster: string }}
  */
 export function parseArgs(args, env = process.env) {
     const options = {
         outputDir: env.PAGES_ARTIFACT_DIR || DEFAULT_OUTPUT_DIR,
+        siteDir: env.PAGES_SITE_DIR || DEFAULT_SITE_DIR,
         cacheBuster: env.DEPLOY_CACHE_BUSTER || env.GITHUB_SHA || ""
     };
     for (let i = 0; i < args.length; i++) {
@@ -90,6 +92,12 @@ export function parseArgs(args, env = process.env) {
         if (arg === "--output-dir") {
             if (!next) throw new Error("--output-dir requires a directory path");
             options.outputDir = next;
+            i++;
+            continue;
+        }
+        if (arg === "--site-dir") {
+            if (!next) throw new Error("--site-dir requires a directory path");
+            options.siteDir = next;
             i++;
             continue;
         }
@@ -136,6 +144,29 @@ export function resolvePagesArtifactOutputDir(outputDir, rootDir = process.cwd()
 }
 
 /**
+ * artifact の入力元となる静的 site directory を project root 配下に解決する。
+ * @param {string} siteDir
+ * @param {string} [rootDir]
+ * @returns {string}
+ */
+export function resolvePagesArtifactSiteDir(siteDir, rootDir = process.cwd()) {
+    const projectRoot = resolve(rootDir);
+    const resolvedSiteDir = resolve(projectRoot, siteDir);
+    const relativeSiteDir = relative(projectRoot, resolvedSiteDir);
+    if (!relativeSiteDir) {
+        return projectRoot;
+    }
+    if (relativeSiteDir.startsWith("..") || isAbsolute(relativeSiteDir)) {
+        throw new Error("Pages artifact site directory must stay inside the project root");
+    }
+    const sitePathSegments = relativeSiteDir.split(/[\\/]+/).filter(Boolean);
+    if (sitePathSegments.some((segment) => segment.startsWith("."))) {
+        throw new Error("Pages artifact site directory must not include dot directories");
+    }
+    return resolvedSiteDir;
+}
+
+/**
  * Pages artifact へコピーする app asset かを返す。
  * TypeScript source は build:ts で生成した .mjs を配布対象にするため除外する。
  * @param {string} sourcePath
@@ -148,20 +179,21 @@ export function shouldCopyAppAsset(sourcePath) {
 /**
  * 公開に必要な静的ファイルを artifact directory へコピーする。
  * @param {string} outputDir
+ * @param {string} siteDir
  * @returns {Promise<void>}
  */
-async function copySiteAssets(outputDir) {
+async function copySiteAssets(outputDir, siteDir) {
     await rm(outputDir, { recursive: true, force: true });
     await mkdir(join(outputDir, "data"), { recursive: true });
     await Promise.all(ROOT_ASSET_FILES.map((fileName) => (
-        copyFile(resolve(fileName), join(outputDir, fileName))
+        copyFile(join(siteDir, fileName), join(outputDir, fileName))
     )));
-    await cp(resolve("app"), join(outputDir, "app"), {
+    await cp(join(siteDir, "app"), join(outputDir, "app"), {
         recursive: true,
         filter: shouldCopyAppAsset
     });
     await Promise.all(DATA_ASSET_FILES.map((fileName) => (
-        copyFile(resolve("data", fileName), join(outputDir, "data", fileName))
+        copyFile(join(siteDir, "data", fileName), join(outputDir, "data", fileName))
     )));
 }
 
@@ -197,12 +229,13 @@ async function transformTextFile(filePath, transform) {
 
 /**
  * GitHub Pages へ upload する静的 artifact を生成する。
- * @param {{ outputDir: string, cacheBuster: string }} options
+ * @param {{ outputDir: string, siteDir?: string, cacheBuster: string }} options
  * @returns {Promise<string>}
  */
 export async function buildPagesArtifact(options) {
     const outputDir = resolvePagesArtifactOutputDir(options.outputDir);
-    await copySiteAssets(outputDir);
+    const siteDir = resolvePagesArtifactSiteDir(options.siteDir || DEFAULT_SITE_DIR);
+    await copySiteAssets(outputDir, siteDir);
     await transformTextFile(
         join(outputDir, "index.html"),
         (html) => appendCacheBusterToHtml(html, options.cacheBuster)

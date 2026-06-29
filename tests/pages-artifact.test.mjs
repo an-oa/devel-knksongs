@@ -5,6 +5,7 @@ import {
     appendCacheBusterToJavaScriptImports,
     parseArgs,
     resolvePagesArtifactOutputDir,
+    resolvePagesArtifactSiteDir,
     shouldCopyAppAsset
 } from "../scripts/build-pages-artifact.mjs";
 
@@ -60,6 +61,18 @@ test("pages artifact: reads cache buster from deploy environment", () => {
         parseArgs(["--output-dir", "_site/out"], { DEPLOY_CACHE_BUSTER: "abc123" }),
         {
             outputDir: "_site/out",
+            siteDir: ".",
+            cacheBuster: "abc123"
+        }
+    );
+});
+
+test("pages artifact: reads source site directory from arguments", () => {
+    assert.deepEqual(
+        parseArgs(["--site-dir", "_build"], { DEPLOY_CACHE_BUSTER: "abc123" }),
+        {
+            outputDir: "_site",
+            siteDir: "_build",
             cacheBuster: "abc123"
         }
     );
@@ -79,6 +92,17 @@ test("pages artifact: resolves output directories inside the project root", () =
     assert.equal(
         resolvePagesArtifactOutputDir("_site/pages", "/repo/knksongs"),
         "/repo/knksongs/_site/pages"
+    );
+});
+
+test("pages artifact: resolves source site directories inside the project root", () => {
+    assert.equal(
+        resolvePagesArtifactSiteDir(".", "/repo/knksongs"),
+        "/repo/knksongs"
+    );
+    assert.equal(
+        resolvePagesArtifactSiteDir("_build", "/repo/knksongs"),
+        "/repo/knksongs/_build"
     );
 });
 
@@ -105,6 +129,17 @@ test("pages artifact: rejects unsafe output directories", () => {
     );
     assert.throws(
         () => resolvePagesArtifactOutputDir("_site/.git", "/repo/knksongs"),
+        /must not include dot directories/
+    );
+});
+
+test("pages artifact: rejects unsafe source site directories", () => {
+    assert.throws(
+        () => resolvePagesArtifactSiteDir("../outside", "/repo/knksongs"),
+        /must stay inside the project root/
+    );
+    assert.throws(
+        () => resolvePagesArtifactSiteDir(".git", "/repo/knksongs"),
         /must not include dot directories/
     );
 });

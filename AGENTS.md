@@ -75,7 +75,8 @@ feat: move settings into dedicated sidebar panel
 - `.mts` または生成 `.mjs` を変更したときは、`npm run check:ts-emit` で生成物の同期漏れがないことを確認する。
 - `tsconfig.build.json` は `app/**/*.mts` だけを emit 対象にし、`allowJs: false` のまま保つ。
   既存 `.mjs` を TypeScript emit 対象へ巻き込むと、入力ファイル上書き防止で失敗しやすい。
-- Pages artifact は `build:ts` 後の `.mjs` を配布対象にし、`.ts` / `.mts` source は含めない。
+- `npm run build` は `build:ts` 後の静的 site を `_build` へ作り、`.ts` / `.mts` source を含めない。
+- Pages artifact は `_build` を入力元にして `_site` を作り、cache buster を付与する。
 
 ## Naming
 
@@ -89,6 +90,7 @@ feat: move settings into dedicated sidebar panel
 - JavaScript や型定義を変更したときは、静的解析として `npm run typecheck` と
   `npm run lint` を基本の確認手順として実行する。
 - `.mts` または生成 `.mjs` を変更したときは、`npm run check:ts-emit` も実行する。
+- TypeScript build や Pages artifact の入力経路に関わる変更では、`npm run build` も実行する。
 - `tests/` 配下に Node のテストがあるため、JavaScript を変更したときは
   `npm run test:unit` も基本の確認手順として実行する。
 - 曲データや生成/検証スクリプトに関わる変更では、`npm run validate:songs-json` も実行する。

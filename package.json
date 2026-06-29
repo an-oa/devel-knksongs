@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build:pages-artifact": "npm run build:ts && node scripts/build-pages-artifact.mjs",
+    "build": "npm run build:ts && node scripts/build-site.mjs",
+    "build:pages-artifact": "npm run build && node scripts/build-pages-artifact.mjs --site-dir _build",
     "build:songs-json": "node scripts/build-songs-json.mjs",
     "build:ts": "node scripts/build-ts.mjs",
     "check:ts-emit": "node scripts/build-ts.mjs --check",
