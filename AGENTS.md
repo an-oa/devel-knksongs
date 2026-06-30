@@ -70,6 +70,18 @@ feat: move settings into dedicated sidebar panel
 - `AppState` や UI slice など実装の初期化・更新処理と強く結びつく型は、
   `types/*.d.ts` へ遠ざける前に、実装 module 側へ寄せられないか検討する。
 
+## TypeScript Type Alias Readability
+
+- 同じ事物に単なる別名を増やさない。
+  `type FooController = ReturnType<typeof createFooController>` のような alias は、
+  その module 内で独立した役割名として読む価値がある場合に限る。
+- composition root や bootstrap では、別 module の factory 戻り値を表すだけの型 alias より、
+  `ReturnType<typeof createFooController>` のように参照元がその場で読める表記を優先する。
+- 一方で、`FooCallbacksInput` のように、その module 内 helper の入力形状や役割を表す型名は許容する。
+- 複数 module で共有する安定した概念になった型だけ、所有 module から `export type` する。
+  記述量を減らす目的だけで `export type` や local alias を増やさない。
+- 型名で詳細を隠すより、依存元・由来・役割がファイル内で追えることを優先する。
+
 ## TypeScript Emit During Migration
 
 - `.mts` は TypeScript source として扱い、ブラウザ・テスト・Node scripts は `npm run build:ts` が `_build/app/**/*.mjs` に生成した module を読む。
