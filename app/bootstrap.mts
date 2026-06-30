@@ -52,25 +52,60 @@ import type {
     AppYoutubeRuntimeState
 } from "./state.types";
 
+type SearchCallbacksInput = {
+    getRenderController: () => ReturnType<typeof createRenderController>;
+    ui: AppUiState;
+};
+
+type RenderCallbacksInput = {
+    getSearchController: () => ReturnType<typeof createSearchController>;
+    getYoutubeController: () => ReturnType<typeof createYoutubeController>;
+    getSidebarController: () => ReturnType<typeof createSidebarController>;
+    getStorageController: () => ReturnType<typeof createStorageController>;
+};
+
+type StorageCallbacksInput = {
+    searchController: ReturnType<typeof createSearchController>;
+    getBookmarkUiController: () => ReturnType<typeof createBookmarkUiController> | null;
+};
+
+type BookmarkUiCallbacksInput = {
+    searchController: ReturnType<typeof createSearchController>;
+    storageController: ReturnType<typeof createStorageController>;
+    getSidebarController: () => ReturnType<typeof createSidebarController> | null;
+    clearSearchDebounce: () => void;
+};
+
+type SidebarCallbacksInput = {
+    getBookmarkUiController: () => ReturnType<typeof createBookmarkUiController> | null;
+    youtubeController: ReturnType<typeof createYoutubeController>;
+    searchController: ReturnType<typeof createSearchController>;
+    renderController: ReturnType<typeof createRenderController>;
+    markFilterTouched: ReturnType<typeof createSearchUiActions>["markFilterTouched"];
+    markQueryTouched: ReturnType<typeof createSearchUiActions>["markQueryTouched"];
+    resetDateSelectGroup: ReturnType<typeof createSearchUiActions>["resetDateSelectGroup"];
+    clearSearch: ReturnType<typeof createSearchUiActions>["clearSearch"];
+};
+
+type YoutubePlaybackHooksInput = {
+    youtubeController: ReturnType<typeof createYoutubeController>;
+    renderController: ReturnType<typeof createRenderController>;
+    playbackSessionController: ReturnType<typeof createPlaybackSessionController>;
+};
+
 const appDataState: AppDataState = appState.data;
 
-/** @typedef {import("./state.types").AppUiState} AppUiState */
 const appUiState: AppUiState = appState.ui;
 const searchUiState = getSearchUiState(appUiState);
 const youtubeRuntimeState: AppYoutubeRuntimeState = appState.youtube;
 
 /**
  * 検索 controller から描画更新へ委譲する callback 群を作成する。
- * @param {{
- *   getRenderController: () => ReturnType<typeof createRenderController>,
- *   ui: AppUiState
- * }} input
- * @returns {{
- *   updateDisplay: () => void,
- *   scrollResultsPaneToTop: () => void
- * }}
  */
-function createSearchCallbacks({ getRenderController, ui }) {
+function createSearchCallbacks({
+    getRenderController,
+    ui
+}: SearchCallbacksInput): Parameters<typeof createSearchController>[0]["callbacks"] {
     return {
         updateDisplay: () => getRenderController().updateDisplay(),
         scrollResultsPaneToTop: () => scrollResultListToTop(ui.el.resultList)
@@ -80,19 +115,13 @@ function createSearchCallbacks({ getRenderController, ui }) {
 /**
  * 描画 controller から検索・YouTube・サイドバー・保存へ委譲する callback 群を作成する。
  * controller 生成順の循環を避けるため、後続 controller は呼び出し時に getter で解決する。
- * @param {{
- *   getSearchController: () => ReturnType<typeof createSearchController>,
- *   getYoutubeController: () => ReturnType<typeof createYoutubeController>,
- *   getSidebarController: () => ReturnType<typeof createSidebarController>,
- *   getStorageController: () => ReturnType<typeof createStorageController>
- * }} input
  */
 function createRenderCallbacks({
     getSearchController,
     getYoutubeController,
     getSidebarController,
     getStorageController
-}) {
+}: RenderCallbacksInput): Parameters<typeof createRenderController>[0]["callbacks"] {
     return {
         getSearchState: () => getSearchController().getSearchState(),
         isRecommendedMode: (state) => getSearchController().isRecommendedMode(state),
@@ -109,18 +138,11 @@ function createRenderCallbacks({
 
 /**
  * storage controller から検索とブックマーク UI へ委譲する callback 群を作成する。
- * @param {{
- *   searchController: ReturnType<typeof createSearchController>,
- *   getBookmarkUiController: () => ReturnType<typeof createBookmarkUiController> | null
- * }} input
- * @returns {{
- *   getDateSelectValue: (kind: string) => string,
- *   applyPendingDateValues: () => void,
- *   renderBookmarks: () => void,
- *   scheduleSearch: (options?: { immediate?: boolean }) => void
- * }}
  */
-function createStorageCallbacks({ searchController, getBookmarkUiController }) {
+function createStorageCallbacks({
+    searchController,
+    getBookmarkUiController
+}: StorageCallbacksInput): Parameters<typeof createStorageController>[0]["callbacks"] {
     return {
         getDateSelectValue: (kind) => searchController.getDateSelectValue(kind),
         applyPendingDateValues: () => searchController.applyPendingDateValues(),
@@ -134,19 +156,13 @@ function createStorageCallbacks({ searchController, getBookmarkUiController }) {
 
 /**
  * ブックマーク UI controller から検索・保存・サイドバーへ委譲する callback 群を作成する。
- * @param {{
- *   searchController: ReturnType<typeof createSearchController>,
- *   storageController: ReturnType<typeof createStorageController>,
- *   getSidebarController: () => ReturnType<typeof createSidebarController> | null,
- *   clearSearchDebounce: () => void
- * }} input
  */
 function createBookmarkUiCallbacks({
     searchController,
     storageController,
     getSidebarController,
     clearSearchDebounce
-}) {
+}: BookmarkUiCallbacksInput): Parameters<typeof createBookmarkUiController>[0]["callbacks"] {
     return {
         clearSearchDebounce,
         scheduleSearch: (options) => searchController.scheduleSearch(options),
@@ -168,16 +184,6 @@ function createBookmarkUiCallbacks({
 
 /**
  * サイドバー controller から各 controller へ委譲する callback 群を作成する。
- * @param {{
- *   getBookmarkUiController: () => ReturnType<typeof createBookmarkUiController> | null,
- *   youtubeController: ReturnType<typeof createYoutubeController>,
- *   searchController: ReturnType<typeof createSearchController>,
- *   renderController: ReturnType<typeof createRenderController>,
- *   markFilterTouched: (options?: { immediate?: boolean }) => void,
- *   markQueryTouched: () => void,
- *   resetDateSelectGroup: (kind: string) => void,
- *   clearSearch: () => void
- * }} input
  */
 function createSidebarCallbacks({
     getBookmarkUiController,
@@ -188,7 +194,7 @@ function createSidebarCallbacks({
     markQueryTouched,
     resetDateSelectGroup,
     clearSearch
-}) {
+}: SidebarCallbacksInput): Parameters<typeof createSidebarController>[0]["callbacks"] {
     return {
         getBookmarkUiController,
         isIOSWebKit: () => youtubeController.isIOSWebKit(),
@@ -204,13 +210,12 @@ function createSidebarCallbacks({
 
 /**
  * YouTube 再生イベントを描画更新と連続再生セッションへ接続する。
- * @param {{
- *   youtubeController: ReturnType<typeof createYoutubeController>,
- *   renderController: ReturnType<typeof createRenderController>,
- *   playbackSessionController: ReturnType<typeof createPlaybackSessionController>
- * }} input
  */
-function wireYoutubePlaybackHooks({ youtubeController, renderController, playbackSessionController }) {
+function wireYoutubePlaybackHooks({
+    youtubeController,
+    renderController,
+    playbackSessionController
+}: YoutubePlaybackHooksInput): void {
     youtubeController.setLayoutHook(() => renderController.refreshLayout());
     youtubeController.setPlaybackEndedHook(({ songKey }) => {
         debugPlayback("script", "continuePlayback requested from playback ended", {
@@ -236,18 +241,6 @@ function wireYoutubePlaybackHooks({ youtubeController, renderController, playbac
 
 /**
  * アプリ controller 群を作成し、相互 callback を同じ composition 境界内で配線する。
- * @returns {{
- *   searchFiltersController: ReturnType<typeof createSearchFiltersController>,
- *   searchController: ReturnType<typeof createSearchController>,
- *   renderController: ReturnType<typeof createRenderController>,
- *   playbackSettingsController: ReturnType<typeof createPlaybackSettingsController>,
- *   youtubeController: ReturnType<typeof createYoutubeController>,
- *   storageController: ReturnType<typeof createStorageController>,
- *   sidebarController: ReturnType<typeof createSidebarController>,
- *   uiSyncController: ReturnType<typeof createUiSyncController>,
- *   searchUiActions: ReturnType<typeof createSearchUiActions>,
- *   dataLoader: ReturnType<typeof createDataLoader>
- * }}
  */
 function createAppControllers() {
     /**
@@ -354,9 +347,8 @@ function createAppControllers() {
     /**
      * ブックマークパネル UI controller の遅延参照。
      * storageController と sidebarController の callbacks から相互参照するため、生成後に代入する。
-     * @type {ReturnType<typeof createBookmarkUiController> | null}
      */
-    let bookmarkUiController = null;
+    let bookmarkUiController: ReturnType<typeof createBookmarkUiController> | null = null;
 
     /**
      * localStorage 上の検索状態・ブックマーク保存データを読み書きする controller。
@@ -491,7 +483,7 @@ const {
 /**
  * DOM 参照の初期化と UI 各機能のセットアップを行う。
  */
-async function initUI() {
+async function initUI(): Promise<void> {
     appUiState.el = collectUiElements();
     if (youtubeController.isIOSWebKit()) document.documentElement.classList.add("ios");
 
@@ -516,15 +508,14 @@ async function initUI() {
 /**
  * アプリ起動時に初期化処理を開始する。
  */
-function boot() {
+function boot(): void {
     initUI().catch(reportInitError);
 }
 
 /**
  * 初期化失敗時のエラーを記録する。
- * @param {unknown} error
  */
-function reportInitError(error) {
+function reportInitError(error: unknown): void {
     console.error("initUI failed", error);
 }
 
@@ -533,6 +524,6 @@ document.addEventListener("DOMContentLoaded", boot);
 /**
  * Inspect の console から隠し再生設定をページ内だけで操作できる API を公開する。
  */
-function exposePlaybackSettingsConsoleApi() {
+function exposePlaybackSettingsConsoleApi(): void {
     window.knkPlaybackSettings = playbackSettingsController.createConsoleApi();
 }
