@@ -100,6 +100,12 @@ feat: move settings into dedicated sidebar panel
 - TypeScript build や Pages artifact の入力経路に関わる変更では、`npm run build` も実行する。
 - `tests/` 配下に Node のテストがあるため、JavaScript を変更したときは
   `npm run test:unit` も基本の確認手順として実行する。
+- Codex 側の `npm run test:unit` では Node test runner の表示が
+  `tests/*.mjs` のファイル単位になり、47 件前後として報告されることがある。
+  ユーザーの実ターミナルで見える個別 `test()` 単位の件数に近づけるため、
+  UnitTest の件数を共有するときは必要に応じて
+  `node --test --test-isolation=process tests/*.mjs` も実行し、
+  305 件前後の pass/fail として併記する。
 - 曲データや生成/検証スクリプトに関わる変更では、`npm run validate:songs-json` も実行する。
 - YouTube 再生やサイドバー操作などブラウザ上の回帰に関わる変更では、
   `npm run test:e2e` も実行する。
