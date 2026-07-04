@@ -6,6 +6,25 @@ import {
     isUtamitaEquivalentFormat
 } from "./song-format.mjs";
 
+/** 条件未指定時に表示するおすすめ曲のキャッシュ。 */
+export type RecommendedSearchCache = {
+    /** 抽出済みのおすすめ曲。 */
+    songs: Song[];
+    /** この cache が満たしている要求件数。 */
+    requestedCount: number;
+};
+
+type RecommendedCacheSelectionOptions = {
+    count: number;
+    minPerformanceCount: number;
+    currentCache?: RecommendedSearchCache | null;
+};
+
+type RecommendedCacheSelectionResult = {
+    songs: Song[];
+    cache: RecommendedSearchCache;
+};
+
 /**
  * おすすめ表示に使う曲一覧を抽選して返す。
  * @param {*} songs
@@ -14,6 +33,101 @@ import {
 export function pickRecommendedSongs(songs, { count, minPerformanceCount }) {
     const groups = buildRecommendedGroups(songs, minPerformanceCount);
     return selectRecommendedSongs(groups, count);
+}
+
+/**
+ * 既存 cache を尊重しながら、おすすめ表示に必要な曲一覧と次の cache state を返す。
+ * @param {Song[]} songs
+ * @param {RecommendedCacheSelectionOptions} options
+ * @returns {RecommendedCacheSelectionResult}
+ */
+export function pickRecommendedSongsWithCache(
+    songs: Song[],
+    {
+        count,
+        minPerformanceCount,
+        currentCache = null
+    }: RecommendedCacheSelectionOptions
+): RecommendedCacheSelectionResult {
+    const cachedSongs = getRecommendedCacheSongs(currentCache);
+    if (cachedSongs && getRecommendedCacheRequestedCount(currentCache) >= count) {
+        return {
+            songs: cachedSongs.slice(0, count),
+            cache: currentCache as RecommendedSearchCache
+        };
+    }
+    const nextSongs = cachedSongs
+        ? expandRecommendedCache(songs, cachedSongs, count, minPerformanceCount)
+        : pickRecommendedSongs(songs, { count, minPerformanceCount });
+    return {
+        songs: nextSongs,
+        cache: createRecommendedCacheState(nextSongs, count)
+    };
+}
+
+/**
+ * cache と要求件数を同じ lifecycle で扱うおすすめ cache state を作る。
+ * @param {Song[]} songs
+ * @param {number} requestedCount
+ * @returns {RecommendedSearchCache}
+ */
+function createRecommendedCacheState(
+    songs: Song[],
+    requestedCount: number
+): RecommendedSearchCache {
+    return {
+        songs,
+        requestedCount
+    };
+}
+
+/**
+ * 現在のおすすめ cache から曲配列を返す。
+ * @param {RecommendedSearchCache | null | undefined} cache
+ * @returns {Song[] | null}
+ */
+function getRecommendedCacheSongs(cache: RecommendedSearchCache | null | undefined): Song[] | null {
+    return cache && Array.isArray(cache.songs) ? cache.songs : null;
+}
+
+/**
+ * 現在のおすすめ cache が満たしている要求件数を返す。
+ * @param {RecommendedSearchCache | null | undefined} cache
+ * @returns {number}
+ */
+function getRecommendedCacheRequestedCount(cache: RecommendedSearchCache | null | undefined): number {
+    if (!cache || !Number.isFinite(cache.requestedCount)) return 0;
+    return cache.requestedCount;
+}
+
+/**
+ * 既存 cache の並びを保ったまま、不足分だけ新しいおすすめ候補で補う。
+ * @param {Song[]} songs
+ * @param {Song[]} currentCache
+ * @param {number} count
+ * @param {number} minPerformanceCount
+ * @returns {Song[]}
+ */
+function expandRecommendedCache(
+    songs: Song[],
+    currentCache: Song[],
+    count: number,
+    minPerformanceCount: number
+): Song[] {
+    const nextCache = currentCache.slice();
+    const usedKeys = new Set(nextCache.map((row) => getRecommendedSongKey(row)));
+    const picked = pickRecommendedSongs(songs, {
+        count: count + currentCache.length,
+        minPerformanceCount
+    });
+    for (const row of picked) {
+        const key = getRecommendedSongKey(row);
+        if (usedKeys.has(key)) continue;
+        nextCache.push(row);
+        usedKeys.add(key);
+        if (nextCache.length >= count) break;
+    }
+    return nextCache;
 }
 
 /**
@@ -134,10 +248,11 @@ function pickRandomEntry(list) {
 }
 
 /**
- * 同一曲判定用の正規化キーを生成する。
+ * おすすめ抽選で使う同一曲判定用の正規化キーを生成する。
+ * cache 拡張時も同じ単位で重複除外するため export している。
  * @param {*} row
  */
-function getRecommendedSongKey(row) {
+export function getRecommendedSongKey(row) {
     return [
         row.titleNorm || "",
         row.artistNorm || "",
