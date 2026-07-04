@@ -6,6 +6,7 @@ import { tracePlayback } from "../lib/playback-debug.mjs";
 import { scheduleScrollElementIntoView } from "../lib/results-scroll.mjs";
 import { createBookmarkDragReorderController } from "../lib/render/drag-reorder.mjs";
 import { applyMasonryLayout } from "../lib/render/masonry-layout.mjs";
+import { createResultTailObserver } from "../lib/render/result-tail-observer.mjs";
 import { getPlaybackUiState, getRenderUiState, getSearchUiState } from "../lib/ui-slices.mjs";
 import {
     createYoutubePlaybackStartResult,
@@ -18,6 +19,8 @@ import type {
     RenderUiRuntimeState,
     SearchUiRuntimeState
 } from "../state.types";
+
+const DEFAULT_RESULT_DISPLAY_BATCH_SIZE = 48;
 
 type YoutubeTarget = {
     videoId: string;
@@ -55,7 +58,7 @@ type RenderDataState = {
 
 type RenderUiElements = {
     resultList?: HTMLElement | null;
-    loadMoreContainer?: HTMLElement | null;
+    resultTailSentinel?: HTMLElement | null;
 };
 
 type RenderUiState = {
@@ -63,17 +66,6 @@ type RenderUiState = {
     search: SearchUiRuntimeState;
     playback: PlaybackUiRuntimeState;
     render: RenderUiRuntimeState;
-};
-
-type RenderSearchState = {
-    queryRaw: string;
-    dateFromKey: DateKey | null;
-    dateToKey: DateKey | null;
-    hasDateFilter: boolean;
-    collabHostOnly?: boolean;
-    collabGuestOnly?: boolean;
-    relayOnly?: boolean;
-    harmonyOnly?: boolean;
 };
 
 type ActiveCardRenderState = {
@@ -96,7 +88,6 @@ type ResultNodeBuildResult = {
 type DisplayState = {
     container: HTMLElement;
     results: Song[];
-    recommendedMode: boolean;
 };
 
 type RenderedDisplayState = {
@@ -104,8 +95,6 @@ type RenderedDisplayState = {
 };
 
 type RenderCallbacks = {
-    getSearchState: () => RenderSearchState;
-    isRecommendedMode: (state: RenderSearchState) => boolean;
     updateThumbnail: (thumbDiv: HTMLElement, yt: YoutubeTarget) => void;
     extractYoutubeInfo: (url?: string) => YoutubeTarget;
     playThumbnail: (
@@ -180,7 +169,7 @@ type RenderControllerInput = {
 /**
  * @typedef {{
  *   resultList?: HTMLElement | null,
- *   loadMoreContainer?: HTMLElement | null
+ *   resultTailSentinel?: HTMLElement | null
  * }} RenderUiElements
  */
 
@@ -191,19 +180,6 @@ type RenderControllerInput = {
  *   playback: PlaybackUiRuntimeState,
  *   render: RenderUiRuntimeState
  * }} RenderUiState
- */
-
-/**
- * @typedef {{
- *   queryRaw: string,
- *   dateFromKey: DateKey | null,
- *   dateToKey: DateKey | null,
- *   hasDateFilter: boolean,
- *   collabHostOnly?: boolean,
- *   collabGuestOnly?: boolean,
- *   relayOnly?: boolean,
- *   harmonyOnly?: boolean
- * }} RenderSearchState
  */
 
 /**
@@ -224,7 +200,7 @@ type RenderControllerInput = {
  */
 
 /**
- * @typedef {{ container: HTMLElement, results: Song[], recommendedMode: boolean }} DisplayState
+ * @typedef {{ container: HTMLElement, results: Song[] }} DisplayState
  */
 
 /**
@@ -233,8 +209,6 @@ type RenderControllerInput = {
 
 /**
  * @typedef {{
- *   getSearchState: () => RenderSearchState,
- *   isRecommendedMode: (state: RenderSearchState) => boolean,
  *   updateThumbnail: (thumbDiv: HTMLElement, yt: YoutubeTarget) => void,
  *   extractYoutubeInfo: (url?: string) => YoutubeTarget,
  *   playThumbnail: (thumbDiv: HTMLElement, yt: YoutubeTarget, options?: { playbackMode?: string }) => Promise<YoutubePlaybackStartResult> | YoutubePlaybackStartResult,
@@ -270,8 +244,6 @@ export function createRenderController({
     const searchUiState = getSearchUiState(ui);
     const playbackUi = getPlaybackUiState(ui);
     const renderUi = getRenderUiState(ui);
-    const getSearchState = callbacks.getSearchState;
-    const isRecommendedMode = callbacks.isRecommendedMode;
     const updateThumbnail = callbacks.updateThumbnail;
     const extractYoutubeInfo = callbacks.extractYoutubeInfo;
     const playThumbnail = callbacks.playThumbnail;
@@ -280,11 +252,19 @@ export function createRenderController({
     const setupScrollObserver = callbacks.setupScrollObserver;
     const removeSongFromActiveBookmark = callbacks.removeSongFromActiveBookmark;
     const saveBookmarks = callbacks.saveBookmarks;
+    const displayBatchSize = Number.isFinite(resultDisplayBatchSize) && resultDisplayBatchSize > 0
+        ? Math.max(1, Math.floor(resultDisplayBatchSize))
+        : DEFAULT_RESULT_DISPLAY_BATCH_SIZE;
     const dragReorderController = createBookmarkDragReorderController({
         data,
         getBookmarkSongRef: (row) => getBookmarkSongRef(row),
         saveBookmarks,
         updateDisplay: () => updateDisplay()
+    });
+    const resultTailObservationController = createResultTailObserver({
+        getSentinel: () => ui.el.resultTailSentinel,
+        hasMoreResults,
+        extendDisplayedResults
     });
 
     /**
@@ -507,6 +487,45 @@ export function createRenderController({
     }
 
     /**
+     * 追加表示できる検索結果が残っているかを返す。
+     * @returns {boolean}
+     */
+    function hasMoreResults(): boolean {
+        return data.currentResults.length > data.displayLimit;
+    }
+
+    /**
+     * 表示上限を結果件数の範囲に丸める。
+     * @param {number} limit
+     * @returns {number}
+     */
+    function clampDisplayLimit(limit: number): number {
+        if (!Number.isFinite(limit)) return data.displayLimit;
+        return Math.max(0, Math.min(data.currentResults.length, Math.floor(limit)));
+    }
+
+    /**
+     * 表示上限を指定値まで広げ、変更があれば再描画する。
+     * @param {number} nextLimit
+     * @returns {boolean}
+     */
+    function extendDisplayLimitTo(nextLimit: number): boolean {
+        const clampedLimit = clampDisplayLimit(nextLimit);
+        if (clampedLimit <= data.displayLimit) return false;
+        data.displayLimit = clampedLimit;
+        updateDisplay();
+        return true;
+    }
+
+    /**
+     * 次の表示 batch 分だけ検索結果を追加表示する。
+     * @returns {boolean}
+     */
+    function extendDisplayedResults(): boolean {
+        return extendDisplayLimitTo(data.displayLimit + displayBatchSize);
+    }
+
+    /**
      * 曲キーに対応する描画エントリを返す。
      * @param {string} songKey
      * @returns {ResultCardEntry | null}
@@ -523,9 +542,8 @@ export function createRenderController({
     function ensureResultVisible(index) {
         if (!Number.isFinite(index) || index < 0) return;
         if (index < data.displayLimit) return;
-        const nextLimit = Math.ceil((index + 1) / resultDisplayBatchSize) * resultDisplayBatchSize;
-        data.displayLimit = Math.min(data.currentResults.length, nextLimit);
-        updateDisplay();
+        const nextLimit = Math.ceil((index + 1) / displayBatchSize) * displayBatchSize;
+        extendDisplayLimitTo(nextLimit);
     }
 
     /**
@@ -568,16 +586,15 @@ export function createRenderController({
     }
 
     /**
-     * 空結果UIを描画し、再生状態と「もっと見る」表示をリセットする。
+     * 空結果UIを描画し、再生状態と末尾監視をリセットする。
      * @param {HTMLElement} container
-     * @param {HTMLElement} loadMoreContainer
      */
-    function renderEmptyResults(container, loadMoreContainer) {
+    function renderEmptyResults(container) {
         restoreActivePlayback();
         const emptyState = getEmptyStateDescriptor();
         container.replaceChildren(createEmptyStateElement(emptyState.message));
         container.style.height = "";
-        loadMoreContainer.classList.add("hidden");
+        resultTailObservationController.disconnect();
     }
 
     /**
@@ -748,27 +765,13 @@ export function createRenderController({
     }
 
     /**
-     * 推薦モードと件数に応じて「もっと見る」表示を切り替える。
-     * @param {boolean} recommendedMode
-     */
-    function updateLoadMoreVisibility(recommendedMode) {
-        const loadMoreContainer = ui.el.loadMoreContainer;
-        if (!recommendedMode && data.currentResults.length > data.displayLimit) {
-            loadMoreContainer.classList.remove("hidden");
-        } else {
-            loadMoreContainer.classList.add("hidden");
-        }
-    }
-
-    /**
      * 描画に必要なコンテナ・結果・モード情報をまとめる。
      * @returns {DisplayState}
      */
     function collectDisplayState(): DisplayState {
         return {
             container: ui.el.resultList,
-            results: getVisibleResults(),
-            recommendedMode: isRecommendedMode(getSearchState())
+            results: getVisibleResults()
         };
     }
 
@@ -788,7 +791,7 @@ export function createRenderController({
     function renderDisplayState(displayState: DisplayState): RenderedDisplayState | null {
         const { container, results } = displayState;
         if (results.length === 0) {
-            renderEmptyResults(container, ui.el.loadMoreContainer);
+            renderEmptyResults(container);
             return null;
         }
         const { nodes, entries } = buildResultNodes(results);
@@ -798,13 +801,12 @@ export function createRenderController({
     }
 
     /**
-     * 描画後のサムネイル監視と「もっと見る」状態を更新する。
+     * 描画後のサムネイル監視と末尾監視を更新する。
      * @param {RenderedDisplayState} rendered
-     * @param {DisplayState} displayState
      */
-    function monitorDisplayState(rendered: RenderedDisplayState, displayState: DisplayState) {
+    function monitorDisplayState(rendered: RenderedDisplayState) {
         observeVisibleThumbnails(rendered.entries);
-        updateLoadMoreVisibility(displayState.recommendedMode);
+        resultTailObservationController.observe();
     }
 
     /**
@@ -816,7 +818,7 @@ export function createRenderController({
         prepareDisplayObservation();
         const rendered = renderDisplayState(displayState);
         if (!rendered) return;
-        monitorDisplayState(rendered, displayState);
+        monitorDisplayState(rendered);
     }
 
     return {

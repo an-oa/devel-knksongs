@@ -33,6 +33,8 @@ import { createYoutubeController, extractYoutubeInfo } from "./controllers/youtu
 import { createStorageController } from "./controllers/storage.mjs";
 import { createBookmarkUiController } from "./ui/bookmark/ui.mjs";
 import { scrollResultListToTop } from "./lib/results-scroll.mjs";
+import { estimateMasonryVisibleCardCount } from "./lib/render/masonry-layout.mjs";
+import { setupResultsViewportRefresh } from "./lib/render/results-viewport-refresh.mjs";
 import {
     collectUiElements,
     applyThemeFromStorage,
@@ -58,7 +60,6 @@ type SearchCallbacksInput = {
 };
 
 type RenderCallbacksInput = {
-    getSearchController: () => ReturnType<typeof createSearchController>;
     getYoutubeController: () => ReturnType<typeof createYoutubeController>;
     getSidebarController: () => ReturnType<typeof createSidebarController>;
     getStorageController: () => ReturnType<typeof createStorageController>;
@@ -80,7 +81,6 @@ type SidebarCallbacksInput = {
     getBookmarkUiController: () => ReturnType<typeof createBookmarkUiController> | null;
     youtubeController: ReturnType<typeof createYoutubeController>;
     searchController: ReturnType<typeof createSearchController>;
-    renderController: ReturnType<typeof createRenderController>;
     markFilterTouched: ReturnType<typeof createSearchUiActions>["markFilterTouched"];
     markQueryTouched: ReturnType<typeof createSearchUiActions>["markQueryTouched"];
     resetDateSelectGroup: ReturnType<typeof createSearchUiActions>["resetDateSelectGroup"];
@@ -108,7 +108,10 @@ function createSearchCallbacks({
 }: SearchCallbacksInput): Parameters<typeof createSearchController>[0]["callbacks"] {
     return {
         updateDisplay: () => getRenderController().updateDisplay(),
-        scrollResultsPaneToTop: () => scrollResultListToTop(ui.el.resultList)
+        scrollResultsPaneToTop: () => scrollResultListToTop(ui.el.resultList),
+        getRecommendedDisplayCount: () => estimateMasonryVisibleCardCount(ui.el.resultList, {
+            minItemCount: RANDOM_DISPLAY_COUNT
+        })
     };
 }
 
@@ -117,14 +120,11 @@ function createSearchCallbacks({
  * controller 生成順の循環を避けるため、後続 controller は呼び出し時に getter で解決する。
  */
 function createRenderCallbacks({
-    getSearchController,
     getYoutubeController,
     getSidebarController,
     getStorageController
 }: RenderCallbacksInput): Parameters<typeof createRenderController>[0]["callbacks"] {
     return {
-        getSearchState: () => getSearchController().getSearchState(),
-        isRecommendedMode: (state) => getSearchController().isRecommendedMode(state),
         updateThumbnail: (thumbDiv, yt) => getYoutubeController().updateThumbnail(thumbDiv, yt),
         extractYoutubeInfo,
         playThumbnail: (thumbDiv, yt, options) => getYoutubeController().playThumbnail(thumbDiv, yt, options),
@@ -189,7 +189,6 @@ function createSidebarCallbacks({
     getBookmarkUiController,
     youtubeController,
     searchController,
-    renderController,
     markFilterTouched,
     markQueryTouched,
     resetDateSelectGroup,
@@ -203,7 +202,6 @@ function createSidebarCallbacks({
         clampDateInputsIfNeeded: () => searchController.clampDateInputsIfNeeded(),
         syncDateSelectOptions: (kind) => searchController.syncDateSelectOptions(kind),
         resetDateSelectGroup,
-        updateDisplay: () => renderController.updateDisplay(),
         clearSearch
     };
 }
@@ -298,7 +296,6 @@ function createAppControllers() {
         isAllFormatsSelected: () => searchController.areAllFormatsSelected(),
         resultDisplayBatchSize: RESULT_DISPLAY_BATCH_SIZE,
         callbacks: createRenderCallbacks({
-            getSearchController: () => searchController,
             getYoutubeController: () => youtubeController,
             getSidebarController: () => sidebarController,
             getStorageController: () => storageController
@@ -392,16 +389,11 @@ function createAppControllers() {
      * サイドバー全体の開閉、設定パネル、ブックマークパネル、検索リセット導線を扱う controller。
      */
     sidebarController = createSidebarController({
-        data: appDataState,
         ui: appUiState,
-        constants: {
-            resultDisplayBatchSize: RESULT_DISPLAY_BATCH_SIZE
-        },
         callbacks: createSidebarCallbacks({
             getBookmarkUiController: () => bookmarkUiController,
             youtubeController,
             searchController,
-            renderController,
             markFilterTouched: searchUiActions.markFilterTouched,
             markQueryTouched: searchUiActions.markQueryTouched,
             resetDateSelectGroup: searchUiActions.resetDateSelectGroup,
@@ -470,6 +462,7 @@ function createAppControllers() {
 
 const {
     searchFiltersController,
+    searchController,
     renderController,
     playbackSettingsController,
     youtubeController,
@@ -479,6 +472,8 @@ const {
     searchUiActions,
     dataLoader
 } = createAppControllers();
+
+let resultsViewportRefreshCleanup: (() => void) | null = null;
 
 /**
  * DOM 参照の初期化と UI 各機能のセットアップを行う。
@@ -497,9 +492,12 @@ async function initUI(): Promise<void> {
     exposePlaybackSettingsConsoleApi();
     youtubeController.setupScrollObserver();
     uiSyncController.setupSyncEvents();
-    window.addEventListener("resize", () => {
-        youtubeController.setupScrollObserver();
-        renderController.refreshLayout();
+    if (resultsViewportRefreshCleanup) resultsViewportRefreshCleanup();
+    resultsViewportRefreshCleanup = setupResultsViewportRefresh({
+        resultList: appUiState.el.resultList,
+        refreshRecommendedDisplay: () => searchController.refreshRecommendedDisplay(),
+        refreshLayout: () => renderController.refreshLayout(),
+        setupScrollObserver: () => youtubeController.setupScrollObserver()
     });
     storageController.restoreSearchState();
     await dataLoader.loadInitialData();

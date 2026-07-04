@@ -18,9 +18,7 @@ type SidebarBookmarkUiController = {
 };
 
 type SidebarControllerInput = {
-    data: { displayLimit: number };
     ui: AppUiState;
-    constants: { resultDisplayBatchSize: number };
     callbacks: {
         getBookmarkUiController: () => SidebarBookmarkUiController | null;
         isIOSWebKit: () => boolean;
@@ -29,7 +27,6 @@ type SidebarControllerInput = {
         clampDateInputsIfNeeded: () => void;
         syncDateSelectOptions: (kind?: string) => void;
         resetDateSelectGroup: (kind: string) => void;
-        updateDisplay: () => void;
         clearSearch: () => void;
     };
 };
@@ -37,9 +34,7 @@ type SidebarControllerInput = {
 /**
  * サイドバー関連の UI 操作をまとめるコントローラーを作成する。
  * @param {{
- *   data: { displayLimit: number },
  *   ui: AppUiState,
- *   constants: { resultDisplayBatchSize: number },
  *   callbacks: {
  *     getBookmarkUiController: () => {
  *       closeBookmarkModal: (options?: { restoreFocus?: boolean }) => void,
@@ -55,15 +50,13 @@ type SidebarControllerInput = {
  *     clampDateInputsIfNeeded: () => void,
  *     syncDateSelectOptions: (kind?: string) => void,
  *     resetDateSelectGroup: (kind: string) => void,
- *     updateDisplay: () => void,
  *     clearSearch: () => void
  *   }
  * }} input
  */
 export function createSidebarController(input: SidebarControllerInput) {
-    const { data, ui, constants, callbacks } = input;
+    const { ui, callbacks } = input;
     const settingsPanelUi = getSettingsPanelUiState(ui);
-    const { resultDisplayBatchSize } = constants;
     const {
         getBookmarkUiController,
         isIOSWebKit,
@@ -72,7 +65,6 @@ export function createSidebarController(input: SidebarControllerInput) {
         clampDateInputsIfNeeded,
         syncDateSelectOptions,
         resetDateSelectGroup,
-        updateDisplay,
         clearSearch
     } = callbacks;
     let closeSidebarMenu: (() => void) | null = null;
@@ -181,7 +173,6 @@ export function createSidebarController(input: SidebarControllerInput) {
         const openBtn = ui.el.openSidebarBtn;
         const closeBtn = ui.el.closeSidebarBtn;
         const overlay = ui.el.sidebarOverlay;
-        const loadMoreBtn = ui.el.loadMoreBtn;
         const clearBtn = ui.el.clearBtn;
         const dateFromYear = ui.el.dateFromYear;
         const dateFromMonth = ui.el.dateFromMonth;
@@ -191,7 +182,7 @@ export function createSidebarController(input: SidebarControllerInput) {
         const dateToDay = ui.el.dateToDay;
         let lastFocusedElement: HTMLElement | null = null;
 
-        if (!sidebar || !openBtn || !closeBtn || !overlay || !loadMoreBtn || !clearBtn) return;
+        if (!sidebar || !openBtn || !closeBtn || !overlay || !clearBtn) return;
         const popoverController = createSidebarPopoverController({
             sidebar,
             sidebarSheet: ui.el.sidebarSheet,
@@ -359,11 +350,6 @@ export function createSidebarController(input: SidebarControllerInput) {
                 resetDateSelectGroup(index === 0 ? "from" : "to");
                 markFilterTouched({ immediate: true });
             });
-        });
-
-        loadMoreBtn.addEventListener("click", () => {
-            data.displayLimit += resultDisplayBatchSize;
-            updateDisplay();
         });
 
         clearBtn.addEventListener("click", clearSearch);

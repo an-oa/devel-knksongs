@@ -16,6 +16,20 @@ export function canUseDom(): boolean {
 }
 
 /**
+ * 現在の viewport 高を返す。
+ * @returns {number}
+ */
+export function getViewportHeight(): number {
+    if (typeof window !== "undefined" && Number.isFinite(window.innerHeight)) {
+        return window.innerHeight;
+    }
+    if (typeof document !== "undefined" && Number.isFinite(document.documentElement.clientHeight)) {
+        return document.documentElement.clientHeight;
+    }
+    return 0;
+}
+
+/**
  * 固定ヘッダーの高さを返す。
  * @returns {number}
  */
