@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
     canUseDom,
     getHeaderHeight,
+    getViewportHeight,
     isHtmlElement
 } from "../_build/app/lib/dom-utils.mjs";
 import { installFakeDom } from "./test-helpers.mjs";
@@ -30,6 +31,20 @@ test("dom utils: getHeaderHeight reads header rect height and falls back to zero
         document.body.appendChild(header);
 
         assert.equal(getHeaderHeight(), 72);
+    } finally {
+        cleanup();
+    }
+});
+
+test("dom utils: getViewportHeight prefers window height and falls back to document element", () => {
+    const cleanup = installFakeDom();
+    try {
+        assert.equal(getViewportHeight(), 720);
+
+        window.innerHeight = undefined;
+        document.documentElement._clientHeight = 640;
+
+        assert.equal(getViewportHeight(), 640);
     } finally {
         cleanup();
     }
