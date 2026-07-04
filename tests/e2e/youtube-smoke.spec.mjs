@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import {
     installNetworkMocks,
+    routeSongsJsonFixture,
     setMockVideoBehavior,
     waitForMockYoutube
 } from "./support/mock-youtube.mjs";
@@ -31,6 +32,73 @@ test.beforeEach(async ({ page }) => {
     });
     await page.reload();
     await waitForInitialLoad(page);
+});
+
+/**
+ * 通常検索で 48 件を超える追加表示を検証するための曲 fixture を作る。
+ * @param {number} count
+ * @returns {Song[]}
+ */
+function createScrollableResultSongs(count) {
+    return Array.from({ length: count }, (_, index) => {
+        const sourceIndex = index + 1;
+        const paddedIndex = String(sourceIndex).padStart(2, "0");
+        const month = 2 + Math.floor(index / 28);
+        const day = (index % 28) + 1;
+        const date = `2024/${String(month).padStart(2, "0")}/${String(day).padStart(2, "0")}`;
+        const videoId = `scroll-video-${paddedIndex}`;
+        const title = `Scroll Song ${paddedIndex}`;
+        const artist = "Scroll Artist";
+        return {
+            date,
+            dateKey: 20240000 + (month * 100) + day,
+            archiveId: `scroll-archive-${paddedIndex}`,
+            archiveOrder: 1,
+            sourceIndex,
+            videoId,
+            songKey: `scroll-archive-${paddedIndex}::1`,
+            bookmarkSongKey: `${videoId}::1`,
+            legacySongKey: `scroll-archive-${paddedIndex}::1::https://www.youtube.com/watch?v=${videoId}&t=${sourceIndex}s`,
+            format: "配信",
+            streamRole: "",
+            videoOrientation: "",
+            isRelay: false,
+            isHarmony: false,
+            title,
+            artist,
+            titleYomi: title,
+            artistYomi: artist,
+            url: `https://www.youtube.com/watch?v=${videoId}&t=${sourceIndex}s`,
+            endSeconds: null,
+            titleNorm: title.toLowerCase(),
+            artistNorm: artist.toLowerCase(),
+            titleYomiNorm: title.toLowerCase(),
+            artistYomiNorm: artist.toLowerCase()
+        };
+    });
+}
+
+test("result tail sentinel appends search results when scrolling to the bottom", async ({ page }) => {
+    await routeSongsJsonFixture(page, createScrollableResultSongs(60));
+    await page.reload();
+    await waitForInitialLoad(page);
+
+    await openSidebar(page);
+    await page.locator("#searchBox").fill("Scroll Artist");
+    await expect(page.locator("#searchBox")).toHaveValue("Scroll Artist");
+    await closeSidebar(page);
+
+    const cards = page.locator(".song-card");
+    const resultTailSentinel = page.locator("#resultTailSentinel");
+
+    await expect(cards).toHaveCount(48);
+    await expect(resultTailSentinel).not.toHaveAttribute("hidden", "");
+
+    await resultTailSentinel.scrollIntoViewIfNeeded();
+
+    await expect(cards).toHaveCount(60);
+    await expect(getSongCard(page, "Scroll Song 60")).toBeVisible();
+    await expect(resultTailSentinel).toHaveAttribute("hidden", "");
 });
 
 test("playback settings are gated by thumbnail visibility", async ({ page }) => {

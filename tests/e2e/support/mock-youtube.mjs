@@ -9,13 +9,22 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const fixtureCsvPath = path.join(__dirname, "..", "fixtures", "smoke-songs.csv");
 const csvFixturePromise = readFile(fixtureCsvPath, "utf8");
 
-const songsJsonFixturePromise = csvFixturePromise.then((csvFixture) => {
-    const songs = parseCsvToSongs(csvFixture);
+/**
+ * 曲配列から songs.json と meta.json の mock payload を作る。
+ * @param {unknown[]} songs
+ * @returns {{ json: string, meta: string }}
+ */
+function buildSongsJsonFixture(songs) {
     const contentHash = createSongsContentHash(songs);
     return {
         json: JSON.stringify(buildSongsJsonPayload(songs, contentHash)),
         meta: JSON.stringify(buildSongsJsonMetaPayload(contentHash))
     };
+}
+
+const songsJsonFixturePromise = csvFixturePromise.then((csvFixture) => {
+    const songs = parseCsvToSongs(csvFixture);
+    return buildSongsJsonFixture(songs);
 });
 
 export const YOUTUBE_IFRAME_API_MOCK = `
@@ -177,6 +186,31 @@ export async function installNetworkMocks(page) {
         await route.fulfill({
             status: 204,
             body: ""
+        });
+    });
+}
+
+/**
+ * テストごとに songs.json / meta.json の応答を指定曲配列へ差し替える。
+ * @param {import("@playwright/test").Page} page
+ * @param {unknown[]} songs
+ */
+export async function routeSongsJsonFixture(page, songs) {
+    const songsJsonFixture = buildSongsJsonFixture(songs);
+    await page.unroute("**/data/songs-meta.json*");
+    await page.unroute("**/data/songs.json*");
+    await page.route("**/data/songs-meta.json*", async (route) => {
+        await route.fulfill({
+            status: 200,
+            contentType: "application/json; charset=utf-8",
+            body: songsJsonFixture.meta
+        });
+    });
+    await page.route("**/data/songs.json*", async (route) => {
+        await route.fulfill({
+            status: 200,
+            contentType: "application/json; charset=utf-8",
+            body: songsJsonFixture.json
         });
     });
 }
