@@ -21,7 +21,6 @@ function createSidebarUiState() {
     const openSidebarBtn = document.createElement("button");
     const closeSidebarBtn = document.createElement("button");
     const overlay = document.createElement("div");
-    const loadMoreBtn = document.createElement("button");
     const clearBtn = document.createElement("button");
     const openSettingsPanelBtn = document.createElement("button");
     const closeSettingsPanelBtn = document.createElement("button");
@@ -46,7 +45,6 @@ function createSidebarUiState() {
     openSidebarBtn.setAttribute("id", "open-sidebar");
     closeSidebarBtn.setAttribute("id", "close-sidebar");
     overlay.setAttribute("id", "sidebar-overlay");
-    loadMoreBtn.setAttribute("id", "loadMoreBtn");
     clearBtn.setAttribute("id", "clearBtn");
 
     settingsSidebarPanel.hidden = true;
@@ -62,7 +60,6 @@ function createSidebarUiState() {
         openSidebarBtn,
         closeSidebarBtn,
         overlay,
-        loadMoreBtn,
         clearBtn
     );
 
@@ -101,7 +98,6 @@ function createSidebarUiState() {
                 mainContent,
                 openSidebarBtn,
                 closeSidebarBtn,
-                loadMoreBtn,
                 clearBtn,
                 settingsSidebarPanel,
                 bookmarkSidebarPanel,
@@ -133,14 +129,13 @@ function createSidebarUiState() {
         closeSidebarBtn,
         overlay,
         mainContent,
-        loadMoreBtn,
         clearBtn
     };
 }
 
 /**
  * サイドバー controller をテスト用の状態で作る。
- * @param {{ data: object, ui: object, constants: object, callbacks: object }} input
+ * @param {{ ui: object, callbacks: object }} input
  * @returns {object}
  */
 function createSidebarControllerForTest(input) {
@@ -170,7 +165,6 @@ function createSidebarCallbacks(input) {
         clampDateInputsIfNeeded: () => {},
         syncDateSelectOptions: () => {},
         resetDateSelectGroup: () => {},
-        updateDisplay: () => {},
         clearSearch: () => {}
     };
 }
@@ -181,9 +175,7 @@ test("sidebar: opening settings panel makes background inert and focuses back bu
         const { ui, openSidebarBtn } = createSidebarUiState();
         let closedBookmarkModal = 0;
         const controller = createSidebarControllerForTest({
-            data: { displayLimit: 48 },
             ui,
-            constants: { resultDisplayBatchSize: 48 },
             callbacks: createSidebarCallbacks({
                 bookmarkUiController: {
                     closeBookmarkModal() {
@@ -218,9 +210,7 @@ test("sidebar: escape closes settings panel, removes inert, and restores focus",
     try {
         const { ui, openSidebarBtn } = createSidebarUiState();
         const controller = createSidebarControllerForTest({
-            data: { displayLimit: 48 },
             ui,
-            constants: { resultDisplayBatchSize: 48 },
             callbacks: createSidebarCallbacks()
         });
 
@@ -258,9 +248,7 @@ test("sidebar: openBookmarkModal opens sidebar first when closed and passes clos
         launcher.focus();
         const openBookmarkCalls = [];
         const controller = createSidebarControllerForTest({
-            data: { displayLimit: 48 },
             ui,
-            constants: { resultDisplayBatchSize: 48 },
             callbacks: createSidebarCallbacks({
                 bookmarkUiController: {
                     closeBookmarkModal() {},
@@ -295,9 +283,7 @@ test("sidebar: open button aria-expanded follows sidebar open state", () => {
         const { ui, openSidebarBtn, overlay, mainContent } = createSidebarUiState();
         openSidebarBtn.setAttribute("aria-expanded", "false");
         const controller = createSidebarControllerForTest({
-            data: { displayLimit: 48 },
             ui,
-            constants: { resultDisplayBatchSize: 48 },
             callbacks: createSidebarCallbacks()
         });
 
@@ -331,9 +317,7 @@ test("sidebar: native popover opens without fallback overlay and backdrop click 
             hidePopoverCount += 1;
         };
         const controller = createSidebarControllerForTest({
-            data: { displayLimit: 48 },
             ui,
-            constants: { resultDisplayBatchSize: 48 },
             callbacks: createSidebarCallbacks()
         });
 
@@ -365,9 +349,7 @@ test("sidebar: escape prioritizes settings panel over bookmark panel", () => {
         const { ui, openSidebarBtn } = createSidebarUiState();
         let bookmarkCloseCount = 0;
         const controller = createSidebarControllerForTest({
-            data: { displayLimit: 48 },
             ui,
-            constants: { resultDisplayBatchSize: 48 },
             callbacks: createSidebarCallbacks({
                 bookmarkUiController: {
                     closeBookmarkModal() {
@@ -428,9 +410,7 @@ test("sidebar: ios year change clears lower date selects and removes updating cl
         let clampCount = 0;
         let syncCount = 0;
         const controller = createSidebarControllerForTest({
-            data: { displayLimit: 48 },
             ui,
-            constants: { resultDisplayBatchSize: 48 },
             callbacks: {
                 ...createSidebarCallbacks(),
                 isIOSWebKit: () => true,
@@ -471,9 +451,7 @@ test("sidebar: tab focus is trapped within the active sidebar in both directions
     try {
         const { ui, openSidebarBtn, closeSidebarBtn } = createSidebarUiState();
         const controller = createSidebarControllerForTest({
-            data: { displayLimit: 48 },
             ui,
-            constants: { resultDisplayBatchSize: 48 },
             callbacks: createSidebarCallbacks()
         });
 

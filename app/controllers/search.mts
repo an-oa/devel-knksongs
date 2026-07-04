@@ -1,6 +1,6 @@
 import { createDateFilterController } from "../ui/date/filter.mjs";
 import { filterSongsByCriteria } from "../lib/search-filters.mjs";
-import { pickRecommendedSongs } from "../lib/search-recommendation.mjs";
+import { pickRecommendedSongsWithCache } from "../lib/search-recommendation.mjs";
 import {
     collectSearchBooleanFilterState,
     hasSelectedSearchBooleanFilterState
@@ -8,6 +8,10 @@ import {
 import { resolveSongRefs } from "../lib/song-lookup.mjs";
 import { getLookupUiState, getSearchUiState } from "../lib/ui-slices.mjs";
 import type { BookmarkRecord } from "../state.types";
+
+type SearchOutcomeApplyOptions = {
+    scrollToTop?: boolean;
+};
 
 /**
  * 検索条件の収集・結果解決・推薦選曲を管理するコントローラーを作成する。
@@ -31,6 +35,7 @@ export function createSearchController({
     const dateFilterController = createDateFilterController({ ui });
     const updateDisplay = callbacks.updateDisplay;
     const scrollResultsPaneToTop = callbacks.scrollResultsPaneToTop;
+    const getRecommendedDisplayCount = callbacks.getRecommendedDisplayCount || (() => RANDOM_DISPLAY_COUNT);
 
     /**
      * デバウンス付きで検索実行を予約し、必要時は即時実行する。
@@ -81,13 +86,18 @@ export function createSearchController({
      * 検索結果を state と UI へ反映する。
      * @param {SearchInput} searchInput
      * @param {SearchOutcome} outcome
+     * @param {SearchOutcomeApplyOptions} [options]
      */
-    function applySearchOutcome(searchInput: SearchInput, outcome: SearchOutcome): void {
+    function applySearchOutcome(
+        searchInput: SearchInput,
+        outcome: SearchOutcome,
+        options: SearchOutcomeApplyOptions = {}
+    ): void {
         data.currentResults = outcome.results;
         data.displayLimit = outcome.displayLimit;
         if (searchInput.resultCountEl) searchInput.resultCountEl.innerText = outcome.label;
         updateDisplay();
-        scrollResultsPaneToTop();
+        if (options.scrollToTop !== false) scrollResultsPaneToTop();
     }
 
     /**
@@ -147,9 +157,11 @@ export function createSearchController({
         }
 
         if (isRecommendedMode(searchState)) {
+            const recommendedDisplayCount = getRecommendedResultCount();
+            const results = pickRecommended(recommendedDisplayCount);
             return {
-                results: pickRecommended(),
-                displayLimit: RANDOM_DISPLAY_COUNT,
+                results,
+                displayLimit: Math.min(results.length, recommendedDisplayCount),
                 label: "おすすめを表示中"
             };
         }
@@ -182,21 +194,48 @@ export function createSearchController({
     }
 
     /**
+     * おすすめ表示で抽出する件数を、48 件基準と現在の表示領域に合わせて決定する。
+     * @returns {number}
+     */
+    function getRecommendedResultCount(): number {
+        const displayCount = getRecommendedDisplayCount();
+        const count = Number.isFinite(displayCount) ? Math.floor(displayCount) : RANDOM_DISPLAY_COUNT;
+        return Math.max(RANDOM_DISPLAY_COUNT, count);
+    }
+
+    /**
      * おすすめ曲をキャッシュ付きで選定して返す。
+     * @param {number} count
      * @returns {Song[]}
      */
-    function pickRecommended(): Song[] {
-        if (searchUiState.recommendedCache) return searchUiState.recommendedCache;
-        searchUiState.recommendedCache = pickRecommendedSongs(data.allSongsRaw, {
-            count: RANDOM_DISPLAY_COUNT,
-            minPerformanceCount: MIN_PERFORMANCE_FOR_RANDOM
+    function pickRecommended(count: number): Song[] {
+        const { songs, cache } = pickRecommendedSongsWithCache(data.allSongsRaw, {
+            count,
+            minPerformanceCount: MIN_PERFORMANCE_FOR_RANDOM,
+            currentCache: searchUiState.recommendedCache
         });
-        return searchUiState.recommendedCache;
+        searchUiState.recommendedCache = cache;
+        return songs;
+    }
+
+    /**
+     * おすすめ表示中だけ、現在の画面サイズに合わせて表示件数を再適用する。
+     * リサイズ追随用のため、検索結果ペインのスクロール位置は維持する。
+     * @returns {boolean}
+     */
+    function refreshRecommendedDisplay(): boolean {
+        const searchInput = collectSearchInput();
+        if (!isRecommendedMode(searchInput.searchState)) return false;
+        applySearchOutcome(searchInput, resolveSearchResults(searchInput.searchState), {
+            scrollToTop: false
+        });
+        return true;
     }
 
     return {
         scheduleSearch,
         search,
+        refreshRecommendedDisplay,
         getSearchState,
         isRecommendedMode,
         areAllFormatsSelected: searchFiltersController.areAllFormatsSelected,

@@ -71,15 +71,6 @@ function createRenderUiState(input) {
 function createRenderCallbacks(input) {
     const callbacks = input || {};
     return {
-        getSearchState: callbacks.getSearchState || (() => ({
-            queryRaw: "",
-            relayOnly: false,
-            harmonyOnly: false,
-            dateFromKey: null,
-            dateToKey: null,
-            hasDateFilter: false
-        })),
-        isRecommendedMode: callbacks.isRecommendedMode || (() => false),
         updateThumbnail: callbacks.updateThumbnail || (() => {}),
         extractYoutubeInfo: callbacks.extractYoutubeInfo || (() => ({ videoId: "", startSeconds: 0 })),
         playThumbnail: callbacks.playThumbnail || (() => playbackStartResult(YOUTUBE_PLAYBACK_START_STATUS.FAILED)),
@@ -103,7 +94,7 @@ test("render: empty results stop active playback", () => {
             activeThumb: document.createElement("div"),
             el: {
                 resultList: document.createElement("div"),
-                loadMoreContainer: document.createElement("div")
+                resultTailSentinel: document.createElement("div")
             }
         });
         let restoreCount = 0;
@@ -112,7 +103,6 @@ test("render: empty results stop active playback", () => {
             ui,
             isAllFormatsSelected: () => true,
             callbacks: createRenderCallbacks({
-                getSearchState: () => ({ queryRaw: "" }),
                 restoreActivePlayback: () => {
                     restoreCount += 1;
                 }
@@ -138,7 +128,7 @@ test("render: active card kept in next nodes does not stop playback", () => {
         const ui = createRenderUiState({
             el: {
                 resultList: document.createElement("div"),
-                loadMoreContainer: document.createElement("div")
+                resultTailSentinel: document.createElement("div")
             }
         });
         let restoreCount = 0;
@@ -147,7 +137,6 @@ test("render: active card kept in next nodes does not stop playback", () => {
             ui,
             isAllFormatsSelected: () => true,
             callbacks: createRenderCallbacks({
-                getSearchState: () => ({ queryRaw: "" }),
                 restoreActivePlayback: () => {
                     restoreCount += 1;
                 }
@@ -181,7 +170,7 @@ test("render: active card hidden from next nodes stops playback", () => {
         const ui = createRenderUiState({
             el: {
                 resultList: document.createElement("div"),
-                loadMoreContainer: document.createElement("div")
+                resultTailSentinel: document.createElement("div")
             }
         });
         let restoreCount = 0;
@@ -190,7 +179,6 @@ test("render: active card hidden from next nodes stops playback", () => {
             ui,
             isAllFormatsSelected: () => true,
             callbacks: createRenderCallbacks({
-                getSearchState: () => ({ queryRaw: "" }),
                 restoreActivePlayback: () => {
                     restoreCount += 1;
                 }
@@ -223,7 +211,7 @@ test("render: result cards and empty state use list semantics", () => {
         const ui = createRenderUiState({
             el: {
                 resultList: document.createElement("ol"),
-                loadMoreContainer: document.createElement("div")
+                resultTailSentinel: document.createElement("div")
             }
         });
         const controller = createRenderController({
@@ -266,16 +254,14 @@ test("render: cards keep fixed columns while preserving DOM order", () => {
         const ui = createRenderUiState({
             el: {
                 resultList: document.createElement("div"),
-                loadMoreContainer: document.createElement("div")
+                resultTailSentinel: document.createElement("div")
             }
         });
         const controller = createRenderController({
             data,
             ui,
             isAllFormatsSelected: () => true,
-            callbacks: createRenderCallbacks({
-                getSearchState: () => ({ queryRaw: "" })
-            })
+            callbacks: createRenderCallbacks()
         });
         ui.el.resultList._clientWidth = 700;
         ui.el.resultList._rect = { top: 0, bottom: 200, left: 0, right: 700, width: 700, height: 200 };
@@ -316,16 +302,14 @@ test("render: card height changes only shift cards in the same column", () => {
         const ui = createRenderUiState({
             el: {
                 resultList: document.createElement("div"),
-                loadMoreContainer: document.createElement("div")
+                resultTailSentinel: document.createElement("div")
             }
         });
         const controller = createRenderController({
             data,
             ui,
             isAllFormatsSelected: () => true,
-            callbacks: createRenderCallbacks({
-                getSearchState: () => ({ queryRaw: "" })
-            })
+            callbacks: createRenderCallbacks()
         });
         ui.el.resultList._clientWidth = 700;
         ui.el.resultList._rect = { top: 0, bottom: 200, left: 0, right: 700, width: 700, height: 200 };
@@ -377,16 +361,14 @@ test("render: refreshLayout shrinks container height after card height decreases
         const ui = createRenderUiState({
             el: {
                 resultList: document.createElement("div"),
-                loadMoreContainer: document.createElement("div")
+                resultTailSentinel: document.createElement("div")
             }
         });
         const controller = createRenderController({
             data,
             ui,
             isAllFormatsSelected: () => true,
-            callbacks: createRenderCallbacks({
-                getSearchState: () => ({ queryRaw: "" })
-            })
+            callbacks: createRenderCallbacks()
         });
 
         controller.updateDisplay();
@@ -426,16 +408,14 @@ test("render: adds footer tags for collaboration, relay, and harmony", () => {
         const ui = createRenderUiState({
             el: {
                 resultList: document.createElement("div"),
-                loadMoreContainer: document.createElement("div")
+                resultTailSentinel: document.createElement("div")
             }
         });
         const controller = createRenderController({
             data,
             ui,
             isAllFormatsSelected: () => true,
-            callbacks: createRenderCallbacks({
-                getSearchState: () => ({ queryRaw: "" })
-            })
+            callbacks: createRenderCallbacks()
         });
 
         controller.updateDisplay();
@@ -472,7 +452,7 @@ test("render: explicit video orientation overrides URL heuristic", () => {
         const ui = createRenderUiState({
             el: {
                 resultList: document.createElement("div"),
-                loadMoreContainer: document.createElement("div")
+                resultTailSentinel: document.createElement("div")
             }
         });
         let received = null;
@@ -481,7 +461,6 @@ test("render: explicit video orientation overrides URL heuristic", () => {
             ui,
             isAllFormatsSelected: () => true,
             callbacks: createRenderCallbacks({
-                getSearchState: () => ({ queryRaw: "" }),
                 updateThumbnail: (_, yt) => {
                     received = yt;
                 },
@@ -513,7 +492,7 @@ test("render: playSongByKey expands display limit and starts playback for hidden
             showThumbnails: true,
             el: {
                 resultList: document.createElement("div"),
-                loadMoreContainer: document.createElement("div")
+                resultTailSentinel: document.createElement("div")
             }
         });
         const playCalls = [];
@@ -523,7 +502,6 @@ test("render: playSongByKey expands display limit and starts playback for hidden
             isAllFormatsSelected: () => true,
             resultDisplayBatchSize: 2,
             callbacks: createRenderCallbacks({
-                getSearchState: () => ({ queryRaw: "" }),
                 extractYoutubeInfo,
                 playThumbnail: (thumbDiv, yt, options) => {
                     playCalls.push({ thumbDiv, yt, options });
@@ -569,7 +547,7 @@ test("render: playSongByKey expands display limit in increment-sized chunks", as
             showThumbnails: true,
             el: {
                 resultList: document.createElement("div"),
-                loadMoreContainer: document.createElement("div")
+                resultTailSentinel: document.createElement("div")
             }
         });
         const controller = createRenderController({
@@ -578,7 +556,6 @@ test("render: playSongByKey expands display limit in increment-sized chunks", as
             isAllFormatsSelected: () => true,
             resultDisplayBatchSize: 2,
             callbacks: createRenderCallbacks({
-                getSearchState: () => ({ queryRaw: "" }),
                 extractYoutubeInfo,
                 playThumbnail: () => playbackStartResult(YOUTUBE_PLAYBACK_START_STATUS.STARTED)
             })
@@ -593,8 +570,31 @@ test("render: playSongByKey expands display limit in increment-sized chunks", as
     }
 });
 
-test("bookmark: shows load-more and increases by RESULT_DISPLAY_BATCH_SIZE (48)", () => {
+test("bookmark: observes result tail and increases by RESULT_DISPLAY_BATCH_SIZE (48)", () => {
     const cleanup = installFakeDom();
+    const previousIntersectionObserver = globalThis.IntersectionObserver;
+    const observers = [];
+    globalThis.IntersectionObserver = class {
+        constructor(callback, options) {
+            this.callback = callback;
+            this.options = options;
+            this.targets = [];
+            this.disconnected = false;
+            observers.push(this);
+        }
+
+        observe(target) {
+            this.targets.push(target);
+        }
+
+        disconnect() {
+            this.disconnected = true;
+        }
+
+        trigger(isIntersecting = true) {
+            this.callback(this.targets.map((target) => ({ target, isIntersecting })));
+        }
+    };
     try {
         const rows = Array.from({ length: 100 }, (_, index) => ({
             sourceIndex: index + 1,
@@ -624,13 +624,13 @@ test("bookmark: shows load-more and increases by RESULT_DISPLAY_BATCH_SIZE (48)"
             currentResults: [],
             displayLimit: 0
         };
-        const loadMoreContainer = document.createElement("div");
-        loadMoreContainer.classList.add("hidden");
+        const resultTailSentinel = document.createElement("div");
+        resultTailSentinel.hidden = true;
         const ui = createRenderUiState({
             debounceId: 0,
             el: {
                 resultList: document.createElement("div"),
-                loadMoreContainer,
+                resultTailSentinel,
                 resultCount: { innerText: "" },
                 searchBox: { value: "" },
                 relayOnly: { checked: false },
@@ -649,14 +649,6 @@ test("bookmark: shows load-more and increases by RESULT_DISPLAY_BATCH_SIZE (48)"
             ui,
             isAllFormatsSelected: () => true,
             callbacks: createRenderCallbacks({
-                getSearchState: () => ({
-                    queryRaw: "",
-                    relayOnly: false,
-                    harmonyOnly: false,
-                    dateFromKey: null,
-                    dateToKey: null,
-                    hasDateFilter: false
-                }),
                 extractYoutubeInfo: (url) => ({ videoId: String(url || ""), startSeconds: 0 })
             })
         });
@@ -685,20 +677,149 @@ test("bookmark: shows load-more and increases by RESULT_DISPLAY_BATCH_SIZE (48)"
         assert.equal(data.currentResults.length, 100);
         assert.equal(data.displayLimit, 48);
         assert.equal(ui.el.resultList.children.length, 48);
-        assert.equal(loadMoreContainer.classList.contains("hidden"), false);
+        assert.equal(resultTailSentinel.hidden, false);
+        assert.equal(observers.length, 1);
 
-        data.displayLimit += 48;
-        renderController.updateDisplay();
+        observers.at(-1).trigger();
         assert.equal(data.displayLimit, 96);
         assert.equal(ui.el.resultList.children.length, 96);
-        assert.equal(loadMoreContainer.classList.contains("hidden"), false);
+        assert.equal(resultTailSentinel.hidden, false);
 
-        data.displayLimit += 48;
-        renderController.updateDisplay();
-        assert.equal(data.displayLimit, 144);
+        observers.at(-1).trigger();
+        assert.equal(data.displayLimit, 100);
         assert.equal(ui.el.resultList.children.length, 100);
-        assert.equal(loadMoreContainer.classList.contains("hidden"), true);
+        assert.equal(resultTailSentinel.hidden, true);
     } finally {
+        globalThis.IntersectionObserver = previousIntersectionObserver;
+        cleanup();
+    }
+});
+
+test("render: result tail fallback increases display limit without IntersectionObserver", () => {
+    const cleanup = installFakeDom();
+    const previousIntersectionObserver = globalThis.IntersectionObserver;
+    globalThis.IntersectionObserver = undefined;
+    window.removeEventListener = function removeEventListener(type, listener) {
+        if (this._events.get(type) === listener) this._events.delete(type);
+    };
+    try {
+        const rows = Array.from({ length: 60 }, (_, index) => makeRenderRow({
+            sourceIndex: index + 1,
+            songKey: `song-${index + 1}`,
+            url: `https://youtu.be/video${index + 1}`
+        }));
+        const resultTailSentinel = document.createElement("div");
+        resultTailSentinel.hidden = true;
+        resultTailSentinel._rect = { top: 1300, bottom: 1301, left: 0, right: 1, width: 1, height: 1 };
+        const data = {
+            allSongsRaw: rows,
+            bookmarks: {},
+            activeBookmark: null,
+            currentResults: rows,
+            displayLimit: 48
+        };
+        const ui = createRenderUiState({
+            el: {
+                resultList: document.createElement("div"),
+                resultTailSentinel
+            }
+        });
+        const controller = createRenderController({
+            data,
+            ui,
+            isAllFormatsSelected: () => true,
+            callbacks: createRenderCallbacks()
+        });
+
+        controller.updateDisplay();
+
+        assert.equal(data.displayLimit, 48);
+        assert.equal(ui.el.resultList.children.length, 48);
+        assert.equal(resultTailSentinel.hidden, false);
+        assert.equal(typeof window._events.get("scroll"), "function");
+
+        resultTailSentinel._rect = { top: 800, bottom: 801, left: 0, right: 1, width: 1, height: 1 };
+        window._events.get("scroll")();
+
+        assert.equal(data.displayLimit, 60);
+        assert.equal(ui.el.resultList.children.length, 60);
+        assert.equal(resultTailSentinel.hidden, true);
+        assert.equal(window._events.has("scroll"), false);
+    } finally {
+        globalThis.IntersectionObserver = previousIntersectionObserver;
+        cleanup();
+    }
+});
+
+test("render: result tail fallback listens to the nearest scrollable ancestor", () => {
+    const cleanup = installFakeDom();
+    const previousIntersectionObserver = globalThis.IntersectionObserver;
+    globalThis.IntersectionObserver = undefined;
+    window.removeEventListener = function removeEventListener(type, listener) {
+        if (this._events.get(type) === listener) this._events.delete(type);
+    };
+    try {
+        const rows = Array.from({ length: 60 }, (_, index) => makeRenderRow({
+            sourceIndex: index + 1,
+            songKey: `song-${index + 1}`,
+            url: `https://youtu.be/video${index + 1}`
+        }));
+        const scrollContainer = document.createElement("section");
+        scrollContainer._scrollHeight = 2000;
+        scrollContainer._clientHeight = 400;
+        scrollContainer._rect = { top: 100, bottom: 500, left: 0, right: 500, width: 500, height: 400 };
+        scrollContainer.removeEventListener = function removeEventListener(type, listener) {
+            if (this._events.get(type) === listener) this._events.delete(type);
+        };
+        window.getComputedStyle = (element) => ({
+            overflowY: element === scrollContainer ? "auto" : "visible"
+        });
+
+        const resultList = document.createElement("div");
+        const resultTailSentinel = document.createElement("div");
+        resultTailSentinel.hidden = true;
+        resultTailSentinel._rect = { top: 1200, bottom: 1201, left: 0, right: 1, width: 1, height: 1 };
+        scrollContainer.appendChild(resultList);
+        scrollContainer.appendChild(resultTailSentinel);
+        document.body.appendChild(scrollContainer);
+
+        const data = {
+            allSongsRaw: rows,
+            bookmarks: {},
+            activeBookmark: null,
+            currentResults: rows,
+            displayLimit: 48
+        };
+        const ui = createRenderUiState({
+            el: {
+                resultList,
+                resultTailSentinel
+            }
+        });
+        const controller = createRenderController({
+            data,
+            ui,
+            isAllFormatsSelected: () => true,
+            callbacks: createRenderCallbacks()
+        });
+
+        controller.updateDisplay();
+
+        assert.equal(data.displayLimit, 48);
+        assert.equal(resultTailSentinel.hidden, false);
+        assert.equal(typeof scrollContainer._events.get("scroll"), "function");
+        assert.equal(window._events.has("scroll"), false);
+        assert.equal(typeof window._events.get("resize"), "function");
+
+        resultTailSentinel._rect = { top: 900, bottom: 901, left: 0, right: 1, width: 1, height: 1 };
+        scrollContainer._events.get("scroll")();
+
+        assert.equal(data.displayLimit, 60);
+        assert.equal(ui.el.resultList.children.length, 60);
+        assert.equal(resultTailSentinel.hidden, true);
+        assert.equal(scrollContainer._events.has("scroll"), false);
+    } finally {
+        globalThis.IntersectionObserver = previousIntersectionObserver;
         cleanup();
     }
 });
@@ -722,7 +843,7 @@ test("render: drag handle is bookmark-only and reorder works in both directions 
         const ui = createRenderUiState({
             el: {
                 resultList: document.createElement("div"),
-                loadMoreContainer: document.createElement("div")
+                resultTailSentinel: document.createElement("div")
             }
         });
         let saveCount = 0;
@@ -731,7 +852,6 @@ test("render: drag handle is bookmark-only and reorder works in both directions 
             ui,
             isAllFormatsSelected: () => true,
             callbacks: createRenderCallbacks({
-                getSearchState: () => ({ queryRaw: "" }),
                 saveBookmarks: () => {
                     saveCount += 1;
                 }
@@ -812,7 +932,7 @@ test("render: active playback card can move back left without jumping to the end
         const ui = createRenderUiState({
             el: {
                 resultList: document.createElement("div"),
-                loadMoreContainer: document.createElement("div")
+                resultTailSentinel: document.createElement("div")
             }
         });
         const controller = createRenderController({
@@ -820,7 +940,6 @@ test("render: active playback card can move back left without jumping to the end
             ui,
             isAllFormatsSelected: () => true,
             callbacks: createRenderCallbacks({
-                getSearchState: () => ({ queryRaw: "" }),
                 saveBookmarks: () => {}
             })
         });

@@ -109,7 +109,8 @@ function createSearchCallbacks(input) {
     const callbacks = input || {};
     return {
         updateDisplay: callbacks.updateDisplay || (() => {}),
-        scrollResultsPaneToTop: callbacks.scrollResultsPaneToTop || (() => {})
+        scrollResultsPaneToTop: callbacks.scrollResultsPaneToTop || (() => {}),
+        getRecommendedDisplayCount: callbacks.getRecommendedDisplayCount
     };
 }
 
@@ -779,5 +780,244 @@ test("createSearchController: single オリ曲 performance is eligible for recom
 
     assert.equal(data.currentResults.length, 1);
     assert.equal(data.currentResults[0].format, "オリ曲");
+    assert.equal(ui.el.resultCount.innerText, "おすすめを表示中");
+});
+
+test("createSearchController: recommendation count expands to the responsive display count", () => {
+    const rows = Array.from({ length: 30 }, (_, index) =>
+        makeRow({
+            archiveId: `a${index + 1}`,
+            sourceIndex: index + 1,
+            title: `おすすめ${index + 1}`,
+            artist: "A",
+            format: "配信"
+        })
+    );
+    const data = {
+        allSongsRaw: rows,
+        bookmarks: {},
+        activeBookmark: null,
+        currentResults: [],
+        displayLimit: 0
+    };
+    const ui = createSearchUiState({
+        el: {
+            searchBox: { value: "" },
+            relayOnly: { checked: false },
+            harmonyOnly: { checked: false },
+            dateFromYear: null,
+            dateFromMonth: null,
+            dateFromDay: null,
+            dateToYear: null,
+            dateToMonth: null,
+            dateToDay: null,
+            resultCount: { innerText: "" }
+        },
+        selectedFormats: new Set(["配信", "歌みた", "ショート"]),
+        recommendedCache: null
+    });
+    const constants = {
+        RANDOM_DISPLAY_COUNT: 10,
+        MIN_PERFORMANCE_FOR_RANDOM: 1,
+        RESULT_DISPLAY_BATCH_SIZE: 10,
+        SEARCH_DEBOUNCE_MS: 0,
+        DEFAULT_FORMATS: ["配信", "歌みた", "ショート"]
+    };
+    let recommendedDisplayCount = 12;
+    let scrollCount = 0;
+    let updateCount = 0;
+    const controller = createSearchControllerForTest({
+        data,
+        ui,
+        constants,
+        callbacks: createSearchCallbacks({
+            getRecommendedDisplayCount: () => recommendedDisplayCount,
+            updateDisplay: () => {
+                updateCount += 1;
+            },
+            scrollResultsPaneToTop: () => {
+                scrollCount += 1;
+            }
+        })
+    });
+
+    controller.search();
+    const firstRecommendedSongs = data.currentResults.slice();
+    assert.equal(data.currentResults.length, 12);
+    assert.equal(data.displayLimit, 12);
+    assert.equal(scrollCount, 1);
+    assert.equal(updateCount, 1);
+
+    recommendedDisplayCount = 20;
+    assert.equal(controller.refreshRecommendedDisplay(), true);
+    assert.equal(data.currentResults.length, 20);
+    assert.equal(data.displayLimit, 20);
+    assert.deepEqual(data.currentResults.slice(0, 12), firstRecommendedSongs);
+    assert.equal(scrollCount, 1);
+    assert.equal(updateCount, 2);
+
+    recommendedDisplayCount = 10;
+    assert.equal(controller.refreshRecommendedDisplay(), true);
+    assert.equal(data.currentResults.length, 10);
+    assert.equal(data.displayLimit, 10);
+    assert.deepEqual(data.currentResults, firstRecommendedSongs.slice(0, 10));
+    assert.equal(scrollCount, 1);
+    assert.equal(updateCount, 3);
+
+    ui.el.searchBox.value = "おすすめ1";
+    assert.equal(controller.refreshRecommendedDisplay(), false);
+    assert.equal(updateCount, 3);
+    assert.equal(ui.el.resultCount.innerText, "おすすめを表示中");
+});
+
+test("createSearchController: recommendation expansion dedupes by recommendation song group", () => {
+    const previousRandom = Math.random;
+    const randomValues = [0.75, 0, 0.75, 0.75, 0];
+    Math.random = () => randomValues.shift() ?? 0;
+    try {
+        const rows = [
+            makeRow({
+                archiveId: "same-a1",
+                sourceIndex: 1,
+                title: "同じ曲",
+                artist: "A",
+                songKey: "same-a1",
+                format: "配信"
+            }),
+            makeRow({
+                archiveId: "same-a2",
+                sourceIndex: 2,
+                title: "同じ曲",
+                artist: "A",
+                songKey: "same-a2",
+                format: "配信"
+            }),
+            makeRow({
+                archiveId: "other-b1",
+                sourceIndex: 3,
+                title: "別の曲",
+                artist: "B",
+                songKey: "other-b1",
+                format: "配信"
+            }),
+            makeRow({
+                archiveId: "other-b2",
+                sourceIndex: 4,
+                title: "別の曲",
+                artist: "B",
+                songKey: "other-b2",
+                format: "配信"
+            })
+        ];
+        const data = {
+            allSongsRaw: rows,
+            bookmarks: {},
+            activeBookmark: null,
+            currentResults: [],
+            displayLimit: 0
+        };
+        const ui = createSearchUiState({
+            el: {
+                searchBox: { value: "" },
+                relayOnly: { checked: false },
+                harmonyOnly: { checked: false },
+                dateFromYear: null,
+                dateFromMonth: null,
+                dateFromDay: null,
+                dateToYear: null,
+                dateToMonth: null,
+                dateToDay: null,
+                resultCount: { innerText: "" }
+            },
+            selectedFormats: new Set(["配信", "歌みた", "ショート"]),
+            recommendedCache: null
+        });
+        const constants = {
+            RANDOM_DISPLAY_COUNT: 1,
+            MIN_PERFORMANCE_FOR_RANDOM: 2,
+            RESULT_DISPLAY_BATCH_SIZE: 10,
+            SEARCH_DEBOUNCE_MS: 0,
+            DEFAULT_FORMATS: ["配信", "歌みた", "ショート"]
+        };
+        let recommendedDisplayCount = 1;
+        const controller = createSearchControllerForTest({
+            data,
+            ui,
+            constants,
+            callbacks: createSearchCallbacks({
+                getRecommendedDisplayCount: () => recommendedDisplayCount
+            })
+        });
+
+        controller.search();
+        assert.equal(data.currentResults.length, 1);
+        assert.equal(data.currentResults[0].titleNorm, normalizeForSearch("同じ曲"));
+
+        recommendedDisplayCount = 2;
+        assert.equal(controller.refreshRecommendedDisplay(), true);
+
+        assert.equal(data.currentResults.length, 2);
+        assert.deepEqual(data.currentResults.map((row) => row.titleNorm), [
+            normalizeForSearch("同じ曲"),
+            normalizeForSearch("別の曲")
+        ]);
+    } finally {
+        Math.random = previousRandom;
+    }
+});
+
+test("createSearchController: recommendation count is capped by available recommendations", () => {
+    const rows = Array.from({ length: 7 }, (_, index) =>
+        makeRow({
+            archiveId: `cap${index + 1}`,
+            sourceIndex: index + 1,
+            title: `候補${index + 1}`,
+            artist: "A",
+            format: "配信"
+        })
+    );
+    const data = {
+        allSongsRaw: rows,
+        bookmarks: {},
+        activeBookmark: null,
+        currentResults: [],
+        displayLimit: 0
+    };
+    const ui = createSearchUiState({
+        el: {
+            searchBox: { value: "" },
+            relayOnly: { checked: false },
+            harmonyOnly: { checked: false },
+            dateFromYear: null,
+            dateFromMonth: null,
+            dateFromDay: null,
+            dateToYear: null,
+            dateToMonth: null,
+            dateToDay: null,
+            resultCount: { innerText: "" }
+        },
+        selectedFormats: new Set(["配信", "歌みた", "ショート"]),
+        recommendedCache: null
+    });
+    const constants = {
+        RANDOM_DISPLAY_COUNT: 10,
+        MIN_PERFORMANCE_FOR_RANDOM: 1,
+        RESULT_DISPLAY_BATCH_SIZE: 10,
+        SEARCH_DEBOUNCE_MS: 0,
+        DEFAULT_FORMATS: ["配信", "歌みた", "ショート"]
+    };
+    const controller = createSearchControllerForTest({
+        data,
+        ui,
+        constants,
+        callbacks: createSearchCallbacks({
+            getRecommendedDisplayCount: () => 20
+        })
+    });
+
+    controller.search();
+
+    assert.equal(data.currentResults.length, 7);
+    assert.equal(data.displayLimit, 7);
     assert.equal(ui.el.resultCount.innerText, "おすすめを表示中");
 });

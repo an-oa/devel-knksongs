@@ -1,3 +1,5 @@
+import type { RecommendedSearchCache } from "./lib/search-recommendation.mjs";
+
 /**
  * コメント粒度の方針:
  * - 状態遷移や保存値、派生キャッシュなど、名前だけでは意味や寿命を判断しにくいプロパティには個別コメントを置く。
@@ -43,8 +45,7 @@ export type AppUiElements = Partial<{
   closeSidebarBtn: HTMLElement | null;
   resultList: HTMLElement | null;
   resultCount: HTMLElement | null;
-  loadMoreContainer: HTMLElement | null;
-  loadMoreBtn: HTMLButtonElement | null;
+  resultTailSentinel: HTMLElement | null;
   searchBox: HTMLInputElement | null;
   clearBtn: HTMLButtonElement | null;
   collabHostOnly: HTMLInputElement | null;
@@ -94,7 +95,7 @@ export type SearchUiRuntimeState = {
   /** 検索デバウンス用のタイマー ID。 */
   debounceId: number;
   /** 条件未指定時に表示するおすすめ曲のキャッシュ。 */
-  recommendedCache: Song[] | null;
+  recommendedCache: RecommendedSearchCache | null;
   /** 曲データ読み込みが完了して検索可能かどうか。 */
   dataReady: boolean;
   /** ユーザーが検索語を編集したかどうか。 */
