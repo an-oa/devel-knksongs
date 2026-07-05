@@ -119,6 +119,16 @@ type YoutubePlaybackOptions = {
     revealCard?: boolean;
 };
 
+type YoutubePostPlaybackAdRestoreWatch = {
+    sessionId: number;
+    startedAt: number;
+    timeoutId: ReturnType<typeof setTimeout> | null;
+};
+
+type YoutubePostPlaybackAdRestoreTimeout = ReturnType<typeof setTimeout> & {
+    unref?: () => void;
+};
+
 type YoutubeControllerInput = {
     ui: YoutubeUiState;
     youtube: YoutubeRuntimeState;
@@ -255,6 +265,13 @@ type YoutubeController = {
  * }} YoutubeController
  */
 
+const YOUTUBE_PLAYER_STATE_UNSTARTED = -1;
+const YOUTUBE_PLAYER_STATE_BUFFERING = 3;
+const YOUTUBE_PLAYER_STATE_CUED = 5;
+const YOUTUBE_PLAYBACK_END_TOLERANCE_SECONDS = 1.5;
+const YOUTUBE_POST_PLAYBACK_AD_RESTORE_POLL_MS = 500;
+const YOUTUBE_POST_PLAYBACK_AD_RESTORE_TIMEOUT_MS = 5 * 60 * 1000;
+
 /**
  * サムネイル表示と埋め込み再生の制御を行うコントローラーを作成する。
  * @param {YoutubeControllerInput} input
@@ -272,6 +289,7 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
     let handlePlaybackEnded: (payload: { songKey: string }) => void = () => {};
     let handlePlaybackStartFailed: (payload: PlaybackStartFailedPayload) => void = () => {};
     let playbackState: YoutubePlaybackRuntimeState = createYoutubePlaybackState();
+    let postPlaybackAdRestoreWatch: YoutubePostPlaybackAdRestoreWatch | null = null;
     const refreshCardLayoutSoon = createLayoutRefreshScheduler(() => refreshLayout);
     const youtubeIframeApiLoader = createYoutubeIframeApiLoader({
         youtube,
@@ -379,6 +397,138 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
         }
     }
 
+    /**
+     * YouTube Player の現在 state を安全に読み取る。
+     * @param {YoutubePlayerLike | null | undefined} player
+     * @returns {number | null}
+     */
+    function readYoutubePlayerState(player: YoutubePlayerLike | null | undefined): number | null {
+        if (!player || typeof player.getPlayerState !== "function") return null;
+        try {
+            const state = player.getPlayerState();
+            return Number.isFinite(state) ? state : null;
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * YouTube Player の現在再生位置を安全に読み取る。
+     * @param {YoutubePlayerLike | null | undefined} player
+     * @returns {number | null}
+     */
+    function readYoutubePlayerCurrentTime(player: YoutubePlayerLike | null | undefined): number | null {
+        if (!player || typeof player.getCurrentTime !== "function") return null;
+        try {
+            const currentTime = player.getCurrentTime();
+            return Number.isFinite(currentTime) ? currentTime : null;
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * YouTube Player の動画尺を安全に読み取る。
+     * @param {YoutubePlayerLike | null | undefined} player
+     * @returns {number | null}
+     */
+    function readYoutubePlayerDuration(player: YoutubePlayerLike | null | undefined): number | null {
+        if (!player || typeof player.getDuration !== "function") return null;
+        try {
+            const duration = player.getDuration();
+            return Number.isFinite(duration) ? duration : null;
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * 再生キーに含めた終了秒数を返す。
+     * @param {Element | null | undefined} thumbDiv
+     * @returns {number | null}
+     */
+    function getPlaybackKeyEndSeconds(thumbDiv: Element | null | undefined): number | null {
+        if (!isHtmlElement(thumbDiv)) return null;
+        const [, , endPart = ""] = String(thumbDiv.dataset.playbackKey || "").split(":");
+        const endSeconds = Number(endPart);
+        return Number.isFinite(endSeconds) && endSeconds > 0 ? endSeconds : null;
+    }
+
+    /**
+     * プレーヤーがこのカードの再生終了位置に到達しているか返す。
+     * @param {Element | null | undefined} thumbDiv
+     * @param {YoutubePlayerLike | null | undefined} player
+     * @returns {boolean}
+     */
+    function hasReachedExpectedPlaybackEnd(
+        thumbDiv: Element | null | undefined,
+        player: YoutubePlayerLike | null | undefined
+    ): boolean {
+        const currentTime = readYoutubePlayerCurrentTime(player);
+        if (typeof currentTime !== "number") return false;
+        const endSeconds = getPlaybackKeyEndSeconds(thumbDiv);
+        const targetEndSeconds = typeof endSeconds === "number"
+            ? endSeconds
+            : readYoutubePlayerDuration(player);
+        if (typeof targetEndSeconds !== "number" || targetEndSeconds <= 0) return false;
+        return currentTime >= targetEndSeconds - YOUTUBE_PLAYBACK_END_TOLERANCE_SECONDS;
+    }
+
+    /**
+     * 広告を含めてプレーヤーがまだ動いている state か返す。
+     * @param {number | null | undefined} playerState
+     * @returns {boolean}
+     */
+    function isPlaybackContinuingPlayerState(playerState: number | null | undefined): boolean {
+        return playerState === window.YT.PlayerState.PLAYING ||
+            playerState === YOUTUBE_PLAYER_STATE_BUFFERING;
+    }
+
+    /**
+     * 動画後広告が終わった後に見られる停止系 state か返す。
+     * @param {number | null | undefined} playerState
+     * @returns {boolean}
+     */
+    function isPostPlaybackAdFinishedPlayerState(playerState: number | null | undefined): boolean {
+        return playerState === window.YT.PlayerState.ENDED ||
+            playerState === window.YT.PlayerState.PAUSED ||
+            playerState === YOUTUBE_PLAYER_STATE_CUED ||
+            playerState === YOUTUBE_PLAYER_STATE_UNSTARTED;
+    }
+
+    /**
+     * 動画後広告の終了監視タイマーに Node の unref があれば適用する。
+     * @param {ReturnType<typeof setTimeout>} timeoutId
+     */
+    function unrefPostPlaybackAdRestoreTimeout(timeoutId: ReturnType<typeof setTimeout>): void {
+        const timeoutHandle = timeoutId as YoutubePostPlaybackAdRestoreTimeout;
+        if (timeoutHandle && typeof timeoutHandle.unref === "function") {
+            timeoutHandle.unref();
+        }
+    }
+
+    /**
+     * 動画後広告の終了監視を解除する。
+     */
+    function clearPostPlaybackAdRestoreWatch(): void {
+        if (postPlaybackAdRestoreWatch && postPlaybackAdRestoreWatch.timeoutId) {
+            clearTimeout(postPlaybackAdRestoreWatch.timeoutId);
+        }
+        postPlaybackAdRestoreWatch = null;
+    }
+
+    /**
+     * 指定セッションの動画後広告終了監視が動いているか返す。
+     * @param {number} playbackSessionId
+     * @returns {boolean}
+     */
+    function isWatchingPostPlaybackAdRestore(playbackSessionId: number): boolean {
+        return Boolean(
+            postPlaybackAdRestoreWatch &&
+            postPlaybackAdRestoreWatch.sessionId === playbackSessionId
+        );
+    }
+
     const unconfirmedPlaybackStarts = createYoutubeUnconfirmedPlaybackStartManager({
         getSharedPlaybackState
     });
@@ -424,6 +574,124 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
     }
 
     /**
+     * 再生終了として扱い、サムネイル復元と継続再生通知を行う。
+     * @param {HTMLElement} thumbDiv
+     * @param {number} playbackSessionId
+     */
+    function completeEndedPlayback(thumbDiv: HTMLElement, playbackSessionId: number): void {
+        clearPostPlaybackAdRestoreWatch();
+        const shouldNotifyPlaybackEnded = playbackState.phase === "playing";
+        const wasPlaybackStartUnconfirmed = unconfirmedPlaybackStarts.consume(playbackSessionId);
+        playbackStartAttempts.settle(
+            playbackSessionId,
+            buildPlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.FAILED)
+        );
+        const endedSongKey = getSongKeyFromYoutubeThumb(thumbDiv);
+        const endedPlaybackMode = getPlaybackMode(thumbDiv);
+        const endedGeneration = applyPlaybackStateEvent({
+            type: "PLAYBACK_ENDED",
+            sessionId: playbackSessionId
+        }).transitionGeneration;
+        Promise.resolve(restoreThumbnail(thumbDiv, thumbDiv.dataset.videoId || "", {
+            preserveTransitionGeneration: true
+        })).then((restored) => {
+            if (!restored) return;
+            if (endedGeneration !== playbackState.transitionGeneration) return;
+            if (shouldNotifyPlaybackEnded && endedSongKey) {
+                handlePlaybackEnded({ songKey: endedSongKey });
+                return;
+            }
+            if (endedSongKey) {
+                handlePlaybackStartFailed(buildPlaybackStartFailedPayload(endedSongKey, endedPlaybackMode, {
+                    wasPlaybackStartUnconfirmed
+                }));
+            }
+        });
+    }
+
+    /**
+     * 動画後広告が終わったか確認し、終わっていれば通常の終了処理へ進める。
+     * @param {YoutubePostPlaybackAdRestoreWatch} watch
+     */
+    function pollPostPlaybackAdRestore(watch: YoutubePostPlaybackAdRestoreWatch): void {
+        if (postPlaybackAdRestoreWatch !== watch) return;
+        watch.timeoutId = null;
+        const thumbDiv = getSharedPlaybackThumb(watch.sessionId);
+        if (!isHtmlElement(thumbDiv) || !isCurrentPlaybackSession(thumbDiv, watch.sessionId)) {
+            clearPostPlaybackAdRestoreWatch();
+            return;
+        }
+        const player = getSharedPlaybackState().player;
+        const playerState = readYoutubePlayerState(player);
+        if (isPostPlaybackAdFinishedPlayerState(playerState)) {
+            completeEndedPlayback(thumbDiv, watch.sessionId);
+            return;
+        }
+        if (Date.now() - watch.startedAt >= YOUTUBE_POST_PLAYBACK_AD_RESTORE_TIMEOUT_MS) {
+            debugPlayback("youtube", "post-playback ad restore watch timed out", {
+                playbackSessionId: watch.sessionId,
+                playerState
+            });
+            completeEndedPlayback(thumbDiv, watch.sessionId);
+            return;
+        }
+        const timeoutId = setTimeout(() => {
+            pollPostPlaybackAdRestore(watch);
+        }, YOUTUBE_POST_PLAYBACK_AD_RESTORE_POLL_MS);
+        unrefPostPlaybackAdRestoreTimeout(timeoutId);
+        watch.timeoutId = timeoutId;
+    }
+
+    /**
+     * 動画後広告が続いている間、終了 state へ変わるまで監視する。
+     * @param {number} playbackSessionId
+     */
+    function startPostPlaybackAdRestoreWatch(playbackSessionId: number): void {
+        clearPostPlaybackAdRestoreWatch();
+        const watch: YoutubePostPlaybackAdRestoreWatch = {
+            sessionId: playbackSessionId,
+            startedAt: Date.now(),
+            timeoutId: null
+        };
+        postPlaybackAdRestoreWatch = watch;
+        const timeoutId = setTimeout(() => {
+            pollPostPlaybackAdRestore(watch);
+        }, YOUTUBE_POST_PLAYBACK_AD_RESTORE_POLL_MS);
+        unrefPostPlaybackAdRestoreTimeout(timeoutId);
+        watch.timeoutId = timeoutId;
+    }
+
+    /**
+     * `ENDED` が広告再生中の古い state として届いた場合に復元を保留する。
+     * @param {HTMLElement} thumbDiv
+     * @param {YoutubePlayerStateEvent} event
+     * @param {number} playbackSessionId
+     * @param {number | null} currentPlayerState
+     * @returns {boolean}
+     */
+    function handlePostPlaybackAdEndedState(
+        thumbDiv: HTMLElement,
+        event: YoutubePlayerStateEvent,
+        playbackSessionId: number,
+        currentPlayerState: number | null
+    ): boolean {
+        if (event.data !== window.YT.PlayerState.ENDED) return false;
+        if (!hasReachedExpectedPlaybackEnd(thumbDiv, event.target)) return false;
+        if (isPostPlaybackAdFinishedPlayerState(currentPlayerState)) {
+            completeEndedPlayback(thumbDiv, playbackSessionId);
+            return true;
+        }
+        if (!isPlaybackContinuingPlayerState(currentPlayerState)) return false;
+        debugPlayback("youtube", "waiting for post-playback ad to finish", {
+            playbackSessionId,
+            playerState: currentPlayerState,
+            songKey: getSongKeyFromYoutubeThumb(thumbDiv)
+        });
+        startPostPlaybackAdRestoreWatch(playbackSessionId);
+        return true;
+    }
+
+    /**
      * 実行環境がiOS系WebKitかどうかを判定する。
      */
     function isIOSWebKit() {
@@ -466,42 +734,32 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
             });
             if (!isHtmlElement(thumbDiv)) return;
             if (!isCurrentPlaybackSession(thumbDiv, playbackSessionId)) return;
+            const currentPlayerState = readYoutubePlayerState(event.target);
+            if (
+                isWatchingPostPlaybackAdRestore(playbackSessionId) &&
+                (
+                    isPostPlaybackAdFinishedPlayerState(event.data) ||
+                    isPostPlaybackAdFinishedPlayerState(currentPlayerState)
+                ) &&
+                !isPlaybackContinuingPlayerState(currentPlayerState)
+            ) {
+                completeEndedPlayback(thumbDiv, playbackSessionId);
+                return;
+            }
             if (event.data !== window.YT.PlayerState.PLAYING && isStalePlayerStateEvent(event)) {
+                if (handlePostPlaybackAdEndedState(thumbDiv, event, playbackSessionId, currentPlayerState)) {
+                    return;
+                }
                 debugPlayback("youtube", "ignored stale player state event", {
                     playbackSessionId,
                     playerState: event && event.data,
+                    currentPlayerState,
                     activeSongKey: getSongKeyFromYoutubeThumb(thumbDiv)
                 });
                 return;
             }
             if (event.data === window.YT.PlayerState.ENDED) {
-                const shouldNotifyPlaybackEnded = playbackState.phase === "playing";
-                const wasPlaybackStartUnconfirmed = unconfirmedPlaybackStarts.consume(playbackSessionId);
-                playbackStartAttempts.settle(
-                    playbackSessionId,
-                    buildPlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.FAILED)
-                );
-                const endedSongKey = getSongKeyFromYoutubeThumb(thumbDiv);
-                const endedPlaybackMode = getPlaybackMode(thumbDiv);
-                const endedGeneration = applyPlaybackStateEvent({
-                    type: "PLAYBACK_ENDED",
-                    sessionId: playbackSessionId
-                }).transitionGeneration;
-                Promise.resolve(restoreThumbnail(thumbDiv, thumbDiv.dataset.videoId || "", {
-                    preserveTransitionGeneration: true
-                })).then((restored) => {
-                    if (!restored) return;
-                    if (endedGeneration !== playbackState.transitionGeneration) return;
-                    if (shouldNotifyPlaybackEnded && endedSongKey) {
-                        handlePlaybackEnded({ songKey: endedSongKey });
-                        return;
-                    }
-                    if (endedSongKey) {
-                        handlePlaybackStartFailed(buildPlaybackStartFailedPayload(endedSongKey, endedPlaybackMode, {
-                            wasPlaybackStartUnconfirmed
-                        }));
-                    }
-                });
+                completeEndedPlayback(thumbDiv, playbackSessionId);
                 return;
             }
             if (event.data === window.YT.PlayerState.PAUSED) {
@@ -770,10 +1028,11 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
      * 共有プレーヤー実体を破棄し、再生成できる初期状態へ戻す。
      */
     function destroySharedPlayback() {
+        clearPostPlaybackAdRestoreWatch();
         destroyYoutubeSharedPlayback({
             youtube,
             syncIframe: () => syncSharedPlaybackIframe(),
-                debug: (message, details) => debugPlayback("youtube", message, details)
+            debug: (message, details) => debugPlayback("youtube", message, details)
         });
     }
 
@@ -798,6 +1057,7 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
      * @returns {boolean}
      */
     function detachSharedPlayback(thumbDiv, options = undefined) {
+        clearPostPlaybackAdRestoreWatch();
         if (!isSharedPlaybackMountedInThumb(thumbDiv)) {
             const sharedPlayback = getSharedPlaybackState();
             if (sharedPlayback.hostThumb === thumbDiv) {
@@ -1055,6 +1315,7 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
      * @returns {Promise<unknown>}
      */
     function restoreThumbnail(thumbDiv, videoId, options = undefined) {
+        clearPostPlaybackAdRestoreWatch();
         tracePlayback("youtube", "restoreThumbnail", {
             songKey: getSongKeyFromYoutubeThumb(thumbDiv),
             videoId,
@@ -1112,6 +1373,7 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
      * @returns {Promise<YoutubePlaybackStartResult>}
      */
     function startEmbeddedPlayback(thumbDiv, yt, options) {
+        clearPostPlaybackAdRestoreWatch();
         const playbackMode = options && options.playbackMode ? options.playbackMode : "manual";
         const playbackSessionId = applyPlaybackStateEvent({
             type: "REQUEST_PLAYBACK"

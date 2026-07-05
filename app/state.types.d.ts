@@ -239,6 +239,8 @@ export type AppUiState = {
 export type YoutubePlayerLike = {
   getIframe?: () => Element | null;
   getPlayerState?: () => number;
+  getCurrentTime?: () => number;
+  getDuration?: () => number;
   stopVideo?: () => void;
   destroy?: () => void;
 };
