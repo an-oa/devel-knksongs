@@ -6,6 +6,7 @@ import {
     YOUTUBE_PLAYBACK_START_STATUS
 } from "../_build/app/lib/youtube/playback-start-attempt.mjs";
 import {
+    installFakeTimeouts,
     installFakeDom,
     invokeListener,
     setGlobalValue
@@ -15,6 +16,7 @@ import {
     createFakeLocalStorage,
     createYoutubeControllerHarness,
     createYoutubeUiState,
+    installStatefulYoutubePlayerMock,
     installYoutubePlayerConstructor
 } from "./youtube-harness.mjs";
 
@@ -1170,6 +1172,7 @@ test("youtube: embed url includes end time when archive-to-end playback is disab
         assert.match(thumb.querySelector("iframe").src, /start=45/);
         assert.match(thumb.querySelector("iframe").src, /end=75/);
         assert.equal(thumb.dataset.playbackKey, "video1:45:75");
+        assert.equal(thumb.dataset.playbackEndSeconds, "75");
     } finally {
         cleanup();
     }
@@ -1254,6 +1257,7 @@ test("youtube: embed url omits end time when archive-to-end playback is enabled"
         assert.match(thumb.querySelector("iframe").src, /start=45/);
         assert.equal(/(?:\?|&)end=/.test(thumb.querySelector("iframe").src), false);
         assert.equal(thumb.dataset.playbackKey, "video1:45:");
+        assert.equal(thumb.dataset.playbackEndSeconds, undefined);
     } finally {
         cleanup();
     }
@@ -1369,70 +1373,21 @@ test("youtube: ended playback notifies song key for playback continuation", asyn
 
 test("youtube: post-playback ad end restores thumbnail after stale ended state", async () => {
     const cleanup = installFakeDom();
-    const previousSetTimeout = globalThis.setTimeout;
-    const previousClearTimeout = globalThis.clearTimeout;
-    const timeoutCalls = [];
-    setGlobalValue("setTimeout", (cb, delay) => {
-        const timeout = {
-            cb,
-            delay,
-            cleared: false,
-            unref() {}
-        };
-        timeoutCalls.push(timeout);
-        return timeout;
-    });
-    setGlobalValue("clearTimeout", (timeout) => {
-        if (timeout) timeout.cleared = true;
-    });
+    const fakeTimeouts = installFakeTimeouts();
     try {
         const ui = createYoutubeUiState({});
         const { controller } = createYoutubeControllerHarness({ ui });
         const endedCalls = [];
-        let playerInstance = null;
         let stateChangeHandler = null;
         controller.setPlaybackEndedHook(({ songKey }) => {
             endedCalls.push(songKey);
         });
-        globalThis.window.YT = {
-            PlayerState: {
-                PAUSED: 2,
-                ENDED: 0,
-                PLAYING: 1
-            },
-            Player: class {
-                constructor(host, options) {
-                    this.iframe = attachMockPlayerIframe(host, options);
-                    this.currentState = -1;
-                    this.currentTime = 0;
-                    this.stopCallCount = 0;
-                    playerInstance = this;
-                    stateChangeHandler = options.events.onStateChange;
-                }
-
-                getIframe() {
-                    return this.iframe;
-                }
-
-                getPlayerState() {
-                    return this.currentState;
-                }
-
-                getCurrentTime() {
-                    return this.currentTime;
-                }
-
-                getDuration() {
-                    return 120;
-                }
-
-                stopVideo() {
-                    this.stopCallCount += 1;
-                }
-
-                destroy() {}
+        const playerInstances = installStatefulYoutubePlayerMock({
+            duration: 120,
+            onCreate: (_, { options }) => {
+                stateChangeHandler = options.events.onStateChange;
             }
-        };
+        });
 
         const card = document.createElement("div");
         card.className = "song-card";
@@ -1444,6 +1399,8 @@ test("youtube: post-playback ad end restores thumbnail after stale ended state",
         thumb.onclick();
         await flushMicrotasks();
 
+        const playerInstance = playerInstances[0];
+        assert.equal(thumb.dataset.playbackEndSeconds, "75");
         playerInstance.currentState = globalThis.window.YT.PlayerState.PLAYING;
         stateChangeHandler({
             data: globalThis.window.YT.PlayerState.PLAYING,
@@ -1460,7 +1417,7 @@ test("youtube: post-playback ad end restores thumbnail after stale ended state",
         assert.ok(thumb.querySelector("iframe"));
         assert.deepEqual(endedCalls, []);
 
-        const restorePoll = timeoutCalls.find((call) => call.delay === 500 && !call.cleared);
+        const restorePoll = fakeTimeouts.timeoutCalls.find((call) => call.delay === 500 && !call.cleared);
         assert.equal(typeof restorePoll?.cb, "function");
         playerInstance.currentState = globalThis.window.YT.PlayerState.PAUSED;
         restorePoll.cb();
@@ -1468,12 +1425,12 @@ test("youtube: post-playback ad end restores thumbnail after stale ended state",
 
         assert.equal(thumb.querySelector("iframe"), null);
         assert.ok(thumb.querySelector("img"));
+        assert.equal(thumb.dataset.playbackEndSeconds, undefined);
         assert.equal(ui.playback.activeThumb, null);
         assert.deepEqual(endedCalls, ["song:post-ad"]);
         assert.equal(playerInstance.stopCallCount, 1);
     } finally {
-        setGlobalValue("setTimeout", previousSetTimeout);
-        setGlobalValue("clearTimeout", previousClearTimeout);
+        fakeTimeouts.cleanup();
         cleanup();
     }
 });

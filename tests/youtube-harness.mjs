@@ -1,10 +1,7 @@
 import { createYoutubeController } from "../_build/app/controllers/youtube.mjs";
+import { YOUTUBE_PLAYER_STATE } from "../_build/app/lib/youtube/player-state.mjs";
 
-export const YOUTUBE_PLAYER_STATES = {
-    ENDED: 0,
-    PLAYING: 1,
-    PAUSED: 2
-};
+export const YOUTUBE_PLAYER_STATES = YOUTUBE_PLAYER_STATE;
 
 export const DEFAULT_YOUTUBE_CONTROLLER_CONSTANTS = {
     YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
@@ -130,4 +127,54 @@ export function installYoutubePlayerConstructor(Player, options = {}) {
         Player
     };
     return target.YT;
+}
+
+/**
+ * 状態と再生位置を変更できる YT.Player mock を登録する。
+ * @param {{ initialState?: number, currentTime?: number, duration?: number, target?: *, onCreate?: Function, onStopVideo?: Function } | undefined} input
+ * @returns {Array<*>}
+ */
+export function installStatefulYoutubePlayerMock(input = {}) {
+    const instances = [];
+    installYoutubePlayerConstructor(class {
+        constructor(host, options) {
+            this.iframe = attachMockPlayerIframe(host, options);
+            this.currentState = input.initialState ?? YOUTUBE_PLAYER_STATES.UNSTARTED;
+            this.currentTime = input.currentTime ?? 0;
+            this.duration = input.duration ?? 0;
+            this.stopCallCount = 0;
+            instances.push(this);
+            if (typeof input.onCreate === "function") {
+                input.onCreate(this, { host, options });
+            }
+        }
+
+        getIframe() {
+            return this.iframe;
+        }
+
+        getPlayerState() {
+            return this.currentState;
+        }
+
+        getCurrentTime() {
+            return this.currentTime;
+        }
+
+        getDuration() {
+            return this.duration;
+        }
+
+        stopVideo() {
+            this.stopCallCount += 1;
+            if (typeof input.onStopVideo === "function") {
+                input.onStopVideo(this);
+            }
+        }
+
+        destroy() {}
+    }, {
+        target: input.target
+    });
+    return instances;
 }

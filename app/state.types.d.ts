@@ -306,9 +306,12 @@ export type AppYoutubeRuntimeState = {
  */
 export type YoutubeIframeApiGlobal = {
   PlayerState: {
+    UNSTARTED: number;
+    ENDED: number;
     PLAYING: number;
     PAUSED: number;
-    ENDED: number;
+    BUFFERING: number;
+    CUED: number;
   };
   Player: new (
     iframe: Element,

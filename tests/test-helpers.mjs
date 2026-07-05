@@ -484,3 +484,36 @@ export function invokeListener(element, type, event) {
     assert.equal(typeof listener, "function", `${type} listener is missing`);
     listener(event);
 }
+
+/**
+ * setTimeout/clearTimeout を記録型 fake に差し替える。
+ * @returns {{
+ *   timeoutCalls: Array<{ cb: Function, delay: number | undefined, cleared: boolean, unref: Function }>,
+ *   cleanup: Function
+ * }}
+ */
+export function installFakeTimeouts() {
+    const previousSetTimeout = globalThis.setTimeout;
+    const previousClearTimeout = globalThis.clearTimeout;
+    const timeoutCalls = [];
+    setGlobalValue("setTimeout", (cb, delay) => {
+        const timeout = {
+            cb,
+            delay,
+            cleared: false,
+            unref() {}
+        };
+        timeoutCalls.push(timeout);
+        return timeout;
+    });
+    setGlobalValue("clearTimeout", (timeout) => {
+        if (timeout) timeout.cleared = true;
+    });
+    return {
+        timeoutCalls,
+        cleanup() {
+            setGlobalValue("setTimeout", previousSetTimeout);
+            setGlobalValue("clearTimeout", previousClearTimeout);
+        }
+    };
+}
