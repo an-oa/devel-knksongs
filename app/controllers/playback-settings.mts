@@ -1,4 +1,3 @@
-import { getPlaybackUiState, getSearchUiState } from "../lib/ui-slices.mjs";
 import {
     createPlaybackSettingDefinitions,
     LEGACY_PLAYBACK_SETTINGS_STORAGE_KEYS,
@@ -13,6 +12,7 @@ import {
 import type {
     AppUiElements,
     PlaybackUiRuntimeState,
+    PlaybackSettingsUiSlice,
     SearchUiRuntimeState
 } from "../state.types";
 import type { PlaybackSettingDefinition } from "../lib/playback-settings/definitions.mjs";
@@ -35,19 +35,10 @@ type PlaybackSettingsUiState = {
     search: SearchUiRuntimeState;
 };
 
-type PlaybackSettingsSnapshot = {
-    showThumbnails: boolean;
-    showExperimentalPlaybackSettings: boolean;
-    useYoutubeNoCookie: boolean;
-    playArchiveToEnd: boolean;
-    continuousPlayback: boolean;
-    loopPlayback: boolean;
-};
-
 export type PlaybackSettingsConsoleApi = {
     setExperimentalPlaybackSettings: (value: boolean) => boolean;
     readonly showExperimentalPlaybackSettings: boolean;
-    readonly state: PlaybackSettingsSnapshot;
+    readonly state: PlaybackSettingsUiSlice;
 };
 
 type PlaybackSettingsCallbacks = {
@@ -77,8 +68,8 @@ type PlaybackSettingValueHookName = "afterStorageApply" | "afterToggleChange";
  * @param {PlaybackSettingsControllerInput} input
  */
 export function createPlaybackSettingsController({ ui, callbacks }: PlaybackSettingsControllerInput) {
-    const playbackUi = getPlaybackUiState(ui);
-    const searchUiState = getSearchUiState(ui);
+    const playbackUi = ui.playback;
+    const searchUiState = ui.search;
     const ensureThumbnailPlaybackReady = callbacks.ensureThumbnailPlaybackReady;
     const restoreActivePlayback = callbacks.restoreActivePlayback;
     const updateDisplay = callbacks.updateDisplay;
@@ -440,9 +431,9 @@ export function createPlaybackSettingsController({ ui, callbacks }: PlaybackSett
 
     /**
      * console から確認しやすい再生設定の現在値を返す。
-     * @returns {PlaybackSettingsSnapshot}
+     * @returns {PlaybackSettingsUiSlice}
      */
-    function getPlaybackSettingsSnapshot(): PlaybackSettingsSnapshot {
+    function getPlaybackSettingsSnapshot(): PlaybackSettingsUiSlice {
         return {
             showThumbnails: Boolean(playbackUi.showThumbnails),
             showExperimentalPlaybackSettings: Boolean(playbackUi.showExperimentalPlaybackSettings),

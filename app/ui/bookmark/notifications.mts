@@ -1,13 +1,7 @@
 import { resolveSongRef } from "../../lib/song-lookup.mjs";
-import { getLookupUiState } from "../../lib/ui-slices.mjs";
 import type { AppDataState, AppUiState } from "../../state.types";
 
 export const BOOKMARK_NOTIFICATION_TIMEOUT_MS = 4000;
-
-/**
- * @typedef {import("../../state.types").AppDataState} AppDataState
- * @typedef {import("../../state.types").AppUiState} AppUiState
- */
 
 /**
  * timeout handle が Node 互換の unref を持つ場合だけ解放する。
@@ -40,11 +34,6 @@ function removeToastElement(toast: HTMLElement | null): void {
 
 /**
  * ブックマーク操作の通知表示を管理するコントローラーを作成する。
- * @param {{
- *   data: AppDataState,
- *   ui: AppUiState,
- *   timeoutMs?: number
- * }} input
  */
 export function createBookmarkNotificationController({
     data,
@@ -55,7 +44,7 @@ export function createBookmarkNotificationController({
     ui: AppUiState;
     timeoutMs?: number;
 }) {
-    const lookupUi = getLookupUiState(ui);
+    const lookupUi = ui.lookup;
     let currentToast: HTMLElement | null = null;
     let currentTimerId: ReturnType<typeof setTimeout> | null = null;
     let nextToastSequence = 0;

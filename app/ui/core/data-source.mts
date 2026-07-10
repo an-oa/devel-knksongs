@@ -6,38 +6,20 @@ import {
 } from "../../lib/storage/songs-json-cache.mjs";
 import { createSongsDataSource } from "../../lib/songs-data-source.mjs";
 
-/**
- * @typedef {{
- *   publicSongsJsonUrl: string,
- *   publicSongsMetaUrl: string,
- *   publicCsvUrl: string,
- *   songsJsonCacheKey: string,
- *   csvCacheKey: string,
- *   legacyCsvCacheKey: string
- * }} BrowserSongsDataSourceInput
- */
-
-/**
- * @typedef {{
- *   songs: Song[],
- *   source: string,
- *   resetConditions?: boolean
- * }} SongsDataSourceResult
- */
-
-/**
- * @typedef {{
- *   loadInitialSongs: (callbacks: {
- *     onSongsLoaded: (result: SongsDataSourceResult) => void
- *   }) => Promise<boolean>
- * }} SongsDataSource
- */
+type BrowserSongsDataSourceInput = {
+    publicSongsJsonUrl: string;
+    publicSongsMetaUrl: string;
+    publicCsvUrl: string;
+    songsJsonCacheKey: string;
+    csvCacheKey: string;
+    legacyCsvCacheKey: string;
+};
 
 /**
  * ブラウザの localStorage を安全に取得する。
  * @returns {Storage | null}
  */
-function getBrowserLocalStorage() {
+function getBrowserLocalStorage(): Storage | null {
     try {
         return globalThis.localStorage ?? null;
     } catch (error) {
@@ -49,10 +31,8 @@ function getBrowserLocalStorage() {
 /**
  * ブラウザ保存領域を使う曲データ取得元を作成する。
  * IndexedDB を主キャッシュ、旧 localStorage キャッシュを移行元として束ねる。
- * @param {BrowserSongsDataSourceInput} input
- * @returns {SongsDataSource}
  */
-export function createBrowserSongsDataSource(input) {
+export function createBrowserSongsDataSource(input: BrowserSongsDataSourceInput) {
     const {
         publicSongsJsonUrl,
         publicSongsMetaUrl,

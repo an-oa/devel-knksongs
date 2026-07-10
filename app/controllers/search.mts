@@ -6,8 +6,6 @@ import {
     hasSelectedSearchBooleanFilterState
 } from "../lib/search-boolean-filters.mjs";
 import { resolveSongRefs } from "../lib/song-lookup.mjs";
-import { getLookupUiState, getSearchUiState } from "../lib/ui-slices.mjs";
-import type { BookmarkRecord } from "../state.types";
 
 type SearchOutcomeApplyOptions = {
     scrollToTop?: boolean;
@@ -30,8 +28,8 @@ export function createSearchController({
         RESULT_DISPLAY_BATCH_SIZE,
         SEARCH_DEBOUNCE_MS
     } = constants;
-    const searchUiState = getSearchUiState(ui);
-    const lookupUi = getLookupUiState(ui);
+    const searchUiState = ui.search;
+    const lookupUi = ui.lookup;
     const dateFilterController = createDateFilterController({ ui });
     const updateDisplay = callbacks.updateDisplay;
     const scrollResultsPaneToTop = callbacks.scrollResultsPaneToTop;
@@ -58,7 +56,7 @@ export function createSearchController({
      */
     function search(): void {
         const searchInput = collectSearchInput();
-        const outcome = resolveSearchOutcome(searchInput.searchState);
+        const outcome = resolveSearchResults(searchInput.searchState);
         applySearchOutcome(searchInput, outcome);
     }
 
@@ -71,15 +69,6 @@ export function createSearchController({
             searchState: getSearchState(),
             resultCountEl: ui.el.resultCount
         };
-    }
-
-    /**
-     * 検索状態から表示用の結果セットを導出する。
-     * @param {SearchState} searchState
-     * @returns {SearchOutcome}
-     */
-    function resolveSearchOutcome(searchState: SearchState): SearchOutcome {
-        return resolveSearchResults(searchState);
     }
 
     /**
@@ -130,15 +119,6 @@ export function createSearchController({
     }
 
     /**
-     * ブックマーク内の参照 ID を曲データ配列へ解決する。
-     * @param {import("../state.types").BookmarkRecord} bookmark
-     * @returns {Song[]}
-     */
-    function resolveBookmarkRows(bookmark: BookmarkRecord): Song[] {
-        return resolveSongRefs(lookupUi, data.allSongsRaw, bookmark.songs);
-    }
-
-    /**
      * 通常検索・ブックマーク検索・おすすめ表示を切り替えて結果を作る。
      * @param {SearchState} searchState
      * @returns {SearchOutcome}
@@ -147,7 +127,7 @@ export function createSearchController({
         if (data.activeBookmark) {
             const bookmark = data.bookmarks[data.activeBookmark];
             if (bookmark) {
-                const bookmarkRows = resolveBookmarkRows(bookmark);
+                const bookmarkRows = resolveSongRefs(lookupUi, data.allSongsRaw, bookmark.songs);
                 const results = filterSongsByCriteria(bookmarkRows, searchState, searchUiState.selectedFormats);
                 return buildIncrementalSearchOutcome(
                     results,
@@ -166,7 +146,7 @@ export function createSearchController({
             };
         }
 
-        const results = filterSongs(searchState);
+        const results = filterSongsByCriteria(data.allSongsRaw, searchState, searchUiState.selectedFormats);
         return buildIncrementalSearchOutcome(results, `${results.length} 件がヒット`);
     }
 
@@ -182,15 +162,6 @@ export function createSearchController({
             displayLimit: Math.min(results.length, RESULT_DISPLAY_BATCH_SIZE),
             label
         };
-    }
-
-    /**
-     * 全曲データを現在の検索条件で絞り込む。
-     * @param {SearchState} searchState
-     * @returns {Song[]}
-     */
-    function filterSongs(searchState: SearchState): Song[] {
-        return filterSongsByCriteria(data.allSongsRaw, searchState, searchUiState.selectedFormats);
     }
 
     /**

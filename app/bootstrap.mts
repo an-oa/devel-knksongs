@@ -45,7 +45,6 @@ import { createDataLoader } from "./ui/core/data.mjs";
 import { createSearchUiActions } from "./ui/core/search-actions.mjs";
 import { createSidebarController } from "./ui/sidebar/ui.mjs";
 import { createSearchFiltersController } from "./ui/search-filters/controller.mjs";
-import { getSearchUiState } from "./lib/ui-slices.mjs";
 import { debugPlayback } from "./lib/playback-debug.mjs";
 import { createBrowserSongsDataSource } from "./ui/core/data-source.mjs";
 import type {
@@ -96,7 +95,7 @@ type YoutubePlaybackHooksInput = {
 const appDataState: AppDataState = appState.data;
 
 const appUiState: AppUiState = appState.ui;
-const searchUiState = getSearchUiState(appUiState);
+const searchUiState = appUiState.search;
 const youtubeRuntimeState: AppYoutubeRuntimeState = appState.youtube;
 
 /**

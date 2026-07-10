@@ -12,9 +12,10 @@ export const YOUTUBE_PLAYBACK_START_STATUS = Object.freeze({
     UNCONFIRMED: "unconfirmed"
 });
 
-type YoutubePlaybackStartStatus = "started" | "failed" | "unconfirmed";
+export type YoutubePlaybackStartStatus =
+    typeof YOUTUBE_PLAYBACK_START_STATUS[keyof typeof YOUTUBE_PLAYBACK_START_STATUS];
 
-type YoutubePlaybackStartResult = {
+export type YoutubePlaybackStartResult = {
     status: YoutubePlaybackStartStatus;
 };
 
@@ -39,23 +40,9 @@ type PlaybackStartTimeoutHandle = ReturnType<typeof setTimeout> & {
 };
 
 /**
- * @typedef {"started" | "failed" | "unconfirmed"} YoutubePlaybackStartStatus
- */
-
-/**
- * @typedef {{ status: YoutubePlaybackStartStatus }} YoutubePlaybackStartResult
- */
-
-/**
- * @typedef {ReturnType<typeof setTimeout> & { unref?: () => void }} PlaybackStartTimeoutHandle
- */
-
-/**
  * 再生開始結果を表すオブジェクトを作成する。
- * @param {string} status
- * @returns {YoutubePlaybackStartResult}
  */
-export function createYoutubePlaybackStartResult(status) {
+export function createYoutubePlaybackStartResult(status: unknown): YoutubePlaybackStartResult {
     switch (status) {
     case YOUTUBE_PLAYBACK_START_STATUS.STARTED:
     case YOUTUBE_PLAYBACK_START_STATUS.UNCONFIRMED:
@@ -67,10 +54,10 @@ export function createYoutubePlaybackStartResult(status) {
 
 /**
  * 再生開始結果から status を返す。
- * @param {YoutubePlaybackStartResult | boolean | null | undefined} playbackResult
- * @returns {YoutubePlaybackStartStatus}
  */
-function getYoutubePlaybackStartStatus(playbackResult) {
+function getYoutubePlaybackStartStatus(
+    playbackResult: YoutubePlaybackStartResult | boolean | null | undefined
+): YoutubePlaybackStartStatus {
     if (playbackResult && typeof playbackResult === "object" && typeof playbackResult.status === "string") {
         return createYoutubePlaybackStartResult(playbackResult.status).status;
     }
@@ -81,28 +68,28 @@ function getYoutubePlaybackStartStatus(playbackResult) {
 
 /**
  * 再生開始結果をオブジェクト形式へ正規化する。
- * @param {YoutubePlaybackStartResult | boolean | null | undefined} playbackResult
- * @returns {YoutubePlaybackStartResult}
  */
-function normalizeYoutubePlaybackStartResult(playbackResult) {
+function normalizeYoutubePlaybackStartResult(
+    playbackResult: YoutubePlaybackStartResult | boolean | null | undefined
+): YoutubePlaybackStartResult {
     return createYoutubePlaybackStartResult(getYoutubePlaybackStartStatus(playbackResult));
 }
 
 /**
  * 再生開始結果が開始済みか返す。
- * @param {YoutubePlaybackStartResult | boolean | undefined} playbackResult
- * @returns {boolean}
  */
-export function isYoutubePlaybackStarted(playbackResult) {
+export function isYoutubePlaybackStarted(
+    playbackResult: YoutubePlaybackStartResult | boolean | undefined
+): boolean {
     return getYoutubePlaybackStartStatus(playbackResult) === YOUTUBE_PLAYBACK_START_STATUS.STARTED;
 }
 
 /**
  * 再生開始結果が未確定か返す。
- * @param {YoutubePlaybackStartResult | boolean | undefined} playbackResult
- * @returns {boolean}
  */
-export function isYoutubePlaybackStartUnconfirmed(playbackResult) {
+export function isYoutubePlaybackStartUnconfirmed(
+    playbackResult: YoutubePlaybackStartResult | boolean | undefined
+): boolean {
     return getYoutubePlaybackStartStatus(playbackResult) === YOUTUBE_PLAYBACK_START_STATUS.UNCONFIRMED;
 }
 

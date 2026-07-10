@@ -1,4 +1,3 @@
-import { getDateUiState, getSearchUiState } from "../lib/ui-slices.mjs";
 import {
     buildStoredBookmarksPayload,
     migrateLegacyBookmarkSongRefsToCurrent,
@@ -14,24 +13,18 @@ import {
 } from "../lib/storage/search-state-schema.mjs";
 import { collectSearchBooleanFilterState } from "../lib/search-boolean-filters.mjs";
 import type {
+    AppDataState,
+    AppUiState,
     AppUiElements,
-    BookmarkRecord,
-    DateUiRuntimeState,
-    SearchUiRuntimeState
+    BookmarkRecord
 } from "../state.types";
 
-type StorageDataState = {
-    allSongsRaw: Song[];
-    bookmarks: Record<string, BookmarkRecord>;
-    activeBookmark: string | null;
-};
+type StorageDataState = Pick<AppDataState, "allSongsRaw" | "bookmarks" | "activeBookmark">;
 
 type StorageUiElements = Pick<AppUiElements, "searchBox"> & Record<string, Element | null | undefined>;
 
-type StorageUiState = {
+type StorageUiState = Pick<AppUiState, "search" | "date"> & {
     el: StorageUiElements;
-    search: SearchUiRuntimeState;
-    date: DateUiRuntimeState;
 };
 
 type StorageConstants = {
@@ -89,8 +82,8 @@ export function createStorageController({
     constants,
     callbacks
 }: StorageControllerInput) {
-    const searchUiState = getSearchUiState(ui);
-    const dateUi = getDateUiState(ui);
+    const searchUiState = ui.search;
+    const dateUi = ui.date;
     const {
         SEARCH_STATE_KEY,
         DEFAULT_FORMATS = [],

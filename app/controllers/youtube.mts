@@ -1,14 +1,12 @@
-// @ts-check
-
 import { createLayoutRefreshScheduler } from "../lib/layout-anchor.mjs";
 import { canUseDom, getHeaderHeight, isHtmlElement } from "../lib/dom-utils.mjs";
 import { debugPlayback, tracePlayback } from "../lib/playback-debug.mjs";
-import { getPlaybackUiState } from "../lib/ui-slices.mjs";
 import {
     applyYoutubePlayerIframeAttributes,
     buildYoutubeEmbedUrl,
     createYoutubeIframeApiLoader
 } from "../lib/youtube/embed.mjs";
+import type { YoutubeTarget } from "../lib/youtube/embed.mjs";
 import {
     destroyYoutubeSharedPlayback,
     ensureYoutubeSharedPlaybackElements,
@@ -38,6 +36,7 @@ import {
     createYoutubePlaybackStartResult,
     YOUTUBE_PLAYBACK_START_STATUS
 } from "../lib/youtube/playback-start-attempt.mjs";
+import type { YoutubePlaybackStartResult } from "../lib/youtube/playback-start-attempt.mjs";
 import { createYoutubeUnconfirmedPlaybackStartManager } from "../lib/youtube/unconfirmed-playback-start.mjs";
 import {
     createYoutubePlayerAdapter
@@ -48,44 +47,18 @@ import {
 } from "../lib/youtube/player-state.mjs";
 import { createYoutubePostPlaybackAdRestoreManager } from "../lib/youtube/post-playback-ad-restore.mjs";
 import type {
+    AppUiState,
     AppYoutubeRuntimeState,
-    PlaybackUiRuntimeState,
     YoutubePlayerLike
 } from "../state.types";
 
 export { extractYoutubeInfo } from "../lib/youtube-url.mjs";
-
-type YoutubeTarget = {
-    videoId: string;
-    startSeconds: number;
-    endSeconds?: number;
-    isVertical: boolean;
-};
-
-type YoutubePlaybackStartStatus = "started" | "failed" | "unconfirmed";
-
-type YoutubePlaybackStartResult = {
-    status: YoutubePlaybackStartStatus;
-};
 
 type YoutubeConstants = {
     YT_IFRAME_API_SRC: string;
     YT_IFRAME_API_SELECTOR: string;
     YT_IFRAME_READY_POLL_MS: number;
     STOP_PLAYBACK_ON_SCROLL_OUT: boolean;
-};
-
-type YoutubeRuntimeState = AppYoutubeRuntimeState;
-
-type YoutubePlaybackRuntimeState = {
-    sessionSequence: number;
-    transitionGeneration: number;
-    activeSessionId: number;
-    phase: string;
-};
-
-type YoutubeUiState = {
-    playback: PlaybackUiRuntimeState;
 };
 
 type YoutubePlayerStateEvent = {
@@ -131,8 +104,8 @@ type YoutubePlaybackTargetMetadata = {
 };
 
 type YoutubeControllerInput = {
-    ui: YoutubeUiState;
-    youtube: YoutubeRuntimeState;
+    ui: Pick<AppUiState, "playback">;
+    youtube: AppYoutubeRuntimeState;
     constants: YoutubeConstants;
 };
 
@@ -153,120 +126,6 @@ type YoutubeController = {
 };
 
 /**
- * @typedef {{
- *   videoId: string,
- *   startSeconds: number,
- *   endSeconds?: number,
- *   isVertical: boolean
- * }} YoutubeTarget
- */
-
-/**
- * @typedef {"started" | "failed" | "unconfirmed"} YoutubePlaybackStartStatus
- */
-
-/**
- * @typedef {{ status: YoutubePlaybackStartStatus }} YoutubePlaybackStartResult
- */
-
-/**
- * @typedef {{
- *   YT_IFRAME_API_SRC: string,
- *   YT_IFRAME_API_SELECTOR: string,
- *   YT_IFRAME_READY_POLL_MS: number,
- *   STOP_PLAYBACK_ON_SCROLL_OUT: boolean
- * }} YoutubeConstants
- */
-
-/** @typedef {import("../state.types").AppYoutubeRuntimeState} AppYoutubeRuntimeState */
-
-/**
- * @typedef {AppYoutubeRuntimeState} YoutubeRuntimeState
- */
-
-/**
- * @typedef {{
- *   sessionSequence: number,
- *   transitionGeneration: number,
- *   activeSessionId: number,
- *   phase: string
- * }} YoutubePlaybackRuntimeState
- */
-
-/** @typedef {import("../state.types").PlaybackUiRuntimeState} PlaybackUiRuntimeState */
-
-/**
- * @typedef {{
- *   playback: PlaybackUiRuntimeState
- * }} YoutubeUiState
- */
-
-/** @typedef {import("../state.types").YoutubePlayerLike} YoutubePlayerLike */
-
-/**
- * @typedef {{
- *   data?: number,
- *   target?: YoutubePlayerLike
- * }} YoutubePlayerStateEvent
- */
-
-/**
- * @typedef {{
- *   type: string,
- *   sessionId?: number,
- *   preserveTransitionGeneration?: boolean
- * }} YoutubePlaybackStateEvent
- */
-
-/**
- * @typedef {Error & { code?: string }} YoutubePlaybackError
- */
-
-/**
- * @typedef {"manual" | "autoplay" | string} YoutubePlaybackMode
- */
-
-/**
- * @typedef {{
- *   playbackMode?: YoutubePlaybackMode,
- *   reason?: string,
- *   errorCode?: unknown,
- *   sessionId?: number,
- *   wasPlaybackStartUnconfirmed?: boolean
- * }} PlaybackStartFailureOptions
- */
-
-/**
- * @typedef {{ songKey: string, playbackMode: YoutubePlaybackMode, wasPlaybackStartUnconfirmed?: boolean }} PlaybackStartFailedPayload
- */
-
-/**
- * @typedef {{ playbackMode?: YoutubePlaybackMode, revealCard?: boolean }} YoutubePlaybackOptions
- */
-
-/**
- * @typedef {{
- *   ui: YoutubeUiState,
- *   youtube: YoutubeRuntimeState,
- *   constants: YoutubeConstants
- * }} YoutubeControllerInput
- */
-
-/**
- * @typedef {{
- *   setLayoutHook: (fn: () => void) => void,
- *   setPlaybackEndedHook: (fn: (payload: { songKey: string }) => void) => void,
- *   setPlaybackStartFailedHook: (fn: (payload: PlaybackStartFailedPayload) => void) => void,
- *   isIOSWebKit: () => boolean,
- *   ensureThumbnailPlaybackReady: () => void,
- *   setupScrollObserver: () => void,
- *   playThumbnail: (thumbDiv: Element | null | undefined, yt: YoutubeTarget | null | undefined, options?: YoutubePlaybackOptions) => Promise<YoutubePlaybackStartResult>,
- *   updateThumbnail: (thumbDiv: HTMLElement, yt: YoutubeTarget) => void,
- *   restoreActivePlayback: () => void
- * }} YoutubeController
- */
-
-/**
  * サムネイル表示と埋め込み再生の制御を行うコントローラーを作成する。
  * @param {YoutubeControllerInput} input
  * @returns {YoutubeController}
@@ -278,11 +137,11 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
         YT_IFRAME_READY_POLL_MS,
         STOP_PLAYBACK_ON_SCROLL_OUT
     } = constants;
-    const playbackUi = getPlaybackUiState(ui);
+    const playbackUi = ui.playback;
     let refreshLayout: () => void = () => {};
     let handlePlaybackEnded: (payload: { songKey: string }) => void = () => {};
     let handlePlaybackStartFailed: (payload: PlaybackStartFailedPayload) => void = () => {};
-    let playbackState: YoutubePlaybackRuntimeState = createYoutubePlaybackState();
+    let playbackState: ReturnType<typeof createYoutubePlaybackState> = createYoutubePlaybackState();
     const refreshCardLayoutSoon = createLayoutRefreshScheduler(() => refreshLayout);
     const youtubeIframeApiLoader = createYoutubeIframeApiLoader({
         youtube,
@@ -358,20 +217,10 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
     /**
      * 再生状態機械へイベントを適用し、最新 state を返す。
      * @param {YoutubePlaybackStateEvent} event
-     * @returns {YoutubePlaybackRuntimeState}
      */
-    function applyPlaybackStateEvent(event: YoutubePlaybackStateEvent): YoutubePlaybackRuntimeState {
+    function applyPlaybackStateEvent(event: YoutubePlaybackStateEvent) {
         playbackState = reduceYoutubePlaybackState(playbackState, event);
         return playbackState;
-    }
-
-    /**
-     * 再生開始結果オブジェクトを作成する。
-     * @param {string} status
-     * @returns {YoutubePlaybackStartResult}
-     */
-    function buildPlaybackStartResult(status) {
-        return createYoutubePlaybackStartResult(status);
     }
 
     /**
@@ -443,7 +292,7 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
         const wasPlaybackStartUnconfirmed = unconfirmedPlaybackStarts.consume(playbackSessionId);
         playbackStartAttempts.settle(
             playbackSessionId,
-            buildPlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.FAILED)
+            createYoutubePlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.FAILED)
         );
         const endedSongKey = getSongKeyFromYoutubeThumb(thumbDiv);
         const endedPlaybackMode = getPlaybackMode(thumbDiv);
@@ -558,7 +407,7 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
                 unconfirmedPlaybackStarts.clear(playbackSessionId);
                 playbackStartAttempts.settle(
                     playbackSessionId,
-                    buildPlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.STARTED)
+                    createYoutubePlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.STARTED)
                 );
                 applyPlaybackStateEvent({
                     type: "PLAYBACK_STARTED",
@@ -579,7 +428,7 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
             const wasPlaybackStartUnconfirmed = unconfirmedPlaybackStarts.consume(playbackSessionId);
             playbackStartAttempts.settle(
                 playbackSessionId,
-                buildPlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.FAILED)
+                createYoutubePlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.FAILED)
             );
             handlePlaybackStartFailure(thumbDiv, {
                 sessionId: playbackSessionId,
@@ -626,7 +475,7 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
         }
         playbackStartAttempts.settle(
             playbackSessionId,
-            buildPlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.STARTED)
+            createYoutubePlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.STARTED)
         );
         return null;
     }
@@ -1233,7 +1082,7 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
             }
             playbackStartAttempts.settle(
                 playbackSessionId,
-                buildPlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.FAILED)
+                createYoutubePlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.FAILED)
             );
             handlePlaybackStartFailure(thumbDiv, {
                 sessionId: playbackSessionId,
@@ -1243,7 +1092,7 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
         }).catch((error) => {
             playbackStartAttempts.settle(
                 playbackSessionId,
-                buildPlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.FAILED)
+                createYoutubePlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.FAILED)
             );
             handlePlaybackStartFailure(thumbDiv, {
                 sessionId: playbackSessionId,

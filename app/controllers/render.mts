@@ -7,54 +7,22 @@ import { scheduleScrollElementIntoView } from "../lib/results-scroll.mjs";
 import { createBookmarkDragReorderController } from "../lib/render/drag-reorder.mjs";
 import { applyMasonryLayout } from "../lib/render/masonry-layout.mjs";
 import { createResultTailObserver } from "../lib/render/result-tail-observer.mjs";
-import { getPlaybackUiState, getRenderUiState, getSearchUiState } from "../lib/ui-slices.mjs";
 import {
     createYoutubePlaybackStartResult,
     YOUTUBE_PLAYBACK_START_STATUS
 } from "../lib/youtube/playback-start-attempt.mjs";
+import type { YoutubePlaybackStartResult } from "../lib/youtube/playback-start-attempt.mjs";
+import type { YoutubeTarget } from "../lib/youtube/embed.mjs";
 import { suppressYoutubeThumbnailContextMenu } from "../lib/youtube/thumbnail.mjs";
 import type {
-    BookmarkRecord,
+    AppDataState,
     PlaybackUiRuntimeState,
+    RenderCardEntry,
     RenderUiRuntimeState,
     SearchUiRuntimeState
 } from "../state.types";
 
 const DEFAULT_RESULT_DISPLAY_BATCH_SIZE = 48;
-
-type YoutubeTarget = {
-    videoId: string;
-    startSeconds: number;
-    endSeconds?: number | null;
-    isVertical: boolean;
-};
-
-type YoutubePlaybackStartStatus = "started" | "failed" | "unconfirmed";
-
-type YoutubePlaybackStartResult = {
-    status: YoutubePlaybackStartStatus;
-};
-
-type ResultCardEntry = {
-    card: HTMLLIElement;
-    thumbDiv: HTMLDivElement;
-    content: HTMLElement;
-    titleHeading: HTMLHeadingElement;
-    titleEl: HTMLAnchorElement;
-    artistEl: HTMLDivElement;
-    dateEl: HTMLSpanElement;
-    tagsEl: HTMLDivElement;
-    actionBtn: HTMLButtonElement;
-    dragHandle: HTMLDivElement;
-};
-
-type RenderDataState = {
-    allSongsRaw: Song[];
-    currentResults: Song[];
-    displayLimit: number;
-    bookmarks: Record<string, BookmarkRecord>;
-    activeBookmark: string | null;
-};
 
 type RenderUiElements = {
     resultList?: HTMLElement | null;
@@ -82,7 +50,7 @@ type EmptyStateDescriptor = {
 
 type ResultNodeBuildResult = {
     nodes: HTMLElement[];
-    entries: ResultCardEntry[];
+    entries: RenderCardEntry[];
 };
 
 type DisplayState = {
@@ -91,7 +59,7 @@ type DisplayState = {
 };
 
 type RenderedDisplayState = {
-    entries: ResultCardEntry[];
+    entries: RenderCardEntry[];
 };
 
 type RenderCallbacks = {
@@ -110,125 +78,12 @@ type RenderCallbacks = {
 };
 
 type RenderControllerInput = {
-    data: RenderDataState;
+    data: AppDataState;
     ui: RenderUiState;
     isAllFormatsSelected: () => boolean;
     resultDisplayBatchSize?: number;
     callbacks: RenderCallbacks;
 };
-
-/**
- * @typedef {import("../state.types").BookmarkRecord} BookmarkRecord
- * @typedef {import("../state.types").SearchUiRuntimeState} SearchUiRuntimeState
- * @typedef {import("../state.types").PlaybackUiRuntimeState} PlaybackUiRuntimeState
- * @typedef {import("../state.types").RenderUiRuntimeState} RenderUiRuntimeState
- */
-
-/**
- * @typedef {{
- *   videoId: string,
- *   startSeconds: number,
- *   endSeconds?: number | null,
- *   isVertical: boolean
- * }} YoutubeTarget
- */
-
-/**
- * @typedef {"started" | "failed" | "unconfirmed"} YoutubePlaybackStartStatus
- */
-
-/**
- * @typedef {{ status: YoutubePlaybackStartStatus }} YoutubePlaybackStartResult
- */
-
-/**
- * @typedef {{
- *   card: HTMLLIElement,
- *   thumbDiv: HTMLDivElement,
- *   content: HTMLElement,
- *   titleHeading: HTMLHeadingElement,
- *   titleEl: HTMLAnchorElement,
- *   artistEl: HTMLDivElement,
- *   dateEl: HTMLSpanElement,
- *   tagsEl: HTMLDivElement,
- *   actionBtn: HTMLButtonElement,
- *   dragHandle: HTMLDivElement
- * }} ResultCardEntry
- */
-
-/**
- * @typedef {{
- *   allSongsRaw: Song[],
- *   currentResults: Song[],
- *   displayLimit: number,
- *   bookmarks: Record<string, BookmarkRecord>,
- *   activeBookmark: string | null
- * }} RenderDataState
- */
-
-/**
- * @typedef {{
- *   resultList?: HTMLElement | null,
- *   resultTailSentinel?: HTMLElement | null
- * }} RenderUiElements
- */
-
-/**
- * @typedef {{
- *   el: RenderUiElements,
- *   search: SearchUiRuntimeState,
- *   playback: PlaybackUiRuntimeState,
- *   render: RenderUiRuntimeState
- * }} RenderUiState
- */
-
-/**
- * @typedef {{
- *   activeThumb: Element | null,
- *   activeCard: HTMLElement | null,
- *   isActiveCardInNextNodes: boolean,
- *   hasEmbeddedPlayer: boolean
- * }} ActiveCardRenderState
- */
-
-/**
- * @typedef {{ kind: "loading" | "error" | "empty", message: string }} EmptyStateDescriptor
- */
-
-/**
- * @typedef {{ nodes: HTMLElement[], entries: ResultCardEntry[] }} ResultNodeBuildResult
- */
-
-/**
- * @typedef {{ container: HTMLElement, results: Song[] }} DisplayState
- */
-
-/**
- * @typedef {{ entries: ResultCardEntry[] }} RenderedDisplayState
- */
-
-/**
- * @typedef {{
- *   updateThumbnail: (thumbDiv: HTMLElement, yt: YoutubeTarget) => void,
- *   extractYoutubeInfo: (url?: string) => YoutubeTarget,
- *   playThumbnail: (thumbDiv: HTMLElement, yt: YoutubeTarget, options?: { playbackMode?: string }) => Promise<YoutubePlaybackStartResult> | YoutubePlaybackStartResult,
- *   restoreActivePlayback: () => void,
- *   openBookmarkModal: (songKey: string) => void,
- *   setupScrollObserver: () => void,
- *   removeSongFromActiveBookmark: (songKey: string) => void,
- *   saveBookmarks: () => void
- * }} RenderCallbacks
- */
-
-/**
- * @typedef {{
- *   data: RenderDataState,
- *   ui: RenderUiState,
- *   isAllFormatsSelected: () => boolean,
- *   resultDisplayBatchSize?: number,
- *   callbacks: RenderCallbacks
- * }} RenderControllerInput
- */
 
 /**
  * 検索結果カードの生成・差分反映・表示更新を担うレンダーコントローラーを作成する。
@@ -241,9 +96,9 @@ export function createRenderController({
     resultDisplayBatchSize = 48,
     callbacks
 }: RenderControllerInput) {
-    const searchUiState = getSearchUiState(ui);
-    const playbackUi = getPlaybackUiState(ui);
-    const renderUi = getRenderUiState(ui);
+    const searchUiState = ui.search;
+    const playbackUi = ui.playback;
+    const renderUi = ui.render;
     const updateThumbnail = callbacks.updateThumbnail;
     const extractYoutubeInfo = callbacks.extractYoutubeInfo;
     const playThumbnail = callbacks.playThumbnail;
@@ -269,7 +124,7 @@ export function createRenderController({
 
     /**
      * 結果カードを構成するDOM要素一式を生成する。
-     * @returns {ResultCardEntry}
+     * @returns {RenderCardEntry}
      */
     function createCardElements() {
         const card = document.createElement("li");
@@ -332,7 +187,7 @@ export function createRenderController({
 
     /**
      * 曲データをカード要素へ反映し、アクションボタンの挙動を設定する。
-     * @param {ResultCardEntry} entry
+     * @param {RenderCardEntry} entry
      * @param {Song} row
      * @param {number} resultIndex
      */
@@ -479,14 +334,6 @@ export function createRenderController({
     }
 
     /**
-     * 表示上限を考慮した可視結果一覧を返す。
-     * @returns {Song[]}
-     */
-    function getVisibleResults() {
-        return data.currentResults.slice(0, data.displayLimit);
-    }
-
-    /**
      * 追加表示できる検索結果が残っているかを返す。
      * @returns {boolean}
      */
@@ -528,7 +375,7 @@ export function createRenderController({
     /**
      * 曲キーに対応する描画エントリを返す。
      * @param {string} songKey
-     * @returns {ResultCardEntry | null}
+     * @returns {RenderCardEntry | null}
      */
     function getCardEntryBySongKey(songKey) {
         if (!songKey) return null;
@@ -755,7 +602,7 @@ export function createRenderController({
 
     /**
      * 表示中カードのサムネイルをIntersectionObserverへ登録する。
-     * @param {ResultCardEntry[]} entries
+     * @param {RenderCardEntry[]} entries
      */
     function observeVisibleThumbnails(entries) {
         if (!playbackUi.showThumbnails || !playbackUi.scrollObserver) return;
@@ -771,7 +618,7 @@ export function createRenderController({
     function collectDisplayState(): DisplayState {
         return {
             container: ui.el.resultList,
-            results: getVisibleResults()
+            results: data.currentResults.slice(0, data.displayLimit)
         };
     }
 
