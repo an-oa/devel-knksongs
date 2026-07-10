@@ -244,6 +244,7 @@ export function createSearchController({
         getDateSelectValue: dateFilterController.getDateSelectValue,
         applyDateSelectValue: dateFilterController.applyDateSelectValue,
         resetDateSelects: dateFilterController.resetDateSelects,
+        resetDateSelectGroup: dateFilterController.resetDateSelectGroup,
         getPartialDateRange: dateFilterController.getPartialDateRange,
         syncDateSelectOptions: dateFilterController.syncDateSelectOptions,
         applyPendingDateValues: dateFilterController.applyPendingDateValues,
