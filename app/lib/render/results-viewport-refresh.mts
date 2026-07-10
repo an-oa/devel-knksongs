@@ -71,7 +71,7 @@ export function setupResultsViewportRefresh({
         resizeObserver = new ResizeObserver((entries) => {
             const resultListEntry = entries.find((entry) => entry.target === resultList);
             if (!resultListEntry) return;
-            const nextWidth = getObservedInlineSize(resultListEntry);
+            const nextWidth = resultListEntry.contentRect.width;
             if (Math.abs(nextWidth - (lastObservedWidth || 0)) < 0.5) return;
             lastObservedWidth = nextWidth;
             scheduleRefresh();
@@ -84,13 +84,4 @@ export function setupResultsViewportRefresh({
     }
 
     return disconnect;
-}
-
-/**
- * ResizeObserver の entry から resultList の現在幅を取得する。
- * @param {ResizeObserverEntry} entry
- * @returns {number}
- */
-function getObservedInlineSize(entry: ResizeObserverEntry): number {
-    return entry.contentRect.width;
 }

@@ -379,15 +379,6 @@ export function createPlaybackSettingsController({ ui, callbacks }: PlaybackSett
     }
 
     /**
-     * トグル変更時の設定更新と副作用実行を行う。
-     * @param {PlaybackSettingDefinition} definition
-     * @param {boolean} nextValue
-     */
-    function handlePlaybackSettingChange(definition: PlaybackSettingDefinition, nextValue: boolean): void {
-        applyPlaybackSettingChange(definition, nextValue);
-    }
-
-    /**
      * 現在の再生設定を UI 状態とトグルへ反映する。
      */
     function applyPlaybackSettingsFromStorage(): void {
@@ -414,7 +405,7 @@ export function createPlaybackSettingsController({ ui, callbacks }: PlaybackSett
             const toggle = getPlaybackSettingToggle(definition);
             if (!toggle) continue;
             toggle.addEventListener("change", () => {
-                handlePlaybackSettingChange(definition, toggle.checked);
+                applyPlaybackSettingChange(definition, toggle.checked);
             });
         }
     }
