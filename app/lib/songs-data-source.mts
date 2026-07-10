@@ -1,53 +1,10 @@
 import { parseCsvToSongs } from "./csv-parser.mjs";
 import { parseSongsJsonMetaPayload, parseSongsJsonPayload } from "./songs-json.mjs";
-
-/**
- * localStorage から文字列を安全に読み込む。
- * @param {{ getItem: (key: string) => string | null } | null | undefined} storage
- * @param {string | undefined} key
- * @returns {string | null}
- */
-function getCachedText(storage, key) {
-    if (!storage || !key) return null;
-    try {
-        return storage.getItem(key);
-    } catch (error) {
-        console.warn(`localStorageを読み込めませんでした: ${key}`, error);
-        return null;
-    }
-}
-
-/**
- * localStorage へ文字列を安全に保存する。
- * @param {{ setItem: (key: string, value: string) => void } | null | undefined} storage
- * @param {string | undefined} key
- * @param {string} value
- * @returns {boolean}
- */
-function setCachedText(storage, key, value) {
-    if (!storage || !key) return false;
-    try {
-        storage.setItem(key, value);
-        return true;
-    } catch (error) {
-        console.warn(`localStorageへ保存できませんでした: ${key}`, error);
-        return false;
-    }
-}
-
-/**
- * localStorage のキャッシュを安全に削除する。
- * @param {{ removeItem: (key: string) => void } | null | undefined} storage
- * @param {string | undefined} key
- */
-function removeCachedText(storage, key) {
-    if (!storage || !key) return;
-    try {
-        storage.removeItem(key);
-    } catch (error) {
-        console.warn(`localStorageから削除できませんでした: ${key}`, error);
-    }
-}
+import {
+    getLocalStorageText,
+    removeLocalStorageText,
+    setLocalStorageText
+} from "./storage/local-storage-text.mjs";
 
 /**
  * 曲データの取得元とキャッシュ更新を扱う data source を作成する。
@@ -176,7 +133,7 @@ export function createSongsDataSource(input) {
                 return false;
             }
         }
-        return setCachedText(storage, csvCacheKey, csvText);
+        return setLocalStorageText(storage, csvCacheKey, csvText);
     }
 
     /**
@@ -195,7 +152,7 @@ export function createSongsDataSource(input) {
             }
         }
         for (const key of fallbackCsvCacheKeys) {
-            const text = getCachedText(storage, key);
+            const text = getLocalStorageText(storage, key);
             if (text) return text;
         }
         return null;
@@ -215,7 +172,7 @@ export function createSongsDataSource(input) {
             }
             return;
         }
-        removeCachedText(storage, csvCacheKey);
+        removeLocalStorageText(storage, csvCacheKey);
     }
 
     /**

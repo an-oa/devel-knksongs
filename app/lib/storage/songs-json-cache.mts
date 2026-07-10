@@ -1,3 +1,8 @@
+import {
+    getLocalStorageText,
+    removeLocalStorageText
+} from "./local-storage-text.mjs";
+
 const DEFAULT_DB_NAME = "knksongs";
 const DEFAULT_STORE_NAME = "songsJsonCache";
 
@@ -24,44 +29,6 @@ type LegacyLocalStorageTextCacheAdapterOptions = {
     label?: string;
     retrySetAfterRemovingLegacy?: boolean;
 };
-
-/**
- * @typedef {{
- *   getText: () => Promise<string | null>,
- *   setText: (value: string) => Promise<boolean>,
- *   removeText: () => Promise<void>
- * }} TextCacheStore
- */
-
-/**
- * localStorage から文字列を安全に読み込む。
- * @param {{ getItem: (key: string) => string | null } | null | undefined} storage
- * @param {string | undefined} key
- * @returns {string | null}
- */
-function getLegacyCachedText(storage, key) {
-    if (!storage || !key) return null;
-    try {
-        return storage.getItem(key);
-    } catch (error) {
-        console.warn(`localStorageを読み込めませんでした: ${key}`, error);
-        return null;
-    }
-}
-
-/**
- * localStorage のキャッシュを安全に削除する。
- * @param {{ removeItem: (key: string) => void } | null | undefined} storage
- * @param {string | undefined} key
- */
-function removeLegacyCachedText(storage, key) {
-    if (!storage || !key) return;
-    try {
-        storage.removeItem(key);
-    } catch (error) {
-        console.warn(`localStorageから削除できませんでした: ${key}`, error);
-    }
-}
 
 /**
  * IndexedDB が現在の実行環境で使えるか判定する。
@@ -241,7 +208,7 @@ function getLegacyCacheKeys(legacyKey, legacyKeys) {
 function getFirstLegacyCachedText(storage, legacyKeys) {
     // 現行 key、旧 key の順に移行元候補を探す。
     for (const key of legacyKeys) {
-        const text = getLegacyCachedText(storage, key);
+        const text = getLocalStorageText(storage, key);
         if (text) return text;
     }
     return null;
@@ -254,7 +221,7 @@ function getFirstLegacyCachedText(storage, legacyKeys) {
  */
 function removeLegacyCachedTexts(storage, legacyKeys) {
     // 移行後に localStorage の容量を解放する。
-    legacyKeys.forEach((key) => removeLegacyCachedText(storage, key));
+    legacyKeys.forEach((key) => removeLocalStorageText(storage, key));
 }
 
 /**
