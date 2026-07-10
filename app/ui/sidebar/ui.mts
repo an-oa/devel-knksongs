@@ -1,9 +1,7 @@
-import { getSettingsPanelUiState } from "../../lib/ui-slices.mjs";
 import { getSearchBooleanFilterElements } from "../../lib/search-boolean-filters.mjs";
 import { createSidebarPopoverController } from "./popover.mjs";
+import { createSidebarSubpanelController } from "./subpanel.mjs";
 import type { AppUiState } from "../../state.types";
-
-/** @typedef {import("../../state.types").AppUiState} AppUiState */
 
 type SidebarBookmarkUiController = {
     closeBookmarkModal: (options?: { restoreFocus?: boolean }) => void;
@@ -33,30 +31,17 @@ type SidebarControllerInput = {
 
 /**
  * サイドバー関連の UI 操作をまとめるコントローラーを作成する。
- * @param {{
- *   ui: AppUiState,
- *   callbacks: {
- *     getBookmarkUiController: () => {
- *       closeBookmarkModal: (options?: { restoreFocus?: boolean }) => void,
- *       openBookmarkBrowser: (options?: { returnFocusEl?: HTMLElement | null }) => void,
- *       setupBookmarkHandlers: () => void,
- *       openBookmarkModal: (songKey: string, options?: { returnFocusEl?: HTMLElement | null, closeSidebarOnExit?: boolean }) => void,
- *       removeSongFromActiveBookmark: (songKey: string) => void,
- *       clearActiveBookmark: (options?: { skipSearch?: boolean }) => void
- *     } | null,
- *     isIOSWebKit: () => boolean,
- *     markFilterTouched: (options?: { immediate?: boolean }) => void,
- *     markQueryTouched: () => void,
- *     clampDateInputsIfNeeded: () => void,
- *     syncDateSelectOptions: (kind?: string) => void,
- *     resetDateSelectGroup: (kind: string) => void,
- *     clearSearch: () => void
- *   }
- * }} input
  */
 export function createSidebarController(input: SidebarControllerInput) {
     const { ui, callbacks } = input;
-    const settingsPanelUi = getSettingsPanelUiState(ui);
+    const settingsPanelUi = ui.settingsPanel;
+    const settingsSubpanel = createSidebarSubpanelController({
+        getPanel: () => ui.el.settingsSidebarPanel,
+        getSidebar: () => ui.el.sidebar,
+        getBackgroundElements: () => [ui.el.sidebarHeader, ui.el.sidebarScrollArea],
+        getOpener: () => ui.el.openSettingsPanelBtn,
+        state: settingsPanelUi
+    });
     const {
         getBookmarkUiController,
         isIOSWebKit,
@@ -74,16 +59,10 @@ export function createSidebarController(input: SidebarControllerInput) {
      * @param {{ returnFocusEl?: HTMLElement | null } | undefined} options
      */
     function openSettingsPanel(options?: { returnFocusEl?: HTMLElement | null }): void {
-        settingsPanelUi.returnFocusEl =
-            options && options.returnFocusEl instanceof HTMLElement ? options.returnFocusEl : null;
-        setSidebarBackgroundInert(true);
-        if (ui.el.settingsSidebarPanel) {
-            ui.el.settingsSidebarPanel.hidden = false;
-            ui.el.settingsSidebarPanel.setAttribute("aria-hidden", "false");
-        }
-        if (ui.el.closeSettingsPanelBtn) {
-            ui.el.closeSettingsPanelBtn.focus();
-        }
+        settingsSubpanel.open({
+            returnFocusEl: options?.returnFocusEl,
+            focusEl: ui.el.closeSettingsPanelBtn
+        });
     }
 
     /**
@@ -91,29 +70,7 @@ export function createSidebarController(input: SidebarControllerInput) {
      * @param {{ restoreFocus?: boolean } | undefined} options
      */
     function closeSettingsPanel(options?: { restoreFocus?: boolean }): void {
-        const shouldRestoreFocus = Boolean(options && options.restoreFocus);
-        const returnFocusEl = settingsPanelUi.returnFocusEl;
-        settingsPanelUi.returnFocusEl = null;
-        if (ui.el.settingsSidebarPanel) {
-            blurPanelActiveElement(ui.el.settingsSidebarPanel);
-            ui.el.settingsSidebarPanel.hidden = true;
-            ui.el.settingsSidebarPanel.setAttribute("aria-hidden", "true");
-        }
-        setSidebarBackgroundInert(false);
-        if (!shouldRestoreFocus) return;
-        if (
-            returnFocusEl &&
-            returnFocusEl.isConnected &&
-            typeof returnFocusEl.focus === "function" &&
-            ui.el.sidebar &&
-            ui.el.sidebar.contains(returnFocusEl)
-        ) {
-            returnFocusEl.focus();
-            return;
-        }
-        if (ui.el.openSettingsPanelBtn && typeof ui.el.openSettingsPanelBtn.focus === "function") {
-            ui.el.openSettingsPanelBtn.focus();
-        }
+        settingsSubpanel.close(options);
     }
 
     /**
@@ -357,23 +314,6 @@ export function createSidebarController(input: SidebarControllerInput) {
     }
 
     /**
-     * サブパネル表示中のみ、背面のサイドバー要素をフォーカス対象外にする。
-     * @param {boolean} isInert
-     */
-    function setSidebarBackgroundInert(isInert) {
-        [ui.el.sidebarHeader, ui.el.sidebarScrollArea].forEach((element) => {
-            if (!element) return;
-            if (isInert) {
-                element.setAttribute("inert", "");
-                element.setAttribute("aria-hidden", "true");
-                return;
-            }
-            element.removeAttribute("inert");
-            element.removeAttribute("aria-hidden");
-        });
-    }
-
-    /**
      * 日付入力時に次のセレクトへフォーカス移動する。
      * @param {HTMLSelectElement} target
      * @param {HTMLSelectElement | null} fromYear
@@ -413,19 +353,6 @@ export function createSidebarController(input: SidebarControllerInput) {
         const active = document.activeElement;
         if (!(active instanceof HTMLElement)) return;
         if (!sidebar.contains(active)) return;
-        if (typeof active.blur === "function") {
-            active.blur();
-        }
-    }
-
-    /**
-     * サブパネルを隠す前に、内部に残っているフォーカスを外す。
-     * @param {HTMLElement} panel
-     */
-    function blurPanelActiveElement(panel) {
-        const active = document.activeElement;
-        if (!(active instanceof HTMLElement)) return;
-        if (!panel.contains(active)) return;
         if (typeof active.blur === "function") {
             active.blur();
         }

@@ -1,4 +1,3 @@
-import { getBookmarkPanelUiState } from "../../lib/ui-slices.mjs";
 import {
     buildBookmarkExportFileName,
     buildBookmarkImportConfirmMessage,
@@ -7,12 +6,8 @@ import {
     saveTextFile
 } from "./import-export.mjs";
 import { createBookmarkNotificationController } from "./notifications.mjs";
+import { createSidebarSubpanelController } from "../sidebar/subpanel.mjs";
 import type { AppDataState, AppUiState } from "../../state.types";
-
-/**
- * @typedef {import("../../state.types").AppDataState} AppDataState
- * @typedef {import("../../state.types").AppUiState} AppUiState
- */
 
 export type BookmarkUiActionResult = {
     ok: boolean;
@@ -57,63 +52,18 @@ type BookmarkUiControllerInput = {
     callbacks: BookmarkUiCallbacks;
 };
 
-/*
- * 以下の JSDoc typedef は emit 後の .mjs に残し、
- * 移行途中の JavaScript 側でも型の参照元を読めるようにする。
- */
-/**
- * @typedef {{
- *   ok: boolean,
- *   reason?: string,
- *   limit?: number,
- *   text?: string,
- *   fileName?: string,
- *   bookmarkCount?: number,
- *   songCount?: number
- * }} BookmarkUiActionResult
- */
-
-/**
- * @typedef {boolean | BookmarkUiActionResult | null | undefined} BookmarkUiActionCallbackResult
- */
-
-/**
- * @typedef {{
- *   clearSearchDebounce: () => void,
- *   scheduleSearch: (options?: { immediate?: boolean }) => void,
- *   onAddSongToBookmark: (
- *     bookmarkId: string,
- *     songKey: string
- *   ) => BookmarkUiActionCallbackResult,
- *   onCreateBookmark: (bookmarkName: string) => BookmarkUiActionCallbackResult,
- *   onCreateBookmarkAndAdd: (
- *     bookmarkName: string,
- *     songKey: string
- *   ) => BookmarkUiActionCallbackResult,
- *   onDeleteBookmark: (bookmarkId: string) => BookmarkUiActionCallbackResult,
- *   onRenameBookmark: (bookmarkId: string, bookmarkName: string) => BookmarkUiActionCallbackResult,
- *   onRemoveSongFromBookmark: (
- *     bookmarkId: string,
- *     songKey: string
- *   ) => BookmarkUiActionCallbackResult,
- *   onRequestCloseSidebar: () => void,
- *   onExportBookmarks: () => BookmarkUiActionCallbackResult,
- *   onPreviewBookmarkImport: (text: string) => BookmarkUiActionCallbackResult,
- *   onImportBookmarksText: (text: string) => BookmarkUiActionCallbackResult,
- *   saveTextFile?: (text: string, fileName: string, mimeType: string) => Promise<void> | void
- * }} BookmarkUiCallbacks
- */
-
 /**
  * ブックマークUIのイベント処理・描画・選択状態管理をまとめたコントローラーを作成する。
- * @param {{
- *   data: AppDataState,
- *   ui: AppUiState,
- *   callbacks: BookmarkUiCallbacks
- * }} input
  */
 export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiControllerInput) {
-    const bookmarkPanelUi = getBookmarkPanelUiState(ui);
+    const bookmarkPanelUi = ui.bookmarkPanel;
+    const bookmarkSubpanel = createSidebarSubpanelController({
+        getPanel: () => ui.el.bookmarkSidebarPanel,
+        getSidebar: () => ui.el.sidebar,
+        getBackgroundElements: () => [ui.el.sidebarHeader, ui.el.sidebarScrollArea],
+        getOpener: () => ui.el.openBookmarkPanelBtn,
+        state: bookmarkPanelUi
+    });
     const bookmarkNotifications = createBookmarkNotificationController({ data, ui });
     const {
         clearSearchDebounce,
@@ -243,84 +193,21 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
 
     /**
      * ブックマーク専用パネルを表示する。
+     * @param {{ returnFocusEl?: Element | null | undefined, focusEl?: HTMLElement | null | undefined } | undefined} [options]
      */
-    function showBookmarkPanel() {
-        setSidebarBackgroundInert(true);
-        if (ui.el.bookmarkSidebarPanel) {
-            ui.el.bookmarkSidebarPanel.hidden = false;
-            ui.el.bookmarkSidebarPanel.setAttribute("aria-hidden", "false");
-        }
+    function showBookmarkPanel(options?: {
+        returnFocusEl?: Element | null | undefined;
+        focusEl?: HTMLElement | null | undefined;
+    }) {
+        bookmarkSubpanel.open(options);
     }
 
     /**
      * ブックマーク専用パネルを閉じる。
+     * @param {{ restoreFocus?: boolean } | undefined} [options]
      */
-    function hideBookmarkPanel() {
-        if (ui.el.bookmarkSidebarPanel) {
-            blurPanelActiveElement(ui.el.bookmarkSidebarPanel);
-            ui.el.bookmarkSidebarPanel.hidden = true;
-            ui.el.bookmarkSidebarPanel.setAttribute("aria-hidden", "true");
-        }
-        setSidebarBackgroundInert(false);
-    }
-
-    /**
-     * パネルを隠す前に、内部に残っているフォーカスを外す。
-     * @param {HTMLElement} panel
-     */
-    function blurPanelActiveElement(panel) {
-        const active = document.activeElement;
-        if (!(active instanceof HTMLElement)) return;
-        if (!panel.contains(active)) return;
-        if (typeof active.blur === "function") {
-            active.blur();
-        }
-    }
-
-    /**
-     * ブックマークパネル表示中のみ、背面のサイドバー要素をフォーカス対象外にする。
-     * @param {boolean} isInert
-     */
-    function setSidebarBackgroundInert(isInert) {
-        [ui.el.sidebarHeader, ui.el.sidebarScrollArea].forEach((el) => {
-            if (!el) return;
-            if (isInert) {
-                el.setAttribute("inert", "");
-                el.setAttribute("aria-hidden", "true");
-                return;
-            }
-            el.removeAttribute("inert");
-            el.removeAttribute("aria-hidden");
-        });
-    }
-
-    /**
-     * パネルを閉じたあとにフォーカスを戻す要素を保持する。
-     * @param {Element | null | undefined} returnFocusEl
-     */
-    function rememberBookmarkPanelReturnFocus(returnFocusEl) {
-        bookmarkPanelUi.returnFocusEl = returnFocusEl instanceof HTMLElement ? returnFocusEl : null;
-    }
-
-    /**
-     * パネルを閉じたあとにフォーカスを元の要素へ戻す。
-     */
-    function restoreBookmarkPanelFocus() {
-        const returnFocusEl = bookmarkPanelUi.returnFocusEl;
-        bookmarkPanelUi.returnFocusEl = null;
-        if (
-            returnFocusEl &&
-            returnFocusEl.isConnected &&
-            typeof returnFocusEl.focus === "function" &&
-            ui.el.sidebar &&
-            ui.el.sidebar.contains(returnFocusEl)
-        ) {
-            returnFocusEl.focus();
-            return;
-        }
-        if (ui.el.openBookmarkPanelBtn && typeof ui.el.openBookmarkPanelBtn.focus === "function") {
-            ui.el.openBookmarkPanelBtn.focus();
-        }
+    function hideBookmarkPanel(options?: { restoreFocus?: boolean }) {
+        bookmarkSubpanel.close(options);
     }
 
     /**
@@ -619,13 +506,12 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
     function openBookmarkBrowser(options?: { returnFocusEl?: Element | null | undefined }) {
         bookmarkPanelUi.pendingAction = null;
         bookmarkPanelUi.exitClosesSidebar = false;
-        rememberBookmarkPanelReturnFocus(options?.returnFocusEl);
         clearBookmarkPanelError();
         renderBookmarks();
-        showBookmarkPanel();
-        if (ui.el.closeBookmarkPanelBtn) {
-            ui.el.closeBookmarkPanelBtn.focus();
-        }
+        showBookmarkPanel({
+            returnFocusEl: options?.returnFocusEl,
+            focusEl: ui.el.closeBookmarkPanelBtn
+        });
     }
 
     /**
@@ -645,15 +531,12 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
     ) {
         bookmarkPanelUi.pendingAction = { songKey };
         bookmarkPanelUi.exitClosesSidebar = Boolean(options?.closeSidebarOnExit);
-        rememberBookmarkPanelReturnFocus(options?.returnFocusEl);
         clearBookmarkPanelError();
         renderBookmarks();
-        showBookmarkPanel();
-        if (ui.el.bookmarkPanelNewName) {
-            ui.el.bookmarkPanelNewName.focus();
-        } else if (ui.el.closeBookmarkPanelBtn) {
-            ui.el.closeBookmarkPanelBtn.focus();
-        }
+        showBookmarkPanel({
+            returnFocusEl: options?.returnFocusEl,
+            focusEl: ui.el.bookmarkPanelNewName || ui.el.closeBookmarkPanelBtn
+        });
     }
 
     /**
@@ -667,18 +550,13 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
         bookmarkPanelUi.pendingAction = null;
         bookmarkPanelUi.exitClosesSidebar = false;
         clearBookmarkPanelError();
-        hideBookmarkPanel();
+        hideBookmarkPanel({ restoreFocus: options?.restoreFocus && !shouldCloseSidebar });
         renderBookmarks();
         if (shouldCloseSidebar) {
             bookmarkPanelUi.returnFocusEl = null;
             onRequestCloseSidebar();
             return;
         }
-        if (options?.restoreFocus) {
-            restoreBookmarkPanelFocus();
-            return;
-        }
-        bookmarkPanelUi.returnFocusEl = null;
     }
 
     /**
