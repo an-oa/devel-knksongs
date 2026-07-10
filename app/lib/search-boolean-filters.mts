@@ -14,9 +14,6 @@ type SearchBooleanFilterUi = {
     el?: Record<string, unknown>;
 } | null | undefined;
 
-/** @typedef {{ checked: boolean, addEventListener: EventTarget["addEventListener"] }} SearchBooleanFilterElement */
-/** @typedef {{ el?: Record<string, unknown> } | null | undefined} SearchBooleanFilterUi */
-
 /**
  * 検索 boolean filter に対応する UI 要素を取得する。
  * @param {SearchBooleanFilterUi} ui

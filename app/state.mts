@@ -24,9 +24,6 @@ export const YT_IFRAME_API_SELECTOR = 'script[data-yt-iframe-api="true"]';
 export const YT_IFRAME_READY_POLL_MS = 50;
 export const STOP_PLAYBACK_ON_SCROLL_OUT = false;
 
-/** @typedef {import("./state.types").PlaybackUiRuntimeState} PlaybackUiRuntimeState */
-/** @typedef {import("./state.types").AppState} AppState */
-
 /**
  * 再生 UI ランタイム状態の初期値を作成する。
  * 本番コードでは appState 初期化に使い、設定 default との同期を
@@ -41,7 +38,6 @@ export function createInitialPlaybackUiRuntimeState(): PlaybackUiRuntimeState {
     };
 }
 
-/** @type {AppState} */
 export const appState: AppState = {
     data: {
         allSongsRaw: [],

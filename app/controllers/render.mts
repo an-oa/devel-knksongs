@@ -1,5 +1,3 @@
-// @ts-check
-
 import { getHeaderHeight } from "../lib/dom-utils.mjs";
 import { hasStreamRole } from "../lib/stream-role.mjs";
 import { tracePlayback } from "../lib/playback-debug.mjs";

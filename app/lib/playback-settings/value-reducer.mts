@@ -24,28 +24,6 @@ type PlaybackSettingChangeResult = {
     pageValues: Map<string, boolean>;
 };
 
-/*
- * 以下の JSDoc typedef は emit 後の .mjs に残し、
- * 移行途中の JavaScript 側でも型の参照元を読めるようにする。
- */
-/** @typedef {import("./definitions.mjs").PlaybackSettingDefinition} PlaybackSettingDefinition */
-/** @typedef {PlaybackSettingDefinition & { scope: "page", kind: "behavior" }} PagePlaybackBehaviorDefinition */
-/** @typedef {{
- *   definition: PlaybackSettingDefinition,
- *   currentValue: boolean,
- *   nextValue: boolean,
- *   experimentalEnabled: boolean,
- *   pageValues: ReadonlyMap<string, boolean>
- * }} PlaybackSettingChangeInput
- */
-/** @typedef {{
- *   previousValue: boolean,
- *   nextValue: boolean,
- *   changed: boolean,
- *   pageValues: Map<string, boolean>
- * }} PlaybackSettingChangeResult
- */
-
 /**
  * ページ内だけで保持する再生挙動設定かを返す。
  * @param {PlaybackSettingDefinition} definition

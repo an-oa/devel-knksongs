@@ -4,18 +4,6 @@ import {
     parseStoredBookmarksPayload
 } from "./bookmark-schema.mjs";
 
-/**
- * @typedef {{ name?: string, songs?: Array<string | number> }} BookmarkImportEntry
- */
-
-/**
- * @typedef {{
- *   maxBookmarkCount?: number,
- *   maxSongsPerBookmark?: number,
- *   maxBookmarkNameLength?: number
- * }} BookmarkImportLimits
- */
-
 type BookmarkImportEntry = {
     name?: string;
     songs?: Array<string | number>;

@@ -12,12 +12,6 @@ type UiSyncControllerInput = {
 
 /**
  * 画面復帰時の UI 再同期をまとめて扱うコントローラーを作成する。
- * @param {{
- *   uiSyncPasses: number,
- *   syncSearchUI: (options?: { visual?: boolean, search?: boolean }) => void,
- *   applyThemeFromStorage: () => void,
- *   applyPlaybackSettingsFromStorage: () => void
- * }} input
  */
 export function createUiSyncController(input: UiSyncControllerInput) {
     const {
