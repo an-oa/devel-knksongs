@@ -1,19 +1,5 @@
 import { dateKeyToParts, parseDateKey } from "../../lib/date-key.mjs";
-import { getDateUiState } from "../../lib/ui-slices.mjs";
 import type { AppUiElements, DateUiRuntimeState } from "../../state.types";
-
-/**
- * @typedef {"year" | "month" | "day"} DateSelectPrecision
- */
-
-/**
- * @typedef {{
- *   year: number,
- *   month: number | null,
- *   day: number | null,
- *   precision: DateSelectPrecision
- * }} DateSelectValue
- */
 
 type DateSelectPrecision = "year" | "month" | "day";
 
@@ -23,6 +9,12 @@ type DateSelectParts = {
     year: string;
     month: string;
     day: string;
+};
+
+type DateSelectElements = {
+    year: HTMLSelectElement | null | undefined;
+    month: HTMLSelectElement | null | undefined;
+    day: HTMLSelectElement | null | undefined;
 };
 
 type DateSelectValue = {
@@ -49,10 +41,9 @@ type DateFilterUiState = {
 
 /**
  * 日付フィルタ UI の初期化・同期・補正を扱うコントローラーを作成する。
- * @param {{ ui: any }} options
  */
 export function createDateFilterController({ ui }: { ui: DateFilterUiState }) {
-    const dateUi = getDateUiState(ui);
+    const dateUi = ui.date;
 
     /**
      * 外部から渡された日付選択側を内部の from/to に正規化する。
@@ -85,11 +76,24 @@ export function createDateFilterController({ ui }: { ui: DateFilterUiState }) {
      * @returns {{ year: string, month: string, day: string }}
      */
     function getDateSelectParts(kind: string): DateSelectParts {
-        const isFrom = resolveDateSelectKind(kind) === "from";
-        const year = (isFrom ? ui.el.dateFromYear : ui.el.dateToYear)?.value ?? "";
-        const month = (isFrom ? ui.el.dateFromMonth : ui.el.dateToMonth)?.value ?? "";
-        const day = (isFrom ? ui.el.dateFromDay : ui.el.dateToDay)?.value ?? "";
+        const elements = getDateSelectElements(kind);
+        const year = elements.year?.value ?? "";
+        const month = elements.month?.value ?? "";
+        const day = elements.day?.value ?? "";
         return { year, month, day };
+    }
+
+    /**
+     * 開始または終了側の日付セレクト要素一式を返す。
+     * @param {string} kind
+     */
+    function getDateSelectElements(kind: string): DateSelectElements {
+        const isFrom = resolveDateSelectKind(kind) === "from";
+        return {
+            year: isFrom ? ui.el.dateFromYear : ui.el.dateToYear,
+            month: isFrom ? ui.el.dateFromMonth : ui.el.dateToMonth,
+            day: isFrom ? ui.el.dateFromDay : ui.el.dateToDay
+        };
     }
 
     /**
@@ -199,10 +203,11 @@ export function createDateFilterController({ ui }: { ui: DateFilterUiState }) {
         const dateValue = parseDateSelectValue(value);
         if (!dateValue) return;
         const dateSelectKind = resolveDateSelectKind(kind);
-        const isFrom = dateSelectKind === "from";
-        const yearSelect = isFrom ? ui.el.dateFromYear : ui.el.dateToYear;
-        const monthSelect = isFrom ? ui.el.dateFromMonth : ui.el.dateToMonth;
-        const daySelect = isFrom ? ui.el.dateFromDay : ui.el.dateToDay;
+        const {
+            year: yearSelect,
+            month: monthSelect,
+            day: daySelect
+        } = getDateSelectElements(dateSelectKind);
         if (!yearSelect || !monthSelect || !daySelect) return;
         yearSelect.value = String(dateValue.year);
         monthSelect.value = "";
@@ -222,15 +227,29 @@ export function createDateFilterController({ ui }: { ui: DateFilterUiState }) {
      */
     function resetDateSelects(): void {
         (["from", "to"] as const).forEach((kind) => {
-            const isFrom = kind === "from";
-            const year = isFrom ? ui.el.dateFromYear : ui.el.dateToYear;
-            const month = isFrom ? ui.el.dateFromMonth : ui.el.dateToMonth;
-            const day = isFrom ? ui.el.dateFromDay : ui.el.dateToDay;
-            if (year) year.value = "";
-            if (month) month.value = "";
-            if (day) day.value = "";
+            clearDateSelectGroup(kind);
         });
         syncDateSelectOptions();
+    }
+
+    /**
+     * 指定側の日付セレクトをクリアして選択肢を同期する。
+     * @param {string} kind
+     */
+    function resetDateSelectGroup(kind: string): void {
+        clearDateSelectGroup(kind);
+        syncDateSelectOptions();
+    }
+
+    /**
+     * 指定側の日付セレクトの値をクリアする。
+     * @param {string} kind
+     */
+    function clearDateSelectGroup(kind: string): void {
+        const { year, month, day } = getDateSelectElements(kind);
+        if (year) year.value = "";
+        if (month) month.value = "";
+        if (day) day.value = "";
     }
 
     /**
@@ -363,10 +382,11 @@ export function createDateFilterController({ ui }: { ui: DateFilterUiState }) {
         const targets = kind ? [resolveDateSelectKind(kind)] : (["from", "to"] as const);
         targets.forEach((k) => {
             const bounds = getConstrainedBounds(k) || dateUi.bounds;
-            const isFrom = k === "from";
-            const yearSelect = isFrom ? ui.el.dateFromYear : ui.el.dateToYear;
-            const monthSelect = isFrom ? ui.el.dateFromMonth : ui.el.dateToMonth;
-            const daySelect = isFrom ? ui.el.dateFromDay : ui.el.dateToDay;
+            const {
+                year: yearSelect,
+                month: monthSelect,
+                day: daySelect
+            } = getDateSelectElements(k);
             if (!yearSelect || !monthSelect || !daySelect) return;
             const minParts = dateKeyToParts(bounds.minKey);
             const maxParts = dateKeyToParts(bounds.maxKey);
@@ -442,13 +462,9 @@ export function createDateFilterController({ ui }: { ui: DateFilterUiState }) {
      * @returns {SearchDateRange | null}
      */
     function applyDateInputRange(songs: Song[]): SearchDateRange | null {
-        const dateFromYear = ui.el.dateFromYear;
-        const dateFromMonth = ui.el.dateFromMonth;
-        const dateFromDay = ui.el.dateFromDay;
-        const dateToYear = ui.el.dateToYear;
-        const dateToMonth = ui.el.dateToMonth;
-        const dateToDay = ui.el.dateToDay;
-        if (!dateFromYear || !dateFromMonth || !dateFromDay || !dateToYear || !dateToMonth || !dateToDay) return null;
+        const fromElements = getDateSelectElements("from");
+        const toElements = getDateSelectElements("to");
+        if (!hasCompleteDateSelectElements(fromElements) || !hasCompleteDateSelectElements(toElements)) return null;
         let minKey: number | null = null;
         let maxKey: number | null = null;
         for (const row of songs) {
@@ -470,13 +486,9 @@ export function createDateFilterController({ ui }: { ui: DateFilterUiState }) {
      * @param {number} maxKey
      */
     function clampDateInputsToBounds(minKey: number, maxKey: number): void {
-        const dateFromYear = ui.el.dateFromYear;
-        const dateFromMonth = ui.el.dateFromMonth;
-        const dateFromDay = ui.el.dateFromDay;
-        const dateToYear = ui.el.dateToYear;
-        const dateToMonth = ui.el.dateToMonth;
-        const dateToDay = ui.el.dateToDay;
-        if (!dateFromYear || !dateFromMonth || !dateFromDay || !dateToYear || !dateToMonth || !dateToDay) return;
+        const fromElements = getDateSelectElements("from");
+        const toElements = getDateSelectElements("to");
+        if (!hasCompleteDateSelectElements(fromElements) || !hasCompleteDateSelectElements(toElements)) return;
         const clampKey = (key: number | null): number | null => {
             if (key === null) return null;
             if (key < minKey) return minKey;
@@ -497,6 +509,14 @@ export function createDateFilterController({ ui }: { ui: DateFilterUiState }) {
     }
 
     /**
+     * 年・月・日のセレクト要素がすべて揃っているかを返す。
+     * @param {DateSelectElements} elements
+     */
+    function hasCompleteDateSelectElements(elements: DateSelectElements): boolean {
+        return Boolean(elements.year && elements.month && elements.day);
+    }
+
+    /**
      * 日付境界がある場合に入力値の範囲補正を行う。
      */
     function clampDateInputsIfNeeded(): void {
@@ -509,6 +529,7 @@ export function createDateFilterController({ ui }: { ui: DateFilterUiState }) {
         getDateSelectValue,
         applyDateSelectValue,
         resetDateSelects,
+        resetDateSelectGroup,
         getPartialDateRange,
         syncDateSelectOptions,
         applyPendingDateValues,

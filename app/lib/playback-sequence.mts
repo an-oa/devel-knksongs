@@ -7,9 +7,6 @@ type PlaybackContinuationOptions = {
     loopPlayback?: boolean;
 } | undefined;
 
-/** @typedef {{ songKey?: string }} PlaybackSequenceRow */
-/** @typedef {{ continuousPlayback?: boolean, loopPlayback?: boolean } | undefined} PlaybackContinuationOptions */
-
 /**
  * 現在の結果順から、次に再生候補となる曲キー列を返す。
  * 再生継続候補の境界条件を単体テストするため export している。

@@ -39,9 +39,9 @@ export type PlaybackSettingElementKey =
     "continuousPlaybackToggle" |
     "loopPlaybackToggle";
 
-export type PlaybackSettingScope = "persisted" | "page";
+export type PlaybackSettingScope = typeof PLAYBACK_SETTING_SCOPES[keyof typeof PLAYBACK_SETTING_SCOPES];
 
-export type PlaybackSettingKind = "visibility" | "behavior";
+export type PlaybackSettingKind = typeof PLAYBACK_SETTING_KINDS[keyof typeof PLAYBACK_SETTING_KINDS];
 
 /**
  * 再生設定 1 件の定義。
@@ -68,45 +68,10 @@ type PlaybackSettingDefinitionSet = {
     playbackSettingDefinitions: PlaybackSettingDefinition[];
 };
 
-/*
- * 以下の JSDoc typedef は emit 後の .mjs に残し、
- * 移行途中の JavaScript 側でも型の参照元を読めるようにする。
- */
-/**
- * @typedef {import("../../state.types").PlaybackSettingsUiSlice} PlaybackSettingsUiSlice
- * @typedef {"thumbToggle" | "youtubeNoCookieToggle" | "playArchiveToEndToggle" | "continuousPlaybackToggle" | "loopPlaybackToggle"} PlaybackSettingElementKey
- * @typedef {"persisted" | "page"} PlaybackSettingScope
- * @typedef {"visibility" | "behavior"} PlaybackSettingKind
- */
-
-/**
- * 再生設定 1 件の定義。
- * @typedef {{
- *   scope: PlaybackSettingScope,
- *   kind: PlaybackSettingKind,
- *   stateKey: keyof PlaybackSettingsUiSlice,
- *   elementKey?: PlaybackSettingElementKey,
- *   storageKey?: string,
- *   defaultValue: boolean,
- *   hiddenValue?: boolean,
- *   effectiveWhenHidden?: boolean,
- *   interactive?: boolean,
- *   restoreActivePlaybackOnChange?: boolean
- * }} PlaybackSettingDefinition
- */
-
 /**
  * 再生設定の定義一覧を作成する。
  * 本番コードでは playback settings controller から使い、
  * 設定 metadata の境界条件を単体テストするため export している。
- * @returns {{
- *   pagePlaybackBehaviorDefinitions: PlaybackSettingDefinition[],
- *   youtubeNoCookieDefinition: PlaybackSettingDefinition,
- *   archivePlaybackBehaviorDefinition: PlaybackSettingDefinition,
- *   experimentalPlaybackVisibilityDefinition: PlaybackSettingDefinition,
- *   thumbnailVisibilityDefinition: PlaybackSettingDefinition,
- *   playbackSettingDefinitions: PlaybackSettingDefinition[]
- * }}
  */
 export function createPlaybackSettingDefinitions(): PlaybackSettingDefinitionSet {
     const youtubeNoCookieDefinition: PlaybackSettingDefinition = {

@@ -1,9 +1,5 @@
 import { isHtmlElement } from "./dom-utils.mjs";
 
-/**
- * @typedef {{ element: HTMLElement, container: HTMLElement, top: number }} ViewportAnchor
- */
-
 type ViewportAnchor = {
     element: HTMLElement;
     container: HTMLElement;

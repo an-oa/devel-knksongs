@@ -10,6 +10,7 @@ type SearchActionsSearchController = {
     syncDateSelectOptions: (kind?: string) => void;
     scheduleSearch: (options?: SearchScheduleOptions) => void;
     resetDateSelects: () => void;
+    resetDateSelectGroup: (kind: string) => void;
     hasDateSelection: () => boolean;
 };
 
@@ -54,14 +55,7 @@ export function createSearchUiActions({
      * @param {string} kind
      */
     function resetDateSelectGroup(kind: string): void {
-        const isFrom = kind === "from";
-        const year = isFrom ? ui.el.dateFromYear : ui.el.dateToYear;
-        const month = isFrom ? ui.el.dateFromMonth : ui.el.dateToMonth;
-        const day = isFrom ? ui.el.dateFromDay : ui.el.dateToDay;
-        if (year) year.value = "";
-        if (month) month.value = "";
-        if (day) day.value = "";
-        getSearchController().syncDateSelectOptions();
+        getSearchController().resetDateSelectGroup(kind);
     }
 
     /**

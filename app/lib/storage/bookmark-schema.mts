@@ -1,12 +1,3 @@
-/**
- * @typedef {{
- *   bookmarkSongKey?: string,
- *   songKey?: string,
- *   legacySongKey?: string,
- *   sourceIndex?: number
- * }} BookmarkSongRow
- */
-
 type BookmarkSongRow = {
     bookmarkSongKey?: string;
     songKey?: string;

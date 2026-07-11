@@ -88,11 +88,8 @@ export function applyDocumentTheme(isDarkMode: boolean): void {
     document.documentElement.style.colorScheme = isDarkMode ? "dark" : "light";
 }
 
-/** @typedef {import("../../state.types").AppUiElements} AppUiElements */
-
 /**
  * 保存値またはシステム設定からテーマを適用する。
- * @param {{ ui: { el: AppUiElements } }} input
  */
 export function applyThemeFromStorage({ ui }: { ui: { el: AppUiElements } }): void {
     const themeToggle = ui.el.themeToggle;
@@ -105,7 +102,6 @@ export function applyThemeFromStorage({ ui }: { ui: { el: AppUiElements } }): vo
 
 /**
  * テーマ状態を初期化し、トグル変更を保存する。
- * @param {{ ui: { el: AppUiElements } }} input
  */
 export function setupTheme({ ui }: { ui: { el: AppUiElements } }): void {
     const themeToggle = ui.el.themeToggle;

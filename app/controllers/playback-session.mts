@@ -1,25 +1,11 @@
 import { getPlaybackContinuationCandidates } from "../lib/playback-sequence.mjs";
 import { debugPlayback } from "../lib/playback-debug.mjs";
-import { getPlaybackUiState } from "../lib/ui-slices.mjs";
 import {
     isYoutubePlaybackStarted,
     isYoutubePlaybackStartUnconfirmed
 } from "../lib/youtube/playback-start-attempt.mjs";
-import type { PlaybackUiRuntimeState } from "../state.types";
-
-type PlaybackSessionDataState = {
-    currentResults: Song[];
-};
-
-type PlaybackSessionUiState = {
-    playback: PlaybackUiRuntimeState;
-};
-
-type YoutubePlaybackStartStatus = "started" | "failed" | "unconfirmed";
-
-type YoutubePlaybackStartResult = {
-    status: YoutubePlaybackStartStatus;
-};
+import type { YoutubePlaybackStartResult } from "../lib/youtube/playback-start-attempt.mjs";
+import type { AppDataState, AppUiState } from "../state.types";
 
 type PlaybackSessionCallbacks = {
     playSongByKey: (songKey: string) => Promise<YoutubePlaybackStartResult> | YoutubePlaybackStartResult;
@@ -27,34 +13,17 @@ type PlaybackSessionCallbacks = {
 };
 
 type PlaybackSessionControllerInput = {
-    data: PlaybackSessionDataState;
-    ui: PlaybackSessionUiState;
+    data: Pick<AppDataState, "currentResults">;
+    ui: Pick<AppUiState, "playback">;
     callbacks: PlaybackSessionCallbacks;
 };
-
-/** @typedef {import("../state.types").PlaybackUiRuntimeState} PlaybackUiRuntimeState */
-/** @typedef {{ currentResults: Song[] }} PlaybackSessionDataState */
-/** @typedef {{ playback: PlaybackUiRuntimeState }} PlaybackSessionUiState */
-/** @typedef {"started" | "failed" | "unconfirmed"} YoutubePlaybackStartStatus */
-/** @typedef {{ status: YoutubePlaybackStartStatus }} YoutubePlaybackStartResult */
-/** @typedef {{
- *   playSongByKey: (songKey: string) => Promise<YoutubePlaybackStartResult> | YoutubePlaybackStartResult,
- *   scrollSongIntoView: (songKey: string) => void
- * }} PlaybackSessionCallbacks
- */
-/** @typedef {{
- *   data: PlaybackSessionDataState,
- *   ui: PlaybackSessionUiState,
- *   callbacks: PlaybackSessionCallbacks
- * }} PlaybackSessionControllerInput
- */
 
 /**
  * 再生終了後の継続再生と追従スクロールを制御する。
  * @param {PlaybackSessionControllerInput} input
  */
 export function createPlaybackSessionController({ data, ui, callbacks }: PlaybackSessionControllerInput) {
-    const playbackUi = getPlaybackUiState(ui);
+    const playbackUi = ui.playback;
     const playSongByKey = callbacks.playSongByKey;
     const scrollSongIntoView = callbacks.scrollSongIntoView;
 

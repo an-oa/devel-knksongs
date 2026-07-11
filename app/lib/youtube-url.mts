@@ -4,8 +4,6 @@ type YoutubeUrlInfo = {
     isVertical: boolean;
 };
 
-/** @typedef {{ videoId: string, startSeconds: number, isVertical: boolean }} YoutubeUrlInfo */
-
 /**
  * YouTube URLから `videoId` と開始秒数を抽出する。
  * @param {string | URL | null | undefined} url

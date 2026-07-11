@@ -3,14 +3,12 @@ import { isHtmlElement } from "../dom-utils.mjs";
 const YT_EMBED_HOST = "https://www.youtube.com";
 const YT_NOCOOKIE_EMBED_HOST = "https://www.youtube-nocookie.com";
 
-/**
- * @typedef {{
- *   videoId: string,
- *   startSeconds: number,
- *   endSeconds?: number | null,
- *   isVertical: boolean
- * }} YoutubeTarget
- */
+export type YoutubeTarget = {
+    videoId: string;
+    startSeconds: number;
+    endSeconds?: number | null;
+    isVertical: boolean;
+};
 
 /**
  * YouTube Iframe API の読み込み完了を扱うローダーを作成する。

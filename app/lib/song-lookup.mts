@@ -1,12 +1,12 @@
-/** @typedef {import("../state.types").LookupUiRuntimeState} LookupUiRuntimeState */
+import type { LookupUiRuntimeState } from "../state.types";
 
 /**
  * 曲参照用の検索マップが最新の曲配列を指しているかを返す。
- * @param {LookupUiRuntimeState} lookupUi
- * @param {Song[]} songRows
- * @returns {boolean}
  */
-function hasCurrentSongLookupMaps(lookupUi, songRows) {
+function hasCurrentSongLookupMaps(
+    lookupUi: LookupUiRuntimeState,
+    songRows: Song[]
+): boolean {
     return lookupUi.songLookupSourceRef === songRows &&
         lookupUi.songMapByBookmarkKey instanceof Map &&
         lookupUi.songMapByKey instanceof Map &&
@@ -16,10 +16,11 @@ function hasCurrentSongLookupMaps(lookupUi, songRows) {
 /**
  * 曲参照用の検索マップを必要時に再構築する。
  * 本番コードでは検索/ブックマーク通知の参照解決から使い、境界条件を単体テストするため export している。
- * @param {LookupUiRuntimeState} lookupUi
- * @param {Song[]} songRows
  */
-export function ensureSongLookupMaps(lookupUi, songRows) {
+export function ensureSongLookupMaps(
+    lookupUi: LookupUiRuntimeState,
+    songRows: Song[]
+): void {
     const rows = Array.isArray(songRows) ? songRows : [];
     if (hasCurrentSongLookupMaps(lookupUi, rows)) return;
 
@@ -36,12 +37,12 @@ export function ensureSongLookupMaps(lookupUi, songRows) {
 
 /**
  * 曲参照から曲データを返す。
- * @param {LookupUiRuntimeState} lookupUi
- * @param {Song[]} songRows
- * @param {string | number | null | undefined} songRef
- * @returns {Song | null}
  */
-export function resolveSongRef(lookupUi, songRows, songRef) {
+export function resolveSongRef(
+    lookupUi: LookupUiRuntimeState,
+    songRows: Song[],
+    songRef: string | number | null | undefined
+): Song | null {
     ensureSongLookupMaps(lookupUi, songRows);
     if (typeof songRef === "string") {
         return lookupUi.songMapByBookmarkKey.get(songRef) || lookupUi.songMapByKey.get(songRef) || null;
@@ -54,15 +55,14 @@ export function resolveSongRef(lookupUi, songRows, songRef) {
 
 /**
  * ブックマーク内の曲参照配列を曲データ配列へ解決する。
- * @param {LookupUiRuntimeState} lookupUi
- * @param {Song[]} songRows
- * @param {Array<string | number> | null | undefined} songRefs
- * @returns {Song[]}
  */
-export function resolveSongRefs(lookupUi, songRows, songRefs) {
+export function resolveSongRefs(
+    lookupUi: LookupUiRuntimeState,
+    songRows: Song[],
+    songRefs: Array<string | number> | null | undefined
+): Song[] {
     const refs = Array.isArray(songRefs) ? songRefs : [];
-    /** @type {Song[]} */
-    const resolvedSongs = [];
+    const resolvedSongs: Song[] = [];
     refs.forEach((songRef) => {
         const song = resolveSongRef(lookupUi, songRows, songRef);
         if (song) resolvedSongs.push(song);

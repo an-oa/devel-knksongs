@@ -1,11 +1,4 @@
-import { getDateUiState, getSearchUiState } from "../../lib/ui-slices.mjs";
-import type { AppUiState } from "../../state.types";
-
-/** @typedef {import("../../state.types").AppUiState} AppUiState */
-
-type DataLoaderDataState = {
-    allSongsRaw: Song[];
-};
+import type { AppDataState, AppUiState } from "../../state.types";
 
 type DataSourceLoadResult = {
     songs: Song[];
@@ -14,7 +7,7 @@ type DataSourceLoadResult = {
 };
 
 type DataLoaderInput = {
-    data: DataLoaderDataState;
+    data: Pick<AppDataState, "allSongsRaw">;
     ui: AppUiState;
     dataSource: {
         loadInitialSongs: (callbacks: {
@@ -32,20 +25,6 @@ type DataLoaderInput = {
 
 /**
  * 曲データの読込と初期データ反映を扱うコントローラーを作成する。
- * @param {{
- *   data: { allSongsRaw: Song[] },
- *   ui: AppUiState,
- *   dataSource: {
- *     loadInitialSongs: (callbacks: { onSongsLoaded: (result: { songs: Song[], source: string, resetConditions?: boolean }) => void }) => Promise<boolean>
- *   },
- *   callbacks: {
- *     migrateLegacyBookmarkSongRefs: () => void,
- *     applyDateInputRange: (songs: Song[]) => { minKey: number, maxKey: number } | null,
- *     clampDateInputsToBounds: (minKey: number, maxKey: number) => void,
- *     resetSearchConditions: (shouldSearch: boolean) => void,
- *     scheduleSearch: (options?: { immediate?: boolean }) => void
- *   }
- * }} input
  */
 export function createDataLoader(input: DataLoaderInput) {
     const {
@@ -54,8 +33,8 @@ export function createDataLoader(input: DataLoaderInput) {
         dataSource,
         callbacks
     } = input;
-    const searchUiState = getSearchUiState(ui);
-    const dateUi = getDateUiState(ui);
+    const searchUiState = ui.search;
+    const dateUi = ui.date;
     const {
         migrateLegacyBookmarkSongRefs,
         applyDateInputRange,

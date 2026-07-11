@@ -1,4 +1,3 @@
-import { getDateUiState, getSearchUiState } from "../../lib/ui-slices.mjs";
 import {
     applySearchBooleanFilterState,
     hasEnabledSearchBooleanFilter,
@@ -45,24 +44,10 @@ type SearchFiltersControllerInput = {
 
 /**
  * 検索条件 UI の個別 filter controller を束ねる facade を作成する。
- * @param {{ ui: object, defaultFormats?: string[] }} input
- * @returns {{
- *   setupFilterOptions: (options?: { onFilterChange?: (event: Event) => void }) => void,
- *   renderFilterOptions: (options?: { onFormatChange?: (event: Event) => void }) => void,
- *   getSelectedFormatValues: () => string[],
- *   setSelectedFormatsToDefault: () => void,
- *   applySelectedFormats: (formats: unknown) => void,
- *   syncFormatCheckboxesFromState: () => void,
- *   areAllFormatsSelected: () => boolean,
- *   areFormatsDefault: () => boolean,
- *   applyStoredFilterState: (payload: Record<string, unknown>) => void,
- *   resetFiltersToDefault: (options?: { resetDateSelects?: () => void }) => void,
- *   needsFilterReset: (options?: { hasDateSelection?: () => boolean }) => boolean
- * }}
  */
 export function createSearchFiltersController({ ui, defaultFormats = [] }: SearchFiltersControllerInput) {
-    const searchUiState = getSearchUiState(ui as unknown as { search: SearchUiRuntimeState });
-    const dateUi = ui.date ? getDateUiState(ui as unknown as { date: DateUiRuntimeState }) : null;
+    const searchUiState = ui.search;
+    const dateUi = ui.date ?? null;
 
     /**
      * フォーマット選択 state を Set として取得する。
