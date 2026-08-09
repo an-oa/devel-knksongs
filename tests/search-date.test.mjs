@@ -4,7 +4,11 @@ import { createDateFilterController } from "../_build/app/ui/date/filter.mjs";
 import { createSearchFiltersController } from "../_build/app/ui/search-filters/controller.mjs";
 import { pickRecommendedSongs } from "../_build/app/lib/search-recommendation.mjs";
 import { isWithinDateRange, parseDateKey } from "../_build/app/lib/date-key.mjs";
-import { filterSongsByCriteria, normalizeForSearch } from "../_build/app/lib/search-filters.mjs";
+import {
+    filterSongsByCriteria,
+    normalizeForSearch,
+    parseSearchQuery
+} from "../_build/app/lib/search-filters.mjs";
 import {
     createSearchController
 } from "../_build/app/controllers/search.mjs";
@@ -129,6 +133,39 @@ test("isWithinDateRange: inclusive bounds", () => {
     assert.equal(isWithinDateRange(row, null, 20240114), false);
 });
 
+test("parseSearchQuery: separates normalized inclusive date operators from keywords", () => {
+    assert.deepEqual(
+        parseSearchQuery("Star ＳＩＮＣＥ：２０２４－２－９ until:2024-12-31"),
+        {
+            keywords: ["star"],
+            sinceKey: 20240209,
+            untilKey: 20241231
+        }
+    );
+});
+
+test("parseSearchQuery: repeated operators use the narrowest valid bounds", () => {
+    assert.deepEqual(
+        parseSearchQuery("since:2024-01-01 since:2024-02-01 until:2024-12-31 until:2024-11-30"),
+        {
+            keywords: [],
+            sinceKey: 20240201,
+            untilKey: 20241130
+        }
+    );
+});
+
+test("parseSearchQuery: invalid date operators remain searchable keywords", () => {
+    assert.deepEqual(
+        parseSearchQuery("since:2024-02-30 until:today"),
+        {
+            keywords: ["since:2024-02-30", "until:today"],
+            sinceKey: null,
+            untilKey: null
+        }
+    );
+});
+
 test("filterSongsByCriteria: query/date/format/flags", () => {
     const rows = [
         makeRow({ title: "青い月", artist: "A", dateKey: 20240110, format: "配信", isRelay: true }),
@@ -147,6 +184,44 @@ test("filterSongsByCriteria: query/date/format/flags", () => {
     const hit = filterSongsByCriteria(rows, searchState, selectedFormats);
     assert.equal(hit.length, 1);
     assert.equal(hit[0].artistNorm, normalizeForSearch("B"));
+});
+
+test("filterSongsByCriteria: date operators use inclusive bounds", () => {
+    const rows = [
+        makeRow({ title: "Before", dateKey: 20240109 }),
+        makeRow({ title: "From", dateKey: 20240110 }),
+        makeRow({ title: "To", dateKey: 20240120 }),
+        makeRow({ title: "After", dateKey: 20240121 }),
+        makeRow({ title: "Unknown", dateKey: null })
+    ];
+    const searchState = {
+        queryRaw: "since:2024-1-10 until:2024-01-20",
+        relayOnly: false,
+        harmonyOnly: false,
+        dateFromKey: null,
+        dateToKey: null
+    };
+
+    const hit = filterSongsByCriteria(rows, searchState, new Set(["配信"]));
+    assert.deepEqual(hit.map((row) => row.titleNorm), ["from", "to"]);
+});
+
+test("filterSongsByCriteria: text date operators intersect with date select bounds", () => {
+    const rows = [
+        makeRow({ title: "Target", dateKey: 20240110 }),
+        makeRow({ title: "Target", dateKey: 20240115 }),
+        makeRow({ title: "Target", dateKey: 20240120 })
+    ];
+    const searchState = {
+        queryRaw: "target since:2024-01-01 until:2024-01-31",
+        relayOnly: false,
+        harmonyOnly: false,
+        dateFromKey: 20240112,
+        dateToKey: 20240118
+    };
+
+    const hit = filterSongsByCriteria(rows, searchState, new Set(["配信"]));
+    assert.deepEqual(hit.map((row) => row.dateKey), [20240115]);
 });
 
 test("filterSongsByCriteria: オリ曲 is included when 歌みた is selected", () => {

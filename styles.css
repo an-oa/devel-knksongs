@@ -399,6 +399,12 @@ body.hide-thumbs .thumb {
 .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .section-label { display: block; font-size: 11px; font-weight: bold; color: var(--text-mute); }
 .text-clear-btn { background: none; border: none; color: var(--primary-color); font-size: 11px; cursor: pointer; padding: 0; text-decoration: underline; }
+.search-operator-help {
+  margin: 0 0 6px;
+  color: var(--text-mute);
+  font-size: 11px;
+  line-height: 1.4;
+}
 
 input[type="text"] {
   width: 100%; padding: 9px 10px; border: 2px solid var(--border-color);

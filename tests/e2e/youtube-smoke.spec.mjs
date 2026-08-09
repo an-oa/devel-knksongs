@@ -233,6 +233,23 @@ test("sidebar native popover backdrop click closes and restores focus", async ({
     await expect(openButton).toBeFocused();
 });
 
+test("search box date operators filter songs and expose input guidance", async ({ page }) => {
+    await openSidebar(page);
+
+    const searchBox = page.locator("#searchBox");
+    const searchHelp = page.locator("#searchBoxHelp");
+    await expect(searchBox).toHaveAttribute("aria-describedby", "searchBoxHelp");
+    await expect(searchHelp).toContainText("since:YYYY-MM-DD");
+    await expect(searchHelp).toContainText("until:YYYY-MM-DD");
+
+    await searchBox.fill("Chain since:2024-01-04 until:2024-01-04");
+    await expect(page.locator("#resultCount")).toHaveText("1 件がヒット");
+    await closeSidebar(page);
+
+    await expect(getSongCard(page, "Chain Alpha")).toHaveCount(0);
+    await expect(getSongCard(page, "Chain Beta")).toBeVisible();
+});
+
 test("bookmark notification toast opens, closes, and auto-dismisses", async ({ page }) => {
     const bookmarkName = "Toast Check";
     await createBookmarkFromSong(page, {

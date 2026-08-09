@@ -1,16 +1,56 @@
-import { isWithinDateRange } from "./date-key.mjs";
+import { isWithinDateRange, parseDateKey } from "./date-key.mjs";
 import { matchesSelectedFormat } from "./song-format.mjs";
 import { isGuestStreamRole, normalizeStreamRole, STREAM_ROLE_HOST } from "./stream-role.mjs";
 
+type ParsedSearchQuery = {
+    keywords: string[];
+    sinceKey: number | null;
+    untilKey: number | null;
+};
+
+const DATE_SEARCH_OPERATOR_PATTERN = /^(since|until):(\d{4}-\d{1,2}-\d{1,2})$/;
+
 /**
  * 検索比較しやすい形に文字列を正規化する。
- * @param {*} s
+ * @param {string | null | undefined} s
  */
-export function normalizeForSearch(s) {
+export function normalizeForSearch(s: string | null | undefined): string {
     return (s || "")
         .normalize("NFKC")
         .replace(/[\u3041-\u3096\u309D-\u309F]/g, (m) => String.fromCharCode(m.charCodeAt(0) + 0x60))
         .toLowerCase();
+}
+
+/**
+ * 通常キーワードと since/until 日付演算子を分離する。
+ * 同じ演算子が複数ある場合は、すべてを満たす最も狭い境界を返す。
+ * 境界条件を単体テストするため export している。
+ * @param {string | null | undefined} queryRaw
+ * @returns {ParsedSearchQuery}
+ */
+export function parseSearchQuery(queryRaw: string | null | undefined): ParsedSearchQuery {
+    const tokens = normalizeForSearch(queryRaw)
+        .split(/[\s\u3000]+/)
+        .filter((token) => token.length > 0);
+    const keywords: string[] = [];
+    let sinceKey: number | null = null;
+    let untilKey: number | null = null;
+
+    tokens.forEach((token) => {
+        const match = DATE_SEARCH_OPERATOR_PATTERN.exec(token);
+        const dateKey = match ? parseDateKey(match[2]) : null;
+        if (!match || dateKey === null) {
+            keywords.push(token);
+            return;
+        }
+        if (match[1] === "since") {
+            sinceKey = sinceKey === null ? dateKey : Math.max(sinceKey, dateKey);
+            return;
+        }
+        untilKey = untilKey === null ? dateKey : Math.min(untilKey, dateKey);
+    });
+
+    return { keywords, sinceKey, untilKey };
 }
 
 /**
@@ -36,16 +76,21 @@ export function matchesCollabRoleFilters(row, searchState) {
  * @returns {Song[]}
  */
 export function filterSongsByCriteria(rows, searchState, selectedFormats) {
-    const queryNorm = normalizeForSearch(searchState.queryRaw);
-    const keywords = queryNorm.split(/[\s\u3000]+/).filter((k) => k.length > 0);
+    const parsedQuery = parseSearchQuery(searchState.queryRaw);
+    const fromKeys = [searchState.dateFromKey, parsedQuery.sinceKey]
+        .filter((key): key is number => typeof key === "number");
+    const toKeys = [searchState.dateToKey, parsedQuery.untilKey]
+        .filter((key): key is number => typeof key === "number");
+    const dateFromKey = fromKeys.length > 0 ? Math.max(...fromKeys) : null;
+    const dateToKey = toKeys.length > 0 ? Math.min(...toKeys) : null;
     return rows.filter((row) => {
-        const matchText = keywords.every((kw) =>
+        const matchText = parsedQuery.keywords.every((kw) =>
             row.titleNorm.includes(kw) ||
             row.artistNorm.includes(kw) ||
             row.titleYomiNorm.includes(kw) ||
             row.artistYomiNorm.includes(kw)
         );
-        const matchDate = isWithinDateRange(row, searchState.dateFromKey, searchState.dateToKey);
+        const matchDate = isWithinDateRange(row, dateFromKey, dateToKey);
         return matchText &&
             matchDate &&
             matchesSelectedFormat(row.format, selectedFormats) &&
