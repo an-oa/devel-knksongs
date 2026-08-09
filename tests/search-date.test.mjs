@@ -10,6 +10,11 @@ import {
     parseSearchQuery
 } from "../_build/app/lib/search-filters.mjs";
 import {
+    clearSearchQueryValidation,
+    getSearchQueryValidationMessage,
+    validateSearchQueryInput
+} from "../_build/app/ui/search-query-validation.mjs";
+import {
     createSearchController
 } from "../_build/app/controllers/search.mjs";
 import { installFakeDom } from "./test-helpers.mjs";
@@ -139,7 +144,9 @@ test("parseSearchQuery: separates normalized inclusive date operators from keywo
         {
             keywords: ["star"],
             sinceKey: 20240209,
-            untilKey: 20241231
+            untilKey: 20241231,
+            invalidOperators: [],
+            hasContradictoryDateRange: false
         }
     );
 });
@@ -150,19 +157,64 @@ test("parseSearchQuery: repeated operators use the narrowest valid bounds", () =
         {
             keywords: [],
             sinceKey: 20240201,
-            untilKey: 20241130
+            untilKey: 20241130,
+            invalidOperators: [],
+            hasContradictoryDateRange: false
         }
     );
 });
 
-test("parseSearchQuery: invalid date operators remain searchable keywords", () => {
+test("parseSearchQuery: invalid date operators are reported instead of becoming keywords", () => {
     assert.deepEqual(
         parseSearchQuery("since:2024-02-30 until:today"),
         {
-            keywords: ["since:2024-02-30", "until:today"],
+            keywords: [],
             sinceKey: null,
-            untilKey: null
+            untilKey: null,
+            invalidOperators: ["since:2024-02-30", "until:today"],
+            hasContradictoryDateRange: false
         }
+    );
+});
+
+test("parseSearchQuery: reports a contradictory date operator range", () => {
+    const parsedQuery = parseSearchQuery("since:2024-02-01 until:2024-01-31");
+    assert.equal(parsedQuery.hasContradictoryDateRange, true);
+});
+
+test("search query validation: exposes errors on completion and clears them during correction", () => {
+    const attributes = new Map();
+    const searchBox = {
+        value: "since:2024-02-30",
+        validationMessage: "",
+        setCustomValidity(message) {
+            this.validationMessage = message;
+        },
+        setAttribute(name, value) {
+            attributes.set(name, value);
+        },
+        removeAttribute(name) {
+            attributes.delete(name);
+        }
+    };
+    const errorElement = { hidden: true, textContent: "" };
+
+    assert.equal(validateSearchQueryInput(searchBox, errorElement), false);
+    assert.match(searchBox.validationMessage, /YYYY-MM-DD/);
+    assert.equal(attributes.get("aria-invalid"), "true");
+    assert.equal(errorElement.hidden, false);
+
+    clearSearchQueryValidation(searchBox, errorElement);
+    assert.equal(searchBox.validationMessage, "");
+    assert.equal(attributes.has("aria-invalid"), false);
+    assert.equal(errorElement.hidden, true);
+    assert.equal(errorElement.textContent, "");
+});
+
+test("search query validation: explains contradictory operator bounds", () => {
+    assert.match(
+        getSearchQueryValidationMessage("since:2024-02-01 until:2024-01-31"),
+        /since の日付は until の日付以前/
     );
 });
 
@@ -204,6 +256,20 @@ test("filterSongsByCriteria: date operators use inclusive bounds", () => {
 
     const hit = filterSongsByCriteria(rows, searchState, new Set(["配信"]));
     assert.deepEqual(hit.map((row) => row.titleNorm), ["from", "to"]);
+});
+
+test("filterSongsByCriteria: invalid date operators are ignored as date conditions", () => {
+    const rows = [makeRow({ title: "Target", dateKey: 20240110 })];
+    const searchState = {
+        queryRaw: "target since:2024-02-30",
+        relayOnly: false,
+        harmonyOnly: false,
+        dateFromKey: null,
+        dateToKey: null
+    };
+
+    const hit = filterSongsByCriteria(rows, searchState, new Set(["配信"]));
+    assert.deepEqual(hit.map((row) => row.titleNorm), ["target"]);
 });
 
 test("filterSongsByCriteria: text date operators intersect with date select bounds", () => {

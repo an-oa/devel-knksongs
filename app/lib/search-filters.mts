@@ -6,9 +6,12 @@ type ParsedSearchQuery = {
     keywords: string[];
     sinceKey: number | null;
     untilKey: number | null;
+    invalidOperators: string[];
+    hasContradictoryDateRange: boolean;
 };
 
 const DATE_SEARCH_OPERATOR_PATTERN = /^(since|until):(\d{4}-\d{1,2}-\d{1,2})$/;
+const DATE_SEARCH_OPERATOR_PREFIX_PATTERN = /^(since|until):/;
 
 /**
  * 検索比較しやすい形に文字列を正規化する。
@@ -33,14 +36,23 @@ export function parseSearchQuery(queryRaw: string | null | undefined): ParsedSea
         .split(/[\s\u3000]+/)
         .filter((token) => token.length > 0);
     const keywords: string[] = [];
+    const invalidOperators: string[] = [];
     let sinceKey: number | null = null;
     let untilKey: number | null = null;
 
     tokens.forEach((token) => {
         const match = DATE_SEARCH_OPERATOR_PATTERN.exec(token);
-        const dateKey = match ? parseDateKey(match[2]) : null;
-        if (!match || dateKey === null) {
+        if (!match) {
+            if (DATE_SEARCH_OPERATOR_PREFIX_PATTERN.test(token)) {
+                invalidOperators.push(token);
+                return;
+            }
             keywords.push(token);
+            return;
+        }
+        const dateKey = parseDateKey(match[2]);
+        if (dateKey === null) {
+            invalidOperators.push(token);
             return;
         }
         if (match[1] === "since") {
@@ -50,7 +62,13 @@ export function parseSearchQuery(queryRaw: string | null | undefined): ParsedSea
         untilKey = untilKey === null ? dateKey : Math.min(untilKey, dateKey);
     });
 
-    return { keywords, sinceKey, untilKey };
+    return {
+        keywords,
+        sinceKey,
+        untilKey,
+        invalidOperators,
+        hasContradictoryDateRange: sinceKey !== null && untilKey !== null && sinceKey > untilKey
+    };
 }
 
 /**

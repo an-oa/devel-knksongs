@@ -1,4 +1,5 @@
 import type { AppUiState, SearchUiRuntimeState } from "../../state.types";
+import { clearSearchQueryValidation } from "../search-query-validation.mjs";
 
 type SearchScheduleOptions = {
     immediate?: boolean;
@@ -73,6 +74,7 @@ export function createSearchUiActions({
      */
     function resetSearchQuery(): void {
         if (ui.el.searchBox) ui.el.searchBox.value = "";
+        clearSearchQueryValidation(ui.el.searchBox, ui.el.searchBoxError);
         search.userTouchedQuery = false;
     }
 

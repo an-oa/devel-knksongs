@@ -233,16 +233,34 @@ test("sidebar native popover backdrop click closes and restores focus", async ({
     await expect(openButton).toBeFocused();
 });
 
-test("search box date operators filter songs and expose input guidance", async ({ page }) => {
+test("search box date operators validate input and filter songs", async ({ page }) => {
     await openSidebar(page);
 
     const searchBox = page.locator("#searchBox");
     const searchHelp = page.locator("#searchBoxHelp");
+    const searchError = page.locator("#searchBoxError");
     await expect(searchBox).toHaveAttribute("aria-describedby", "searchBoxHelp");
+    await expect(searchBox).toHaveAttribute("aria-errormessage", "searchBoxError");
     await expect(searchHelp).toContainText("since:YYYY-MM-DD");
     await expect(searchHelp).toContainText("until:YYYY-MM-DD");
 
+    await searchBox.fill("since:2024-02-30");
+    await searchBox.blur();
+    await expect(searchBox).toHaveAttribute("aria-invalid", "true");
+    await expect(searchError).toContainText("実在する日付");
+    await expect(searchError).toBeVisible();
+
+    await searchBox.fill("since:2024-01-05 until:2024-01-04");
+    await expect(searchBox).not.toHaveAttribute("aria-invalid", "true");
+    await expect(searchError).toBeHidden();
+    await searchBox.blur();
+    await expect(searchBox).toHaveAttribute("aria-invalid", "true");
+    await expect(searchError).toContainText("since の日付は until の日付以前");
+
     await searchBox.fill("Chain since:2024-01-04 until:2024-01-04");
+    await searchBox.blur();
+    await expect(searchBox).not.toHaveAttribute("aria-invalid", "true");
+    await expect(searchError).toBeHidden();
     await expect(page.locator("#resultCount")).toHaveText("1 件がヒット");
     await closeSidebar(page);
 

@@ -12,6 +12,7 @@
   --transition-speed: 0.3s;
   --focus-ring-color: #f59e0b;
   --focus-ring-shadow: rgba(245, 158, 11, 0.28);
+  --validation-error-color: #b3261e;
 }
 
 :root.dark-theme {
@@ -26,6 +27,7 @@
   --primary-color: #4285f4;
   --focus-ring-color: #facc15;
   --focus-ring-shadow: rgba(250, 204, 21, 0.26);
+  --validation-error-color: #ffb4ab;
 }
 
 body {
@@ -405,11 +407,21 @@ body.hide-thumbs .thumb {
   font-size: 11px;
   line-height: 1.4;
 }
+.search-query-error {
+  margin: 6px 0 0;
+  color: var(--validation-error-color);
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
 
 input[type="text"] {
   width: 100%; padding: 9px 10px; border: 2px solid var(--border-color);
   border-radius: 8px; background: var(--card-bg); color: var(--text-color); outline: none; box-sizing: border-box;
   font-size: 16px;
+}
+input[type="text"][aria-invalid="true"] {
+  border-color: var(--validation-error-color);
 }
 
 #formatsList {

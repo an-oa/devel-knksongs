@@ -47,6 +47,7 @@ export type AppUiElements = Partial<{
   resultCount: HTMLElement | null;
   resultTailSentinel: HTMLElement | null;
   searchBox: HTMLInputElement | null;
+  searchBoxError: HTMLElement | null;
   clearBtn: HTMLButtonElement | null;
   collabHostOnly: HTMLInputElement | null;
   collabGuestOnly: HTMLInputElement | null;

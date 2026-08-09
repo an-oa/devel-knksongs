@@ -37,6 +37,7 @@ export function collectUiElements(): AppUiElements {
         resultCount: document.getElementById("resultCount"),
         resultTailSentinel: document.getElementById("resultTailSentinel"),
         searchBox: getInputElementById("searchBox"),
+        searchBoxError: document.getElementById("searchBoxError"),
         clearBtn: getButtonElementById("clearBtn"),
         collabHostOnly: getInputElementById("collabHostOnly"),
         collabGuestOnly: getInputElementById("collabGuestOnly"),

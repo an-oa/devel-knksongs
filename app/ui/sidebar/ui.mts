@@ -1,4 +1,8 @@
 import { getSearchBooleanFilterElements } from "../../lib/search-boolean-filters.mjs";
+import {
+    clearSearchQueryValidation,
+    validateSearchQueryInput
+} from "../search-query-validation.mjs";
 import { createSidebarPopoverController } from "./popover.mjs";
 import { createSidebarSubpanelController } from "./subpanel.mjs";
 import type { AppUiState } from "../../state.types";
@@ -263,7 +267,11 @@ export function createSidebarController(input: SidebarControllerInput) {
         });
         if (ui.el.searchBox) {
             ui.el.searchBox.addEventListener("input", () => {
+                clearSearchQueryValidation(ui.el.searchBox, ui.el.searchBoxError);
                 markQueryTouched();
+            });
+            ui.el.searchBox.addEventListener("blur", () => {
+                validateSearchQueryInput(ui.el.searchBox, ui.el.searchBoxError);
             });
         }
 
