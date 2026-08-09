@@ -237,12 +237,9 @@ test("search box date operators validate input and filter songs", async ({ page 
     await openSidebar(page);
 
     const searchBox = page.locator("#searchBox");
-    const searchHelp = page.locator("#searchBoxHelp");
     const searchError = page.locator("#searchBoxError");
-    await expect(searchBox).toHaveAttribute("aria-describedby", "searchBoxHelp");
+    await expect(page.locator("#searchBoxHelp")).toHaveCount(0);
     await expect(searchBox).toHaveAttribute("aria-errormessage", "searchBoxError");
-    await expect(searchHelp).toContainText("since:YYYY-MM-DD");
-    await expect(searchHelp).toContainText("until:YYYY-MM-DD");
 
     await searchBox.fill("since:2024-02-30");
     await searchBox.blur();
