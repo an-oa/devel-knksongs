@@ -1,4 +1,4 @@
-name: Update songs json and deploy Pages
+name: Update songs json
 
 on:
   workflow_dispatch:
@@ -6,20 +6,17 @@ on:
     - cron: "17 6,18 * * *"
 
 permissions:
+  actions: write
   contents: write
-  pages: write
-  id-token: write
 
 concurrency:
-  group: update-songs-json-and-deploy-pages
+  group: update-songs-json
   cancel-in-progress: false
 
 jobs:
-  update-and-deploy:
+  update:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
 
     steps:
       - uses: actions/checkout@v6
@@ -36,24 +33,22 @@ jobs:
       - run: npm run validate:songs-json
 
       - name: Commit generated songs json
+        id: commit
         run: |
           if git diff --quiet -- data/songs.json data/songs-meta.json; then
             echo "No generated changes"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add data/songs.json data/songs-meta.json
             git commit -m "chore: update generated songs json" -m "- 公開CSVから songs.json と songs-meta.json を再生成した。"
             git push
+            echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Prepare Pages artifact
+      - name: Run CI for updated songs json
+        if: steps.commit.outputs.changed == 'true'
         env:
-          DEPLOY_CACHE_BUSTER: ${{ github.sha }}
-        run: npm run build:pages-artifact
-
-      - uses: actions/upload-pages-artifact@v5
-        with:
-          path: _site
-
-      - uses: actions/deploy-pages@v5
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run ci.yml --ref main

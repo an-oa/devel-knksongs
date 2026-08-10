@@ -112,8 +112,9 @@ flowchart TD
 - `songs-meta.json` の `contentHash` で手元のJSONキャッシュが最新かを確認し、変化がなければ大きい `songs.json` の再取得を避けます。
 - 公開スプレッドシートのCSVは、事前生成JSONの元データかつJSON取得失敗時のフォールバックとして参照します(`app/config.mts` の `PUBLIC_CSV_URL` で指定し、実行時は `_build/app/config.mjs` に生成された module を読みます)。
 - CSVの `配信上の立場` は曲データの `streamRole` としてJSONへ保持します。
-- `.github/workflows/update-songs-json-and-deploy.yml` は GitHub Actions 上で `npm run build:songs-json` と `npm run validate:songs-json` を実行し、`data/songs.json` / `data/songs-meta.json` に差分があればコミットします。その後 `npm run build:pages-artifact` で `_build` から `_site` を作成し、Pages へ deploy します。
-- `.github/workflows/ci.yml` は push / pull request / 手動実行で `npm run validate:songs-json`、`npm run typecheck`、`npm run check:ts-emit`、`npm run build`、`npm run lint`、`npm run test:unit` を実行します。
+- `.github/workflows/update-songs-json.yml` は GitHub Actions 上で `npm run build:songs-json` と `npm run validate:songs-json` を実行し、`data/songs.json` / `data/songs-meta.json` に差分があればコミットして、更新後の `main` に対する CI を明示的に起動します。差分がない場合はコミットも deploy も行いません。
+- `.github/workflows/ci.yml` は `main` への push / pull request / 手動実行で `npm run validate:songs-json`、`npm run typecheck`、`npm run check:ts-emit`、`npm run build`、`npm run lint`、`npm run test:unit` を実行します。`main` の CI が成功すると `.github/workflows/deploy-pages.yml` が検証済み commit を deploy します。
+- `.github/workflows/deploy-pages.yml` は CI が成功した最新の `main` commit だけを checkout し、`npm run build:pages-artifact` で `_build` から `_site` を作成して Pages へ deploy します。deploy 後は公開 `index.html` の cache buster が対象 commit SHA と一致するまで再取得し、実際の公開反映を確認します。
 - Pages artifact 生成時は `DEPLOY_CACHE_BUSTER` または `GITHUB_SHA` を使い、`index.html` の `styles.css` / `app/bootstrap.mjs` と、配布用 `app/**/*.mjs` 内の相対 `.mjs` 参照へ `?v=...` を付与します。ソースの `index.html` や import には通常 `?v=...` を書きません。
 - フロントエンドのみで動作します(静的ホスティング想定)。
 - 配布物はHTML/CSS/JavaScriptのみで、実行時にnpm等の同梱依存はありません。

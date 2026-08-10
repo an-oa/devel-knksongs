@@ -1,0 +1,100 @@
+name: Deploy Pages
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: deploy-pages
+  cancel-in-progress: true
+
+jobs:
+  resolve:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    outputs:
+      deploy-sha: ${{ steps.target.outputs.deploy-sha }}
+      is-current-main: ${{ steps.target.outputs.is-current-main }}
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - name: Resolve deployment target
+        id: target
+        env:
+          DEPLOY_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          current_main_sha="$(git rev-parse HEAD)"
+          echo "deploy-sha=$DEPLOY_SHA" >> "$GITHUB_OUTPUT"
+          if [ "$DEPLOY_SHA" = "$current_main_sha" ]; then
+            echo "is-current-main=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is-current-main=false" >> "$GITHUB_OUTPUT"
+            echo "Skip outdated deployment target: $DEPLOY_SHA (current main: $current_main_sha)"
+          fi
+
+  build:
+    needs: resolve
+    if: needs.resolve.outputs.is-current-main == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.resolve.outputs.deploy-sha }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: npm
+
+      - run: npm ci
+
+      - name: Prepare Pages artifact
+        env:
+          DEPLOY_CACHE_BUSTER: ${{ needs.resolve.outputs.deploy-sha }}
+        run: npm run build:pages-artifact
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+  deploy:
+    needs:
+      - resolve
+      - build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
+
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.resolve.outputs.deploy-sha }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+
+      - name: Verify deployed commit
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+          EXPECTED_SHA: ${{ needs.resolve.outputs.deploy-sha }}
+        run: node scripts/verify-pages-deployment.mjs
