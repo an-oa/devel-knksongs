@@ -11,8 +11,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 jobs:
   resolve:
@@ -97,6 +95,10 @@ jobs:
       - freshness
     if: needs.freshness.outputs.should-deploy == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     concurrency:
       group: deploy-pages
       cancel-in-progress: false
@@ -133,3 +135,14 @@ jobs:
           PAGE_URL: ${{ steps.deployment.outputs.page_url }}
           EXPECTED_SHA: ${{ needs.resolve.outputs.deploy-sha }}
         run: node scripts/verify-pages-deployment.mjs
+
+      - name: Verify deployed commit is still main
+        env:
+          DEPLOY_SHA: ${{ needs.resolve.outputs.deploy-sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          current_main_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+          if [ "$DEPLOY_SHA" != "$current_main_sha" ]; then
+            echo "Deployed commit is no longer current main: $DEPLOY_SHA (current main: $current_main_sha)"
+            exit 1
+          fi
