@@ -105,6 +105,17 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
+      - name: Verify deployment target after waiting
+        env:
+          DEPLOY_SHA: ${{ needs.resolve.outputs.deploy-sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          current_main_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+          if [ "$DEPLOY_SHA" != "$current_main_sha" ]; then
+            echo "Reject outdated deployment target: $DEPLOY_SHA (current main: $current_main_sha)"
+            exit 1
+          fi
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5

@@ -114,7 +114,7 @@ flowchart TD
 - CSVの `配信上の立場` は曲データの `streamRole` としてJSONへ保持します。
 - `.github/workflows/update-songs-json.yml` は GitHub Actions 上で `npm run build:songs-json` と `npm run validate:songs-json` を実行し、`data/songs.json` / `data/songs-meta.json` に差分があればコミットして、更新後の `main` に対する CI を明示的に起動します。差分がない場合はコミットも deploy も行いません。
 - `.github/workflows/ci.yml` は `main` への push / pull request / 手動実行で `npm run validate:songs-json`、`npm run typecheck`、`npm run check:ts-emit`、`npm run build`、`npm run lint`、`npm run test:unit` を実行します。`main` の CI が成功すると `.github/workflows/deploy-pages.yml` が検証済み commit を deploy します。
-- `.github/workflows/deploy-pages.yml` は成功した CI の対象が `main` の最新 commit であることを build 前と deploy 直前に確認し、`npm run build:pages-artifact` で `_build` から `_site` を作成して Pages へ deploy します。deploy job は直列化し、失敗した CI や古い commit が進行中の deploy を取り消さないようにします。deploy 後は公開 `deployment.json` の SHA が対象 commit と一致するまで最長10分間再取得し、実際の公開反映を確認します。
+- `.github/workflows/deploy-pages.yml` は「現在の `main` だけを公開する」方針とし、成功した CI の対象を build 前、artifact 生成後、concurrency / environment 待機後の deploy action 直前に `main` と照合します。待機前に古くなった run は deploy job ごと skip し、待機中に古くなった run は古い artifact を公開せず、成功した deployment record と誤認されないよう失敗として記録します。deploy 後は公開 `deployment.json` の SHA が対象 commit と一致するまで最長10分間再取得し、実際の公開反映を確認します。
 - Pages artifact 生成時は CSS と配布用 JavaScript module の内容から cache buster を算出し、`index.html` の `styles.css` / `app/bootstrap.mjs` と、配布用 `app/**/*.mjs` 内の相対 `.mjs` 参照へ `?v=...` を付与します。明示的な上書きには `DEPLOY_CACHE_BUSTER` を使えます。deploy SHA は `deployment.json` に分離して記録するため、曲 JSON だけの更新では CSS / JavaScript の URL は変わりません。ソースの `index.html` や import には通常 `?v=...` を書きません。
 - フロントエンドのみで動作します(静的ホスティング想定)。
 - 配布物はHTML/CSS/JavaScriptのみで、実行時にnpm等の同梱依存はありません。
