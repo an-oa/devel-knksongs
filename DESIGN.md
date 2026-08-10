@@ -11,7 +11,7 @@
 - 静的フロントエンドのみ（HTML/CSS/JavaScript, ES Modules）。
   `app/**/*.mts` を source とし、`npm run build:ts` で `_build/app/**/*.mjs` へ生成した JavaScript をブラウザ・テスト・Node scripts が読む
 - データ取得：事前生成JSON（`data/songs.json` / `data/songs-meta.json`）を優先し、公開スプレッドシートのCSVは生成元とフォールバックに使う
-- データ生成/公開：GitHub Actions でCSVからJSONを生成・検証し、差分を `main` へコミットして CI を起動する。CI 成功後、現在の `main` と一致する検証済み commit から Pages artifact を生成して deploy し、公開HTMLの commit SHA を確認する
+- データ生成/公開：GitHub Actions でCSVからJSONを生成・検証し、差分を `main` へコミットして CI を起動する。CI 成功後、現在の `main` と一致する検証済み commit から Pages artifact を生成して deploy し、公開された `deployment.json` の commit SHA を確認する
 - CI：GitHub Actions で TypeScript emit、曲データ検証、typecheck、lint、unit test、静的 site build を実行する
 - 実行時の同梱外部ライブラリ依存：なし
 - 埋め込み再生まわりでは YouTube Iframe API を動的に利用し、標準では `youtube.com`、プライバシー強化設定ON時は `youtube-nocookie.com` の埋め込みURLを使う
