@@ -80,30 +80,37 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
-      - name: Verify deployment target is still main
+      - name: Check deployment target is still main
+        id: target
         env:
           DEPLOY_SHA: ${{ needs.resolve.outputs.deploy-sha }}
           GH_TOKEN: ${{ github.token }}
         run: |
           current_main_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
-          if [ "$DEPLOY_SHA" != "$current_main_sha" ]; then
-            echo "Refuse outdated deployment target: $DEPLOY_SHA (current main: $current_main_sha)"
-            exit 1
+          if [ "$DEPLOY_SHA" = "$current_main_sha" ]; then
+            echo "should-deploy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should-deploy=false" >> "$GITHUB_OUTPUT"
+            echo "Skip outdated deployment target: $DEPLOY_SHA (current main: $current_main_sha)"
           fi
 
       - name: Deploy to GitHub Pages
         id: deployment
+        if: steps.target.outputs.should-deploy == 'true'
         uses: actions/deploy-pages@v5
 
       - uses: actions/checkout@v6
+        if: steps.target.outputs.should-deploy == 'true'
         with:
           ref: ${{ needs.resolve.outputs.deploy-sha }}
 
       - uses: actions/setup-node@v6
+        if: steps.target.outputs.should-deploy == 'true'
         with:
           node-version: 24.16.0
 
       - name: Verify deployed commit
+        if: steps.target.outputs.should-deploy == 'true'
         env:
           PAGE_URL: ${{ steps.deployment.outputs.page_url }}
           EXPECTED_SHA: ${{ needs.resolve.outputs.deploy-sha }}
