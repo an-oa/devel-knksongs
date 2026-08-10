@@ -14,10 +14,6 @@ permissions:
   pages: write
   id-token: write
 
-concurrency:
-  group: deploy-pages
-  cancel-in-progress: true
-
 jobs:
   resolve:
     if: github.event.workflow_run.conclusion == 'success'
@@ -64,7 +60,7 @@ jobs:
 
       - name: Prepare Pages artifact
         env:
-          DEPLOY_CACHE_BUSTER: ${{ needs.resolve.outputs.deploy-sha }}
+          DEPLOY_SHA: ${{ needs.resolve.outputs.deploy-sha }}
         run: npm run build:pages-artifact
 
       - uses: actions/upload-pages-artifact@v5
@@ -76,11 +72,25 @@ jobs:
       - resolve
       - build
     runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-pages
+      cancel-in-progress: false
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
+      - name: Verify deployment target is still main
+        env:
+          DEPLOY_SHA: ${{ needs.resolve.outputs.deploy-sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          current_main_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+          if [ "$DEPLOY_SHA" != "$current_main_sha" ]; then
+            echo "Refuse outdated deployment target: $DEPLOY_SHA (current main: $current_main_sha)"
+            exit 1
+          fi
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5

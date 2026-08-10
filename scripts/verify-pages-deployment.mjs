@@ -2,23 +2,30 @@
 
 import { pathToFileURL } from "node:url";
 
-const DEFAULT_ATTEMPTS = 12;
+const DEFAULT_DEADLINE_MS = 10 * 60 * 1_000;
 const DEFAULT_DELAY_MS = 10_000;
+const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
 
 /**
- * 公開HTMLが期待するcommit SHAのcache busterを参照しているか判定する。
- * @param {string} html
+ * 公開markerが期待するcommit SHAを示しているか判定する。
+ * @param {string} markerJson
  * @param {string} expectedSha
  * @returns {boolean}
  */
-export function hasExpectedDeploySha(html, expectedSha) {
-    const encodedSha = encodeURIComponent(expectedSha);
-    return html.includes(`styles.css?v=${encodedSha}`) &&
-        html.includes(`app/bootstrap.mjs?v=${encodedSha}`);
+export function hasExpectedDeploySha(markerJson, expectedSha) {
+    try {
+        const marker = JSON.parse(markerJson);
+        return marker !== null &&
+            typeof marker === "object" &&
+            !Array.isArray(marker) &&
+            marker.sha === expectedSha;
+    } catch {
+        return false;
+    }
 }
 
 /**
- * CDNとbrowser cacheを避けて公開HTMLを確認するURLを作る。
+ * CDNとbrowser cacheを避けて公開markerを確認するURLを作る。
  * @param {string} pageUrl
  * @param {string} verificationToken
  * @param {number} attempt
@@ -29,7 +36,7 @@ export function createVerificationUrl(pageUrl, verificationToken, attempt) {
     if (!baseUrl.pathname.endsWith("/")) {
         baseUrl.pathname = `${baseUrl.pathname}/`;
     }
-    const verificationUrl = new URL("index.html", baseUrl);
+    const verificationUrl = new URL("deployment.json", baseUrl);
     verificationUrl.searchParams.set("deployment-check", `${verificationToken}-${attempt}`);
     return verificationUrl;
 }
@@ -60,15 +67,18 @@ function readPositiveInteger(value, fallback, label) {
 }
 
 /**
- * Pagesの公開HTMLを繰り返し取得し、期待するcommit SHAの反映を確認する。
+ * Pagesの公開markerを期限まで繰り返し取得し、期待するcommit SHAの反映を確認する。
  * @param {{
  *   pageUrl: string,
  *   expectedSha: string,
  *   verificationToken?: string,
- *   attempts?: number,
+ *   deadlineMs?: number,
  *   delayMs?: number,
+ *   requestTimeoutMs?: number,
  *   fetchImpl?: typeof fetch,
- *   wait?: (delayMs: number) => Promise<void>
+ *   wait?: (delayMs: number) => Promise<void>,
+ *   now?: () => number,
+ *   createTimeoutSignal?: (timeoutMs: number) => AbortSignal
  * }} options
  * @returns {Promise<URL>}
  */
@@ -77,53 +87,71 @@ export async function verifyPagesDeployment(options) {
         pageUrl,
         expectedSha,
         verificationToken = expectedSha,
-        attempts = DEFAULT_ATTEMPTS,
+        deadlineMs = DEFAULT_DEADLINE_MS,
         delayMs = DEFAULT_DELAY_MS,
+        requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
         fetchImpl = fetch,
-        wait = waitFor
+        wait = waitFor,
+        now = Date.now,
+        createTimeoutSignal = (timeoutMs) => AbortSignal.timeout(timeoutMs)
     } = options;
     if (!pageUrl) throw new Error("PAGE_URL is required");
     if (!/^[0-9a-f]{7,64}$/i.test(expectedSha)) {
         throw new Error("EXPECTED_SHA must be a hexadecimal commit SHA");
     }
     if (!verificationToken) throw new Error("verificationToken is required");
-    if (!Number.isSafeInteger(attempts) || attempts <= 0) {
-        throw new Error("attempts must be a positive integer");
+    if (!Number.isSafeInteger(deadlineMs) || deadlineMs <= 0) {
+        throw new Error("deadlineMs must be a positive integer");
     }
-    if (!Number.isSafeInteger(delayMs) || delayMs < 0) {
-        throw new Error("delayMs must be a non-negative integer");
+    if (!Number.isSafeInteger(delayMs) || delayMs <= 0) {
+        throw new Error("delayMs must be a positive integer");
+    }
+    if (!Number.isSafeInteger(requestTimeoutMs) || requestTimeoutMs <= 0) {
+        throw new Error("requestTimeoutMs must be a positive integer");
     }
 
+    const startedAt = now();
+    let attempt = 0;
     /** @type {Error | null} */
     let lastError = null;
-    for (let attempt = 1; attempt <= attempts; attempt++) {
+
+    while (true) {
+        const elapsedMs = now() - startedAt;
+        if (elapsedMs >= deadlineMs) break;
+        attempt++;
+        const remainingMs = deadlineMs - elapsedMs;
         const verificationUrl = createVerificationUrl(pageUrl, verificationToken, attempt);
         try {
             const response = await fetchImpl(verificationUrl, {
                 headers: {
                     "cache-control": "no-cache",
                     pragma: "no-cache"
-                }
+                },
+                signal: createTimeoutSignal(Math.min(requestTimeoutMs, remainingMs))
             });
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
-            const html = await response.text();
-            if (hasExpectedDeploySha(html, expectedSha)) {
+            const markerJson = await response.text();
+            if (hasExpectedDeploySha(markerJson, expectedSha)) {
                 console.log(`Verified deployed commit ${expectedSha} at ${verificationUrl.href}`);
                 return verificationUrl;
             }
-            lastError = new Error(`response does not reference commit ${expectedSha}`);
+            lastError = new Error(`deployment marker does not identify commit ${expectedSha}`);
         } catch (error) {
             lastError = error instanceof Error ? error : new Error(String(error));
         }
 
-        console.warn(`Deployment verification attempt ${attempt}/${attempts} failed: ${lastError.message}`);
-        if (attempt < attempts) await wait(delayMs);
+        console.warn(`Deployment verification attempt ${attempt} failed: ${lastError.message}`);
+        const remainingAfterAttemptMs = deadlineMs - (now() - startedAt);
+        if (remainingAfterAttemptMs > 0) {
+            await wait(Math.min(delayMs, remainingAfterAttemptMs));
+        }
     }
 
     throw new Error(
-        `Pages did not serve commit ${expectedSha} after ${attempts} attempts: ${lastError?.message || "unknown error"}`
+        `Pages did not serve commit ${expectedSha} within ${deadlineMs} ms ` +
+        `after ${attempt} attempts: ${lastError?.message || "unknown error"}`
     );
 }
 
@@ -135,15 +163,20 @@ if (import.meta.url === entryPointUrl) {
             pageUrl: process.env.PAGE_URL || "",
             expectedSha: process.env.EXPECTED_SHA || "",
             verificationToken: process.env.GITHUB_RUN_ID || process.env.EXPECTED_SHA || "",
-            attempts: readPositiveInteger(
-                process.env.DEPLOY_VERIFY_ATTEMPTS,
-                DEFAULT_ATTEMPTS,
-                "DEPLOY_VERIFY_ATTEMPTS"
+            deadlineMs: readPositiveInteger(
+                process.env.DEPLOY_VERIFY_DEADLINE_MS,
+                DEFAULT_DEADLINE_MS,
+                "DEPLOY_VERIFY_DEADLINE_MS"
             ),
             delayMs: readPositiveInteger(
                 process.env.DEPLOY_VERIFY_DELAY_MS,
                 DEFAULT_DELAY_MS,
                 "DEPLOY_VERIFY_DELAY_MS"
+            ),
+            requestTimeoutMs: readPositiveInteger(
+                process.env.DEPLOY_VERIFY_REQUEST_TIMEOUT_MS,
+                DEFAULT_REQUEST_TIMEOUT_MS,
+                "DEPLOY_VERIFY_REQUEST_TIMEOUT_MS"
             )
         });
     } catch (error) {

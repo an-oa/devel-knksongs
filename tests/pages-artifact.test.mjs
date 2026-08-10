@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import {
     appendCacheBusterToHtml,
     appendCacheBusterToJavaScriptImports,
+    createAssetCacheBuster,
+    createDeploymentMarker,
     parseArgs,
     resolvePagesArtifactOutputDir,
     resolvePagesArtifactSiteDir,
@@ -62,7 +64,8 @@ test("pages artifact: reads cache buster from deploy environment", () => {
         {
             outputDir: "_site/out",
             siteDir: ".",
-            cacheBuster: "abc123"
+            cacheBuster: "abc123",
+            deploymentSha: ""
         }
     );
 });
@@ -73,8 +76,43 @@ test("pages artifact: reads source site directory from arguments", () => {
         {
             outputDir: "_site",
             siteDir: "_build",
-            cacheBuster: "abc123"
+            cacheBuster: "abc123",
+            deploymentSha: ""
         }
+    );
+});
+
+test("pages artifact: derives stable cache busters from static asset contents", () => {
+    const assets = [
+        { path: "styles.css", content: "body {}" },
+        { path: "app/bootstrap.mjs", content: "import './app.mjs';" }
+    ];
+    const reversedAssets = [...assets].reverse();
+    const changedAssets = [
+        ...assets.slice(0, 1),
+        { path: "app/bootstrap.mjs", content: "import './changed.mjs';" }
+    ];
+
+    assert.equal(createAssetCacheBuster(assets), createAssetCacheBuster(reversedAssets));
+    assert.notEqual(createAssetCacheBuster(assets), createAssetCacheBuster(changedAssets));
+});
+
+test("pages artifact: separates deployment SHA from the asset cache buster", () => {
+    assert.deepEqual(
+        parseArgs([], {
+            DEPLOY_CACHE_BUSTER: "asset-version",
+            DEPLOY_SHA: "c2abca650af9fca8ff7a2ab28627ea3c3620d9b9"
+        }),
+        {
+            outputDir: "_site",
+            siteDir: ".",
+            cacheBuster: "asset-version",
+            deploymentSha: "c2abca650af9fca8ff7a2ab28627ea3c3620d9b9"
+        }
+    );
+    assert.equal(
+        createDeploymentMarker("c2abca650af9fca8ff7a2ab28627ea3c3620d9b9"),
+        '{"sha":"c2abca650af9fca8ff7a2ab28627ea3c3620d9b9"}\n'
     );
 });
 

@@ -336,7 +336,9 @@ IndexedDB保存：
 - source の `index.html` や `app/**/*.mts` 内の `.mjs` import specifier には通常 `?v=...` を書かない
 - `scripts/build-pages-artifact.mjs` が `_build` から `_site` へコピーした配布用 `index.html` の
   `styles.css` / `app/bootstrap.mjs` と、生成済み `app/**/*.mjs` の相対 import/export/dynamic import に
-  `?v=<DEPLOY_CACHE_BUSTER or GITHUB_SHA>` を付与する
+  CSS / JavaScript module の内容から算出した `?v=<sha256>` を付与する
+- `DEPLOY_CACHE_BUSTER` を指定した場合は、内容から算出した値の代わりに明示値を使う
+- deploy commit SHA は cache buster と兼用せず、artifact 直下の `deployment.json` に記録する
 - cache buster の仕様を変える場合は `scripts/build-pages-artifact.mjs` と `tests/pages-artifact.test.mjs` を合わせて更新する
 - `songs.json` / `songs-meta.json` の内容更新だけでは cache buster を上げず、`contentHash` による鮮度確認で反映する
 - 日付入力はセレクト方式（ブラウザ互換性優先）

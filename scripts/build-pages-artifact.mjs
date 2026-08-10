@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
+import { createHash } from "node:crypto";
 import { copyFile, cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, relative, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { resolveProjectPath } from "./lib/paths.mjs";
 import {
@@ -12,6 +13,7 @@ import {
 
 const DEFAULT_OUTPUT_DIR = "_site";
 const DEFAULT_SITE_DIR = ".";
+const DEPLOYMENT_MARKER_FILE = "deployment.json";
 const HTML_CACHE_BUSTER_TARGETS = [
     { attribute: "href", path: "styles.css" },
     { attribute: "src", path: "app/bootstrap.mjs" }
@@ -78,16 +80,44 @@ export function appendCacheBusterToJavaScriptImports(source, cacheBuster) {
 }
 
 /**
+ * CSSとJavaScript moduleの内容から安定したcache busterを作る。
+ * 本番 artifact 生成で使う変換で、JSONだけの更新で値が変わらないことを
+ * 単体テストするため export している。
+ * @param {Array<{ path: string, content: string | Uint8Array }>} assets
+ * @returns {string}
+ */
+export function createAssetCacheBuster(assets) {
+    const hash = createHash("sha256");
+    for (const asset of [...assets].sort((left, right) => left.path.localeCompare(right.path))) {
+        hash.update(asset.path);
+        hash.update("\0");
+        hash.update(asset.content);
+        hash.update("\0");
+    }
+    return hash.digest("hex");
+}
+
+/**
+ * 公開済みcommitを識別するmarker JSONを作る。
+ * @param {string} deploymentSha
+ * @returns {string}
+ */
+export function createDeploymentMarker(deploymentSha) {
+    return `${JSON.stringify({ sha: deploymentSha })}\n`;
+}
+
+/**
  * CLI 引数と環境変数から artifact 生成オプションを作る。
  * @param {string[]} args
  * @param {Record<string, string | undefined>} env
- * @returns {{ outputDir: string, siteDir: string, cacheBuster: string }}
+ * @returns {{ outputDir: string, siteDir: string, cacheBuster: string, deploymentSha: string }}
  */
 export function parseArgs(args, env = process.env) {
     const options = {
         outputDir: env.PAGES_ARTIFACT_DIR || DEFAULT_OUTPUT_DIR,
         siteDir: env.PAGES_SITE_DIR || DEFAULT_SITE_DIR,
-        cacheBuster: env.DEPLOY_CACHE_BUSTER || env.GITHUB_SHA || ""
+        cacheBuster: env.DEPLOY_CACHE_BUSTER || "",
+        deploymentSha: env.DEPLOY_SHA || ""
     };
     for (let i = 0; i < args.length; i++) {
         const arg = args[i];
@@ -110,11 +140,18 @@ export function parseArgs(args, env = process.env) {
             i++;
             continue;
         }
+        if (arg === "--deployment-sha") {
+            if (!next) throw new Error("--deployment-sha requires a commit SHA");
+            options.deploymentSha = next;
+            i++;
+            continue;
+        }
         throw new Error(`Unknown argument: ${arg}`);
     }
     options.cacheBuster = options.cacheBuster.trim();
-    if (!options.cacheBuster) {
-        throw new Error("DEPLOY_CACHE_BUSTER or GITHUB_SHA is required");
+    options.deploymentSha = options.deploymentSha.trim();
+    if (options.deploymentSha && !/^[0-9a-f]{7,64}$/i.test(options.deploymentSha)) {
+        throw new Error("DEPLOY_SHA must be a hexadecimal commit SHA");
     }
     return options;
 }
@@ -190,6 +227,21 @@ async function listModuleFiles(directory) {
 }
 
 /**
+ * artifact内のCSSとJavaScript moduleからcache busterを算出する。
+ * @param {string} outputDir
+ * @param {string[]} moduleFiles
+ * @returns {Promise<string>}
+ */
+async function calculateArtifactCacheBuster(outputDir, moduleFiles) {
+    const assetFiles = [join(outputDir, "styles.css"), ...moduleFiles];
+    const assets = await Promise.all(assetFiles.map(async (filePath) => ({
+        path: relative(outputDir, filePath).split(sep).join("/"),
+        content: await readFile(filePath)
+    })));
+    return createAssetCacheBuster(assets);
+}
+
+/**
  * テキストファイルを読み込み、変化がある場合だけ書き戻す。
  * @param {string} filePath
  * @param {(text: string) => string} transform
@@ -205,24 +257,35 @@ async function transformTextFile(filePath, transform) {
 
 /**
  * GitHub Pages へ upload する静的 artifact を生成する。
- * @param {{ outputDir: string, siteDir?: string, cacheBuster: string }} options
+ * @param {{ outputDir: string, siteDir?: string, cacheBuster?: string, deploymentSha?: string }} options
  * @returns {Promise<string>}
  */
 export async function buildPagesArtifact(options) {
     const outputDir = resolvePagesArtifactOutputDir(options.outputDir);
     const siteDir = resolvePagesArtifactSiteDir(options.siteDir || DEFAULT_SITE_DIR);
     await copySiteAssets(outputDir, siteDir);
+    const moduleFiles = await listModuleFiles(join(outputDir, "app"));
+    const cacheBuster = options.cacheBuster || await calculateArtifactCacheBuster(
+        outputDir,
+        moduleFiles
+    );
     await transformTextFile(
         join(outputDir, "index.html"),
-        (html) => appendCacheBusterToHtml(html, options.cacheBuster)
+        (html) => appendCacheBusterToHtml(html, cacheBuster)
     );
-    const moduleFiles = await listModuleFiles(join(outputDir, "app"));
     await Promise.all(moduleFiles.map((filePath) => (
         transformTextFile(
             filePath,
-            (source) => appendCacheBusterToJavaScriptImports(source, options.cacheBuster)
+            (source) => appendCacheBusterToJavaScriptImports(source, cacheBuster)
         )
     )));
+    if (options.deploymentSha) {
+        await writeFile(
+            join(outputDir, DEPLOYMENT_MARKER_FILE),
+            createDeploymentMarker(options.deploymentSha),
+            "utf8"
+        );
+    }
     return outputDir;
 }
 
