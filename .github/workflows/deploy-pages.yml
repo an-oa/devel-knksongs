@@ -67,17 +67,13 @@ jobs:
         with:
           path: _site
 
-  deploy:
+  freshness:
     needs:
       - resolve
       - build
     runs-on: ubuntu-latest
-    concurrency:
-      group: deploy-pages
-      cancel-in-progress: false
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      should-deploy: ${{ steps.target.outputs.should-deploy }}
 
     steps:
       - name: Check deployment target is still main
@@ -94,23 +90,34 @@ jobs:
             echo "Skip outdated deployment target: $DEPLOY_SHA (current main: $current_main_sha)"
           fi
 
+  deploy:
+    needs:
+      - resolve
+      - build
+      - freshness
+    if: needs.freshness.outputs.should-deploy == 'true'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        if: steps.target.outputs.should-deploy == 'true'
         uses: actions/deploy-pages@v5
 
       - uses: actions/checkout@v6
-        if: steps.target.outputs.should-deploy == 'true'
         with:
           ref: ${{ needs.resolve.outputs.deploy-sha }}
 
       - uses: actions/setup-node@v6
-        if: steps.target.outputs.should-deploy == 'true'
         with:
           node-version: 24.16.0
 
       - name: Verify deployed commit
-        if: steps.target.outputs.should-deploy == 'true'
         env:
           PAGE_URL: ${{ steps.deployment.outputs.page_url }}
           EXPECTED_SHA: ${{ needs.resolve.outputs.deploy-sha }}
