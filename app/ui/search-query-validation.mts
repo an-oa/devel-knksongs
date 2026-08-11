@@ -2,6 +2,7 @@ import { parseSearchQuery } from "../lib/search-filters.mjs";
 
 type SearchQueryValidationInput = {
     value: string;
+    validationMessage?: string;
     setCustomValidity?: (message: string) => void;
     setAttribute?: (name: string, value: string) => void;
     removeAttribute?: (name: string) => void;
@@ -22,7 +23,13 @@ export function getSearchQueryValidationMessage(queryRaw: string | null | undefi
     const parsedQuery = parseSearchQuery(queryRaw);
     const messages: string[] = [];
     if (parsedQuery.invalidOperators.length > 0) {
-        messages.push("日付演算子は YYYY-MM-DD 形式の実在する日付で入力してください。");
+        messages.push(
+            "日付演算子は YYYY、YYYY-MM、YYYY-MM-DD 形式の実在する日付で入力してください。" +
+            "文字列として検索する場合は二重引用符で囲んでください。"
+        );
+    }
+    if (parsedQuery.hasUnterminatedQuote) {
+        messages.push("二重引用符が閉じられていません。");
     }
     if (parsedQuery.hasContradictoryDateRange) {
         messages.push("since の日付は until の日付以前にしてください。");
@@ -61,14 +68,31 @@ export function validateSearchQueryInput(
 ): boolean {
     if (!searchBox) return true;
     const message = getSearchQueryValidationMessage(searchBox.value);
-    clearSearchQueryValidation(searchBox, errorElement);
-    if (message === "") return true;
+    if (message === "") {
+        clearSearchQueryValidation(searchBox, errorElement);
+        return true;
+    }
 
-    searchBox.setCustomValidity?.(message);
+    if (searchBox.validationMessage !== message) searchBox.setCustomValidity?.(message);
     searchBox.setAttribute?.("aria-invalid", "true");
     if (errorElement) {
-        errorElement.textContent = message;
+        if (errorElement.textContent !== message) errorElement.textContent = message;
         errorElement.hidden = false;
     }
     return false;
+}
+
+/**
+ * 修正中の検索語が有効になった場合だけ、表示済みの検証エラーを即時に消去する。
+ * @param {SearchQueryValidationInput | null | undefined} searchBox
+ * @param {SearchQueryValidationMessageElement | null | undefined} errorElement
+ * @returns {boolean}
+ */
+export function clearSearchQueryValidationIfValid(
+    searchBox: SearchQueryValidationInput | null | undefined,
+    errorElement: SearchQueryValidationMessageElement | null | undefined
+): boolean {
+    if (!searchBox || getSearchQueryValidationMessage(searchBox.value) !== "") return false;
+    clearSearchQueryValidation(searchBox, errorElement);
+    return true;
 }

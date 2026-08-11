@@ -242,20 +242,18 @@ test("search box date operators validate input and filter songs", async ({ page 
     await expect(searchBox).toHaveAttribute("aria-errormessage", "searchBoxError");
 
     await searchBox.fill("since:2024-02-30");
-    await searchBox.blur();
     await expect(searchBox).toHaveAttribute("aria-invalid", "true");
     await expect(searchError).toContainText("実在する日付");
+    await expect(searchError).toContainText("二重引用符");
     await expect(searchError).toBeVisible();
+    await expect(page.locator("#resultCount")).toHaveText("0 件がヒット");
 
     await searchBox.fill("since:2024-01-05 until:2024-01-04");
-    await expect(searchBox).not.toHaveAttribute("aria-invalid", "true");
-    await expect(searchError).toBeHidden();
-    await searchBox.blur();
     await expect(searchBox).toHaveAttribute("aria-invalid", "true");
     await expect(searchError).toContainText("since の日付は until の日付以前");
+    await expect(page.locator("#resultCount")).toHaveText("0 件がヒット");
 
     await searchBox.fill("Chain since:2024-01-04 until:2024-01-04");
-    await searchBox.blur();
     await expect(searchBox).not.toHaveAttribute("aria-invalid", "true");
     await expect(searchError).toBeHidden();
     await expect(page.locator("#resultCount")).toHaveText("1 件がヒット");
@@ -263,6 +261,48 @@ test("search box date operators validate input and filter songs", async ({ page 
 
     await expect(getSongCard(page, "Chain Alpha")).toHaveCount(0);
     await expect(getSongCard(page, "Chain Beta")).toBeVisible();
+});
+
+test("search box restores an invalid query with its error and empty results", async ({ page }) => {
+    await openSidebar(page);
+    const searchBox = page.locator("#searchBox");
+    await searchBox.fill("until:2026-13");
+    await expect(searchBox).toHaveAttribute("aria-invalid", "true");
+    await expect(page.locator("#resultCount")).toHaveText("0 件がヒット");
+
+    await page.reload();
+    await waitForInitialLoad(page);
+
+    await expect(page.locator("#resultCount")).toHaveText("0 件がヒット");
+    await openSidebar(page);
+    await expect(page.locator("#searchBox")).toHaveValue("until:2026-13");
+    await expect(page.locator("#searchBox")).toHaveAttribute("aria-invalid", "true");
+    await expect(page.locator("#searchBoxError")).toBeVisible();
+});
+
+test("search box treats quoted phrases as literal text", async ({ page }) => {
+    const [literalSong] = createScrollableResultSongs(1);
+    literalSong.title = "Song until:2026-13";
+    literalSong.titleYomi = "Song until:2026-13";
+    literalSong.titleNorm = "song until:2026-13";
+    literalSong.titleYomiNorm = "song until:2026-13";
+    await routeSongsJsonFixture(page, [literalSong]);
+    await page.reload();
+    await waitForInitialLoad(page);
+
+    await openSidebar(page);
+    const searchBox = page.locator("#searchBox");
+
+    await searchBox.fill("until:2026-13");
+    await expect(searchBox).toHaveAttribute("aria-invalid", "true");
+    await expect(page.locator("#resultCount")).toHaveText("0 件がヒット");
+
+    await searchBox.fill('"Song until:2026-13"');
+
+    await expect(searchBox).not.toHaveAttribute("aria-invalid", "true");
+    await expect(page.locator("#resultCount")).toHaveText("1 件がヒット");
+    await closeSidebar(page);
+    await expect(getSongCard(page, "Song until:2026-13")).toBeVisible();
 });
 
 test("bookmark notification toast opens, closes, and auto-dismisses", async ({ page }) => {

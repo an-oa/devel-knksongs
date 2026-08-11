@@ -6,6 +6,7 @@ import {
     hasSelectedSearchBooleanFilterState
 } from "../lib/search-boolean-filters.mjs";
 import { resolveSongRefs } from "../lib/song-lookup.mjs";
+import { validateSearchQueryInput } from "../ui/search-query-validation.mjs";
 
 type SearchOutcomeApplyOptions = {
     scrollToTop?: boolean;
@@ -55,6 +56,7 @@ export function createSearchController({
      * 検索入力の収集から結果反映までの処理を行う。
      */
     function search(): void {
+        validateSearchQueryInput(ui.el.searchBox, ui.el.searchBoxError);
         const searchInput = collectSearchInput();
         const outcome = resolveSearchResults(searchInput.searchState);
         applySearchOutcome(searchInput, outcome);

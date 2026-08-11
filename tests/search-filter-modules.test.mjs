@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { dateKeyToParts, isWithinDateRange, parseDateKey } from "../_build/app/lib/date-key.mjs";
+import {
+    getPartialDateKeyRange,
+    normalizePartialDateParts
+} from "../_build/app/lib/partial-date.mjs";
 import { matchesCollabRoleFilters } from "../_build/app/lib/search-filters.mjs";
 import {
     isOriginalSongFormat,
@@ -16,6 +20,20 @@ test("date key helpers: parse, split, and range checks", () => {
     assert.deepEqual(dateKeyToParts(20240209), { year: 2024, month: 2, day: 9 });
     assert.equal(isWithinDateRange({ dateKey: 20240209 }, 20240201, 20240210), true);
     assert.equal(isWithinDateRange({ dateKey: 20240209 }, 20240210, null), false);
+});
+
+test("partial date helpers: normalize precision and calculate leap-aware ranges", () => {
+    const year = normalizePartialDateParts({ year: "2024" });
+    const leapMonth = normalizePartialDateParts({ year: "2024", month: "2" });
+    const commonMonth = normalizePartialDateParts({ year: "2025", month: "02" });
+    const complete = normalizePartialDateParts({ year: "2024", month: "2", day: "29" });
+
+    assert.deepEqual(getPartialDateKeyRange(year), { minKey: 20240101, maxKey: 20241231 });
+    assert.deepEqual(getPartialDateKeyRange(leapMonth), { minKey: 20240201, maxKey: 20240229 });
+    assert.deepEqual(getPartialDateKeyRange(commonMonth), { minKey: 20250201, maxKey: 20250228 });
+    assert.deepEqual(getPartialDateKeyRange(complete), { minKey: 20240229, maxKey: 20240229 });
+    assert.equal(normalizePartialDateParts({ year: "2025", month: "2", day: "29" }), null);
+    assert.equal(normalizePartialDateParts({ year: "2025", month: "13" }), null);
 });
 
 test("collab role helpers: match selected host and guest rows", () => {

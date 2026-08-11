@@ -11,6 +11,7 @@ import {
 } from "../_build/app/lib/search-filters.mjs";
 import {
     clearSearchQueryValidation,
+    clearSearchQueryValidationIfValid,
     getSearchQueryValidationMessage,
     validateSearchQueryInput
 } from "../_build/app/ui/search-query-validation.mjs";
@@ -146,6 +147,7 @@ test("parseSearchQuery: separates normalized inclusive date operators from keywo
             sinceKey: 20240209,
             untilKey: 20241231,
             invalidOperators: [],
+            hasUnterminatedQuote: false,
             hasContradictoryDateRange: false
         }
     );
@@ -159,22 +161,76 @@ test("parseSearchQuery: repeated operators use the narrowest valid bounds", () =
             sinceKey: 20240201,
             untilKey: 20241130,
             invalidOperators: [],
+            hasUnterminatedQuote: false,
             hasContradictoryDateRange: false
         }
     );
 });
 
-test("parseSearchQuery: invalid date operators are reported instead of becoming keywords", () => {
+test("parseSearchQuery: invalid date-like operators are reported and non-date suffixes stay keywords", () => {
     assert.deepEqual(
         parseSearchQuery("since:2024-02-30 until:today"),
         {
-            keywords: [],
+            keywords: ["until:today"],
             sinceKey: null,
             untilKey: null,
-            invalidOperators: ["since:2024-02-30", "until:today"],
+            invalidOperators: ["since:2024-02-30"],
+            hasUnterminatedQuote: false,
             hasContradictoryDateRange: false
         }
     );
+});
+
+test("parseSearchQuery: expands partial date operators to inclusive boundaries", () => {
+    const cases = [
+        ["since:2024", 20240101, null],
+        ["since:2024-", 20240101, null],
+        ["since:2024-7", 20240701, null],
+        ["since:2024-07", 20240701, null],
+        ["since:2024-7-", 20240701, null],
+        ["since:2024-07-", 20240701, null],
+        ["until:2026", null, 20261231],
+        ["until:2026-", null, 20261231],
+        ["until:2026-8", null, 20260831],
+        ["until:2026-08", null, 20260831],
+        ["until:2026-8-", null, 20260831],
+        ["until:2026-08-", null, 20260831],
+        ["until:2024-2", null, 20240229],
+        ["until:2025-2", null, 20250228]
+    ];
+
+    for (const [query, sinceKey, untilKey] of cases) {
+        const parsed = parseSearchQuery(query);
+        assert.equal(parsed.sinceKey, sinceKey, query);
+        assert.equal(parsed.untilKey, untilKey, query);
+        assert.deepEqual(parsed.invalidOperators, [], query);
+    }
+});
+
+test("parseSearchQuery: supports quoted literal phrases and reports an unclosed quote", () => {
+    assert.deepEqual(
+        parseSearchQuery('Star "until:2026-13" "Song until:2026" "until:"'),
+        {
+            keywords: ["star", "until:2026-13", "song until:2026", "until:"],
+            sinceKey: null,
+            untilKey: null,
+            invalidOperators: [],
+            hasUnterminatedQuote: false,
+            hasContradictoryDateRange: false
+        }
+    );
+    assert.equal(parseSearchQuery('"Song until:2026').hasUnterminatedQuote, true);
+});
+
+test("parseSearchQuery: empty and impossible date-like operands stay invalid", () => {
+    const parsed = parseSearchQuery("until: until:2026-13 since:2025-2-29");
+    assert.deepEqual(parsed.invalidOperators, ["until:", "until:2026-13", "since:2025-2-29"]);
+});
+
+test("parseSearchQuery: non-date operator suffixes remain ordinary keywords", () => {
+    const parsed = parseSearchQuery("until:なんちゃら since:hogehoge");
+    assert.deepEqual(parsed.keywords, [normalizeForSearch("until:なんちゃら"), "since:hogehoge"]);
+    assert.deepEqual(parsed.invalidOperators, []);
 });
 
 test("parseSearchQuery: reports a contradictory date operator range", () => {
@@ -200,7 +256,8 @@ test("search query validation: exposes errors on completion and clears them duri
     const errorElement = { hidden: true, textContent: "" };
 
     assert.equal(validateSearchQueryInput(searchBox, errorElement), false);
-    assert.match(searchBox.validationMessage, /YYYY-MM-DD/);
+    assert.match(searchBox.validationMessage, /YYYY/);
+    assert.match(searchBox.validationMessage, /二重引用符/);
     assert.equal(attributes.get("aria-invalid"), "true");
     assert.equal(errorElement.hidden, false);
 
@@ -209,6 +266,36 @@ test("search query validation: exposes errors on completion and clears them duri
     assert.equal(attributes.has("aria-invalid"), false);
     assert.equal(errorElement.hidden, true);
     assert.equal(errorElement.textContent, "");
+});
+
+test("search query validation: keeps an existing error until input becomes valid", () => {
+    const attributes = new Map([["aria-invalid", "true"]]);
+    const searchBox = {
+        value: "until:2026-13",
+        validationMessage: "existing error",
+        setCustomValidity(message) {
+            this.validationMessage = message;
+        },
+        setAttribute(name, value) {
+            attributes.set(name, value);
+        },
+        removeAttribute(name) {
+            attributes.delete(name);
+        }
+    };
+    const errorElement = { hidden: false, textContent: "existing error" };
+
+    assert.equal(clearSearchQueryValidationIfValid(searchBox, errorElement), false);
+    assert.equal(errorElement.hidden, false);
+
+    searchBox.value = '"until:2026-13"';
+    assert.equal(clearSearchQueryValidationIfValid(searchBox, errorElement), true);
+    assert.equal(attributes.has("aria-invalid"), false);
+    assert.equal(errorElement.hidden, true);
+});
+
+test("search query validation: reports an unclosed quoted phrase", () => {
+    assert.match(getSearchQueryValidationMessage('"Song until:2026'), /閉じられていません/);
 });
 
 test("search query validation: explains contradictory operator bounds", () => {
@@ -258,7 +345,7 @@ test("filterSongsByCriteria: date operators use inclusive bounds", () => {
     assert.deepEqual(hit.map((row) => row.titleNorm), ["from", "to"]);
 });
 
-test("filterSongsByCriteria: invalid date operators are ignored as date conditions", () => {
+test("filterSongsByCriteria: invalid date operators return no songs", () => {
     const rows = [makeRow({ title: "Target", dateKey: 20240110 })];
     const searchState = {
         queryRaw: "target since:2024-02-30",
@@ -269,7 +356,48 @@ test("filterSongsByCriteria: invalid date operators are ignored as date conditio
     };
 
     const hit = filterSongsByCriteria(rows, searchState, new Set(["配信"]));
-    assert.deepEqual(hit.map((row) => row.titleNorm), ["target"]);
+    assert.deepEqual(hit, []);
+});
+
+test("filterSongsByCriteria: quoted operator-like phrases search titles and artists literally", () => {
+    const rows = [
+        makeRow({ title: "Song until:2026", artist: "A" }),
+        makeRow({ title: "Other", artist: "since:2024-7 unit" }),
+        makeRow({ title: "Until Bound", artist: "A", dateKey: 20261231 })
+    ];
+    const baseState = {
+        relayOnly: false,
+        harmonyOnly: false,
+        dateFromKey: null,
+        dateToKey: null
+    };
+
+    const titleHit = filterSongsByCriteria(
+        rows,
+        { ...baseState, queryRaw: '"Song until:2026"' },
+        new Set(["配信"])
+    );
+    const artistHit = filterSongsByCriteria(
+        rows,
+        { ...baseState, queryRaw: '"since:2024-7"' },
+        new Set(["配信"])
+    );
+
+    assert.deepEqual(titleHit.map((row) => row.titleNorm), ["song until:2026"]);
+    assert.deepEqual(artistHit.map((row) => row.titleNorm), ["other"]);
+});
+
+test("filterSongsByCriteria: an unclosed quoted phrase returns no songs", () => {
+    const rows = [makeRow({ title: "Song until:2026" })];
+    const hit = filterSongsByCriteria(rows, {
+        queryRaw: '"Song until:2026',
+        relayOnly: false,
+        harmonyOnly: false,
+        dateFromKey: null,
+        dateToKey: null
+    }, new Set(["配信"]));
+
+    assert.deepEqual(hit, []);
 });
 
 test("filterSongsByCriteria: text date operators intersect with date select bounds", () => {
@@ -705,6 +833,73 @@ test("createSearchController: active bookmark also applies search criteria", () 
     assert.equal(data.currentResults.length, 0);
     assert.equal(data.displayLimit, 0);
     assert.equal(ui.el.resultCount.innerText, "ブックマーク: 検証 (0 件)");
+});
+
+test("createSearchController: direct search synchronizes restored query validation", () => {
+    const attributes = new Map();
+    const searchBox = {
+        value: "until:2026-13",
+        validationMessage: "",
+        setCustomValidity(message) {
+            this.validationMessage = message;
+        },
+        setAttribute(name, value) {
+            attributes.set(name, value);
+        },
+        removeAttribute(name) {
+            attributes.delete(name);
+        }
+    };
+    const searchBoxError = { hidden: true, textContent: "" };
+    const data = {
+        allSongsRaw: [makeRow({ title: "until:2026-13", dateKey: 20260101 })],
+        bookmarks: {},
+        activeBookmark: null,
+        currentResults: [],
+        displayLimit: 0
+    };
+    const ui = createSearchUiState({
+        el: {
+            searchBox,
+            searchBoxError,
+            relayOnly: { checked: false },
+            harmonyOnly: { checked: false },
+            dateFromYear: null,
+            dateFromMonth: null,
+            dateFromDay: null,
+            dateToYear: null,
+            dateToMonth: null,
+            dateToDay: null,
+            resultCount: { innerText: "" }
+        },
+        selectedFormats: new Set(["配信"])
+    });
+    const controller = createSearchControllerForTest({
+        data,
+        ui,
+        constants: {
+            RANDOM_DISPLAY_COUNT: 10,
+            MIN_PERFORMANCE_FOR_RANDOM: 1,
+            RESULT_DISPLAY_BATCH_SIZE: 30,
+            SEARCH_DEBOUNCE_MS: 0,
+            DEFAULT_FORMATS: ["配信"]
+        },
+        callbacks: createSearchCallbacks()
+    });
+
+    controller.search();
+
+    assert.deepEqual(data.currentResults, []);
+    assert.equal(ui.el.resultCount.innerText, "0 件がヒット");
+    assert.equal(attributes.get("aria-invalid"), "true");
+    assert.equal(searchBoxError.hidden, false);
+
+    searchBox.value = '"until:2026-13"';
+    controller.search();
+
+    assert.equal(data.currentResults.length, 1);
+    assert.equal(attributes.has("aria-invalid"), false);
+    assert.equal(searchBoxError.hidden, true);
 });
 
 test("createSearchController: active bookmark resolves rows by bookmarkSongKey", () => {
