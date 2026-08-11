@@ -1013,7 +1013,7 @@ test("createSearchController: active bookmark uses incremental display limit", (
     assert.equal(ui.el.resultCount.innerText, "ブックマーク: 検証 (5 件)");
 });
 
-test("createSearchController: recommendation mode counts オリ曲 as 歌みた", () => {
+test("createSearchController: an empty quoted query uses recommendation mode for オリ曲", () => {
     const rows = [
         makeRow({ archiveId: "a1", sourceIndex: 1, title: "覚声", artist: "PSYBELL", format: "オリ曲" }),
         makeRow({ archiveId: "a2", sourceIndex: 2, title: "覚声", artist: "PSYBELL", format: "オリ曲" }),
@@ -1028,7 +1028,7 @@ test("createSearchController: recommendation mode counts オリ曲 as 歌みた"
     };
     const ui = createSearchUiState({
         el: {
-            searchBox: { value: "" },
+            searchBox: { value: '""' },
             relayOnly: { checked: false },
             harmonyOnly: { checked: false },
             dateFromYear: null,

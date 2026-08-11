@@ -1,5 +1,5 @@
 import { createDateFilterController } from "../ui/date/filter.mjs";
-import { filterSongsByCriteria } from "../lib/search-filters.mjs";
+import { filterSongsByCriteria, isValidEmptySearchQuery } from "../lib/search-filters.mjs";
 import { pickRecommendedSongsWithCache } from "../lib/search-recommendation.mjs";
 import {
     collectSearchBooleanFilterState,
@@ -114,7 +114,7 @@ export function createSearchController({
      */
     function isRecommendedMode(searchState: SearchState): boolean {
         return !data.activeBookmark &&
-            searchState.queryRaw === "" &&
+            isValidEmptySearchQuery(searchState.queryRaw) &&
             !hasSelectedSearchBooleanFilterState(searchState) &&
             !searchState.hasDateFilter &&
             searchFiltersController.areAllFormatsSelected();

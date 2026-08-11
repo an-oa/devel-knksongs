@@ -15,7 +15,7 @@ type ParsedSearchQuery = {
 
 type SearchQueryToken = {
     value: string;
-    isLiteral: boolean;
+    isQuoted: boolean;
 };
 
 type TokenizedSearchQuery = {
@@ -37,45 +37,65 @@ export function normalizeForSearch(s: string | null | undefined): string {
     return (s || "")
         .normalize("NFKC")
         .replace(/[\u3041-\u3096\u309D-\u309F]/g, (m) => String.fromCharCode(m.charCodeAt(0) + 0x60))
-        .toLowerCase();
+        .toLowerCase()
+        .replace(/\s+/gu, " ")
+        .trim();
 }
 
 /**
  * 正規化済み検索語を空白区切りの語と二重引用符内のフレーズへ分割する。
+ * 引用符は検索要素の境界とし、引用句内では引用符とバックスラッシュのエスケープを扱う。
  * @param {string} query
  * @returns {TokenizedSearchQuery}
  */
 function tokenizeSearchQuery(query: string): TokenizedSearchQuery {
     const tokens: SearchQueryToken[] = [];
     let value = "";
-    let isLiteral = false;
     let isQuoted = false;
-    let hasToken = false;
 
-    /** 現在構築中の検索語を確定する。 */
-    function pushToken(): void {
-        if (hasToken && value.length > 0) tokens.push({ value, isLiteral });
+    /** 現在構築中の検索要素を確定する。 */
+    function pushToken(quoted: boolean): void {
+        const normalizedValue = quoted ? value.trim() : value;
+        if (normalizedValue.length > 0) tokens.push({ value: normalizedValue, isQuoted: quoted });
         value = "";
-        isLiteral = false;
-        hasToken = false;
     }
 
-    for (const character of query) {
+    for (let index = 0; index < query.length; index++) {
+        const character = query[index];
+        if (isQuoted && character === "\\") {
+            const nextCharacter = query[index + 1];
+            if (nextCharacter === "\"" || nextCharacter === "\\") {
+                value += nextCharacter;
+                index++;
+                continue;
+            }
+            value += character;
+            continue;
+        }
         if (character === "\"") {
+            pushToken(isQuoted);
             isQuoted = !isQuoted;
-            isLiteral = true;
-            hasToken = true;
             continue;
         }
         if (!isQuoted && /\s/u.test(character)) {
-            pushToken();
+            pushToken(false);
             continue;
         }
         value += character;
-        hasToken = true;
     }
-    pushToken();
+    pushToken(isQuoted);
     return { tokens, hasUnterminatedQuote: isQuoted };
+}
+
+/**
+ * 解析済み検索語に、検索を成立させない構文上の問題があるか判定する。
+ * @param {ParsedSearchQuery} parsedQuery
+ * @returns {boolean}
+ */
+function hasSearchQueryIssue(parsedQuery: ParsedSearchQuery): boolean {
+    return parsedQuery.invalidOperators.length > 0 ||
+        parsedQuery.hasUnterminatedQuote ||
+        parsedQuery.hasContradictoryDateRange;
 }
 
 /**
@@ -119,7 +139,7 @@ export function parseSearchQuery(queryRaw: string | null | undefined): ParsedSea
     let untilKey: number | null = null;
 
     tokenizedQuery.tokens.forEach((token) => {
-        if (token.isLiteral) {
+        if (token.isQuoted) {
             keywords.push(token.value);
             return;
         }
@@ -156,6 +176,20 @@ export function parseSearchQuery(queryRaw: string | null | undefined): ParsedSea
 }
 
 /**
+ * 検索語が構文上有効で、キーワードも日付演算子も持たない実質的な空検索か判定する。
+ * 境界条件を単体テストするため export している。
+ * @param {string | null | undefined} queryRaw
+ * @returns {boolean}
+ */
+export function isValidEmptySearchQuery(queryRaw: string | null | undefined): boolean {
+    const parsedQuery = parseSearchQuery(queryRaw);
+    return !hasSearchQueryIssue(parsedQuery) &&
+        parsedQuery.keywords.length === 0 &&
+        parsedQuery.sinceKey === null &&
+        parsedQuery.untilKey === null;
+}
+
+/**
  * コラボ種別フィルタの選択状態に曲行が一致するか判定する。
  * @param {{ streamRole?: string | null } | null | undefined} row
  * @param {{ collabHostOnly?: boolean, collabGuestOnly?: boolean }} searchState
@@ -179,11 +213,7 @@ export function matchesCollabRoleFilters(row, searchState) {
  */
 export function filterSongsByCriteria(rows, searchState, selectedFormats) {
     const parsedQuery = parseSearchQuery(searchState.queryRaw);
-    if (parsedQuery.invalidOperators.length > 0 ||
-        parsedQuery.hasUnterminatedQuote ||
-        parsedQuery.hasContradictoryDateRange) {
-        return [];
-    }
+    if (hasSearchQueryIssue(parsedQuery)) return [];
     const fromKeys = [searchState.dateFromKey, parsedQuery.sinceKey]
         .filter((key): key is number => typeof key === "number");
     const toKeys = [searchState.dateToKey, parsedQuery.untilKey]

@@ -280,13 +280,34 @@ test("search box restores an invalid query with its error and empty results", as
     await expect(page.locator("#searchBoxError")).toBeVisible();
 });
 
+test("search box treats an empty quoted query as recommendations after restore", async ({ page }) => {
+    await openSidebar(page);
+    const searchBox = page.locator("#searchBox");
+    await searchBox.fill('""');
+    await expect(searchBox).not.toHaveAttribute("aria-invalid", "true");
+    await expect(page.locator("#searchBoxError")).toBeHidden();
+    await expect(page.locator("#resultCount")).toHaveText("おすすめを表示中");
+
+    await page.reload();
+    await waitForInitialLoad(page);
+
+    await expect(page.locator("#resultCount")).toHaveText("おすすめを表示中");
+    await openSidebar(page);
+    await expect(page.locator("#searchBox")).toHaveValue('""');
+    await expect(page.locator("#searchBoxError")).toBeHidden();
+});
+
 test("search box treats quoted phrases as literal text", async ({ page }) => {
-    const [literalSong] = createScrollableResultSongs(1);
+    const [literalSong, escapedQuoteSong] = createScrollableResultSongs(2);
     literalSong.title = "Song until:2026-13";
     literalSong.titleYomi = "Song until:2026-13";
     literalSong.titleNorm = "song until:2026-13";
     literalSong.titleYomiNorm = "song until:2026-13";
-    await routeSongsJsonFixture(page, [literalSong]);
+    escapedQuoteSong.title = 'Don’t say "lazy"';
+    escapedQuoteSong.titleYomi = 'Don’t say "lazy"';
+    escapedQuoteSong.titleNorm = 'don’t say "lazy"';
+    escapedQuoteSong.titleYomiNorm = 'don’t say "lazy"';
+    await routeSongsJsonFixture(page, [literalSong, escapedQuoteSong]);
     await page.reload();
     await waitForInitialLoad(page);
 
@@ -301,8 +322,12 @@ test("search box treats quoted phrases as literal text", async ({ page }) => {
 
     await expect(searchBox).not.toHaveAttribute("aria-invalid", "true");
     await expect(page.locator("#resultCount")).toHaveText("1 件がヒット");
+
+    await searchBox.fill(String.raw`"Don’t say \"lazy\""`);
+    await expect(searchBox).not.toHaveAttribute("aria-invalid", "true");
+    await expect(page.locator("#resultCount")).toHaveText("1 件がヒット");
     await closeSidebar(page);
-    await expect(getSongCard(page, "Song until:2026-13")).toBeVisible();
+    await expect(getSongCard(page, 'Don’t say "lazy"')).toBeVisible();
 });
 
 test("bookmark notification toast opens, closes, and auto-dismisses", async ({ page }) => {
