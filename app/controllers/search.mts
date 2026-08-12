@@ -1,5 +1,7 @@
 import { createDateFilterController } from "../ui/date/filter.mjs";
-import { filterSongsByCriteria, isValidEmptySearchQuery } from "../lib/search-filters.mjs";
+import { filterSongsByCriteria } from "../lib/search-filters.mjs";
+import { isValidEmptySearchQuery, parseSearchQuery } from "../lib/search-query.mjs";
+import type { ParsedSearchQuery } from "../lib/search-query.mjs";
 import { pickRecommendedSongsWithCache } from "../lib/search-recommendation.mjs";
 import {
     collectSearchBooleanFilterState,
@@ -56,9 +58,9 @@ export function createSearchController({
      * 検索入力の収集から結果反映までの処理を行う。
      */
     function search(): void {
-        validateSearchQueryInput(ui.el.searchBox, ui.el.searchBoxError);
         const searchInput = collectSearchInput();
-        const outcome = resolveSearchResults(searchInput.searchState);
+        validateSearchQueryInput(ui.el.searchBox, ui.el.searchBoxError, searchInput.parsedQuery);
+        const outcome = resolveSearchResults(searchInput.searchState, searchInput.parsedQuery);
         applySearchOutcome(searchInput, outcome);
     }
 
@@ -67,8 +69,10 @@ export function createSearchController({
      * @returns {SearchInput}
      */
     function collectSearchInput(): SearchInput {
+        const searchState = getSearchState();
         return {
-            searchState: getSearchState(),
+            searchState,
+            parsedQuery: parseSearchQuery(searchState.queryRaw),
             resultCountEl: ui.el.resultCount
         };
     }
@@ -110,11 +114,12 @@ export function createSearchController({
     /**
      * 条件未指定時のおすすめ表示モードかどうかを判定する。
      * @param {SearchState} searchState
+     * @param parsedQuery 解析済み検索語
      * @returns {boolean}
      */
-    function isRecommendedMode(searchState: SearchState): boolean {
+    function isRecommendedMode(searchState: SearchState, parsedQuery: ParsedSearchQuery): boolean {
         return !data.activeBookmark &&
-            isValidEmptySearchQuery(searchState.queryRaw) &&
+            isValidEmptySearchQuery(parsedQuery) &&
             !hasSelectedSearchBooleanFilterState(searchState) &&
             !searchState.hasDateFilter &&
             searchFiltersController.areAllFormatsSelected();
@@ -123,14 +128,20 @@ export function createSearchController({
     /**
      * 通常検索・ブックマーク検索・おすすめ表示を切り替えて結果を作る。
      * @param {SearchState} searchState
+     * @param parsedQuery 解析済み検索語
      * @returns {SearchOutcome}
      */
-    function resolveSearchResults(searchState: SearchState): SearchOutcome {
+    function resolveSearchResults(searchState: SearchState, parsedQuery: ParsedSearchQuery): SearchOutcome {
         if (data.activeBookmark) {
             const bookmark = data.bookmarks[data.activeBookmark];
             if (bookmark) {
                 const bookmarkRows = resolveSongRefs(lookupUi, data.allSongsRaw, bookmark.songs);
-                const results = filterSongsByCriteria(bookmarkRows, searchState, searchUiState.selectedFormats);
+                const results = filterSongsByCriteria(
+                    bookmarkRows,
+                    searchState,
+                    searchUiState.selectedFormats,
+                    parsedQuery
+                );
                 return buildIncrementalSearchOutcome(
                     results,
                     `ブックマーク: ${bookmark.name} (${results.length} 件)`
@@ -138,7 +149,7 @@ export function createSearchController({
             }
         }
 
-        if (isRecommendedMode(searchState)) {
+        if (isRecommendedMode(searchState, parsedQuery)) {
             const recommendedDisplayCount = getRecommendedResultCount();
             const results = pickRecommended(recommendedDisplayCount);
             return {
@@ -148,7 +159,12 @@ export function createSearchController({
             };
         }
 
-        const results = filterSongsByCriteria(data.allSongsRaw, searchState, searchUiState.selectedFormats);
+        const results = filterSongsByCriteria(
+            data.allSongsRaw,
+            searchState,
+            searchUiState.selectedFormats,
+            parsedQuery
+        );
         return buildIncrementalSearchOutcome(results, `${results.length} 件がヒット`);
     }
 
@@ -198,10 +214,14 @@ export function createSearchController({
      */
     function refreshRecommendedDisplay(): boolean {
         const searchInput = collectSearchInput();
-        if (!isRecommendedMode(searchInput.searchState)) return false;
-        applySearchOutcome(searchInput, resolveSearchResults(searchInput.searchState), {
-            scrollToTop: false
-        });
+        if (!isRecommendedMode(searchInput.searchState, searchInput.parsedQuery)) return false;
+        applySearchOutcome(
+            searchInput,
+            resolveSearchResults(searchInput.searchState, searchInput.parsedQuery),
+            {
+                scrollToTop: false
+            }
+        );
         return true;
     }
 

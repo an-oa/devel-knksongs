@@ -2,10 +2,12 @@
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { parseCsvToSongs } from "../_build/app/lib/csv-parser.mjs";
 import { buildSongsJsonMetaPayload, buildSongsJsonPayload } from "../_build/app/lib/songs-json.mjs";
 import { PUBLIC_CSV_URL } from "../_build/app/config.mjs";
 import { createSongsContentHash } from "./songs-content-hash.mjs";
+import { validateSongsJsonArtifacts } from "./songs-json-artifact.mjs";
 
 const DEFAULT_OUTPUT_PATH = "data/songs.json";
 const DEFAULT_META_OUTPUT_PATH = "data/songs-meta.json";
@@ -84,30 +86,29 @@ function stringifyPayload(payload) {
  * @param {{ inputPath: string, outputPath: string, metaOutputPath: string, sourceUrl: string }} options
  * @returns {Promise<number>}
  */
-async function buildSongsJson(options) {
+export async function buildSongsJson(options) {
     const csvText = await loadCsvText(options);
     const songs = parseCsvToSongs(csvText);
     const contentHash = createSongsContentHash(songs);
+    const songsJsonText = stringifyPayload(buildSongsJsonPayload(songs, contentHash));
+    const songsMetaJsonText = stringifyPayload(buildSongsJsonMetaPayload(contentHash));
+    validateSongsJsonArtifacts(songsJsonText, songsMetaJsonText);
     await mkdir(dirname(resolve(options.outputPath)), { recursive: true });
     await mkdir(dirname(resolve(options.metaOutputPath)), { recursive: true });
-    await writeFile(
-        resolve(options.outputPath),
-        stringifyPayload(buildSongsJsonPayload(songs, contentHash)),
-        "utf8"
-    );
-    await writeFile(
-        resolve(options.metaOutputPath),
-        stringifyPayload(buildSongsJsonMetaPayload(contentHash)),
-        "utf8"
-    );
+    await Promise.all([
+        writeFile(resolve(options.outputPath), songsJsonText, "utf8"),
+        writeFile(resolve(options.metaOutputPath), songsMetaJsonText, "utf8")
+    ]);
     return songs.length;
 }
 
-try {
-    const options = parseArgs(process.argv.slice(2));
-    const count = await buildSongsJson(options);
-    console.log(`Generated ${options.outputPath} and ${options.metaOutputPath} (${count} songs)`);
-} catch (error) {
-    console.error(error instanceof Error ? error.message : error);
-    process.exitCode = 1;
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+    try {
+        const options = parseArgs(process.argv.slice(2));
+        const count = await buildSongsJson(options);
+        console.log(`Generated ${options.outputPath} and ${options.metaOutputPath} (${count} songs)`);
+    } catch (error) {
+        console.error(error instanceof Error ? error.message : error);
+        process.exitCode = 1;
+    }
 }

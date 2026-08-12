@@ -4,11 +4,9 @@ import { createDateFilterController } from "../_build/app/ui/date/filter.mjs";
 import { createSearchFiltersController } from "../_build/app/ui/search-filters/controller.mjs";
 import { pickRecommendedSongs } from "../_build/app/lib/search-recommendation.mjs";
 import { isWithinDateRange, parseDateKey } from "../_build/app/lib/date-key.mjs";
-import {
-    filterSongsByCriteria,
-    normalizeForSearch,
-    parseSearchQuery
-} from "../_build/app/lib/search-filters.mjs";
+import { filterSongsByCriteria } from "../_build/app/lib/search-filters.mjs";
+import { normalizeForSearch } from "../_build/app/lib/search-normalization.mjs";
+import { parseSearchQuery } from "../_build/app/lib/search-query.mjs";
 import {
     clearSearchQueryValidation,
     clearSearchQueryValidationIfValid,
@@ -124,6 +122,17 @@ function createSearchCallbacks(input) {
     };
 }
 
+/**
+ * 本番と同じく検索語を一度解析してから曲一覧を絞り込む。
+ * @param {Song[]} rows
+ * @param {SearchState} searchState
+ * @param {Set<string>} selectedFormats
+ * @returns {Song[]}
+ */
+function filterSongsForTest(rows, searchState, selectedFormats) {
+    return filterSongsByCriteria(rows, searchState, selectedFormats, parseSearchQuery(searchState.queryRaw));
+}
+
 test("parseDateKey: valid and invalid dates", () => {
     assert.equal(parseDateKey("2024-02-29"), 20240229);
     assert.equal(parseDateKey("2024/2/9"), 20240209);
@@ -146,9 +155,7 @@ test("parseSearchQuery: separates normalized inclusive date operators from keywo
             keywords: ["star"],
             sinceKey: 20240209,
             untilKey: 20241231,
-            invalidOperators: [],
-            hasUnterminatedQuote: false,
-            hasContradictoryDateRange: false
+            issues: []
         }
     );
 });
@@ -160,9 +167,7 @@ test("parseSearchQuery: repeated operators use the narrowest valid bounds", () =
             keywords: [],
             sinceKey: 20240201,
             untilKey: 20241130,
-            invalidOperators: [],
-            hasUnterminatedQuote: false,
-            hasContradictoryDateRange: false
+            issues: []
         }
     );
 });
@@ -174,9 +179,7 @@ test("parseSearchQuery: invalid date-like operators are reported and non-date su
             keywords: ["until:today"],
             sinceKey: null,
             untilKey: null,
-            invalidOperators: ["since:2024-02-30"],
-            hasUnterminatedQuote: false,
-            hasContradictoryDateRange: false
+            issues: [{ code: "invalid-date-operator", operator: "since:2024-02-30" }]
         }
     );
 });
@@ -203,7 +206,7 @@ test("parseSearchQuery: expands partial date operators to inclusive boundaries",
         const parsed = parseSearchQuery(query);
         assert.equal(parsed.sinceKey, sinceKey, query);
         assert.equal(parsed.untilKey, untilKey, query);
-        assert.deepEqual(parsed.invalidOperators, [], query);
+        assert.deepEqual(parsed.issues, [], query);
     }
 });
 
@@ -214,28 +217,32 @@ test("parseSearchQuery: supports quoted literal phrases and reports an unclosed 
             keywords: ["star", "until:2026-13", "song until:2026", "until:"],
             sinceKey: null,
             untilKey: null,
-            invalidOperators: [],
-            hasUnterminatedQuote: false,
-            hasContradictoryDateRange: false
+            issues: []
         }
     );
-    assert.equal(parseSearchQuery('"Song until:2026').hasUnterminatedQuote, true);
+    assert.deepEqual(parseSearchQuery('"Song until:2026').issues, [{ code: "unterminated-quote" }]);
 });
 
 test("parseSearchQuery: empty and impossible date-like operands stay invalid", () => {
     const parsed = parseSearchQuery("until: until:2026-13 since:2025-2-29");
-    assert.deepEqual(parsed.invalidOperators, ["until:", "until:2026-13", "since:2025-2-29"]);
+    assert.deepEqual(
+        parsed.issues,
+        ["until:", "until:2026-13", "since:2025-2-29"].map((operator) => ({
+            code: "invalid-date-operator",
+            operator
+        }))
+    );
 });
 
 test("parseSearchQuery: non-date operator suffixes remain ordinary keywords", () => {
     const parsed = parseSearchQuery("until:なんちゃら since:hogehoge");
     assert.deepEqual(parsed.keywords, [normalizeForSearch("until:なんちゃら"), "since:hogehoge"]);
-    assert.deepEqual(parsed.invalidOperators, []);
+    assert.deepEqual(parsed.issues, []);
 });
 
 test("parseSearchQuery: reports a contradictory date operator range", () => {
     const parsedQuery = parseSearchQuery("since:2024-02-01 until:2024-01-31");
-    assert.equal(parsedQuery.hasContradictoryDateRange, true);
+    assert.deepEqual(parsedQuery.issues, [{ code: "contradictory-date-range" }]);
 });
 
 test("search query validation: exposes errors on completion and clears them during correction", () => {
@@ -295,14 +302,35 @@ test("search query validation: keeps an existing error until input becomes valid
 });
 
 test("search query validation: reports an unclosed quoted phrase", () => {
-    assert.match(getSearchQueryValidationMessage('"Song until:2026'), /閉じられていません/);
+    assert.match(
+        getSearchQueryValidationMessage(parseSearchQuery('"Song until:2026')),
+        /閉じられていません/
+    );
 });
 
 test("search query validation: explains contradictory operator bounds", () => {
     assert.match(
-        getSearchQueryValidationMessage("since:2024-02-01 until:2024-01-31"),
+        getSearchQueryValidationMessage(parseSearchQuery("since:2024-02-01 until:2024-01-31")),
         /since の日付は until の日付以前/
     );
+});
+
+test("search query validation: reports every issue type and deduplicates repeated date errors", () => {
+    const parsedQuery = parseSearchQuery('until: until:2026-13 since:2025 until:2024 "unfinished');
+    assert.deepEqual(
+        parsedQuery.issues.map((issue) => issue.code),
+        [
+            "invalid-date-operator",
+            "invalid-date-operator",
+            "unterminated-quote",
+            "contradictory-date-range"
+        ]
+    );
+
+    const message = getSearchQueryValidationMessage(parsedQuery);
+    assert.equal(message.match(/日付演算子は/g)?.length, 1);
+    assert.match(message, /二重引用符が閉じられていません/);
+    assert.match(message, /since の日付は until の日付以前/);
 });
 
 test("filterSongsByCriteria: query/date/format/flags", () => {
@@ -320,7 +348,7 @@ test("filterSongsByCriteria: query/date/format/flags", () => {
         dateToKey: 20240131
     };
 
-    const hit = filterSongsByCriteria(rows, searchState, selectedFormats);
+    const hit = filterSongsForTest(rows, searchState, selectedFormats);
     assert.equal(hit.length, 1);
     assert.equal(hit[0].artistNorm, normalizeForSearch("B"));
 });
@@ -341,7 +369,7 @@ test("filterSongsByCriteria: date operators use inclusive bounds", () => {
         dateToKey: null
     };
 
-    const hit = filterSongsByCriteria(rows, searchState, new Set(["配信"]));
+    const hit = filterSongsForTest(rows, searchState, new Set(["配信"]));
     assert.deepEqual(hit.map((row) => row.titleNorm), ["from", "to"]);
 });
 
@@ -355,7 +383,7 @@ test("filterSongsByCriteria: invalid date operators return no songs", () => {
         dateToKey: null
     };
 
-    const hit = filterSongsByCriteria(rows, searchState, new Set(["配信"]));
+    const hit = filterSongsForTest(rows, searchState, new Set(["配信"]));
     assert.deepEqual(hit, []);
 });
 
@@ -372,12 +400,12 @@ test("filterSongsByCriteria: quoted operator-like phrases search titles and arti
         dateToKey: null
     };
 
-    const titleHit = filterSongsByCriteria(
+    const titleHit = filterSongsForTest(
         rows,
         { ...baseState, queryRaw: '"Song until:2026"' },
         new Set(["配信"])
     );
-    const artistHit = filterSongsByCriteria(
+    const artistHit = filterSongsForTest(
         rows,
         { ...baseState, queryRaw: '"since:2024-7"' },
         new Set(["配信"])
@@ -389,7 +417,7 @@ test("filterSongsByCriteria: quoted operator-like phrases search titles and arti
 
 test("filterSongsByCriteria: an unclosed quoted phrase returns no songs", () => {
     const rows = [makeRow({ title: "Song until:2026" })];
-    const hit = filterSongsByCriteria(rows, {
+    const hit = filterSongsForTest(rows, {
         queryRaw: '"Song until:2026',
         relayOnly: false,
         harmonyOnly: false,
@@ -414,7 +442,7 @@ test("filterSongsByCriteria: text date operators intersect with date select boun
         dateToKey: 20240118
     };
 
-    const hit = filterSongsByCriteria(rows, searchState, new Set(["配信"]));
+    const hit = filterSongsForTest(rows, searchState, new Set(["配信"]));
     assert.deepEqual(hit.map((row) => row.dateKey), [20240115]);
 });
 
@@ -430,7 +458,7 @@ test("filterSongsByCriteria: オリ曲 is included when 歌みた is selected", 
         dateToKey: null
     };
 
-    const hit = filterSongsByCriteria(rows, searchState, new Set(["歌みた"]));
+    const hit = filterSongsForTest(rows, searchState, new Set(["歌みた"]));
     assert.equal(hit.length, 1);
     assert.equal(hit[0].format, "オリ曲");
 });
@@ -449,7 +477,7 @@ test("filterSongsByCriteria: AND keywords and harmony flag", () => {
         dateToKey: null
     };
 
-    const hit = filterSongsByCriteria(rows, searchState, selectedFormats);
+    const hit = filterSongsForTest(rows, searchState, selectedFormats);
     assert.equal(hit.length, 1);
 });
 
@@ -467,10 +495,10 @@ test("filterSongsByCriteria: collab role filters keep selected host and guest ro
         dateToKey: null
     };
 
-    const allRows = filterSongsByCriteria(rows, baseState, new Set(["配信"]));
-    const hostRows = filterSongsByCriteria(rows, { ...baseState, collabHostOnly: true }, new Set(["配信"]));
-    const guestRows = filterSongsByCriteria(rows, { ...baseState, collabGuestOnly: true }, new Set(["配信"]));
-    const collabRows = filterSongsByCriteria(
+    const allRows = filterSongsForTest(rows, baseState, new Set(["配信"]));
+    const hostRows = filterSongsForTest(rows, { ...baseState, collabHostOnly: true }, new Set(["配信"]));
+    const guestRows = filterSongsForTest(rows, { ...baseState, collabGuestOnly: true }, new Set(["配信"]));
+    const collabRows = filterSongsForTest(
         rows,
         { ...baseState, collabHostOnly: true, collabGuestOnly: true },
         new Set(["配信"])

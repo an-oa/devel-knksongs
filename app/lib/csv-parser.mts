@@ -1,6 +1,7 @@
 import { normalizeStreamRole } from "./stream-role.mjs";
 import { parseDateKey } from "./date-key.mjs";
-import { normalizeForSearch } from "./search-filters.mjs";
+import { normalizeForSearch } from "./search-normalization.mjs";
+import { assertSongsDataQuality } from "./songs-data-quality.mjs";
 import { extractYoutubeInfo } from "./youtube-url.mjs";
 
 /**
@@ -211,5 +212,6 @@ export function parseCsvToSongs(csvText) {
             artistYomiNorm: normalizeForSearch(artistYomi)
         });
     }
+    assertSongsDataQuality(songs);
     return songs;
 }

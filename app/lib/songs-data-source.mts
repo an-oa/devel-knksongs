@@ -183,8 +183,9 @@ export function createSongsDataSource(input) {
     async function loadCsvFallback(onSongsLoaded) {
         try {
             const csvText = await fetchCsvText();
+            const songs = parseCsvToSongs(csvText);
             await setCachedCsvText(csvText);
-            onSongsLoaded({ songs: parseCsvToSongs(csvText), source: "network" });
+            onSongsLoaded({ songs, source: "network" });
             return true;
         } catch (error) {
             const cached = await getCachedCsvText();

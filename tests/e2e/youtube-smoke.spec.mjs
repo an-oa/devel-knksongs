@@ -558,7 +558,7 @@ test("thumbnail images keep masonry layout stable after refresh", async ({ page 
 
 test("manual playback failure advances to the next result when continuous playback is enabled", async ({ page }) => {
     await enablePlaybackSettings(page, { continuousPlayback: true });
-    await setMockVideoBehavior(page, "reject-alpha", "auto-error");
+    await setMockVideoBehavior(page, "reject-alph", "auto-error");
     await setMockVideoBehavior(page, "reject-beta", "auto-playing");
     await filterBySongTitle(page, "Reject");
 
@@ -578,7 +578,7 @@ test("manual playback failure advances to the next result when continuous playba
 
 test("continuous playback advances to the next result after the current song ends", async ({ page }) => {
     await enablePlaybackSettings(page, { continuousPlayback: true });
-    await setMockVideoBehavior(page, "chain-beta", "auto-playing");
+    await setMockVideoBehavior(page, "chain-beta1", "auto-playing");
     await filterBySongTitle(page, "Chain");
 
     const firstCard = getSongCard(page, "Chain Alpha");
@@ -598,13 +598,13 @@ test("continuous playback advances to the next result after the current song end
     await expect(secondCard.locator("iframe")).toBeVisible();
     await expect.poll(async () => {
         return page.evaluate(() => window.__knkMockYoutube.latestVideoId());
-    }).toBe("chain-beta");
+    }).toBe("chain-beta1");
 });
 
 test("continuous playback does not double-start the first successful autoplay successor after a rejection", async ({ page }) => {
     await enablePlaybackSettings(page, { continuousPlayback: true });
     await filterBySongTitle(page, "Artist");
-    await setMockVideoBehavior(page, "replay-video", "auto-error");
+    await setMockVideoBehavior(page, "replay-vide", "auto-error");
     await setMockVideoBehavior(page, "chain-alpha", "auto-playing");
 
     const manualCard = getSongCard(page, "Manual Song");
@@ -640,7 +640,7 @@ test("autoplay rejection is logged as autoplay and does not use the manual failu
     });
     await enablePlaybackSettings(page, { continuousPlayback: true });
     await filterBySongTitle(page, "Artist");
-    await setMockVideoBehavior(page, "replay-video", "auto-error");
+    await setMockVideoBehavior(page, "replay-vide", "auto-error");
     await setMockVideoBehavior(page, "chain-alpha", "auto-playing");
 
     const manualCard = getSongCard(page, "Manual Song");

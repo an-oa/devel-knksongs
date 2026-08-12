@@ -52,7 +52,7 @@ function createFakeTextCacheStore(initialValue = null) {
 function createValidCsv() {
     return [
         "#,配信日,配信上の立場,画面の向き,公開範囲,形態,歌枠リレー？,ハモリあり？,##,曲名,アーティスト名,キョクメイ,アーティストメイ,URL,終了時刻,メモ",
-        "archive-1,2026/03/11,,縦,全体,配信,,,1,KING,Kanaria feat. GUMI,キング,カナリアフィーチャリンググミ,https://www.youtube.com/watch?v=abc123&t=10s,0:09:41,"
+        "archive-1,2026/03/11,,縦,全体,配信,,,1,KING,Kanaria feat. GUMI,キング,カナリアフィーチャリンググミ,https://www.youtube.com/watch?v=abc123def45&t=10s,0:09:41,"
     ].join("\n");
 }
 
@@ -63,8 +63,19 @@ function createValidCsv() {
 function createLegacyCsv() {
     return [
         "#,配信日,画面の向き,公開範囲,形態,歌枠リレー？,ハモリあり？,##,曲名,アーティスト名,キョクメイ,アーティストメイ,URL,終了時刻,メモ",
-        "archive-1,2026/03/11,縦,全体,配信,,,1,KING,Kanaria feat. GUMI,キング,カナリアフィーチャリンググミ,https://www.youtube.com/watch?v=abc123&t=10s,0:09:41,"
+        "archive-1,2026/03/11,縦,全体,配信,,,1,KING,Kanaria feat. GUMI,キング,カナリアフィーチャリンググミ,https://www.youtube.com/watch?v=abc123def45&t=10s,0:09:41,"
     ].join("\n");
+}
+
+/**
+ * data sourceの品質検証を失敗させるCSVを返す。
+ * @returns {string}
+ */
+function createInvalidCsv() {
+    return createValidCsv().replace(
+        "https://www.youtube.com/watch?v=abc123def45&t=10s",
+        "https://example.com/watch?v=abc123def45&t=10s"
+    );
 }
 
 /**
@@ -82,10 +93,10 @@ function createSongsJson(songKey, contentHash = `sha256:${songKey}`) {
             archiveId,
             archiveOrder: 1,
             sourceIndex: 0,
-            videoId: "abc123",
+            videoId: "abc123def45",
             songKey,
-            bookmarkSongKey: `abc123::${songKey}`,
-            legacySongKey: `${songKey}::https://www.youtube.com/watch?v=abc123&t=10s`,
+            bookmarkSongKey: `abc123def45::${songKey}`,
+            legacySongKey: `${songKey}::https://www.youtube.com/watch?v=abc123def45&t=10s`,
             format: "配信",
             streamRole: "",
             videoOrientation: "vertical",
@@ -95,7 +106,7 @@ function createSongsJson(songKey, contentHash = `sha256:${songKey}`) {
             artist: "Kanaria feat. GUMI",
             titleYomi: "キング",
             artistYomi: "カナリアフィーチャリンググミ",
-            url: "https://www.youtube.com/watch?v=abc123&t=10s",
+            url: "https://www.youtube.com/watch?v=abc123def45&t=10s",
             endSeconds: 581,
             titleNorm: "king",
             artistNorm: "kanaria feat. gumi",
@@ -192,6 +203,35 @@ test("songs data source: csv cache save failure does not write localStorage fall
     } finally {
         globalThis.fetch = previousFetch;
         console.warn = previousConsoleWarn;
+    }
+});
+
+test("songs data source: invalid network CSV is not stored over a valid CSV cache", async () => {
+    const previousFetch = globalThis.fetch;
+    try {
+        const cachedCsv = createValidCsv();
+        const csvCache = createFakeTextCacheStore(cachedCsv);
+        globalThis.fetch = async () => ({
+            ok: true,
+            async text() {
+                return createInvalidCsv();
+            }
+        });
+        const results = [];
+        const dataSource = createSongsDataSource({
+            publicCsvUrl: "https://example.test/songs.csv",
+            csvCache,
+            csvCacheKey: "cachedCsv"
+        });
+
+        assert.equal(await dataSource.loadInitialSongs({ onSongsLoaded: (result) => results.push(result) }), true);
+
+        assert.equal(csvCache.peek(), cachedCsv);
+        assert.equal(results.length, 1);
+        assert.equal(results[0].source, "cache");
+        assert.equal(results[0].songs[0].songKey, "archive-1::1");
+    } finally {
+        globalThis.fetch = previousFetch;
     }
 });
 

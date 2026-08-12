@@ -39,6 +39,7 @@ type SearchConstants = {
 
 type SearchInput = {
   searchState: SearchState;
+  parsedQuery: import("../app/lib/search-query.mjs").ParsedSearchQuery;
   resultCountEl?: HTMLElement | null;
 };
 

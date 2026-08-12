@@ -1,11 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {
-    filterSongsByCriteria,
-    isValidEmptySearchQuery,
-    normalizeForSearch,
-    parseSearchQuery
-} from "../_build/app/lib/search-filters.mjs";
+import { filterSongsByCriteria } from "../_build/app/lib/search-filters.mjs";
+import { normalizeForSearch } from "../_build/app/lib/search-normalization.mjs";
+import { isValidEmptySearchQuery, parseSearchQuery } from "../_build/app/lib/search-query.mjs";
 
 /**
  * 検索構文テスト用の曲行を作る。
@@ -34,21 +31,33 @@ const BASE_SEARCH_STATE = {
     harmonyOnly: false
 };
 
+/**
+ * 本番と同じく検索語を一度解析してから曲一覧を絞り込む。
+ * @param {Song[]} rows
+ * @param {SearchState} searchState
+ * @param {Set<string>} selectedFormats
+ * @returns {Song[]}
+ */
+function filterSongsForTest(rows, searchState, selectedFormats) {
+    return filterSongsByCriteria(rows, searchState, selectedFormats, parseSearchQuery(searchState.queryRaw));
+}
+
 test("normalizeForSearch: normalizes compatible characters and repeated whitespace", () => {
     assert.equal(normalizeForSearch("  Ｆｏｏ　 \t BAR  "), "foo bar");
 });
 
 test("parseSearchQuery: ignores empty quoted phrases", () => {
     for (const query of ['""', '"   "', '"　"', '"" ""', "＂　＂"]) {
-        assert.equal(isValidEmptySearchQuery(query), true, query);
-        assert.deepEqual(parseSearchQuery(query).keywords, [], query);
+        const parsedQuery = parseSearchQuery(query);
+        assert.equal(isValidEmptySearchQuery(parsedQuery), true, query);
+        assert.deepEqual(parsedQuery.keywords, [], query);
     }
 
-    assert.equal(isValidEmptySearchQuery('foo ""'), false);
-    assert.equal(isValidEmptySearchQuery('since:2024 ""'), false);
-    assert.equal(isValidEmptySearchQuery('"" until:'), false);
-    assert.equal(isValidEmptySearchQuery('"'), false);
-    assert.equal(isValidEmptySearchQuery("“”"), false);
+    assert.equal(isValidEmptySearchQuery(parseSearchQuery('foo ""')), false);
+    assert.equal(isValidEmptySearchQuery(parseSearchQuery('since:2024 ""')), false);
+    assert.equal(isValidEmptySearchQuery(parseSearchQuery('"" until:')), false);
+    assert.equal(isValidEmptySearchQuery(parseSearchQuery('"')), false);
+    assert.equal(isValidEmptySearchQuery(parseSearchQuery("“”")), false);
 });
 
 test("parseSearchQuery: quote boundaries split adjacent search elements", () => {
@@ -60,7 +69,7 @@ test("parseSearchQuery: quote boundaries split adjacent search elements", () => 
     assert.deepEqual(mixedOperator.keywords, ["foo"]);
 
     const quotedOperand = parseSearchQuery('since:"2024"');
-    assert.deepEqual(quotedOperand.invalidOperators, ["since:"]);
+    assert.deepEqual(quotedOperand.issues, [{ code: "invalid-date-operator", operator: "since:" }]);
     assert.deepEqual(quotedOperand.keywords, ["2024"]);
     assert.deepEqual(parseSearchQuery('"since:2024"').keywords, ["since:2024"]);
 });
@@ -74,7 +83,10 @@ test("parseSearchQuery: supports quoted escapes and full-width compatible syntax
     assert.deepEqual(parseSearchQuery(String.raw`"foo\bar"`).keywords, [String.raw`foo\bar`]);
     assert.deepEqual(parseSearchQuery("＂Don’t say ＼＂lazy＼＂＂").keywords, ['don’t say "lazy"']);
     assert.deepEqual(parseSearchQuery("“quoted”").keywords, ["“quoted”"]);
-    assert.equal(parseSearchQuery(String.raw`"foo\"`).hasUnterminatedQuote, true);
+    assert.deepEqual(
+        parseSearchQuery(String.raw`"foo\"`).issues,
+        [{ code: "unterminated-quote" }]
+    );
 });
 
 test("filterSongsByCriteria: matches normalized phrase whitespace and escaped quotes", () => {
@@ -83,12 +95,12 @@ test("filterSongsByCriteria: matches normalized phrase whitespace and escaped qu
         makeRow({ title: 'Don’t say "lazy"' })
     ];
     const selectedFormats = new Set(["配信"]);
-    const whitespaceHit = filterSongsByCriteria(
+    const whitespaceHit = filterSongsForTest(
         rows,
         { ...BASE_SEARCH_STATE, queryRaw: '"  foo   bar  "' },
         selectedFormats
     );
-    const quoteHit = filterSongsByCriteria(
+    const quoteHit = filterSongsForTest(
         rows,
         { ...BASE_SEARCH_STATE, queryRaw: String.raw`"Don’t say \"lazy\""` },
         selectedFormats
@@ -96,4 +108,17 @@ test("filterSongsByCriteria: matches normalized phrase whitespace and escaped qu
 
     assert.deepEqual(whitespaceHit.map((row) => row.titleNorm), ["foo bar"]);
     assert.deepEqual(quoteHit.map((row) => row.titleNorm), ['don’t say "lazy"']);
+});
+
+test("filterSongsByCriteria: consumes the supplied parse result without parsing queryRaw again", () => {
+    const parsedQuery = parseSearchQuery("target");
+    const rows = [makeRow({ title: "Target" })];
+    const hit = filterSongsByCriteria(
+        rows,
+        { ...BASE_SEARCH_STATE, queryRaw: "until:2026-13" },
+        new Set(["配信"]),
+        parsedQuery
+    );
+
+    assert.equal(hit.length, 1);
 });

@@ -1,69 +1,55 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {
-    validateSongsDataQuality,
-    validateSongYoutubeFields
-} from "../scripts/validate-songs-json.mjs";
+import { buildSongsJsonMetaPayload, buildSongsJsonPayload } from "../_build/app/lib/songs-json.mjs";
+import { createSongsContentHash } from "../scripts/songs-content-hash.mjs";
+import { validateSongsJsonArtifacts } from "../scripts/songs-json-artifact.mjs";
 
 /**
- * 検証用の曲データを作成する。
- * @param {Record<string, unknown>} overrides
- * @returns {Record<string, unknown>}
+ * JSON成果物検証用のsongs.jsonとsongs-meta.jsonを作る。
+ * @param {unknown[]} songs 曲配列
+ * @returns {{ songsJson: string, metaJson: string, contentHash: string }}
  */
-function makeSong(overrides = {}) {
+function makeArtifacts(songs) {
+    const contentHash = createSongsContentHash(songs);
     return {
-        title: "Song",
-        artist: "Artist",
-        url: "https://www.youtube.com/watch?v=7fOw-4QeB7M&t=349s",
-        endSeconds: 649,
-        ...overrides
+        songsJson: JSON.stringify(buildSongsJsonPayload(songs, contentHash)),
+        metaJson: JSON.stringify(buildSongsJsonMetaPayload(contentHash)),
+        contentHash
     };
 }
 
-test("songs json validation: accepts valid generated song data", () => {
-    assert.deepEqual(validateSongsDataQuality([makeSong()]), []);
+test("songs json artifacts: accept matching derived files", () => {
+    const artifacts = makeArtifacts([{ songKey: "archive-1::1" }]);
+    assert.equal(validateSongsJsonArtifacts(artifacts.songsJson, artifacts.metaJson), 1);
 });
 
-test("songs json validation: rejects invalid YouTube hosts", () => {
-    const issues = validateSongsDataQuality([
-        makeSong({ url: "https://example.com/watch?v=7fOw-4QeB7M&t=349s" })
-    ]);
-    assert.match(issues.join("\n"), /url host must be a supported YouTube host/);
-});
-
-test("songs json validation: rejects invalid extracted video IDs", () => {
-    const issues = [];
-    validateSongYoutubeFields(
-        makeSong({ url: "https://www.youtube.com/watch?v=short&t=349s" }),
-        0,
-        issues
+test("songs json artifacts: reject mismatched metadata hashes", () => {
+    const artifacts = makeArtifacts([{ songKey: "archive-1::1" }]);
+    const mismatchedMeta = JSON.stringify(buildSongsJsonMetaPayload("sha256:different"));
+    assert.throws(
+        () => validateSongsJsonArtifacts(artifacts.songsJson, mismatchedMeta),
+        /songs\.json and songs-meta\.json contentHash values must match/
     );
-    assert.match(issues.join("\n"), /extracted videoId must match/);
 });
 
-test("songs json validation: rejects empty required text fields", () => {
-    const issues = validateSongsDataQuality([
-        makeSong({ title: " ", artist: "", url: "" })
-    ]);
-    assert.match(issues.join("\n"), /title must not be empty/);
-    assert.match(issues.join("\n"), /artist must not be empty/);
-    assert.match(issues.join("\n"), /url must not be empty/);
-});
-
-test("songs json validation: rejects invalid start seconds from URL", () => {
-    const issues = validateSongsDataQuality([
-        makeSong({ url: "https://youtu.be/7fOw-4QeB7M?t=-1" })
-    ]);
-    assert.match(issues.join("\n"), /startSeconds must be a finite number/);
-});
-
-test("songs json validation: rejects invalid end seconds", () => {
-    assert.match(
-        validateSongsDataQuality([makeSong({ endSeconds: Number.NaN })]).join("\n"),
-        /endSeconds must be a finite number/
+test("songs json artifacts: reject hashes that do not represent the songs array", () => {
+    const contentHash = "sha256:not-the-song-content";
+    const songsJson = JSON.stringify(buildSongsJsonPayload([{ songKey: "archive-1::1" }], contentHash));
+    const metaJson = JSON.stringify(buildSongsJsonMetaPayload(contentHash));
+    assert.throws(
+        () => validateSongsJsonArtifacts(songsJson, metaJson),
+        /contentHash must match the serialized songs array/
     );
-    assert.match(
-        validateSongsDataQuality([makeSong({ endSeconds: 100 })]).join("\n"),
-        /endSeconds must be greater than startSeconds/
+});
+
+test("songs json artifacts: reject unsupported schemas in either derived file", () => {
+    const artifacts = makeArtifacts([]);
+    const invalidMeta = JSON.stringify({
+        schemaVersion: 999,
+        contentHash: artifacts.contentHash
+    });
+    assert.throws(
+        () => validateSongsJsonArtifacts(artifacts.songsJson, invalidMeta),
+        /unsupported songs json schema/
     );
 });

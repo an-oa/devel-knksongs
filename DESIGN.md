@@ -10,8 +10,8 @@
 ## 全体構成
 - 静的フロントエンドのみ（HTML/CSS/JavaScript, ES Modules）。
   `app/**/*.mts` を source とし、`npm run build:ts` で `_build/app/**/*.mjs` へ生成した JavaScript をブラウザ・テスト・Node scripts が読む
-- データ取得：事前生成JSON（`data/songs.json` / `data/songs-meta.json`）を優先し、公開スプレッドシートのCSVは生成元とフォールバックに使う
-- データ生成/公開：GitHub Actions でCSVからJSONを生成・検証し、差分を `main` へコミットして CI を起動する。CI 成功後、検証済み commit を deploy 前後に現在の `main` と照合し、公開された `deployment.json` の commit SHA を確認する
+- データ取得：事前生成JSON（`data/songs.json` / `data/songs-meta.json`）を優先し、唯一のマスターである公開スプレッドシートのCSVを生成元とフォールバックに使う
+- データ生成/公開：GitHub Actions でCSVから派生JSONを生成・検証し、差分を `main` へコミットして CI を起動する。CI 成功後、検証済み commit を deploy 前後に現在の `main` と照合し、公開された `deployment.json` の commit SHA を確認する
 - CI：GitHub Actions で TypeScript emit、曲データ検証、typecheck、lint、unit test、静的 site build を実行する
 - 実行時の同梱外部ライブラリ依存：なし
 - 埋め込み再生まわりでは YouTube Iframe API を動的に利用し、標準では `youtube.com`、プライバシー強化設定ON時は `youtube-nocookie.com` の埋め込みURLを使う
@@ -63,6 +63,8 @@
   - `tests/e2e/youtube-smoke.spec.mjs`
   - `tests/songs-content-hash.test.mjs`
   - `tests/songs-data-source.test.mjs`
+  - `tests/songs-data-quality.test.mjs`
+  - `tests/build-songs-json.test.mjs`
   - `tests/songs-json-cache.test.mjs`
   - `tests/songs-json.test.mjs`
   - `tests/songs-json-validation.test.mjs`
@@ -153,6 +155,20 @@ flowchart TD
     K --> N
 ```
 
+### マスターCSVと派生JSON
+- 公開スプレッドシートのCSVを唯一のマスターデータとする。JSONを直接修正する更新経路や、
+  JSONからCSVへ戻す経路は持たない
+- `songs.json` / `songs-meta.json` は、現在表示・再生可能な曲を配信する派生成果物とする
+- 公開対象でもURLが空の行は、現在再生できない曲の履歴としてCSVへ残し、エラーにせず派生JSONから除外する。
+  URLが非空で不正な場合は品質エラーとして生成を停止する
+- CSVから公開対象曲へ変換した直後に、必須文字列、YouTube URL・動画ID、再生範囲を全件検証する。
+  問題はCSV行番号と曲名でまとめて報告し、検証成功前はどちらのJSONも書き換えない
+- 開始位置`0`と終了位置`null`は、ショート・切り抜き・歌みたなどの動画全体を再生する正常値とする。
+  非空の不正な終了時刻・画面の向きに対する既存の警告とフォールバックは維持する
+- ブラウザのCSVフォールバックも同じ変換・品質検証を通し、検証前のCSVをキャッシュしない
+- 派生JSONの検証では、両ファイルの構文・スキーマ、`contentHash`同士の一致、
+  曲配列から再計算したhashとの一致だけを確認し、曲データの意味的品質は再判定しない
+
 ## データモデル（概要）
 `SongRow`
 - date / dateKey / archiveId / archiveOrder / sourceIndex
@@ -186,7 +202,7 @@ flowchart TD
   演算子を併用した場合は下限の最大値と上限の最小値による共通部分を検索する
 - 同一の日付演算子を複数指定した場合、`since` は最も新しい日、`until` は最も古い日を採用する
 - `since:` / `until:` の接尾辞が空、または数字・ハイフン・スラッシュから始まる場合は
-  日付演算子候補とする。形式不正または実在しない値は `invalidOperators` に保持し、検索結果を0件にする。
+  日付演算子候補とする。形式不正または実在しない値は `invalid-date-operator` issueとして保持し、検索結果を0件にする。
   日付として始まらない接尾辞は通常キーワードとして扱う。`since` が `until` より後の場合も
   解析結果で範囲矛盾として扱い、検索結果を0件にする
 - 日付演算子は完全に非引用の検索要素だけを認識する。`since:2024"foo"` は日付演算子とキーワード、
@@ -197,6 +213,11 @@ flowchart TD
 - 不正・矛盾した日付演算子と引用符エラーは、検索のデバウンス後またはblur時に
   インラインメッセージ、`aria-invalid`、検索結果を同期する。同じメッセージは再設定せず、
   修正によって入力が有効になった場合はエラー状態を消去する
+- tokenizerとparserは`search-query` moduleに集約し、無効日付、未終了引用符、範囲矛盾を
+  判別可能な`issues`として一元管理する。UIはissueを日本語文言へ変換するだけとし、
+  issue追加時の文言漏れをTypeScriptの網羅性検査で検出する
+- 検索実行ごとに解析結果を1回だけ作り、UI検証、おすすめ判定、ブックマークを含む曲絞り込みで共有する。
+  解析結果は永続化せず、入力・blurなど別イベントではその時点の入力を改めて解析する
 
 ## おすすめ表示の方針
 - 条件未指定時におすすめ表示
@@ -276,7 +297,7 @@ stateDiagram-v2
 - `applyLoadedSongs()`：曲データ読込後の初期化（おすすめキャッシュのリセット含む）
 - `pickRecommended()`：おすすめ候補の抽出とシャッフル、キャッシュ利用の中心
 - `scheduleSearch()`：検索/絞り込みの実行をデバウンスして呼び出す
-- `search()`：条件取得→フィルタ→表示までの入口
+- `search()`：条件取得と検索語の1回限りの解析→検証→フィルタ→表示までの入口
 - `updateDisplay()`：結果のカード表示と「おすすめ/ヒット件数」表示の切替
 ## 状態管理
 `state`
