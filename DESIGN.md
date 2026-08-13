@@ -32,8 +32,16 @@
   - `tests/csv-parser.test.mjs`
   - `tests/data-loader.test.mjs`
   - `tests/dom-utils.test.mjs`
-  - `tests/search-date.test.mjs`
+  - `tests/date-filter-controller.test.mjs`
+  - `tests/date-key.test.mjs`
+  - `tests/partial-date.test.mjs`
   - `tests/search-boolean-filters.test.mjs`
+  - `tests/search-controller.test.mjs`
+  - `tests/search-filters.test.mjs`
+  - `tests/search-query.test.mjs`
+  - `tests/search-query-validation.test.mjs`
+  - `tests/search-recommendation.test.mjs`
+  - `tests/song-format.test.mjs`
   - `tests/format-filter.test.mjs`
   - `tests/pages-artifact.test.mjs`
   - `tests/playback-sequence.test.mjs`
@@ -42,7 +50,6 @@
   - `tests/render-drag-reorder.test.mjs`
   - `tests/render-layout.test.mjs`
   - `tests/render-masonry-layout.test.mjs`
-  - `tests/search-filter-modules.test.mjs`
   - `tests/search-filters-controller.test.mjs`
   - `tests/search-state-schema.test.mjs`
   - `tests/sidebar-ui.test.mjs`
