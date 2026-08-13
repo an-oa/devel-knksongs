@@ -132,8 +132,8 @@ flowchart TD
 - CSVから公開対象曲を変換した直後に、必須文字列、YouTube URL・動画ID、再生範囲を全件検証します。
   問題がある場合はCSV行番号を報告し、どちらのJSONも書き換えません。開始位置`0`と終了位置`null`は、
   動画全体を再生する正常値として扱います。ブラウザのCSVフォールバックも同じ変換・検証を使用します。
-- `npm run validate:songs-json` は曲データの意味を再判定せず、2つの派生JSONの構文・スキーマと、
-  `contentHash`同士および曲配列から再計算したhashとの一致を検証します。
+- `npm run validate:songs-json` は曲データの意味を再判定せず、2つの派生JSONの構文、
+  各曲の必須フィールドと型を含むスキーマ、`contentHash`同士および曲配列から再計算したhashとの一致を検証します。
 - `.github/workflows/update-songs-json.yml` は GitHub Actions 上で `npm run build:songs-json` と `npm run validate:songs-json` を実行し、`data/songs.json` / `data/songs-meta.json` に差分があればコミットして、更新後の `main` に対する CI を明示的に起動します。差分がない場合はコミットも deploy も行いません。
 - `.github/workflows/ci.yml` は `main` への push / pull request / 手動実行で `npm run validate:songs-json`、`npm run typecheck`、`npm run check:ts-emit`、`npm run build`、`npm run lint`、`npm run test:unit` を実行します。`main` の CI が成功すると `.github/workflows/deploy-pages.yml` が検証済み commit を deploy します。
 - `.github/workflows/deploy-pages.yml` は成功した CI の対象を build 前、artifact 生成後、concurrency / environment 待機後の deploy action 直前に `main` と照合します。待機前に古くなった run は deploy job ごと skip し、待機中に古くなった run は古い artifact を公開せず失敗として記録します。deploy 後は公開 `deployment.json` の SHA が対象 commit と一致するまで最長10分間確認し、最後に対象 commit が引き続き `main` であることを再確認してから workflow を成功扱いにします。
