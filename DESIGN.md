@@ -170,8 +170,9 @@ flowchart TD
 - `songs.json` / `songs-meta.json` は、現在表示・再生可能な曲を配信する派生成果物とする
 - 両JSONはschema Version 2として、同じ `contentHash` とUTC ISO 8601形式の `generatedAt` を持つ。
   `generatedAt` はcontentHashが変わった場合だけ更新し、同じ内容の定期生成では引き継ぐ
-- 実行時は既存のVersion 1 JSONキャッシュもフォールバックとして読み込む。
-  Version 1は生成日時を持たないため、hash不一致時の新旧判定には使用しない
+- 実行時は実際に配布された全期間のVersion 1 JSONキャッシュもフォールバックとして読み込む。
+  初期形式で省略されていた `contentHash` は `null`、各曲の `streamRole` は空文字へ正規化する。
+  Version 1は生成日時を持たず、初期形式はhashも持たないため、比較不能な場合は新旧判定に使用しない
 - 公開対象でもURLが空の行は、現在再生できない曲の履歴としてCSVへ残し、エラーにせず派生JSONから除外する。
   URLが非空で不正な場合は品質エラーとして生成を停止する
 - CSVから公開対象曲へ変換した直後に、必須文字列、YouTube URL・動画ID、再生範囲を全件検証する。

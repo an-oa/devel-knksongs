@@ -2,11 +2,21 @@ export const SONGS_JSON_SCHEMA_VERSION = 2;
 
 const LEGACY_SONGS_JSON_SCHEMA_VERSION = 1;
 
-export type SongsJsonArtifactMetadata = {
-    schemaVersion: number;
+type CurrentSongsJsonArtifactMetadata = {
+    schemaVersion: typeof SONGS_JSON_SCHEMA_VERSION;
     contentHash: string;
-    generatedAt: string | null;
+    generatedAt: string;
 };
+
+type LegacySongsJsonArtifactMetadata = {
+    schemaVersion: typeof LEGACY_SONGS_JSON_SCHEMA_VERSION;
+    contentHash: string | null;
+    generatedAt: null;
+};
+
+export type SongsJsonArtifactMetadata =
+    | CurrentSongsJsonArtifactMetadata
+    | LegacySongsJsonArtifactMetadata;
 
 export type SongsJsonPayload = SongsJsonArtifactMetadata & {
     songs: Song[];
@@ -96,7 +106,9 @@ function parseJsonObject(jsonText: string): Record<string, unknown> {
  * @param schemaVersion 検証するschema version
  * @returns 検証済みschema version
  */
-function parseSupportedSchemaVersion(schemaVersion: unknown): number {
+function parseSupportedSchemaVersion(
+    schemaVersion: unknown
+): typeof LEGACY_SONGS_JSON_SCHEMA_VERSION | typeof SONGS_JSON_SCHEMA_VERSION {
     if (
         schemaVersion !== LEGACY_SONGS_JSON_SCHEMA_VERSION &&
         schemaVersion !== SONGS_JSON_SCHEMA_VERSION
@@ -107,15 +119,20 @@ function parseSupportedSchemaVersion(schemaVersion: unknown): number {
 }
 
 /**
- * schema versionに応じて生成日時を検証する。
- * Version 1は日時を持たない旧キャッシュとしてnullへ正規化する。
+ * schema versionに応じてcontentHashを検証する。
+ * 初期のVersion 1に存在しなかったcontentHashはnullへ正規化する。
  * @param schemaVersion 検証済みschema version
- * @param generatedAt 検証する生成日時
- * @returns 検証済みの生成日時、または旧schemaを表すnull
+ * @param contentHash 検証するhash
+ * @returns 検証済みhash、またはhashを持たない旧schemaを表すnull
  */
-function parseGeneratedAtForSchema(schemaVersion: number, generatedAt: unknown): string | null {
-    if (schemaVersion === LEGACY_SONGS_JSON_SCHEMA_VERSION) return null;
-    return parseGeneratedAt(generatedAt);
+function parseContentHashForSchema(
+    schemaVersion: typeof LEGACY_SONGS_JSON_SCHEMA_VERSION | typeof SONGS_JSON_SCHEMA_VERSION,
+    contentHash: unknown
+): string | null {
+    if (schemaVersion === LEGACY_SONGS_JSON_SCHEMA_VERSION && contentHash === undefined) {
+        return null;
+    }
+    return parseContentHash(contentHash);
 }
 
 /**
@@ -170,16 +187,35 @@ function assertSongStructure(song: unknown, index: number): asserts song is Song
 }
 
 /**
- * songs値を配列として検証し、各曲要素の構造を確認する。
+ * 初期のVersion 1で存在しなかったstreamRoleを空文字へ正規化する。
+ * ほかの構造エラーは後続の検証へ渡す。
+ * @param song 正規化する曲要素
+ * @returns Version 1の不足フィールドを補った曲要素
+ */
+function normalizeLegacySong(song: unknown): unknown {
+    if (!song || typeof song !== "object" || Array.isArray(song)) return song;
+    if (Object.hasOwn(song, "streamRole")) return song;
+    return { ...song, streamRole: "" };
+}
+
+/**
+ * songs値をschema versionに応じて正規化し、各曲要素の構造を確認する。
  * @param songs 検証するsongs値
+ * @param schemaVersion 検証済みschema version
  * @returns 検証済み曲配列
  */
-function parseSongsArray(songs: unknown): Song[] {
+function parseSongsArray(
+    songs: unknown,
+    schemaVersion: typeof LEGACY_SONGS_JSON_SCHEMA_VERSION | typeof SONGS_JSON_SCHEMA_VERSION
+): Song[] {
     if (!Array.isArray(songs)) {
         throw new Error("songs json payload requires a songs array");
     }
-    songs.forEach((song, index) => assertSongStructure(song, index));
-    return songs;
+    const normalizedSongs = schemaVersion === LEGACY_SONGS_JSON_SCHEMA_VERSION
+        ? songs.map(normalizeLegacySong)
+        : songs;
+    normalizedSongs.forEach((song, index) => assertSongStructure(song, index));
+    return normalizedSongs;
 }
 
 /**
@@ -198,7 +234,7 @@ export function buildSongsJsonPayload(
         schemaVersion: SONGS_JSON_SCHEMA_VERSION,
         contentHash: parseContentHash(contentHash),
         generatedAt: parseGeneratedAt(generatedAt),
-        songs: parseSongsArray(songs)
+        songs: parseSongsArray(songs, SONGS_JSON_SCHEMA_VERSION)
     };
 }
 
@@ -230,7 +266,9 @@ export function compareSongsJsonArtifactFreshness(
     candidate: SongsJsonArtifactMetadata,
     reference: SongsJsonArtifactMetadata
 ): SongsJsonArtifactFreshness {
-    if (candidate.contentHash === reference.contentHash) return "same-content";
+    if (candidate.contentHash !== null && candidate.contentHash === reference.contentHash) {
+        return "same-content";
+    }
     if (!candidate.generatedAt || !reference.generatedAt) return "incomparable";
     const candidateTimestamp = Date.parse(candidate.generatedAt);
     const referenceTimestamp = Date.parse(reference.generatedAt);
@@ -247,12 +285,20 @@ export function compareSongsJsonArtifactFreshness(
 export function parseSongsJsonPayload(jsonText: string): SongsJsonPayload {
     const payload = parseJsonObject(jsonText);
     const schemaVersion = parseSupportedSchemaVersion(payload.schemaVersion);
-    const contentHash = parseContentHash(payload.contentHash);
+    const songs = parseSongsArray(payload.songs, schemaVersion);
+    if (schemaVersion === LEGACY_SONGS_JSON_SCHEMA_VERSION) {
+        return {
+            schemaVersion,
+            contentHash: parseContentHashForSchema(schemaVersion, payload.contentHash),
+            generatedAt: null,
+            songs
+        };
+    }
     return {
         schemaVersion,
-        contentHash,
-        generatedAt: parseGeneratedAtForSchema(schemaVersion, payload.generatedAt),
-        songs: parseSongsArray(payload.songs)
+        contentHash: parseContentHash(payload.contentHash),
+        generatedAt: parseGeneratedAt(payload.generatedAt),
+        songs
     };
 }
 
@@ -264,9 +310,16 @@ export function parseSongsJsonPayload(jsonText: string): SongsJsonPayload {
 export function parseSongsJsonMetaPayload(jsonText: string): SongsJsonArtifactMetadata {
     const payload = parseJsonObject(jsonText);
     const schemaVersion = parseSupportedSchemaVersion(payload.schemaVersion);
+    if (schemaVersion === LEGACY_SONGS_JSON_SCHEMA_VERSION) {
+        return {
+            schemaVersion,
+            contentHash: parseContentHashForSchema(schemaVersion, payload.contentHash),
+            generatedAt: null
+        };
+    }
     return {
         schemaVersion,
         contentHash: parseContentHash(payload.contentHash),
-        generatedAt: parseGeneratedAtForSchema(schemaVersion, payload.generatedAt)
+        generatedAt: parseGeneratedAt(payload.generatedAt)
     };
 }

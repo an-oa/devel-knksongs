@@ -131,6 +131,8 @@ flowchart TD
   `generatedAt` はcontentHashが変わった場合だけ更新するため、CSVに変更がない定期生成では差分が発生しません。
 - 手元のJSONキャッシュがmetaと同じ内容か、metaより新しいと判断できれば、大きい `songs.json` の再取得を避けます。
   meta取得失敗時もJSON本体を試し、JSONキャッシュがある場合は両者を直接比較して古いJSONへの巻き戻りを防ぎます。
+- 実際に配布された全期間のVersion 1 JSONキャッシュはフォールバックとして読み込みます。
+  初期形式に存在しない `contentHash` は比較不能、`streamRole` は空文字として扱い、現在の必須構造へ正規化します。
 - 公開スプレッドシートのCSVは、事前生成JSONの元データかつJSON取得失敗時のフォールバックとして参照します(`app/config.mts` の `PUBLIC_CSV_URL` で指定し、実行時は `_build/app/config.mjs` に生成された module を読みます)。
   実行時の優先順位は公開JSON、有効なJSONキャッシュ、ネットワークCSVの順で、CSVはキャッシュしません。
   旧バージョンが保存したCSVキャッシュは起動時に削除します。

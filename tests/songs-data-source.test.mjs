@@ -108,15 +108,27 @@ function createSongsJson(
 }
 
 /**
- * Version 1互換確認用のJSON文字列を返す。
+ * Version 1末期の互換確認用JSON文字列を返す。
  * @param {string} songKey 曲識別子
  * @param {string} contentHash 内容hash
  * @returns {string}
  */
-function createLegacySongsJson(songKey, contentHash) {
+function createFinalVersion1SongsJson(songKey, contentHash) {
     const payload = JSON.parse(createSongsJson(songKey, contentHash));
     payload.schemaVersion = 1;
     delete payload.generatedAt;
+    return JSON.stringify(payload);
+}
+
+/**
+ * contentHashとstreamRoleがなかった初期Version 1の互換確認用JSON文字列を返す。
+ * @param {string} songKey 曲識別子
+ * @returns {string}
+ */
+function createInitialVersion1SongsJson(songKey) {
+    const payload = JSON.parse(createFinalVersion1SongsJson(songKey, "sha256:unused"));
+    delete payload.contentHash;
+    for (const song of payload.songs) delete song.streamRole;
     return JSON.stringify(payload);
 }
 
@@ -592,10 +604,10 @@ test("songs data source: equal timestamps with mismatched hashes are rejected", 
     }
 });
 
-test("songs data source: Version 1 cache remains a fallback but cannot win a mismatched freshness comparison", async () => {
+test("songs data source: initial Version 1 cache remains an undated fallback", async () => {
     const previousFetch = globalThis.fetch;
     try {
-        const legacyJson = createLegacySongsJson("legacy-archive::1", "sha256:legacy");
+        const legacyJson = createInitialVersion1SongsJson("legacy-archive::1");
         const songsJsonCache = createFakeTextCacheStore(legacyJson);
         const fetchUrls = [];
         globalThis.fetch = async (url, options) => {
@@ -620,17 +632,19 @@ test("songs data source: Version 1 cache remains a fallback but cannot win a mis
             ["data/songs.json", { cache: "no-cache" }]
         ]);
         assert.equal(songsJsonCache.peek(), legacyJson);
+        assert.equal(songsJsonCache.getRemoveCount(), 0);
         assert.equal(results[0].source, "cache");
         assert.equal(results[0].songs[0].songKey, "legacy-archive::1");
+        assert.equal(results[0].songs[0].streamRole, "");
     } finally {
         globalThis.fetch = previousFetch;
     }
 });
 
-test("songs data source: Version 1 network json is not cached and falls back to csv", async () => {
+test("songs data source: initial Version 1 network json is not cached and falls back to csv", async () => {
     const previousFetch = globalThis.fetch;
     try {
-        const legacyJson = createLegacySongsJson("legacy-network::1", "sha256:legacy");
+        const legacyJson = createInitialVersion1SongsJson("legacy-network::1");
         const songsJsonCache = createFakeTextCacheStore();
         globalThis.fetch = async (url) => {
             if (url === "data/songs.json") return createResponse(legacyJson);
@@ -683,7 +697,7 @@ test("songs data source: legacy localStorage json is migrated into the json cach
     const previousFetch = globalThis.fetch;
     try {
         const storage = createFakeLocalStorage();
-        const cachedJson = createLegacySongsJson("legacy-archive::1", "sha256:legacy");
+        const cachedJson = createFinalVersion1SongsJson("legacy-archive::1", "sha256:legacy");
         const primarySongsJsonCache = createFakeTextCacheStore();
         const songsJsonCache = createLegacyLocalStorageSongsJsonCacheAdapter({
             cache: primarySongsJsonCache,

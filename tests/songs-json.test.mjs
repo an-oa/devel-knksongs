@@ -105,7 +105,7 @@ test("songs json: builds and parses meta payload", () => {
     });
 });
 
-test("songs json: parses Version 1 payloads as undated legacy cache entries", () => {
+test("songs json: parses final Version 1 payloads as undated legacy cache entries", () => {
     const songs = [createSongFixture()];
     assert.deepEqual(parseSongsJsonPayload(JSON.stringify({
         schemaVersion: 1,
@@ -125,6 +125,52 @@ test("songs json: parses Version 1 payloads as undated legacy cache entries", ()
         contentHash: "sha256:legacy",
         generatedAt: null
     });
+});
+
+test("songs json: normalizes fields omitted across early Version 1 payloads", () => {
+    const legacySong = createSongFixture();
+    delete legacySong.streamRole;
+
+    assert.deepEqual(parseSongsJsonPayload(JSON.stringify({
+        schemaVersion: 1,
+        contentHash: "sha256:legacy",
+        songs: [legacySong]
+    })), {
+        schemaVersion: 1,
+        contentHash: "sha256:legacy",
+        generatedAt: null,
+        songs: [{ ...legacySong, streamRole: "" }]
+    });
+    assert.deepEqual(parseSongsJsonPayload(JSON.stringify({
+        schemaVersion: 1,
+        songs: [legacySong]
+    })), {
+        schemaVersion: 1,
+        contentHash: null,
+        generatedAt: null,
+        songs: [{ ...legacySong, streamRole: "" }]
+    });
+    assert.deepEqual(parseSongsJsonMetaPayload(JSON.stringify({
+        schemaVersion: 1
+    })), {
+        schemaVersion: 1,
+        contentHash: null,
+        generatedAt: null
+    });
+});
+
+test("songs json: Version 1 normalization does not hide unrelated structural errors", () => {
+    const incompleteSong = createSongFixture();
+    delete incompleteSong.streamRole;
+    delete incompleteSong.title;
+
+    assert.throws(
+        () => parseSongsJsonPayload(JSON.stringify({
+            schemaVersion: 1,
+            songs: [incompleteSong]
+        })),
+        /songs\[0\]\.title is required/
+    );
 });
 
 test("songs json: compares hashes before generated timestamps", () => {
@@ -168,6 +214,15 @@ test("songs json: compares generated timestamps only for mismatched hashes", () 
         contentHash: "sha256:legacy",
         generatedAt: null
     }, reference), "incomparable");
+    assert.equal(compareSongsJsonArtifactFreshness({
+        schemaVersion: 1,
+        contentHash: null,
+        generatedAt: null
+    }, {
+        schemaVersion: 1,
+        contentHash: null,
+        generatedAt: null
+    }), "incomparable");
 });
 
 test("songs json: rejects unsupported schema versions", () => {
