@@ -1,4 +1,22 @@
-export const SONGS_JSON_SCHEMA_VERSION = 1;
+export const SONGS_JSON_SCHEMA_VERSION = 2;
+
+const LEGACY_SONGS_JSON_SCHEMA_VERSION = 1;
+
+export type SongsJsonArtifactMetadata = {
+    schemaVersion: number;
+    contentHash: string;
+    generatedAt: string | null;
+};
+
+export type SongsJsonPayload = SongsJsonArtifactMetadata & {
+    songs: Song[];
+};
+
+export type SongsJsonArtifactFreshness =
+    | "same-content"
+    | "candidate-newer"
+    | "candidate-older"
+    | "incomparable";
 
 type SongFieldKind = "string" | "number" | "nullable-number" | "boolean" | "video-orientation";
 
@@ -44,6 +62,22 @@ function parseContentHash(contentHash: unknown): string {
 }
 
 /**
+ * 曲データJSONの生成日時をUTCのISO 8601形式として検証する。
+ * @param generatedAt 検証する生成日時
+ * @returns 検証済みの生成日時
+ */
+function parseGeneratedAt(generatedAt: unknown): string {
+    if (typeof generatedAt !== "string") {
+        throw new Error("songs json payload requires a generatedAt");
+    }
+    const timestamp = Date.parse(generatedAt);
+    if (!Number.isFinite(timestamp) || new Date(timestamp).toISOString() !== generatedAt) {
+        throw new Error("songs json payload generatedAt must be a UTC ISO 8601 timestamp");
+    }
+    return generatedAt;
+}
+
+/**
  * JSON文字列をオブジェクトとして解析する。
  * @param jsonText JSON文字列
  * @returns 解析済みオブジェクト
@@ -58,12 +92,30 @@ function parseJsonObject(jsonText: string): Record<string, unknown> {
 
 /**
  * 曲データJSONのschemaVersionを検証する。
+ * Version 1は既存キャッシュのフォールバック利用に限って読み込み互換を保つ。
  * @param schemaVersion 検証するschema version
+ * @returns 検証済みschema version
  */
-function assertSupportedSchemaVersion(schemaVersion: unknown): void {
-    if (schemaVersion !== SONGS_JSON_SCHEMA_VERSION) {
+function parseSupportedSchemaVersion(schemaVersion: unknown): number {
+    if (
+        schemaVersion !== LEGACY_SONGS_JSON_SCHEMA_VERSION &&
+        schemaVersion !== SONGS_JSON_SCHEMA_VERSION
+    ) {
         throw new Error(`unsupported songs json schema: ${schemaVersion}`);
     }
+    return schemaVersion;
+}
+
+/**
+ * schema versionに応じて生成日時を検証する。
+ * Version 1は日時を持たない旧キャッシュとしてnullへ正規化する。
+ * @param schemaVersion 検証済みschema version
+ * @param generatedAt 検証する生成日時
+ * @returns 検証済みの生成日時、または旧schemaを表すnull
+ */
+function parseGeneratedAtForSchema(schemaVersion: number, generatedAt: unknown): string | null {
+    if (schemaVersion === LEGACY_SONGS_JSON_SCHEMA_VERSION) return null;
+    return parseGeneratedAt(generatedAt);
 }
 
 /**
@@ -134,15 +186,18 @@ function parseSongsArray(songs: unknown): Song[] {
  * 曲データ配列を現在のJSONスキーマへ包む。
  * @param songs 曲配列
  * @param contentHash 曲配列のhash
+ * @param generatedAt contentHashが生成された日時
  * @returns 現在のスキーマで包んだpayload
  */
 export function buildSongsJsonPayload(
     songs: unknown[],
-    contentHash: string
-): { schemaVersion: number; contentHash: string; songs: Song[] } {
+    contentHash: string,
+    generatedAt: string
+): SongsJsonPayload {
     return {
         schemaVersion: SONGS_JSON_SCHEMA_VERSION,
         contentHash: parseContentHash(contentHash),
+        generatedAt: parseGeneratedAt(generatedAt),
         songs: parseSongsArray(songs)
     };
 }
@@ -150,28 +205,53 @@ export function buildSongsJsonPayload(
 /**
  * 曲データJSONのメタ情報を現在のJSONスキーマへ包む。
  * @param contentHash 曲配列のhash
+ * @param generatedAt contentHashが生成された日時
  * @returns 現在のスキーマで包んだメタ情報
  */
 export function buildSongsJsonMetaPayload(
-    contentHash: string
-): { schemaVersion: number; contentHash: string } {
+    contentHash: string,
+    generatedAt: string
+): SongsJsonArtifactMetadata {
     return {
         schemaVersion: SONGS_JSON_SCHEMA_VERSION,
-        contentHash: parseContentHash(contentHash)
+        contentHash: parseContentHash(contentHash),
+        generatedAt: parseGeneratedAt(generatedAt)
     };
+}
+
+/**
+ * 2つの曲データJSON成果物について、候補側の鮮度を判定する。
+ * hash一致時は日時を参照せず、hash不一致で日時を比較できない場合はincomparableを返す。
+ * @param candidate 採用候補の成果物メタ情報
+ * @param reference 比較基準の成果物メタ情報
+ * @returns 候補側から見た鮮度
+ */
+export function compareSongsJsonArtifactFreshness(
+    candidate: SongsJsonArtifactMetadata,
+    reference: SongsJsonArtifactMetadata
+): SongsJsonArtifactFreshness {
+    if (candidate.contentHash === reference.contentHash) return "same-content";
+    if (!candidate.generatedAt || !reference.generatedAt) return "incomparable";
+    const candidateTimestamp = Date.parse(candidate.generatedAt);
+    const referenceTimestamp = Date.parse(reference.generatedAt);
+    if (candidateTimestamp > referenceTimestamp) return "candidate-newer";
+    if (candidateTimestamp < referenceTimestamp) return "candidate-older";
+    return "incomparable";
 }
 
 /**
  * 曲データJSONを検証して、現在のスキーマの内容を返す。
  * @param jsonText JSON文字列
- * @returns 検証済みのhashと曲配列
+ * @returns 検証済みの成果物メタ情報と曲配列
  */
-export function parseSongsJsonPayload(jsonText: string): { contentHash: string; songs: Song[] } {
+export function parseSongsJsonPayload(jsonText: string): SongsJsonPayload {
     const payload = parseJsonObject(jsonText);
-    assertSupportedSchemaVersion(payload.schemaVersion);
+    const schemaVersion = parseSupportedSchemaVersion(payload.schemaVersion);
     const contentHash = parseContentHash(payload.contentHash);
     return {
+        schemaVersion,
         contentHash,
+        generatedAt: parseGeneratedAtForSchema(schemaVersion, payload.generatedAt),
         songs: parseSongsArray(payload.songs)
     };
 }
@@ -181,10 +261,12 @@ export function parseSongsJsonPayload(jsonText: string): { contentHash: string; 
  * @param jsonText JSON文字列
  * @returns 検証済みのメタ情報
  */
-export function parseSongsJsonMetaPayload(jsonText: string): { contentHash: string } {
+export function parseSongsJsonMetaPayload(jsonText: string): SongsJsonArtifactMetadata {
     const payload = parseJsonObject(jsonText);
-    assertSupportedSchemaVersion(payload.schemaVersion);
+    const schemaVersion = parseSupportedSchemaVersion(payload.schemaVersion);
     return {
-        contentHash: parseContentHash(payload.contentHash)
+        schemaVersion,
+        contentHash: parseContentHash(payload.contentHash),
+        generatedAt: parseGeneratedAtForSchema(schemaVersion, payload.generatedAt)
     };
 }

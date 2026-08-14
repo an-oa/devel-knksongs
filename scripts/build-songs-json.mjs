@@ -4,7 +4,11 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { parseCsvToSongs } from "../_build/app/lib/csv-parser.mjs";
-import { buildSongsJsonMetaPayload, buildSongsJsonPayload } from "../_build/app/lib/songs-json.mjs";
+import {
+    buildSongsJsonMetaPayload,
+    buildSongsJsonPayload,
+    parseSongsJsonMetaPayload
+} from "../_build/app/lib/songs-json.mjs";
 import { PUBLIC_CSV_URL } from "../_build/app/config.mjs";
 import { createSongsContentHash } from "./songs-content-hash.mjs";
 import { validateSongsJsonArtifacts } from "./songs-json-artifact.mjs";
@@ -82,16 +86,36 @@ function stringifyPayload(payload) {
 }
 
 /**
+ * 既存成果物とcontentHashが同じ場合は生成日時を引き継ぎ、差分がある場合だけ更新する。
+ * @param {{ metaOutputPath: string, now?: () => Date }} options
+ * @param {string} contentHash
+ * @returns {Promise<string>}
+ */
+async function resolveGeneratedAt(options, contentHash) {
+    try {
+        const existingMetaText = await readFile(resolve(options.metaOutputPath), "utf8");
+        const existingMeta = parseSongsJsonMetaPayload(existingMetaText);
+        if (existingMeta.contentHash === contentHash && existingMeta.generatedAt) {
+            return existingMeta.generatedAt;
+        }
+    } catch {
+        // 初回生成や旧・不正なmetaの場合は現在時刻からVersion 2成果物を作る。
+    }
+    return (options.now?.() ?? new Date()).toISOString();
+}
+
+/**
  * CSV から曲データJSONを生成してファイルへ保存する。
- * @param {{ inputPath: string, outputPath: string, metaOutputPath: string, sourceUrl: string }} options
+ * @param {{ inputPath: string, outputPath: string, metaOutputPath: string, sourceUrl: string, now?: () => Date }} options
  * @returns {Promise<number>}
  */
 export async function buildSongsJson(options) {
     const csvText = await loadCsvText(options);
     const songs = parseCsvToSongs(csvText);
     const contentHash = createSongsContentHash(songs);
-    const songsJsonText = stringifyPayload(buildSongsJsonPayload(songs, contentHash));
-    const songsMetaJsonText = stringifyPayload(buildSongsJsonMetaPayload(contentHash));
+    const generatedAt = await resolveGeneratedAt(options, contentHash);
+    const songsJsonText = stringifyPayload(buildSongsJsonPayload(songs, contentHash, generatedAt));
+    const songsMetaJsonText = stringifyPayload(buildSongsJsonMetaPayload(contentHash, generatedAt));
     validateSongsJsonArtifacts(songsJsonText, songsMetaJsonText);
     await mkdir(dirname(resolve(options.outputPath)), { recursive: true });
     await mkdir(dirname(resolve(options.metaOutputPath)), { recursive: true });

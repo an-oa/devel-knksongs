@@ -131,12 +131,15 @@
 
 ## データフロー
 1. IndexedDB の曲データJSONキャッシュを確認する。
-2. キャッシュがある場合は `songs-meta.json` の `contentHash` を確認する。
-   - hash が一致、または meta 確認に失敗した場合はキャッシュを表示する。
-   - hash が変わっている場合は、古いキャッシュを先に表示せず `songs.json` の取得を試す。
-3. キャッシュがない、または `contentHash` が変わっている場合は `songs.json` を取得し、schema を検証して保存する。
-4. JSON取得に失敗した場合は、公開CSVまたはCSVキャッシュを取得し、`SongRow` に正規化する。
-5. 新しいJSON/CSVを取得できない場合は、最後に既存JSONキャッシュを表示する。
+2. `songs-meta.json` を取得し、キャッシュとの `contentHash` と `generatedAt` を比較する。
+   - hash が一致する場合は日時を参照せずキャッシュを表示する。
+   - hash が異なり、キャッシュの生成日時が新しい場合もキャッシュを表示する。
+   - meta の生成日時が新しい、日時が同じ、または日時を比較できない場合は `songs.json` を取得する。
+   - meta の取得・検証に失敗しても、`songs.json` 本体の取得は試す。
+3. 取得した `songs.json` はschemaを検証し、metaがある場合は同じ新旧判定を行う。
+   hash一致またはJSON本体の生成日時が新しい場合だけ表示してIndexedDBへ保存する。
+4. JSON本体を取得・採用できなかった場合は、有効なJSONキャッシュを表示する。
+5. JSONキャッシュもない場合だけ公開CSVを取得し、`SongRow` に正規化する。CSVは実行時キャッシュへ保存しない。
 6. （ブックマーク選択中なら）ブックマーク内の曲集合を解決する。
 7. 条件未指定ならおすすめ結果を解決し、通常時は検索条件を取得してフィルタする。
 8. 結果一覧を描画し、通常検索/ブックマーク検索時のみ段階表示を有効化する。
@@ -144,19 +147,18 @@
 ```mermaid
 flowchart TD
     A[IndexedDBの曲データJSONキャッシュ確認] --> B{キャッシュあり?}
-    B -- Yes --> C[songs-meta.jsonのcontentHash確認]
-    C --> D{hash一致またはmeta確認失敗?}
+    B --> C[songs-meta.json取得を試行]
+    C --> D{キャッシュがhash一致またはmetaより新しい?}
     D -- Yes --> E[JSONキャッシュを表示]
     D -- No --> F[songs.json取得]
-    B -- No --> F
-    F --> G{JSON取得成功?}
-    G -- Yes --> H[JSON schemaを検証してSongRow配列を適用しIndexedDB更新]
-    G -- No --> I[公開CSVまたはCSVキャッシュを取得]
-    I --> J{CSV取得成功?}
-    J -- Yes --> K[CSVをパースしてSongRowへ正規化]
-    J -- No --> L{JSONキャッシュあり?}
+    F --> G{schemaとmeta比較を通過?}
+    G -- Yes --> H[SongRow配列を適用しIndexedDB更新]
+    G -- No --> L{有効なJSONキャッシュあり?}
     L -- Yes --> E
-    L -- No --> M[読込エラー]
+    L -- No --> I[公開CSVを取得]
+    I --> J{CSV取得・検証成功?}
+    J -- Yes --> K[CSVをパースしてSongRowへ正規化]
+    J -- No --> M[読込エラー]
     E --> N[検索/ブックマーク/おすすめ/描画]
     H --> N
     K --> N
@@ -166,15 +168,19 @@ flowchart TD
 - 公開スプレッドシートのCSVを唯一のマスターデータとする。JSONを直接修正する更新経路や、
   JSONからCSVへ戻す経路は持たない
 - `songs.json` / `songs-meta.json` は、現在表示・再生可能な曲を配信する派生成果物とする
+- 両JSONはschema Version 2として、同じ `contentHash` とUTC ISO 8601形式の `generatedAt` を持つ。
+  `generatedAt` はcontentHashが変わった場合だけ更新し、同じ内容の定期生成では引き継ぐ
+- 実行時は既存のVersion 1 JSONキャッシュもフォールバックとして読み込む。
+  Version 1は生成日時を持たないため、hash不一致時の新旧判定には使用しない
 - 公開対象でもURLが空の行は、現在再生できない曲の履歴としてCSVへ残し、エラーにせず派生JSONから除外する。
   URLが非空で不正な場合は品質エラーとして生成を停止する
 - CSVから公開対象曲へ変換した直後に、必須文字列、YouTube URL・動画ID、再生範囲を全件検証する。
   問題はCSV行番号と曲名でまとめて報告し、検証成功前はどちらのJSONも書き換えない
 - 開始位置`0`と終了位置`null`は、ショート・切り抜き・歌みたなどの動画全体を再生する正常値とする。
   非空の不正な終了時刻・画面の向きに対する既存の警告とフォールバックは維持する
-- ブラウザのCSVフォールバックも同じ変換・品質検証を通し、検証前のCSVをキャッシュしない
+- ブラウザのCSVフォールバックも同じ変換・品質検証を通し、CSVは検証前後を問わず保存しない
 - 派生JSONの検証では、両ファイルの構文、各曲の必須フィールドと型を含むスキーマ、
-  `contentHash`同士の一致、曲配列から再計算したhashとの一致だけを確認し、
+  `contentHash`と`generatedAt`同士の一致、曲配列から再計算したhashとの一致だけを確認し、
   曲データの意味的品質は再判定しない
 
 ## データモデル（概要）
@@ -338,7 +344,7 @@ flowchart LR
 - プライバシー強化（youtube-nocookie.com 使用）
 - アーカイブ全体を再生
 - 旧バージョンで localStorage に保存していた実験的再生設定キーは、起動時に削除し、現行では読み込まない
-- CSVキャッシュ（JSON取得失敗時のフォールバック用）
+- 廃止済みCSVキャッシュのlocalStorage keyは、起動時に削除する
 - 検索条件（キーワード・日付・形態・コラボ種別・リレー/ハモリ）
   - localStorage key の `searchStateV1` は保存場所の互換維持用で、payload の `version` は検索条件 schema の版数として別に管理する
 - ブックマーク情報（ブックマーク名・曲参照/順序・作成日時）
@@ -348,8 +354,9 @@ flowchart LR
 IndexedDB保存：
 - 曲データJSONキャッシュ
   - DB名は `knksongs`、object store は `songsJsonCache`
-  - `songs-meta.json` の `contentHash` と突き合わせ、変化がなければ `songs.json` の再取得を避ける
+  - `songs-meta.json` の `contentHash` と `generatedAt` を突き合わせ、最新と判断できれば `songs.json` の再取得を避ける
   - 旧localStorageの曲データJSONキャッシュは読み込み時に移行し、移行成功後に旧キャッシュを削除する
+  - 廃止済みCSVキャッシュのIndexedDB keyは、起動時に削除する
 
 ## YouTube埋め込み
 - 標準では `youtube.com` の埋め込みを使用し、`プライバシー強化` がONの場合は `youtube-nocookie.com` の埋め込みを使用する
@@ -368,8 +375,8 @@ IndexedDB保存：
 
 ## パフォーマンス
 - 曲データJSONをIndexedDBにキャッシュし、初期表示時の取得候補として利用する
-- `songs-meta.json` の content hash で鮮度を確認し、大きい `songs.json` の取得頻度を抑える
-- JSON取得に失敗した場合に備え、CSVもフォールバック用にキャッシュする
+- `songs-meta.json` のcontent hashと生成日時で鮮度を確認し、大きい `songs.json` の取得頻度を抑える
+- CSVはJSONとJSONキャッシュの両方を利用できない場合だけネットワークから取得する
 - 段階表示（追加読み込み）
   - 通常検索・ブックマーク検索ともに `RESULT_DISPLAY_BATCH_SIZE` 単位で追加表示
 - サムネ遅延読み込み（IntersectionObserver）

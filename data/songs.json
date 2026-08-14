@@ -1,6 +1,7 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "contentHash": "sha256:12f895875b732e6087d323e3d3f2cb9484abca8949660fd44d871fcce84f40d4",
+  "generatedAt": "2026-08-14T12:41:19.210Z",
   "songs": [
     {
       "date": "2026/08/07",

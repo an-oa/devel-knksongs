@@ -5,6 +5,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildSongsJson } from "../scripts/build-songs-json.mjs";
 import { validateSongsJsonArtifacts } from "../scripts/songs-json-artifact.mjs";
+import {
+    parseSongsJsonMetaPayload,
+    parseSongsJsonPayload,
+    SONGS_JSON_SCHEMA_VERSION
+} from "../_build/app/lib/songs-json.mjs";
 
 /**
  * JSON生成スクリプト用のローカルCSVを作る。
@@ -53,12 +58,70 @@ test("songs json build: writes matching derived artifacts after CSV validation",
             "utf8"
         );
 
-        assert.equal(await buildSongsJson({ inputPath, outputPath, metaOutputPath, sourceUrl: "" }), 1);
+        assert.equal(await buildSongsJson({
+            inputPath,
+            outputPath,
+            metaOutputPath,
+            sourceUrl: "",
+            now: () => new Date("2026-08-14T00:00:00.000Z")
+        }), 1);
         const [songsJsonText, songsMetaJsonText] = await Promise.all([
             readFile(outputPath, "utf8"),
             readFile(metaOutputPath, "utf8")
         ]);
         assert.equal(validateSongsJsonArtifacts(songsJsonText, songsMetaJsonText), 1);
+        const songsPayload = parseSongsJsonPayload(songsJsonText);
+        const metaPayload = parseSongsJsonMetaPayload(songsMetaJsonText);
+        assert.equal(songsPayload.schemaVersion, SONGS_JSON_SCHEMA_VERSION);
+        assert.equal(songsPayload.generatedAt, "2026-08-14T00:00:00.000Z");
+        assert.equal(metaPayload.generatedAt, songsPayload.generatedAt);
+    } finally {
+        await rm(directory, { recursive: true, force: true });
+    }
+});
+
+test("songs json build: preserves generatedAt until the content hash changes", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "knksongs-build-json-"));
+    const inputPath = join(directory, "songs.csv");
+    const outputPath = join(directory, "songs.json");
+    const metaOutputPath = join(directory, "songs-meta.json");
+    try {
+        await writeFile(
+            inputPath,
+            makeCsv("https://www.youtube.com/watch?v=abc123def45"),
+            "utf8"
+        );
+        await buildSongsJson({
+            inputPath,
+            outputPath,
+            metaOutputPath,
+            sourceUrl: "",
+            now: () => new Date("2026-08-14T00:00:00.000Z")
+        });
+        await buildSongsJson({
+            inputPath,
+            outputPath,
+            metaOutputPath,
+            sourceUrl: "",
+            now: () => new Date("2026-08-15T00:00:00.000Z")
+        });
+        const unchangedMeta = parseSongsJsonMetaPayload(await readFile(metaOutputPath, "utf8"));
+        assert.equal(unchangedMeta.generatedAt, "2026-08-14T00:00:00.000Z");
+
+        await writeFile(
+            inputPath,
+            makeCsv("https://www.youtube.com/watch?v=different01"),
+            "utf8"
+        );
+        await buildSongsJson({
+            inputPath,
+            outputPath,
+            metaOutputPath,
+            sourceUrl: "",
+            now: () => new Date("2026-08-16T00:00:00.000Z")
+        });
+        const changedMeta = parseSongsJsonMetaPayload(await readFile(metaOutputPath, "utf8"));
+        assert.equal(changedMeta.generatedAt, "2026-08-16T00:00:00.000Z");
     } finally {
         await rm(directory, { recursive: true, force: true });
     }

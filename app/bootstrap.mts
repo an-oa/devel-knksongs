@@ -412,15 +412,15 @@ function createAppControllers() {
 
     /**
      * 曲データの取得元を束ねる data source。
-     * 公開 JSON と meta による鮮度確認を優先し、失敗時は CSV と保存済みキャッシュへ fallback する。
+     * 公開 JSON とmetaによる鮮度確認を優先し、失敗時は保存済みJSON、公開CSVへfallbackする。
      */
     const songsDataSource = createBrowserSongsDataSource({
         publicSongsJsonUrl: PUBLIC_SONGS_JSON_URL,
         publicSongsMetaUrl: PUBLIC_SONGS_META_URL,
         publicCsvUrl: PUBLIC_CSV_URL,
         songsJsonCacheKey: SONGS_JSON_CACHE_KEY,
-        csvCacheKey: CSV_CACHE_KEY,
-        legacyCsvCacheKey: LEGACY_CSV_CACHE_KEY
+        obsoleteCsvCacheKey: CSV_CACHE_KEY,
+        obsoleteLegacyCsvCacheKey: LEGACY_CSV_CACHE_KEY
     });
 
     /**

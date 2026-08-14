@@ -126,14 +126,21 @@ flowchart TD
   現在表示・再生可能な行だけを収録する派生成果物として扱います。JSONを直接修正したり、
   JSONからCSVへデータを戻したりする更新経路は設けません。
 - 通常の起動時は、事前生成された `data/songs.json` と `data/songs-meta.json` を優先して読み込みます。
-- `songs-meta.json` の `contentHash` で手元のJSONキャッシュが最新かを確認し、変化がなければ大きい `songs.json` の再取得を避けます。
+- `songs.json` / `songs-meta.json` はschema Version 2として、同じ `contentHash` とUTC ISO 8601形式の
+  `generatedAt` を持ちます。hashが一致する場合は日時を参照せず、hashが異なる場合は生成日時で新旧を判断します。
+  `generatedAt` はcontentHashが変わった場合だけ更新するため、CSVに変更がない定期生成では差分が発生しません。
+- 手元のJSONキャッシュがmetaと同じ内容か、metaより新しいと判断できれば、大きい `songs.json` の再取得を避けます。
+  meta取得失敗時もJSON本体を試し、取得できなければ有効なJSONキャッシュを使用します。
 - 公開スプレッドシートのCSVは、事前生成JSONの元データかつJSON取得失敗時のフォールバックとして参照します(`app/config.mts` の `PUBLIC_CSV_URL` で指定し、実行時は `_build/app/config.mjs` に生成された module を読みます)。
+  実行時の優先順位は公開JSON、有効なJSONキャッシュ、ネットワークCSVの順で、CSVはキャッシュしません。
+  旧バージョンが保存したCSVキャッシュは起動時に削除します。
 - CSVの `配信上の立場` は曲データの `streamRole` としてJSONへ保持します。
 - CSVから公開対象曲を変換した直後に、必須文字列、YouTube URL・動画ID、再生範囲を全件検証します。
   問題がある場合はCSV行番号を報告し、どちらのJSONも書き換えません。開始位置`0`と終了位置`null`は、
   動画全体を再生する正常値として扱います。ブラウザのCSVフォールバックも同じ変換・検証を使用します。
 - `npm run validate:songs-json` は曲データの意味を再判定せず、2つの派生JSONの構文、
-  各曲の必須フィールドと型を含むスキーマ、`contentHash`同士および曲配列から再計算したhashとの一致を検証します。
+  各曲の必須フィールドと型を含むスキーマ、`contentHash`と`generatedAt`同士、
+  および曲配列から再計算したhashとの一致を検証します。
 - `.github/workflows/update-songs-json.yml` は GitHub Actions 上で `npm run build:songs-json` と `npm run validate:songs-json` を実行し、`data/songs.json` / `data/songs-meta.json` に差分があればコミットして、更新後の `main` に対する CI を明示的に起動します。差分がない場合はコミットも deploy も行いません。
 - `.github/workflows/ci.yml` は `main` への push / pull request / 手動実行で `npm run validate:songs-json`、`npm run typecheck`、`npm run check:ts-emit`、`npm run build`、`npm run lint`、`npm run test:unit` を実行します。`main` の CI が成功すると `.github/workflows/deploy-pages.yml` が検証済み commit を deploy します。
 - `.github/workflows/deploy-pages.yml` は成功した CI の対象を build 前、artifact 生成後、concurrency / environment 待機後の deploy action 直前に `main` と照合します。待機前に古くなった run は deploy job ごと skip し、待機中に古くなった run は古い artifact を公開せず失敗として記録します。deploy 後は公開 `deployment.json` の SHA が対象 commit と一致するまで最長10分間確認し、最後に対象 commit が引き続き `main` であることを再確認してから workflow を成功扱いにします。

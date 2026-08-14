@@ -3,21 +3,27 @@ import assert from "node:assert/strict";
 import {
     buildSongsJsonMetaPayload,
     buildSongsJsonPayload,
+    compareSongsJsonArtifactFreshness,
     parseSongsJsonMetaPayload,
     parseSongsJsonPayload,
     SONGS_JSON_SCHEMA_VERSION
 } from "../_build/app/lib/songs-json.mjs";
 import { createSongFixture } from "./fixtures/song.mjs";
 
+const GENERATED_AT = "2026-08-14T00:00:00.000Z";
+
 test("songs json: builds and parses current schema payload", () => {
     const songs = [createSongFixture()];
     const contentHash = "sha256:test";
-    const payload = buildSongsJsonPayload(songs, contentHash);
+    const payload = buildSongsJsonPayload(songs, contentHash, GENERATED_AT);
     assert.equal(payload.schemaVersion, SONGS_JSON_SCHEMA_VERSION);
     assert.equal(payload.contentHash, contentHash);
+    assert.equal(payload.generatedAt, GENERATED_AT);
     assert.equal(payload.songs, songs);
     assert.deepEqual(parseSongsJsonPayload(JSON.stringify(payload)), {
+        schemaVersion: SONGS_JSON_SCHEMA_VERSION,
         contentHash,
+        generatedAt: GENERATED_AT,
         songs
     });
 });
@@ -29,7 +35,7 @@ test("songs json: accepts nullable numeric fields and empty orientation", () => 
         endSeconds: null,
         videoOrientation: ""
     });
-    const payload = buildSongsJsonPayload([song], "sha256:test");
+    const payload = buildSongsJsonPayload([song], "sha256:test", GENERATED_AT);
 
     assert.deepEqual(parseSongsJsonPayload(JSON.stringify(payload)).songs, [song]);
 });
@@ -42,6 +48,7 @@ test("songs json: rejects songs missing any required field", () => {
         const payload = {
             schemaVersion: SONGS_JSON_SCHEMA_VERSION,
             contentHash: "sha256:test",
+            generatedAt: GENERATED_AT,
             songs: [incompleteSong]
         };
 
@@ -67,6 +74,7 @@ test("songs json: rejects non-object songs and invalid field types", () => {
         const payload = {
             schemaVersion: SONGS_JSON_SCHEMA_VERSION,
             contentHash: "sha256:test",
+            generatedAt: GENERATED_AT,
             songs: [song]
         };
         assert.throws(() => parseSongsJsonPayload(JSON.stringify(payload)), expected);
@@ -75,17 +83,91 @@ test("songs json: rejects non-object songs and invalid field types", () => {
 
 test("songs json: builder rejects structurally incomplete songs", () => {
     assert.throws(
-        () => buildSongsJsonPayload([{ songKey: "archive-1::1" }], "sha256:test"),
+        () => buildSongsJsonPayload(
+            [{ songKey: "archive-1::1" }],
+            "sha256:test",
+            GENERATED_AT
+        ),
         /songs\[0\]\.date is required/
     );
 });
 
 test("songs json: builds and parses meta payload", () => {
     const contentHash = "sha256:test";
-    const payload = buildSongsJsonMetaPayload(contentHash);
+    const payload = buildSongsJsonMetaPayload(contentHash, GENERATED_AT);
     assert.equal(payload.schemaVersion, SONGS_JSON_SCHEMA_VERSION);
     assert.equal(payload.contentHash, contentHash);
-    assert.deepEqual(parseSongsJsonMetaPayload(JSON.stringify(payload)), { contentHash });
+    assert.equal(payload.generatedAt, GENERATED_AT);
+    assert.deepEqual(parseSongsJsonMetaPayload(JSON.stringify(payload)), {
+        schemaVersion: SONGS_JSON_SCHEMA_VERSION,
+        contentHash,
+        generatedAt: GENERATED_AT
+    });
+});
+
+test("songs json: parses Version 1 payloads as undated legacy cache entries", () => {
+    const songs = [createSongFixture()];
+    assert.deepEqual(parseSongsJsonPayload(JSON.stringify({
+        schemaVersion: 1,
+        contentHash: "sha256:legacy",
+        songs
+    })), {
+        schemaVersion: 1,
+        contentHash: "sha256:legacy",
+        generatedAt: null,
+        songs
+    });
+    assert.deepEqual(parseSongsJsonMetaPayload(JSON.stringify({
+        schemaVersion: 1,
+        contentHash: "sha256:legacy"
+    })), {
+        schemaVersion: 1,
+        contentHash: "sha256:legacy",
+        generatedAt: null
+    });
+});
+
+test("songs json: compares hashes before generated timestamps", () => {
+    const older = {
+        schemaVersion: SONGS_JSON_SCHEMA_VERSION,
+        contentHash: "sha256:same",
+        generatedAt: "2026-08-13T00:00:00.000Z"
+    };
+    const newer = {
+        schemaVersion: SONGS_JSON_SCHEMA_VERSION,
+        contentHash: "sha256:same",
+        generatedAt: "2026-08-15T00:00:00.000Z"
+    };
+
+    assert.equal(compareSongsJsonArtifactFreshness(older, newer), "same-content");
+});
+
+test("songs json: compares generated timestamps only for mismatched hashes", () => {
+    const reference = {
+        schemaVersion: SONGS_JSON_SCHEMA_VERSION,
+        contentHash: "sha256:reference",
+        generatedAt: GENERATED_AT
+    };
+
+    assert.equal(compareSongsJsonArtifactFreshness({
+        ...reference,
+        contentHash: "sha256:newer",
+        generatedAt: "2026-08-15T00:00:00.000Z"
+    }, reference), "candidate-newer");
+    assert.equal(compareSongsJsonArtifactFreshness({
+        ...reference,
+        contentHash: "sha256:older",
+        generatedAt: "2026-08-13T00:00:00.000Z"
+    }, reference), "candidate-older");
+    assert.equal(compareSongsJsonArtifactFreshness({
+        ...reference,
+        contentHash: "sha256:conflict"
+    }, reference), "incomparable");
+    assert.equal(compareSongsJsonArtifactFreshness({
+        ...reference,
+        contentHash: "sha256:legacy",
+        generatedAt: null
+    }, reference), "incomparable");
 });
 
 test("songs json: rejects unsupported schema versions", () => {
@@ -110,10 +192,26 @@ test("songs json: rejects unwrapped arrays", () => {
 test("songs json: rejects payloads without content hash", () => {
     const payload = {
         schemaVersion: SONGS_JSON_SCHEMA_VERSION,
+        generatedAt: GENERATED_AT,
         songs: []
     };
     assert.throws(
         () => parseSongsJsonPayload(JSON.stringify(payload)),
         /requires a contentHash/
     );
+});
+
+test("songs json: rejects missing or non-canonical Version 2 generated timestamps", () => {
+    for (const generatedAt of [undefined, "2026-08-14", "2026-08-14T09:00:00+09:00"]) {
+        const payload = {
+            schemaVersion: SONGS_JSON_SCHEMA_VERSION,
+            contentHash: "sha256:test",
+            generatedAt,
+            songs: []
+        };
+        assert.throws(
+            () => parseSongsJsonPayload(JSON.stringify(payload)),
+            /generatedAt/
+        );
+    }
 });

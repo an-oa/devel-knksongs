@@ -190,3 +190,34 @@ test("text cache adapter: setText success clears legacy localStorage keys", asyn
     assert.equal(storage.getItem("cachedCsvV2"), null);
     assert.equal(storage.getItem("cachedCsv"), null);
 });
+
+test("text cache adapter: removeText clears primary and all legacy cache entries", async () => {
+    const storage = createFakeLocalStorage();
+    let primaryValue = "cached,csv";
+    const cache = {
+        async getText() {
+            return primaryValue;
+        },
+        async setText(value) {
+            primaryValue = value;
+            return true;
+        },
+        async removeText() {
+            primaryValue = null;
+        }
+    };
+    const adapter = createLegacyLocalStorageTextCacheAdapter({
+        cache,
+        legacyKeys: ["cachedCsvV2", "cachedCsv"],
+        storage,
+        label: "CSVキャッシュ"
+    });
+    storage.setItem("cachedCsvV2", "current,csv");
+    storage.setItem("cachedCsv", "legacy,csv");
+
+    await adapter.removeText();
+
+    assert.equal(primaryValue, null);
+    assert.equal(storage.getItem("cachedCsvV2"), null);
+    assert.equal(storage.getItem("cachedCsv"), null);
+});
