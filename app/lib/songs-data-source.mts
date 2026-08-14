@@ -146,14 +146,14 @@ export function createSongsDataSource(input: SongsDataSourceInput) {
     }
 
     /**
-     * 曲データJSONをネットワークから読み込み、metaとの整合確認後に保存・表示する。
-     * metaを取得できなかった場合は、JSON自身のschema検証を通過すれば採用する。
-     * @param meta 比較対象のmeta、または取得失敗時のnull
+     * 曲データJSONをネットワークから読み込み、比較対象との鮮度確認後に保存・表示する。
+     * metaを取得できなかった場合は、既存のJSONキャッシュを比較対象にして巻き戻りを防ぐ。
+     * @param freshnessReference 比較対象のmetaまたはJSONキャッシュ
      * @param onSongsLoaded 読み込み結果の通知先
      * @returns 読み込めたか
      */
     async function loadNetworkSongsJson(
-        meta: SongsJsonArtifactMetadata | null,
+        freshnessReference: SongsJsonArtifactMetadata | null,
         onSongsLoaded: SongsLoadedCallback
     ): Promise<boolean> {
         const jsonText = await fetchSongsJsonText();
@@ -161,8 +161,8 @@ export function createSongsDataSource(input: SongsDataSourceInput) {
         if (payload.schemaVersion !== SONGS_JSON_SCHEMA_VERSION) {
             throw new Error("network songs json must use the current schemaVersion");
         }
-        if (meta && !isCurrentJsonCandidate(payload, meta)) {
-            throw new Error("songs json is older than or inconsistent with songs meta");
+        if (freshnessReference && !isCurrentJsonCandidate(payload, freshnessReference)) {
+            throw new Error("songs json is older than or inconsistent with the freshness reference");
         }
         await setCachedSongsJsonText(jsonText);
         onSongsLoaded({ songs: payload.songs, source: "network" });
@@ -215,7 +215,7 @@ export function createSongsDataSource(input: SongsDataSourceInput) {
 
         if (publicSongsJsonUrl) {
             try {
-                return await loadNetworkSongsJson(meta, onSongsLoaded);
+                return await loadNetworkSongsJson(meta ?? cachedPayload, onSongsLoaded);
             } catch {
                 // 有効なJSONキャッシュがあればCSVより先に使用する。
             }

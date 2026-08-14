@@ -352,8 +352,16 @@ test("songs data source: meta fetch failure still tries network json", async () 
     const previousFetch = globalThis.fetch;
     const previousConsoleWarn = console.warn;
     try {
-        const cachedJson = createSongsJson("cached-archive::1", "sha256:cached");
-        const freshJson = createSongsJson("fresh-archive::1", "sha256:fresh");
+        const cachedJson = createSongsJson(
+            "cached-archive::1",
+            "sha256:cached",
+            "2026-08-13T00:00:00.000Z"
+        );
+        const freshJson = createSongsJson(
+            "fresh-archive::1",
+            "sha256:fresh",
+            "2026-08-14T00:00:00.000Z"
+        );
         const songsJsonCache = createFakeTextCacheStore(cachedJson);
         const fetchUrls = [];
         const warnings = [];
@@ -381,6 +389,51 @@ test("songs data source: meta fetch failure still tries network json", async () 
         assert.equal(results[0].source, "network");
         assert.equal(results[0].songs[0].songKey, "fresh-archive::1");
         assert.match(String(warnings[0]?.[0]), /曲データJSONメタ情報の確認に失敗しました/);
+    } finally {
+        globalThis.fetch = previousFetch;
+        console.warn = previousConsoleWarn;
+    }
+});
+
+test("songs data source: meta fetch failure does not replace newer cache with older network json", async () => {
+    const previousFetch = globalThis.fetch;
+    const previousConsoleWarn = console.warn;
+    try {
+        const cachedJson = createSongsJson(
+            "cached-archive::1",
+            "sha256:newer-cache",
+            "2026-08-15T00:00:00.000Z"
+        );
+        const olderJson = createSongsJson(
+            "older-network::1",
+            "sha256:older-network",
+            "2026-08-14T00:00:00.000Z"
+        );
+        const songsJsonCache = createFakeTextCacheStore(cachedJson);
+        const fetchUrls = [];
+        console.warn = () => {};
+        globalThis.fetch = async (url, options) => {
+            fetchUrls.push([url, options]);
+            if (url === "data/songs-meta.json") return createFailedResponse();
+            return createResponse(olderJson);
+        };
+        const results = [];
+        const dataSource = createSongsDataSource({
+            publicSongsJsonUrl: "data/songs.json",
+            publicSongsMetaUrl: "data/songs-meta.json",
+            publicCsvUrl: "https://example.test/songs.csv",
+            songsJsonCache
+        });
+
+        assert.equal(await dataSource.loadInitialSongs({ onSongsLoaded: (result) => results.push(result) }), true);
+
+        assert.deepEqual(fetchUrls, [
+            ["data/songs-meta.json", { cache: "no-cache" }],
+            ["data/songs.json", { cache: "no-cache" }]
+        ]);
+        assert.equal(songsJsonCache.peek(), cachedJson);
+        assert.equal(results[0].source, "cache");
+        assert.equal(results[0].songs[0].songKey, "cached-archive::1");
     } finally {
         globalThis.fetch = previousFetch;
         console.warn = previousConsoleWarn;
