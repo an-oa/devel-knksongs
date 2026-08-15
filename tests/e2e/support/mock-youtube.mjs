@@ -16,9 +16,10 @@ const csvFixturePromise = readFile(fixtureCsvPath, "utf8");
  */
 function buildSongsJsonFixture(songs) {
     const contentHash = createSongsContentHash(songs);
+    const generatedAt = "2026-08-14T00:00:00.000Z";
     return {
-        json: JSON.stringify(buildSongsJsonPayload(songs, contentHash)),
-        meta: JSON.stringify(buildSongsJsonMetaPayload(contentHash))
+        json: JSON.stringify(buildSongsJsonPayload(songs, contentHash, generatedAt)),
+        meta: JSON.stringify(buildSongsJsonMetaPayload(contentHash, generatedAt))
     };
 }
 

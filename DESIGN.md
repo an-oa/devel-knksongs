@@ -10,8 +10,8 @@
 ## 全体構成
 - 静的フロントエンドのみ（HTML/CSS/JavaScript, ES Modules）。
   `app/**/*.mts` を source とし、`npm run build:ts` で `_build/app/**/*.mjs` へ生成した JavaScript をブラウザ・テスト・Node scripts が読む
-- データ取得：事前生成JSON（`data/songs.json` / `data/songs-meta.json`）を優先し、公開スプレッドシートのCSVは生成元とフォールバックに使う
-- データ生成/公開：GitHub Actions でCSVからJSONを生成・検証し、差分を `main` へコミットして CI を起動する。CI 成功後、検証済み commit を deploy 前後に現在の `main` と照合し、公開された `deployment.json` の commit SHA を確認する
+- データ取得：事前生成JSON（`data/songs.json` / `data/songs-meta.json`）を優先し、唯一のマスターである公開スプレッドシートのCSVを生成元とフォールバックに使う
+- データ生成/公開：GitHub Actions でCSVから派生JSONを生成・検証し、差分を `main` へコミットして CI を起動する。CI 成功後、検証済み commit を deploy 前後に現在の `main` と照合し、公開された `deployment.json` の commit SHA を確認する
 - CI：GitHub Actions で TypeScript emit、曲データ検証、typecheck、lint、unit test、静的 site build を実行する
 - 実行時の同梱外部ライブラリ依存：なし
 - 埋め込み再生まわりでは YouTube Iframe API を動的に利用し、標準では `youtube.com`、プライバシー強化設定ON時は `youtube-nocookie.com` の埋め込みURLを使う
@@ -32,8 +32,16 @@
   - `tests/csv-parser.test.mjs`
   - `tests/data-loader.test.mjs`
   - `tests/dom-utils.test.mjs`
-  - `tests/search-date.test.mjs`
+  - `tests/date-filter-controller.test.mjs`
+  - `tests/date-key.test.mjs`
+  - `tests/partial-date.test.mjs`
   - `tests/search-boolean-filters.test.mjs`
+  - `tests/search-controller.test.mjs`
+  - `tests/search-filters.test.mjs`
+  - `tests/search-query.test.mjs`
+  - `tests/search-query-validation.test.mjs`
+  - `tests/search-recommendation.test.mjs`
+  - `tests/song-format.test.mjs`
   - `tests/format-filter.test.mjs`
   - `tests/pages-artifact.test.mjs`
   - `tests/playback-sequence.test.mjs`
@@ -42,7 +50,6 @@
   - `tests/render-drag-reorder.test.mjs`
   - `tests/render-layout.test.mjs`
   - `tests/render-masonry-layout.test.mjs`
-  - `tests/search-filter-modules.test.mjs`
   - `tests/search-filters-controller.test.mjs`
   - `tests/search-state-schema.test.mjs`
   - `tests/sidebar-ui.test.mjs`
@@ -63,6 +70,8 @@
   - `tests/e2e/youtube-smoke.spec.mjs`
   - `tests/songs-content-hash.test.mjs`
   - `tests/songs-data-source.test.mjs`
+  - `tests/songs-data-quality.test.mjs`
+  - `tests/build-songs-json.test.mjs`
   - `tests/songs-json-cache.test.mjs`
   - `tests/songs-json.test.mjs`
   - `tests/songs-json-validation.test.mjs`
@@ -122,12 +131,15 @@
 
 ## データフロー
 1. IndexedDB の曲データJSONキャッシュを確認する。
-2. キャッシュがある場合は `songs-meta.json` の `contentHash` を確認する。
-   - hash が一致、または meta 確認に失敗した場合はキャッシュを表示する。
-   - hash が変わっている場合は、古いキャッシュを先に表示せず `songs.json` の取得を試す。
-3. キャッシュがない、または `contentHash` が変わっている場合は `songs.json` を取得し、schema を検証して保存する。
-4. JSON取得に失敗した場合は、公開CSVまたはCSVキャッシュを取得し、`SongRow` に正規化する。
-5. 新しいJSON/CSVを取得できない場合は、最後に既存JSONキャッシュを表示する。
+2. `songs-meta.json` を取得し、キャッシュとの `contentHash` と `generatedAt` を比較する。
+   - hash が一致する場合は日時を参照せずキャッシュを表示する。
+   - hash が異なり、キャッシュの生成日時が新しい場合もキャッシュを表示する。
+   - meta の生成日時が新しい、日時が同じ、または日時を比較できない場合は `songs.json` を取得する。
+   - meta の取得・検証に失敗しても、`songs.json` 本体の取得は試す。
+3. 取得した `songs.json` はschemaを検証し、metaがあればmeta、なければ既存JSONキャッシュを基準に
+   同じ新旧判定を行う。hash一致またはJSON本体の生成日時が新しい場合だけ表示してIndexedDBへ保存する。
+4. JSON本体を取得・採用できなかった場合は、有効なJSONキャッシュを表示する。
+5. JSONキャッシュもない場合だけ公開CSVを取得し、`SongRow` に正規化する。CSVは実行時キャッシュへ保存しない。
 6. （ブックマーク選択中なら）ブックマーク内の曲集合を解決する。
 7. 条件未指定ならおすすめ結果を解決し、通常時は検索条件を取得してフィルタする。
 8. 結果一覧を描画し、通常検索/ブックマーク検索時のみ段階表示を有効化する。
@@ -135,23 +147,42 @@
 ```mermaid
 flowchart TD
     A[IndexedDBの曲データJSONキャッシュ確認] --> B{キャッシュあり?}
-    B -- Yes --> C[songs-meta.jsonのcontentHash確認]
-    C --> D{hash一致またはmeta確認失敗?}
+    B --> C[songs-meta.json取得を試行]
+    C --> D{キャッシュがhash一致またはmetaより新しい?}
     D -- Yes --> E[JSONキャッシュを表示]
     D -- No --> F[songs.json取得]
-    B -- No --> F
-    F --> G{JSON取得成功?}
-    G -- Yes --> H[JSON schemaを検証してSongRow配列を適用しIndexedDB更新]
-    G -- No --> I[公開CSVまたはCSVキャッシュを取得]
-    I --> J{CSV取得成功?}
-    J -- Yes --> K[CSVをパースしてSongRowへ正規化]
-    J -- No --> L{JSONキャッシュあり?}
+    F --> G{schemaとmeta比較を通過?}
+    G -- Yes --> H[SongRow配列を適用しIndexedDB更新]
+    G -- No --> L{有効なJSONキャッシュあり?}
     L -- Yes --> E
-    L -- No --> M[読込エラー]
+    L -- No --> I[公開CSVを取得]
+    I --> J{CSV取得・検証成功?}
+    J -- Yes --> K[CSVをパースしてSongRowへ正規化]
+    J -- No --> M[読込エラー]
     E --> N[検索/ブックマーク/おすすめ/描画]
     H --> N
     K --> N
 ```
+
+### マスターCSVと派生JSON
+- 公開スプレッドシートのCSVを唯一のマスターデータとする。JSONを直接修正する更新経路や、
+  JSONからCSVへ戻す経路は持たない
+- `songs.json` / `songs-meta.json` は、現在表示・再生可能な曲を配信する派生成果物とする
+- 両JSONはschema Version 2として、同じ `contentHash` とUTC ISO 8601形式の `generatedAt` を持つ。
+  `generatedAt` はcontentHashが変わった場合だけ更新し、同じ内容の定期生成では引き継ぐ
+- 実行時は実際に配布された全期間のVersion 1 JSONキャッシュもフォールバックとして読み込む。
+  初期形式で省略されていた `contentHash` は `null`、各曲の `streamRole` は空文字へ正規化する。
+  Version 1は生成日時を持たず、初期形式はhashも持たないため、比較不能な場合は新旧判定に使用しない
+- 公開対象でもURLが空の行は、現在再生できない曲の履歴としてCSVへ残し、エラーにせず派生JSONから除外する。
+  URLが非空で不正な場合は品質エラーとして生成を停止する
+- CSVから公開対象曲へ変換した直後に、必須文字列、YouTube URL・動画ID、再生範囲を全件検証する。
+  問題はCSV行番号と曲名でまとめて報告し、検証成功前はどちらのJSONも書き換えない
+- 開始位置`0`と終了位置`null`は、ショート・切り抜き・歌みたなどの動画全体を再生する正常値とする。
+  非空の不正な終了時刻・画面の向きに対する既存の警告とフォールバックは維持する
+- ブラウザのCSVフォールバックも同じ変換・品質検証を通し、CSVは検証前後を問わず保存しない
+- 派生JSONの検証では、両ファイルの構文、各曲の必須フィールドと型を含むスキーマ、
+  `contentHash`と`generatedAt`同士の一致、曲配列から再計算したhashとの一致だけを確認し、
+  曲データの意味的品質は再判定しない
 
 ## データモデル（概要）
 `SongRow`
@@ -168,20 +199,40 @@ flowchart TD
 - ブックマーク検索では `bookmarkSongKey` を優先して曲行へ解決し、旧ブックマークの `songKey` / `legacySongKey` / 数値 index も移行対象として読み取る。
 
 ## 検索・絞り込みロジック
-- 検索語：正規化＋AND検索（スペース区切り）。有効な日付演算子は通常キーワードから分離する
+- 検索語：NFKC・読み・大小文字・連続空白を正規化したAND検索。曲データ側にも同じ空白正規化を適用する。
+  空白区切りの語に加え、二重引用符で囲んだ範囲を1つの検索フレーズとして扱う
+- 引用符は検索要素の境界とし、空白がなくても引用部分と非引用部分を分割する。
+  `foo""bar` は `foo` と `bar`、`foo"bar baz"qux` は `foo`、`bar baz`、`qux` としてAND検索する。
+  引用句の前後空白を無視して内部の連続空白を1つへ揃え、空引用句は検索条件として無視する
+- 引用句内の `\"` は引用符、`\\` はバックスラッシュとして扱い、それ以外のバックスラッシュは通常文字として保持する。
+  NFKCでASCIIへ変換される全角の `＂` / `＼` も構文として認識し、スマート引用符の `“”` は通常文字として扱う。
+  引用符が閉じられていない場合は構文エラーとして検索結果を0件にする
 - 形態：選択セットに含むか。`オリ曲` はUI上 `歌みた` と同じ項目で扱う
 - コラボ種別：`コラボ(ホスト)` は `streamRole` が `ホスト`、`コラボ(ゲスト)` は
   `ゲスト` の行を対象にする。両方選択時はホスト・ゲストのいずれかに一致する行を対象にする
 - リレー/ハモリ：チェック時のみ条件を追加
 - 日付：From/To の範囲一致（部分入力は範囲に補正）に加え、検索ボックスの
-  `since:YYYY-MM-DD`（指定日以降）と `until:YYYY-MM-DD`（指定日以前）を扱う。
-  すべて包含境界とし、From/Toと演算子を併用した場合は下限の最大値と上限の最小値による
-  共通部分を検索する
+  `since:YYYY[-MM[-DD]]` と `until:YYYY[-MM[-DD]]` を扱う。年・年月では末尾の `-` も許容し、
+  `since` は年初・月初、`until` は年末・月末へ補正する。すべて包含境界とし、From/Toと
+  演算子を併用した場合は下限の最大値と上限の最小値による共通部分を検索する
 - 同一の日付演算子を複数指定した場合、`since` は最も新しい日、`until` は最も古い日を採用する
-- 形式不正または実在しない日付の演算子は通常キーワードや日付条件に使わず、解析結果の
-  `invalidOperators` に保持する。`since` が `until` より後の場合も解析結果で範囲矛盾として扱う
-- 不正・矛盾した日付演算子は入力中には通知せず、検索ボックスのblur時にインラインメッセージと
-  `aria-invalid` を同期する。修正入力の開始時にはエラー状態を消去する
+- `since:` / `until:` の接尾辞が空、または数字・ハイフン・スラッシュから始まる場合は
+  日付演算子候補とする。形式不正または実在しない値は `invalid-date-operator` issueとして保持し、検索結果を0件にする。
+  日付として始まらない接尾辞は通常キーワードとして扱う。`since` が `until` より後の場合も
+  解析結果で範囲矛盾として扱い、検索結果を0件にする
+- 日付演算子は完全に非引用の検索要素だけを認識する。`since:2024"foo"` は日付演算子とキーワード、
+  `since:"2024"` は不正な `since:` と引用キーワード、`"since:2024"` は通常キーワードとして扱う
+- 空引用句を除いた解析結果にキーワードも日付演算子もなく、他の絞り込みやブックマークもなければおすすめ表示にする。
+  不正日付、範囲矛盾、未終了引用符がある場合は空検索よりエラーを優先し、検索結果を0件にする。
+  保存・復元では入力文字列を変更せず、実質的な空検索かどうかは解析結果から判定する
+- 不正・矛盾した日付演算子と引用符エラーは、検索のデバウンス後またはblur時に
+  インラインメッセージ、`aria-invalid`、検索結果を同期する。同じメッセージは再設定せず、
+  修正によって入力が有効になった場合はエラー状態を消去する
+- tokenizerとparserは`search-query` moduleに集約し、無効日付、未終了引用符、範囲矛盾を
+  判別可能な`issues`として一元管理する。UIはissueを日本語文言へ変換するだけとし、
+  issue追加時の文言漏れをTypeScriptの網羅性検査で検出する
+- 検索実行ごとに解析結果を1回だけ作り、UI検証、おすすめ判定、ブックマークを含む曲絞り込みで共有する。
+  解析結果は永続化せず、入力・blurなど別イベントではその時点の入力を改めて解析する
 
 ## おすすめ表示の方針
 - 条件未指定時におすすめ表示
@@ -194,7 +245,7 @@ flowchart TD
 - **Filtered**: フィルタ/検索によりおすすめ条件から外れた状態
 
 ### 条件判定（「未指定」の定義）
-- キーワードが空（検索ボックスが空）
+- 検索語が構文上有効で、空引用句を除いたキーワードと日付演算子が空
 - 日付が未指定（From/To ともに年・月・日が未選択）
 - 形態フィルタ5項目がすべてON（配信 / オリ曲/歌みた / ショート / 切り抜き / 収録）
 - コラボ種別/リレー/ハモリがOFF
@@ -261,7 +312,7 @@ stateDiagram-v2
 - `applyLoadedSongs()`：曲データ読込後の初期化（おすすめキャッシュのリセット含む）
 - `pickRecommended()`：おすすめ候補の抽出とシャッフル、キャッシュ利用の中心
 - `scheduleSearch()`：検索/絞り込みの実行をデバウンスして呼び出す
-- `search()`：条件取得→フィルタ→表示までの入口
+- `search()`：条件取得と検索語の1回限りの解析→検証→フィルタ→表示までの入口
 - `updateDisplay()`：結果のカード表示と「おすすめ/ヒット件数」表示の切替
 ## 状態管理
 `state`
@@ -294,7 +345,7 @@ flowchart LR
 - プライバシー強化（youtube-nocookie.com 使用）
 - アーカイブ全体を再生
 - 旧バージョンで localStorage に保存していた実験的再生設定キーは、起動時に削除し、現行では読み込まない
-- CSVキャッシュ（JSON取得失敗時のフォールバック用）
+- 廃止済みCSVキャッシュのlocalStorage keyは、起動時に削除する
 - 検索条件（キーワード・日付・形態・コラボ種別・リレー/ハモリ）
   - localStorage key の `searchStateV1` は保存場所の互換維持用で、payload の `version` は検索条件 schema の版数として別に管理する
 - ブックマーク情報（ブックマーク名・曲参照/順序・作成日時）
@@ -304,8 +355,9 @@ flowchart LR
 IndexedDB保存：
 - 曲データJSONキャッシュ
   - DB名は `knksongs`、object store は `songsJsonCache`
-  - `songs-meta.json` の `contentHash` と突き合わせ、変化がなければ `songs.json` の再取得を避ける
+  - `songs-meta.json` の `contentHash` と `generatedAt` を突き合わせ、最新と判断できれば `songs.json` の再取得を避ける
   - 旧localStorageの曲データJSONキャッシュは読み込み時に移行し、移行成功後に旧キャッシュを削除する
+  - 廃止済みCSVキャッシュのIndexedDB keyは、起動時に削除する
 
 ## YouTube埋め込み
 - 標準では `youtube.com` の埋め込みを使用し、`プライバシー強化` がONの場合は `youtube-nocookie.com` の埋め込みを使用する
@@ -324,8 +376,8 @@ IndexedDB保存：
 
 ## パフォーマンス
 - 曲データJSONをIndexedDBにキャッシュし、初期表示時の取得候補として利用する
-- `songs-meta.json` の content hash で鮮度を確認し、大きい `songs.json` の取得頻度を抑える
-- JSON取得に失敗した場合に備え、CSVもフォールバック用にキャッシュする
+- `songs-meta.json` のcontent hashと生成日時で鮮度を確認し、大きい `songs.json` の取得頻度を抑える
+- CSVはJSONとJSONキャッシュの両方を利用できない場合だけネットワークから取得する
 - 段階表示（追加読み込み）
   - 通常検索・ブックマーク検索ともに `RESULT_DISPLAY_BATCH_SIZE` 単位で追加表示
 - サムネ遅延読み込み（IntersectionObserver）

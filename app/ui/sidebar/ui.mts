@@ -1,6 +1,6 @@
 import { getSearchBooleanFilterElements } from "../../lib/search-boolean-filters.mjs";
 import {
-    clearSearchQueryValidation,
+    clearSearchQueryValidationIfValid,
     validateSearchQueryInput
 } from "../search-query-validation.mjs";
 import { createSidebarPopoverController } from "./popover.mjs";
@@ -267,7 +267,7 @@ export function createSidebarController(input: SidebarControllerInput) {
         });
         if (ui.el.searchBox) {
             ui.el.searchBox.addEventListener("input", () => {
-                clearSearchQueryValidation(ui.el.searchBox, ui.el.searchBoxError);
+                clearSearchQueryValidationIfValid(ui.el.searchBox, ui.el.searchBoxError);
                 markQueryTouched();
             });
             ui.el.searchBox.addEventListener("blur", () => {

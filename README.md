@@ -26,9 +26,20 @@
   - ひらがな/カタカナ等の読みでも検索できます。
   - 複数キーワード(スペース区切り)に対応します(全角スペースも可)。
   - `since:YYYY-MM-DD` で指定日以降、`until:YYYY-MM-DD` で指定日以前に絞り込めます。
-    どちらも指定日を含み、既存のFrom/To日付範囲とは共通部分を検索します。
+    年だけを指定すると `since` は1月1日、`until` は12月31日、年月を指定すると
+    `since` は月初、`until` は月末を包含境界として使います。年・年月の末尾の `-` も省略入力として扱います。
+    既存のFrom/To日付範囲と併用した場合は共通部分を検索します。
   - 同じ日付演算子を複数指定した場合、`since` は最も新しい日、`until` は最も古い日を使います。
-    不正な日付や矛盾した範囲は、検索ボックスからフォーカスを外したときに通知します。
+    日付らしい不正な値や矛盾した範囲は、入力中またはフォーカスを外したときに通知し、結果を0件にします。
+  - `until:なんちゃら` のように日付として始まらない文字列は通常キーワードとして検索します。
+    日付演算子の形をした文字列を検索する場合は、`"until:2026-13"` のように二重引用符で囲みます。
+    空白を含む `"Song until:2026"` も1つのフレーズとして検索できます。引用符は検索要素の境界になるため、
+    `foo"bar baz"qux` は `foo`、`bar baz`、`qux` のAND検索になります。
+  - 引用句内の前後空白は無視し、連続空白は1つに揃えます。空引用句は検索条件として無視され、
+    `""` だけを入力して他の絞り込みがなければおすすめ表示になります。不正な日付や構文エラーは0件表示を優先します。
+  - 引用句内では `\"` で引用符、`\\` でバックスラッシュを検索できます。
+    全角の `＂` / `＼` も互換文字として構文に使えますが、スマート引用符の `“”` は通常文字として検索します。
+    日付演算子は完全に引用されていない要素だけを認識するため、`since:"2024"` は不正な演算子になります。
 - 絞り込みができます。
   - 配信 / オリ曲/歌みた / ショート / 切り抜き / 収録。
   - UI上では `オリ曲` を `歌みた` と同じ項目(「オリ曲/歌みた」)で扱います。
@@ -79,6 +90,8 @@
 4. `URL` 列が空でないこと。
 
 いずれかに該当しない行は一覧に表示されません。
+URLが空の行は、かつてアーカイブが存在した現在再生できない曲としてCSVには残しますが、
+サムネイル表示・動画再生に使う派生JSONからは正常に除外します。
 
 ```mermaid
 flowchart TD
@@ -99,7 +112,8 @@ flowchart TD
 
 1. サイドバーの検索条件で、必要な絞り込みを設定します。
 2. 検索ボックスに曲名 / アーティスト名(読みでも可)を入力します。
-   日付で絞り込む場合は、`since:YYYY-MM-DD` / `until:YYYY-MM-DD` も同じボックスへ入力できます。
+   日付で絞り込む場合は、`since:YYYY[-MM[-DD]]` / `until:YYYY[-MM[-DD]]` も同じボックスへ入力できます。
+   日付演算子の形をした文字列は、二重引用符で囲むと通常の検索フレーズとして扱われます。
 3. 結果一覧が更新されます。
 4. 各行の曲名リンクで動画を開けます。
    - サムネイル表示をONにしている場合は、サムネクリックでページ内再生もできます。
@@ -108,10 +122,27 @@ flowchart TD
 
 ## データソース(開発者向けメモ)
 
+- 公開スプレッドシートのCSVを唯一のマスターデータとし、`songs.json` / `songs-meta.json` は
+  現在表示・再生可能な行だけを収録する派生成果物として扱います。JSONを直接修正したり、
+  JSONからCSVへデータを戻したりする更新経路は設けません。
 - 通常の起動時は、事前生成された `data/songs.json` と `data/songs-meta.json` を優先して読み込みます。
-- `songs-meta.json` の `contentHash` で手元のJSONキャッシュが最新かを確認し、変化がなければ大きい `songs.json` の再取得を避けます。
+- `songs.json` / `songs-meta.json` はschema Version 2として、同じ `contentHash` とUTC ISO 8601形式の
+  `generatedAt` を持ちます。hashが一致する場合は日時を参照せず、hashが異なる場合は生成日時で新旧を判断します。
+  `generatedAt` はcontentHashが変わった場合だけ更新するため、CSVに変更がない定期生成では差分が発生しません。
+- 手元のJSONキャッシュがmetaと同じ内容か、metaより新しいと判断できれば、大きい `songs.json` の再取得を避けます。
+  meta取得失敗時もJSON本体を試し、JSONキャッシュがある場合は両者を直接比較して古いJSONへの巻き戻りを防ぎます。
+- 実際に配布された全期間のVersion 1 JSONキャッシュはフォールバックとして読み込みます。
+  初期形式に存在しない `contentHash` は比較不能、`streamRole` は空文字として扱い、現在の必須構造へ正規化します。
 - 公開スプレッドシートのCSVは、事前生成JSONの元データかつJSON取得失敗時のフォールバックとして参照します(`app/config.mts` の `PUBLIC_CSV_URL` で指定し、実行時は `_build/app/config.mjs` に生成された module を読みます)。
+  実行時の優先順位は公開JSON、有効なJSONキャッシュ、ネットワークCSVの順で、CSVはキャッシュしません。
+  旧バージョンが保存したCSVキャッシュは起動時に削除します。
 - CSVの `配信上の立場` は曲データの `streamRole` としてJSONへ保持します。
+- CSVから公開対象曲を変換した直後に、必須文字列、YouTube URL・動画ID、再生範囲を全件検証します。
+  問題がある場合はCSV行番号を報告し、どちらのJSONも書き換えません。開始位置`0`と終了位置`null`は、
+  動画全体を再生する正常値として扱います。ブラウザのCSVフォールバックも同じ変換・検証を使用します。
+- `npm run validate:songs-json` は曲データの意味を再判定せず、2つの派生JSONの構文、
+  各曲の必須フィールドと型を含むスキーマ、`contentHash`と`generatedAt`同士、
+  および曲配列から再計算したhashとの一致を検証します。
 - `.github/workflows/update-songs-json.yml` は GitHub Actions 上で `npm run build:songs-json` と
   `npm run validate:songs-json` を実行し、`data/songs.json` / `data/songs-meta.json` だけに
   差分があることを確認します。差分があれば `APP_CLIENT_ID` repository variable と
@@ -144,7 +175,12 @@ flowchart TD
   - CSVパースのテスト (`tests/csv-parser.test.mjs`)
   - 初期データ読み込み後の状態反映テスト (`tests/data-loader.test.mjs`)
   - DOM補助関数のテスト (`tests/dom-utils.test.mjs`)
-  - 検索/日付フィルタ/ブックマーク検索のロジック (`tests/search-date.test.mjs`)
+  - 日付キーと部分日付の正規化/範囲判定テスト (`tests/date-key.test.mjs`, `tests/partial-date.test.mjs`)
+  - 検索クエリの解析/入力エラー表示テスト (`tests/search-query.test.mjs`, `tests/search-query-validation.test.mjs`)
+  - 楽曲の絞り込み/おすすめ選曲テスト (`tests/search-filters.test.mjs`, `tests/search-recommendation.test.mjs`)
+  - 日付フィルターUI controllerのテスト (`tests/date-filter-controller.test.mjs`)
+  - 検索/ブックマーク/おすすめ表示controllerのテスト (`tests/search-controller.test.mjs`)
+  - 楽曲形式の分類/選択判定テスト (`tests/song-format.test.mjs`)
   - 検索booleanフィルター共有helperのテスト (`tests/search-boolean-filters.test.mjs`)
   - フォーマット表示ラベルのテスト (`tests/format-filter.test.mjs`)
   - Pages artifact生成とcache buster付与のテスト (`tests/pages-artifact.test.mjs`)
@@ -156,7 +192,6 @@ flowchart TD
   - masonryレイアウト計算のテスト (`tests/render-masonry-layout.test.mjs`)
   - レイアウト補正待機のテスト (`tests/layout-anchor.test.mjs`)
   - 結果一覧スクロール制御のテスト (`tests/results-scroll.test.mjs`)
-  - 検索フィルター共有helperのテスト (`tests/search-filter-modules.test.mjs`)
   - 検索フィルターUI controllerのテスト (`tests/search-filters-controller.test.mjs`)
   - 検索状態保存schemaのテスト (`tests/search-state-schema.test.mjs`)
   - サイドバーUIのテスト (`tests/sidebar-ui.test.mjs`)
@@ -164,7 +199,9 @@ flowchart TD
   - 曲データソースのJSON優先読み込み/CSVフォールバック/キャッシュ更新テスト (`tests/songs-data-source.test.mjs`)
   - 曲データJSONキャッシュのIndexedDB/旧localStorage移行テスト (`tests/songs-json-cache.test.mjs`)
   - 曲データJSONスキーマのテスト (`tests/songs-json.test.mjs`)
-  - 曲データJSON品質検証スクリプトのテスト (`tests/songs-json-validation.test.mjs`)
+  - CSV由来の曲データ品質検証テスト (`tests/songs-data-quality.test.mjs`)
+  - 曲データJSON生成の書き出し前検証テスト (`tests/build-songs-json.test.mjs`)
+  - 派生JSONのスキーマ・hash整合性検証テスト (`tests/songs-json-validation.test.mjs`)
   - ストレージ(ブックマーク上限/リネーム)の単体テスト (`tests/storage-bookmark-limit.test.mjs`)
   - ストレージ(検索状態保存/復元)の単体テスト (`tests/storage-search-state.test.mjs`)
   - UI設定/ストレージ互換のテスト (`tests/ui-storage-compat.test.mjs`)

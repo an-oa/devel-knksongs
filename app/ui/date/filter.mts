@@ -1,7 +1,10 @@
-import { dateKeyToParts, parseDateKey } from "../../lib/date-key.mjs";
+import { dateKeyToParts } from "../../lib/date-key.mjs";
+import {
+    getPartialDateKeyRange,
+    normalizePartialDateParts
+} from "../../lib/partial-date.mjs";
+import type { PartialDateValue } from "../../lib/partial-date.mjs";
 import type { AppUiElements, DateUiRuntimeState } from "../../state.types";
-
-type DateSelectPrecision = "year" | "month" | "day";
 
 type DateSelectKind = "from" | "to";
 
@@ -15,13 +18,6 @@ type DateSelectElements = {
     year: HTMLSelectElement | null | undefined;
     month: HTMLSelectElement | null | undefined;
     day: HTMLSelectElement | null | undefined;
-};
-
-type DateSelectValue = {
-    year: number;
-    month: number | null;
-    day: number | null;
-    precision: DateSelectPrecision;
 };
 
 type DateFilterUiElements = Pick<
@@ -102,49 +98,20 @@ export function createDateFilterController({ ui }: { ui: DateFilterUiState }) {
      * @returns {string}
      */
     function getDateSelectValue(kind: string): string {
-        return formatDateSelectValue(normalizeDateSelectParts(getDateSelectParts(kind)));
-    }
-
-    /**
-     * セレクト部品の文字列値を部分日付値へ正規化する。
-     * @param {{ year: string, month: string, day: string }} parts
-     * @returns {DateSelectValue | null}
-     */
-    function normalizeDateSelectParts(parts: DateSelectParts): DateSelectValue | null {
-        const yearText = parts.year.trim();
-        if (!/^\d{4}$/.test(yearText)) return null;
-        const year = Number(yearText);
-        const monthText = parts.month.trim();
-        if (!monthText) return { year, month: null, day: null, precision: "year" };
-        if (!/^\d{1,2}$/.test(monthText)) return null;
-        const month = Number(monthText);
-        if (month < 1 || month > 12) return null;
-        const dayText = parts.day.trim();
-        if (!dayText) return { year, month, day: null, precision: "month" };
-        if (!/^\d{1,2}$/.test(dayText)) return null;
-        const day = Number(dayText);
-        const key = parseDateKey(`${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`);
-        if (!key) return null;
-        const normalized = dateKeyToParts(key);
-        return {
-            year: normalized.year,
-            month: normalized.month,
-            day: normalized.day,
-            precision: "day"
-        };
+        return formatDateSelectValue(normalizePartialDateParts(getDateSelectParts(kind)));
     }
 
     /**
      * 年・年月・年月日の日付文字列を解析する。
      * @param {string | null | undefined} value
-     * @returns {DateSelectValue | null}
+     * @returns {PartialDateValue | null}
      */
-    function parseDateSelectValue(value: string | null | undefined): DateSelectValue | null {
+    function parseDateSelectValue(value: string | null | undefined): PartialDateValue | null {
         if (!value) return null;
         const trimmed = value.trim();
         const match = /^(\d{4})(?:[/-](\d{1,2})(?:[/-](\d{1,2}))?)?$/.exec(trimmed);
         if (!match) return null;
-        return normalizeDateSelectParts({
+        return normalizePartialDateParts({
             year: match[1],
             month: match[2] ?? "",
             day: match[3] ?? ""
@@ -153,10 +120,10 @@ export function createDateFilterController({ ui }: { ui: DateFilterUiState }) {
 
     /**
      * 部分日付値を保存用の文字列へ整形する。
-     * @param {DateSelectValue | null} value
+     * @param {PartialDateValue | null} value
      * @returns {string}
      */
-    function formatDateSelectValue(value: DateSelectValue | null): string {
+    function formatDateSelectValue(value: PartialDateValue | null): string {
         if (!value) return "";
         const year = String(value.year).padStart(4, "0");
         if (value.precision === "year" || value.month === null) return year;
@@ -166,30 +133,11 @@ export function createDateFilterController({ ui }: { ui: DateFilterUiState }) {
     }
 
     /**
-     * 部分日付値から検索に使う最小/最大キー範囲を求める。
-     * @param {DateSelectValue | null} value
-     * @returns {SearchDateRange | null}
-     */
-    function getDateSelectRange(value: DateSelectValue | null): SearchDateRange | null {
-        if (!value) return null;
-        const { year, month, day } = value;
-        if (value.precision === "year" || month === null) {
-            return { minKey: year * 10000 + 101, maxKey: year * 10000 + 1231 };
-        }
-        const daysInMonth = new Date(year, month, 0).getDate();
-        if (value.precision === "month" || day === null) {
-            return { minKey: year * 10000 + month * 100 + 1, maxKey: year * 10000 + month * 100 + daysInMonth };
-        }
-        const key = year * 10000 + month * 100 + day;
-        return { minKey: key, maxKey: key };
-    }
-
-    /**
      * 完全年月日の部分日付値から日付キーを返す。
-     * @param {DateSelectValue | null} value
+     * @param {PartialDateValue | null} value
      * @returns {number | null}
      */
-    function getCompleteDateSelectKey(value: DateSelectValue | null): number | null {
+    function getCompleteDateSelectKey(value: PartialDateValue | null): number | null {
         if (!value || value.precision !== "day" || value.month === null || value.day === null) return null;
         return value.year * 10000 + value.month * 100 + value.day;
     }
@@ -258,7 +206,7 @@ export function createDateFilterController({ ui }: { ui: DateFilterUiState }) {
      * @returns {SearchDateRange | null}
      */
     function getPartialDateRange(kind: string): SearchDateRange | null {
-        return getDateSelectRange(normalizeDateSelectParts(getDateSelectParts(kind)));
+        return getPartialDateKeyRange(normalizePartialDateParts(getDateSelectParts(kind)));
     }
 
     /**
@@ -495,8 +443,8 @@ export function createDateFilterController({ ui }: { ui: DateFilterUiState }) {
             if (key > maxKey) return maxKey;
             return key;
         };
-        const currentFromValue = normalizeDateSelectParts(getDateSelectParts("from"));
-        const currentToValue = normalizeDateSelectParts(getDateSelectParts("to"));
+        const currentFromValue = normalizePartialDateParts(getDateSelectParts("from"));
+        const currentToValue = normalizePartialDateParts(getDateSelectParts("to"));
         const currentFromKey = getCompleteDateSelectKey(currentFromValue);
         const currentToKey = getCompleteDateSelectKey(currentToValue);
         let fromKey = clampKey(currentFromKey);

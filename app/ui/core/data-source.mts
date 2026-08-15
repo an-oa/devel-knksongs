@@ -11,8 +11,8 @@ type BrowserSongsDataSourceInput = {
     publicSongsMetaUrl: string;
     publicCsvUrl: string;
     songsJsonCacheKey: string;
-    csvCacheKey: string;
-    legacyCsvCacheKey: string;
+    obsoleteCsvCacheKey: string;
+    obsoleteLegacyCsvCacheKey: string;
 };
 
 /**
@@ -30,7 +30,7 @@ function getBrowserLocalStorage(): Storage | null {
 
 /**
  * ブラウザ保存領域を使う曲データ取得元を作成する。
- * IndexedDB を主キャッシュ、旧 localStorage キャッシュを移行元として束ねる。
+ * JSONはIndexedDBを主キャッシュとして使い、廃止済みCSVキャッシュは初期化時に削除する。
  */
 export function createBrowserSongsDataSource(input: BrowserSongsDataSourceInput) {
     const {
@@ -38,8 +38,8 @@ export function createBrowserSongsDataSource(input: BrowserSongsDataSourceInput)
         publicSongsMetaUrl,
         publicCsvUrl,
         songsJsonCacheKey,
-        csvCacheKey,
-        legacyCsvCacheKey
+        obsoleteCsvCacheKey,
+        obsoleteLegacyCsvCacheKey
     } = input;
     const browserStorage = getBrowserLocalStorage();
     const songsJsonCacheStore = createIndexedDbSongsJsonCacheStore({
@@ -50,24 +50,21 @@ export function createBrowserSongsDataSource(input: BrowserSongsDataSourceInput)
         legacyKey: songsJsonCacheKey,
         storage: browserStorage
     });
-    const csvCacheStore = createIndexedDbTextCacheStore({
-        cacheKey: csvCacheKey
+    const obsoleteCsvCacheStore = createIndexedDbTextCacheStore({
+        cacheKey: obsoleteCsvCacheKey
     });
-    const csvCache = createLegacyLocalStorageTextCacheAdapter({
-        cache: csvCacheStore,
-        legacyKeys: [csvCacheKey, legacyCsvCacheKey],
+    const obsoleteCsvCache = createLegacyLocalStorageTextCacheAdapter({
+        cache: obsoleteCsvCacheStore,
+        legacyKeys: [obsoleteCsvCacheKey, obsoleteLegacyCsvCacheKey],
         storage: browserStorage,
         label: "CSVキャッシュ"
     });
+    void obsoleteCsvCache.removeText();
 
     return createSongsDataSource({
         publicSongsJsonUrl,
         publicSongsMetaUrl,
         publicCsvUrl,
-        songsJsonCache,
-        csvCache,
-        storage: browserStorage,
-        csvCacheKey,
-        legacyCsvCacheKeys: [legacyCsvCacheKey]
+        songsJsonCache
     });
 }

@@ -242,20 +242,18 @@ test("search box date operators validate input and filter songs", async ({ page 
     await expect(searchBox).toHaveAttribute("aria-errormessage", "searchBoxError");
 
     await searchBox.fill("since:2024-02-30");
-    await searchBox.blur();
     await expect(searchBox).toHaveAttribute("aria-invalid", "true");
     await expect(searchError).toContainText("実在する日付");
+    await expect(searchError).toContainText("二重引用符");
     await expect(searchError).toBeVisible();
+    await expect(page.locator("#resultCount")).toHaveText("0 件がヒット");
 
     await searchBox.fill("since:2024-01-05 until:2024-01-04");
-    await expect(searchBox).not.toHaveAttribute("aria-invalid", "true");
-    await expect(searchError).toBeHidden();
-    await searchBox.blur();
     await expect(searchBox).toHaveAttribute("aria-invalid", "true");
     await expect(searchError).toContainText("since の日付は until の日付以前");
+    await expect(page.locator("#resultCount")).toHaveText("0 件がヒット");
 
     await searchBox.fill("Chain since:2024-01-04 until:2024-01-04");
-    await searchBox.blur();
     await expect(searchBox).not.toHaveAttribute("aria-invalid", "true");
     await expect(searchError).toBeHidden();
     await expect(page.locator("#resultCount")).toHaveText("1 件がヒット");
@@ -263,6 +261,73 @@ test("search box date operators validate input and filter songs", async ({ page 
 
     await expect(getSongCard(page, "Chain Alpha")).toHaveCount(0);
     await expect(getSongCard(page, "Chain Beta")).toBeVisible();
+});
+
+test("search box restores an invalid query with its error and empty results", async ({ page }) => {
+    await openSidebar(page);
+    const searchBox = page.locator("#searchBox");
+    await searchBox.fill("until:2026-13");
+    await expect(searchBox).toHaveAttribute("aria-invalid", "true");
+    await expect(page.locator("#resultCount")).toHaveText("0 件がヒット");
+
+    await page.reload();
+    await waitForInitialLoad(page);
+
+    await expect(page.locator("#resultCount")).toHaveText("0 件がヒット");
+    await openSidebar(page);
+    await expect(page.locator("#searchBox")).toHaveValue("until:2026-13");
+    await expect(page.locator("#searchBox")).toHaveAttribute("aria-invalid", "true");
+    await expect(page.locator("#searchBoxError")).toBeVisible();
+});
+
+test("search box treats an empty quoted query as recommendations after restore", async ({ page }) => {
+    await openSidebar(page);
+    const searchBox = page.locator("#searchBox");
+    await searchBox.fill('""');
+    await expect(searchBox).not.toHaveAttribute("aria-invalid", "true");
+    await expect(page.locator("#searchBoxError")).toBeHidden();
+    await expect(page.locator("#resultCount")).toHaveText("おすすめを表示中");
+
+    await page.reload();
+    await waitForInitialLoad(page);
+
+    await expect(page.locator("#resultCount")).toHaveText("おすすめを表示中");
+    await openSidebar(page);
+    await expect(page.locator("#searchBox")).toHaveValue('""');
+    await expect(page.locator("#searchBoxError")).toBeHidden();
+});
+
+test("search box treats quoted phrases as literal text", async ({ page }) => {
+    const [literalSong, escapedQuoteSong] = createScrollableResultSongs(2);
+    literalSong.title = "Song until:2026-13";
+    literalSong.titleYomi = "Song until:2026-13";
+    literalSong.titleNorm = "song until:2026-13";
+    literalSong.titleYomiNorm = "song until:2026-13";
+    escapedQuoteSong.title = 'Don’t say "lazy"';
+    escapedQuoteSong.titleYomi = 'Don’t say "lazy"';
+    escapedQuoteSong.titleNorm = 'don’t say "lazy"';
+    escapedQuoteSong.titleYomiNorm = 'don’t say "lazy"';
+    await routeSongsJsonFixture(page, [literalSong, escapedQuoteSong]);
+    await page.reload();
+    await waitForInitialLoad(page);
+
+    await openSidebar(page);
+    const searchBox = page.locator("#searchBox");
+
+    await searchBox.fill("until:2026-13");
+    await expect(searchBox).toHaveAttribute("aria-invalid", "true");
+    await expect(page.locator("#resultCount")).toHaveText("0 件がヒット");
+
+    await searchBox.fill('"Song until:2026-13"');
+
+    await expect(searchBox).not.toHaveAttribute("aria-invalid", "true");
+    await expect(page.locator("#resultCount")).toHaveText("1 件がヒット");
+
+    await searchBox.fill(String.raw`"Don’t say \"lazy\""`);
+    await expect(searchBox).not.toHaveAttribute("aria-invalid", "true");
+    await expect(page.locator("#resultCount")).toHaveText("1 件がヒット");
+    await closeSidebar(page);
+    await expect(getSongCard(page, 'Don’t say "lazy"')).toBeVisible();
 });
 
 test("bookmark notification toast opens, closes, and auto-dismisses", async ({ page }) => {
@@ -493,7 +558,7 @@ test("thumbnail images keep masonry layout stable after refresh", async ({ page 
 
 test("manual playback failure advances to the next result when continuous playback is enabled", async ({ page }) => {
     await enablePlaybackSettings(page, { continuousPlayback: true });
-    await setMockVideoBehavior(page, "reject-alpha", "auto-error");
+    await setMockVideoBehavior(page, "reject-alph", "auto-error");
     await setMockVideoBehavior(page, "reject-beta", "auto-playing");
     await filterBySongTitle(page, "Reject");
 
@@ -513,7 +578,7 @@ test("manual playback failure advances to the next result when continuous playba
 
 test("continuous playback advances to the next result after the current song ends", async ({ page }) => {
     await enablePlaybackSettings(page, { continuousPlayback: true });
-    await setMockVideoBehavior(page, "chain-beta", "auto-playing");
+    await setMockVideoBehavior(page, "chain-beta1", "auto-playing");
     await filterBySongTitle(page, "Chain");
 
     const firstCard = getSongCard(page, "Chain Alpha");
@@ -533,13 +598,13 @@ test("continuous playback advances to the next result after the current song end
     await expect(secondCard.locator("iframe")).toBeVisible();
     await expect.poll(async () => {
         return page.evaluate(() => window.__knkMockYoutube.latestVideoId());
-    }).toBe("chain-beta");
+    }).toBe("chain-beta1");
 });
 
 test("continuous playback does not double-start the first successful autoplay successor after a rejection", async ({ page }) => {
     await enablePlaybackSettings(page, { continuousPlayback: true });
     await filterBySongTitle(page, "Artist");
-    await setMockVideoBehavior(page, "replay-video", "auto-error");
+    await setMockVideoBehavior(page, "replay-vide", "auto-error");
     await setMockVideoBehavior(page, "chain-alpha", "auto-playing");
 
     const manualCard = getSongCard(page, "Manual Song");
@@ -575,7 +640,7 @@ test("autoplay rejection is logged as autoplay and does not use the manual failu
     });
     await enablePlaybackSettings(page, { continuousPlayback: true });
     await filterBySongTitle(page, "Artist");
-    await setMockVideoBehavior(page, "replay-video", "auto-error");
+    await setMockVideoBehavior(page, "replay-vide", "auto-error");
     await setMockVideoBehavior(page, "chain-alpha", "auto-playing");
 
     const manualCard = getSongCard(page, "Manual Song");
