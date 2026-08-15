@@ -44,6 +44,7 @@ import { createUiSyncController } from "./ui/core/sync.mjs";
 import { createDataLoader } from "./ui/core/data.mjs";
 import { createSearchUiActions } from "./ui/core/search-actions.mjs";
 import { createSidebarController } from "./ui/sidebar/ui.mjs";
+import { createAutoHideHeaderController } from "./ui/header/auto-hide.mjs";
 import { createSearchFiltersController } from "./ui/search-filters/controller.mjs";
 import { debugPlayback } from "./lib/playback-debug.mjs";
 import { createBrowserSongsDataSource } from "./ui/core/data-source.mjs";
@@ -84,6 +85,7 @@ type SidebarCallbacksInput = {
     markQueryTouched: ReturnType<typeof createSearchUiActions>["markQueryTouched"];
     resetDateSelectGroup: ReturnType<typeof createSearchUiActions>["resetDateSelectGroup"];
     clearSearch: ReturnType<typeof createSearchUiActions>["clearSearch"];
+    setHeaderSidebarOpen: (open: boolean) => void;
 };
 
 type YoutubePlaybackHooksInput = {
@@ -191,7 +193,8 @@ function createSidebarCallbacks({
     markFilterTouched,
     markQueryTouched,
     resetDateSelectGroup,
-    clearSearch
+    clearSearch,
+    setHeaderSidebarOpen
 }: SidebarCallbacksInput): Parameters<typeof createSidebarController>[0]["callbacks"] {
     return {
         getBookmarkUiController,
@@ -201,7 +204,8 @@ function createSidebarCallbacks({
         clampDateInputsIfNeeded: () => searchController.clampDateInputsIfNeeded(),
         syncDateSelectOptions: (kind) => searchController.syncDateSelectOptions(kind),
         resetDateSelectGroup,
-        clearSearch
+        clearSearch,
+        setHeaderSidebarOpen
     };
 }
 
@@ -385,6 +389,13 @@ function createAppControllers() {
     });
 
     /**
+     * ページスクロール方向とサイドバー表示状態に応じてヘッダー表示を管理する controller。
+     */
+    const autoHideHeaderController = createAutoHideHeaderController({
+        ui: appUiState
+    });
+
+    /**
      * サイドバー全体の開閉、設定パネル、ブックマークパネル、検索リセット導線を扱う controller。
      */
     sidebarController = createSidebarController({
@@ -396,7 +407,8 @@ function createAppControllers() {
             markFilterTouched: searchUiActions.markFilterTouched,
             markQueryTouched: searchUiActions.markQueryTouched,
             resetDateSelectGroup: searchUiActions.resetDateSelectGroup,
-            clearSearch: searchUiActions.clearSearch
+            clearSearch: searchUiActions.clearSearch,
+            setHeaderSidebarOpen: autoHideHeaderController.setSidebarOpen
         })
     });
 
@@ -452,6 +464,7 @@ function createAppControllers() {
         playbackSettingsController,
         youtubeController,
         storageController,
+        autoHideHeaderController,
         sidebarController,
         uiSyncController,
         searchUiActions,
@@ -466,6 +479,7 @@ const {
     playbackSettingsController,
     youtubeController,
     storageController,
+    autoHideHeaderController,
     sidebarController,
     uiSyncController,
     searchUiActions,
@@ -484,6 +498,7 @@ async function initUI(): Promise<void> {
     searchFiltersController.setupFilterOptions({
         onFilterChange: searchUiActions.markFilterTouched
     });
+    autoHideHeaderController.setup();
     sidebarController.setupUIHandlers();
     storageController.loadBookmarks();
     setupTheme({ ui: appUiState });

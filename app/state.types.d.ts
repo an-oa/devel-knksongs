@@ -35,6 +35,7 @@ export type AppDataState = {
  * 個別プロパティは対応する DOM 要素キーそのものを表すため、型全体の説明に集約する。
  */
 export type AppUiElements = Partial<{
+  header: HTMLElement | null;
   sidebar: HTMLElement | null;
   sidebarSheet: Element | null;
   sidebarHeader: Element | null;

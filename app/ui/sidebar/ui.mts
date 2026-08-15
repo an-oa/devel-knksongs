@@ -30,6 +30,7 @@ type SidebarControllerInput = {
         syncDateSelectOptions: (kind?: string) => void;
         resetDateSelectGroup: (kind: string) => void;
         clearSearch: () => void;
+        setHeaderSidebarOpen: (open: boolean) => void;
     };
 };
 
@@ -54,7 +55,8 @@ export function createSidebarController(input: SidebarControllerInput) {
         clampDateInputsIfNeeded,
         syncDateSelectOptions,
         resetDateSelectGroup,
-        clearSearch
+        clearSearch,
+        setHeaderSidebarOpen
     } = callbacks;
     let closeSidebarMenu: (() => void) | null = null;
 
@@ -164,6 +166,7 @@ export function createSidebarController(input: SidebarControllerInput) {
             popoverController.clearPendingHide();
             const usesPopover = popoverController.show();
             sidebar.classList.add("active");
+            setHeaderSidebarOpen(true);
             if (!usesPopover) overlay.classList.add("show");
             lastFocusedElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
             popoverController.setMainContentInert(true);
@@ -182,6 +185,7 @@ export function createSidebarController(input: SidebarControllerInput) {
             }
             blurSidebarActiveElement(sidebar);
             sidebar.classList.remove("active");
+            setHeaderSidebarOpen(false);
             overlay.classList.remove("show");
             popoverController.scheduleHideAfterClose();
             popoverController.setMainContentInert(false);

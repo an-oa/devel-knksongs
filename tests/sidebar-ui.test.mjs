@@ -165,7 +165,8 @@ function createSidebarCallbacks(input) {
         clampDateInputsIfNeeded: () => {},
         syncDateSelectOptions: () => {},
         resetDateSelectGroup: () => {},
-        clearSearch: () => {}
+        clearSearch: () => {},
+        setHeaderSidebarOpen: state.setHeaderSidebarOpen || (() => {})
     };
 }
 
@@ -282,9 +283,14 @@ test("sidebar: open button aria-expanded follows sidebar open state", () => {
     try {
         const { ui, openSidebarBtn, overlay, mainContent } = createSidebarUiState();
         openSidebarBtn.setAttribute("aria-expanded", "false");
+        const headerSidebarOpenCalls = [];
         const controller = createSidebarControllerForTest({
             ui,
-            callbacks: createSidebarCallbacks()
+            callbacks: createSidebarCallbacks({
+                setHeaderSidebarOpen(open) {
+                    headerSidebarOpenCalls.push(open);
+                }
+            })
         });
 
         controller.setupUIHandlers();
@@ -293,12 +299,14 @@ test("sidebar: open button aria-expanded follows sidebar open state", () => {
         assert.equal(ui.el.sidebar.getAttribute("aria-hidden"), "false");
         assert.equal(openSidebarBtn.getAttribute("aria-expanded"), "true");
         assert.equal(mainContent.hasAttribute("inert"), true);
+        assert.deepEqual(headerSidebarOpenCalls, [true]);
 
         invokeListener(overlay, "click", {});
 
         assert.equal(ui.el.sidebar.getAttribute("aria-hidden"), "true");
         assert.equal(openSidebarBtn.getAttribute("aria-expanded"), "false");
         assert.equal(mainContent.hasAttribute("inert"), false);
+        assert.deepEqual(headerSidebarOpenCalls, [true, false]);
     } finally {
         restoreDom();
     }

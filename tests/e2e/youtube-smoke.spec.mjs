@@ -101,6 +101,58 @@ test("result tail sentinel appends search results when scrolling to the bottom",
     await expect(resultTailSentinel).toHaveAttribute("hidden", "");
 });
 
+test("header hides on downward scroll and returns on upward scroll", async ({ page }) => {
+    await routeSongsJsonFixture(page, createScrollableResultSongs(60));
+    await page.reload();
+    await waitForInitialLoad(page);
+
+    await openSidebar(page);
+    await page.locator("#searchBox").fill("Scroll Artist");
+    await closeSidebar(page);
+    await expect(page.locator(".song-card")).toHaveCount(48);
+
+    const header = page.locator(".header");
+    await expect(header).not.toHaveClass(/is-auto-hidden/);
+
+    await page.evaluate(() => window.scrollTo(0, 320));
+    await expect(header).toHaveClass(/is-auto-hidden/);
+
+    await page.evaluate(() => window.scrollBy(0, -20));
+    await expect(header).not.toHaveClass(/is-auto-hidden/);
+
+    await openSidebar(page);
+    await page.evaluate(() => window.scrollBy(0, 80));
+    await expect(header).not.toHaveClass(/is-auto-hidden/);
+
+    await closeSidebar(page);
+    await expect(header).not.toHaveClass(/is-auto-hidden/);
+
+    await page.evaluate(() => window.scrollBy(0, 20));
+    await expect(header).toHaveClass(/is-auto-hidden/);
+});
+
+test("reduced motion keeps header visibility changes but removes sliding", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await routeSongsJsonFixture(page, createScrollableResultSongs(60));
+    await page.reload();
+    await waitForInitialLoad(page);
+
+    await openSidebar(page);
+    await page.locator("#searchBox").fill("Scroll Artist");
+    await closeSidebar(page);
+    await expect(page.locator(".song-card")).toHaveCount(48);
+
+    const header = page.locator(".header");
+    await expect.poll(() => header.evaluate((element) => getComputedStyle(element).transitionDuration))
+        .toBe("0s");
+
+    await page.evaluate(() => window.scrollTo(0, 320));
+    await expect(header).toHaveClass(/is-auto-hidden/);
+
+    await page.evaluate(() => window.scrollBy(0, -20));
+    await expect(header).not.toHaveClass(/is-auto-hidden/);
+});
+
 test("playback settings are gated by thumbnail visibility", async ({ page }) => {
     await openSettingsPanel(page);
 

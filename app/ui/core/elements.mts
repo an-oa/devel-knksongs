@@ -25,6 +25,7 @@ function getButtonElementById(id: string): HTMLButtonElement | null {
 export function collectUiElements(): AppUiElements {
     const sidebar = document.getElementById("sidebar");
     return {
+        header: document.querySelector(".header"),
         sidebar,
         sidebarSheet: sidebar ? sidebar.querySelector(".sidebar-sheet") : null,
         sidebarHeader: sidebar ? sidebar.querySelector(".sidebar-header") : null,
