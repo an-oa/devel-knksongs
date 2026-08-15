@@ -112,7 +112,14 @@ flowchart TD
 - `songs-meta.json` の `contentHash` で手元のJSONキャッシュが最新かを確認し、変化がなければ大きい `songs.json` の再取得を避けます。
 - 公開スプレッドシートのCSVは、事前生成JSONの元データかつJSON取得失敗時のフォールバックとして参照します(`app/config.mts` の `PUBLIC_CSV_URL` で指定し、実行時は `_build/app/config.mjs` に生成された module を読みます)。
 - CSVの `配信上の立場` は曲データの `streamRole` としてJSONへ保持します。
-- `.github/workflows/update-songs-json.yml` は GitHub Actions 上で `npm run build:songs-json` と `npm run validate:songs-json` を実行し、`data/songs.json` / `data/songs-meta.json` に差分があればコミットして、更新後の `main` に対する CI を明示的に起動します。差分がない場合はコミットも deploy も行いません。
+- `.github/workflows/update-songs-json.yml` は GitHub Actions 上で `npm run build:songs-json` と
+  `npm run validate:songs-json` を実行し、`data/songs.json` / `data/songs-meta.json` だけに
+  差分があることを確認します。差分があれば `APP_CLIENT_ID` repository variable と
+  `APP_PRIVATE_KEY` repository secret から現在のリポジトリだけに有効な GitHub App token を作り、
+  App の bot user としてコミットして `main` へ push します。この通常の push を起点に CI が動き、
+  差分がない場合は token 発行、コミット、CI、deploy のいずれも行いません。
+  App は対象リポジトリだけへインストールし、Repository permissions は
+  Contents の Read and write だけを付与します。
 - `.github/workflows/ci.yml` は `main` への push / pull request / 手動実行で `npm run validate:songs-json`、`npm run typecheck`、`npm run check:ts-emit`、`npm run build`、`npm run lint`、`npm run test:unit` を実行します。`main` の CI が成功すると `.github/workflows/deploy-pages.yml` が検証済み commit を deploy します。
 - `.github/workflows/deploy-pages.yml` は成功した CI の対象を build 前、artifact 生成後、concurrency / environment 待機後の deploy action 直前に `main` と照合します。待機前に古くなった run は deploy job ごと skip し、待機中に古くなった run は古い artifact を公開せず失敗として記録します。deploy 後は公開 `deployment.json` の SHA が対象 commit と一致するまで最長10分間確認し、最後に対象 commit が引き続き `main` であることを再確認してから workflow を成功扱いにします。
 - `main` の SHA 照合と Pages deploy API の実行は原子的ではないため、両者の間に `main` が進んだ場合は古い artifact が一時的に公開される可能性があります。この場合も公開後の再照合で workflow を失敗させますが、公開自体を原子的に防ぐ保証はありません。
