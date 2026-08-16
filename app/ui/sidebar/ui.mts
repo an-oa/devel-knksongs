@@ -30,7 +30,7 @@ type SidebarControllerInput = {
         syncDateSelectOptions: (kind?: string) => void;
         resetDateSelectGroup: (kind: string) => void;
         clearSearch: () => void;
-        setHeaderSidebarOpen: (open: boolean) => void;
+        onOpenChange?: (open: boolean) => void;
     };
 };
 
@@ -56,7 +56,7 @@ export function createSidebarController(input: SidebarControllerInput) {
         syncDateSelectOptions,
         resetDateSelectGroup,
         clearSearch,
-        setHeaderSidebarOpen
+        onOpenChange
     } = callbacks;
     let closeSidebarMenu: (() => void) | null = null;
 
@@ -166,12 +166,12 @@ export function createSidebarController(input: SidebarControllerInput) {
             popoverController.clearPendingHide();
             const usesPopover = popoverController.show();
             sidebar.classList.add("active");
-            setHeaderSidebarOpen(true);
             if (!usesPopover) overlay.classList.add("show");
             lastFocusedElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
             popoverController.setMainContentInert(true);
             popoverController.syncExpandedState(true);
             focusSidebarFirst();
+            onOpenChange?.(true);
         }
 
         openBtn.addEventListener("click", openSidebarMenu);
@@ -185,11 +185,11 @@ export function createSidebarController(input: SidebarControllerInput) {
             }
             blurSidebarActiveElement(sidebar);
             sidebar.classList.remove("active");
-            setHeaderSidebarOpen(false);
             overlay.classList.remove("show");
             popoverController.scheduleHideAfterClose();
             popoverController.setMainContentInert(false);
             popoverController.syncExpandedState(false);
+            onOpenChange?.(false);
             if (lastFocusedElement) {
                 lastFocusedElement.focus();
                 return;

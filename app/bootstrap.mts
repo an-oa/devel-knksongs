@@ -85,7 +85,7 @@ type SidebarCallbacksInput = {
     markQueryTouched: ReturnType<typeof createSearchUiActions>["markQueryTouched"];
     resetDateSelectGroup: ReturnType<typeof createSearchUiActions>["resetDateSelectGroup"];
     clearSearch: ReturnType<typeof createSearchUiActions>["clearSearch"];
-    setHeaderSidebarOpen: (open: boolean) => void;
+    onOpenChange: (open: boolean) => void;
 };
 
 type YoutubePlaybackHooksInput = {
@@ -194,7 +194,7 @@ function createSidebarCallbacks({
     markQueryTouched,
     resetDateSelectGroup,
     clearSearch,
-    setHeaderSidebarOpen
+    onOpenChange
 }: SidebarCallbacksInput): Parameters<typeof createSidebarController>[0]["callbacks"] {
     return {
         getBookmarkUiController,
@@ -205,7 +205,7 @@ function createSidebarCallbacks({
         syncDateSelectOptions: (kind) => searchController.syncDateSelectOptions(kind),
         resetDateSelectGroup,
         clearSearch,
-        setHeaderSidebarOpen
+        onOpenChange
     };
 }
 
@@ -392,7 +392,8 @@ function createAppControllers() {
      * ページスクロール方向とサイドバー表示状態に応じてヘッダー表示を管理する controller。
      */
     const autoHideHeaderController = createAutoHideHeaderController({
-        ui: appUiState
+        ui: appUiState,
+        isSidebarOpen: () => appUiState.el.sidebar?.classList.contains("active") === true
     });
 
     /**
@@ -408,7 +409,7 @@ function createAppControllers() {
             markQueryTouched: searchUiActions.markQueryTouched,
             resetDateSelectGroup: searchUiActions.resetDateSelectGroup,
             clearSearch: searchUiActions.clearSearch,
-            setHeaderSidebarOpen: autoHideHeaderController.setSidebarOpen
+            onOpenChange: autoHideHeaderController.handleSidebarOpenChange
         })
     });
 

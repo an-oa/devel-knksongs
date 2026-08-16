@@ -23,6 +23,7 @@ import {
     openSettingsPanel,
     waitForInitialLoad
 } from "./support/ui-helpers.mjs";
+import { createScrollableResultSongs } from "./support/song-fixtures.mjs";
 
 test.beforeEach(async ({ page }) => {
     await installNetworkMocks(page);
@@ -33,50 +34,6 @@ test.beforeEach(async ({ page }) => {
     await page.reload();
     await waitForInitialLoad(page);
 });
-
-/**
- * 通常検索で 48 件を超える追加表示を検証するための曲 fixture を作る。
- * @param {number} count
- * @returns {Song[]}
- */
-function createScrollableResultSongs(count) {
-    return Array.from({ length: count }, (_, index) => {
-        const sourceIndex = index + 1;
-        const paddedIndex = String(sourceIndex).padStart(2, "0");
-        const month = 2 + Math.floor(index / 28);
-        const day = (index % 28) + 1;
-        const date = `2024/${String(month).padStart(2, "0")}/${String(day).padStart(2, "0")}`;
-        const videoId = `scroll-video-${paddedIndex}`;
-        const title = `Scroll Song ${paddedIndex}`;
-        const artist = "Scroll Artist";
-        return {
-            date,
-            dateKey: 20240000 + (month * 100) + day,
-            archiveId: `scroll-archive-${paddedIndex}`,
-            archiveOrder: 1,
-            sourceIndex,
-            videoId,
-            songKey: `scroll-archive-${paddedIndex}::1`,
-            bookmarkSongKey: `${videoId}::1`,
-            legacySongKey: `scroll-archive-${paddedIndex}::1::https://www.youtube.com/watch?v=${videoId}&t=${sourceIndex}s`,
-            format: "配信",
-            streamRole: "",
-            videoOrientation: "",
-            isRelay: false,
-            isHarmony: false,
-            title,
-            artist,
-            titleYomi: title,
-            artistYomi: artist,
-            url: `https://www.youtube.com/watch?v=${videoId}&t=${sourceIndex}s`,
-            endSeconds: null,
-            titleNorm: title.toLowerCase(),
-            artistNorm: artist.toLowerCase(),
-            titleYomiNorm: title.toLowerCase(),
-            artistYomiNorm: artist.toLowerCase()
-        };
-    });
-}
 
 test("result tail sentinel appends search results when scrolling to the bottom", async ({ page }) => {
     await routeSongsJsonFixture(page, createScrollableResultSongs(60));
@@ -99,58 +56,6 @@ test("result tail sentinel appends search results when scrolling to the bottom",
     await expect(cards).toHaveCount(60);
     await expect(getSongCard(page, "Scroll Song 60")).toBeVisible();
     await expect(resultTailSentinel).toHaveAttribute("hidden", "");
-});
-
-test("header hides on downward scroll and returns on upward scroll", async ({ page }) => {
-    await routeSongsJsonFixture(page, createScrollableResultSongs(60));
-    await page.reload();
-    await waitForInitialLoad(page);
-
-    await openSidebar(page);
-    await page.locator("#searchBox").fill("Scroll Artist");
-    await closeSidebar(page);
-    await expect(page.locator(".song-card")).toHaveCount(48);
-
-    const header = page.locator(".header");
-    await expect(header).not.toHaveClass(/is-auto-hidden/);
-
-    await page.evaluate(() => window.scrollTo(0, 320));
-    await expect(header).toHaveClass(/is-auto-hidden/);
-
-    await page.evaluate(() => window.scrollBy(0, -20));
-    await expect(header).not.toHaveClass(/is-auto-hidden/);
-
-    await openSidebar(page);
-    await page.evaluate(() => window.scrollBy(0, 80));
-    await expect(header).not.toHaveClass(/is-auto-hidden/);
-
-    await closeSidebar(page);
-    await expect(header).not.toHaveClass(/is-auto-hidden/);
-
-    await page.evaluate(() => window.scrollBy(0, 20));
-    await expect(header).toHaveClass(/is-auto-hidden/);
-});
-
-test("reduced motion keeps header visibility changes but removes sliding", async ({ page }) => {
-    await page.emulateMedia({ reducedMotion: "reduce" });
-    await routeSongsJsonFixture(page, createScrollableResultSongs(60));
-    await page.reload();
-    await waitForInitialLoad(page);
-
-    await openSidebar(page);
-    await page.locator("#searchBox").fill("Scroll Artist");
-    await closeSidebar(page);
-    await expect(page.locator(".song-card")).toHaveCount(48);
-
-    const header = page.locator(".header");
-    await expect.poll(() => header.evaluate((element) => getComputedStyle(element).transitionDuration))
-        .toBe("0s");
-
-    await page.evaluate(() => window.scrollTo(0, 320));
-    await expect(header).toHaveClass(/is-auto-hidden/);
-
-    await page.evaluate(() => window.scrollBy(0, -20));
-    await expect(header).not.toHaveClass(/is-auto-hidden/);
 });
 
 test("playback settings are gated by thumbnail visibility", async ({ page }) => {

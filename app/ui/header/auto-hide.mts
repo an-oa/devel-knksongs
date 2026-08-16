@@ -2,6 +2,7 @@ import type { AppUiState } from "../../state.types";
 
 type AutoHideHeaderControllerInput = {
     ui: Pick<AppUiState, "el">;
+    isSidebarOpen?: () => boolean;
     scrollDeltaPx?: number;
 };
 
@@ -14,6 +15,7 @@ const DEFAULT_SCROLL_DELTA_PX = 16;
  */
 export function createAutoHideHeaderController(input: AutoHideHeaderControllerInput) {
     const { ui } = input;
+    const isSidebarOpen = input.isSidebarOpen || (() => false);
     const scrollDeltaPx = Number.isFinite(input.scrollDeltaPx) && Number(input.scrollDeltaPx) > 0
         ? Number(input.scrollDeltaPx)
         : DEFAULT_SCROLL_DELTA_PX;
@@ -22,9 +24,6 @@ export function createAutoHideHeaderController(input: AutoHideHeaderControllerIn
     let scrollDirection: ScrollDirection = 0;
     let topVisibilityBoundary = 0;
     let isScrollUpdateScheduled = false;
-    let isSidebarOpen = false;
-    let isKeyboardInput = true;
-    let hasProtectedHeaderFocus = false;
     let isSetup = false;
 
     /**
@@ -76,13 +75,18 @@ export function createAutoHideHeaderController(input: AutoHideHeaderControllerIn
     }
 
     /**
-     * 現在フォーカスされている要素がヘッダー内にあるか判定する。
+     * ヘッダー内で現在フォーカス可視になっている要素があるか判定する。
      * @returns {boolean}
      */
-    function hasHeaderFocus(): boolean {
+    function hasFocusVisibleHeaderElement(): boolean {
         const header = getHeader();
         const activeElement = document.activeElement;
-        return Boolean(header && activeElement instanceof Element && header.contains(activeElement));
+        return Boolean(
+            header
+            && activeElement instanceof Element
+            && header.contains(activeElement)
+            && activeElement.matches(":focus-visible")
+        );
     }
 
     /**
@@ -91,7 +95,7 @@ export function createAutoHideHeaderController(input: AutoHideHeaderControllerIn
     function syncHeaderForScroll(): void {
         isScrollUpdateScheduled = false;
         const scrollY = getPageScrollY();
-        if (isSidebarOpen || hasProtectedHeaderFocus || scrollY <= topVisibilityBoundary) {
+        if (isSidebarOpen() || hasFocusVisibleHeaderElement() || scrollY <= topVisibilityBoundary) {
             showHeaderFrom(scrollY);
             return;
         }
@@ -119,28 +123,9 @@ export function createAutoHideHeaderController(input: AutoHideHeaderControllerIn
     }
 
     /**
-     * キーボード操作中のヘッダーフォーカスを画面内へ維持する。
-     */
-    function handleDocumentKeyDown(): void {
-        isKeyboardInput = true;
-        if (!hasHeaderFocus()) return;
-        hasProtectedHeaderFocus = true;
-        showHeaderFrom(getPageScrollY());
-    }
-
-    /**
-     * ポインター操作へ切り替わったらキーボード用フォーカス保護を解除する。
-     */
-    function handleDocumentPointerDown(): void {
-        isKeyboardInput = false;
-        hasProtectedHeaderFocus = false;
-    }
-
-    /**
-     * ヘッダー内へフォーカスが入ったときに表示し、入力手段に応じて保護する。
+     * ヘッダー内へフォーカスが入ったとき、次の描画前にヘッダーを表示する。
      */
     function handleHeaderFocusIn(): void {
-        hasProtectedHeaderFocus = isKeyboardInput;
         showHeaderFrom(getPageScrollY());
     }
 
@@ -151,7 +136,6 @@ export function createAutoHideHeaderController(input: AutoHideHeaderControllerIn
     function handleHeaderFocusOut(event: FocusEvent): void {
         const header = getHeader();
         if (header && event.relatedTarget instanceof Element && header.contains(event.relatedTarget)) return;
-        hasProtectedHeaderFocus = false;
         resetScrollTracking(getPageScrollY());
     }
 
@@ -174,23 +158,20 @@ export function createAutoHideHeaderController(input: AutoHideHeaderControllerIn
         showHeaderFrom(getPageScrollY());
         window.addEventListener("scroll", scheduleScrollSync, { passive: true });
         window.addEventListener("pageshow", handlePageShow);
-        document.addEventListener("keydown", handleDocumentKeyDown, true);
-        document.addEventListener("pointerdown", handleDocumentPointerDown, true);
         header.addEventListener("focusin", handleHeaderFocusIn);
         header.addEventListener("focusout", handleHeaderFocusOut);
     }
 
     /**
-     * サイドバーの開閉時はヘッダーを表示し、次の下スクロールまで維持する。
-     * @param {boolean} open
+     * サイドバーの開閉通知を受けてヘッダーを表示し、方向判定をやり直す。
+     * 開閉状態そのものは入力された getter から参照する。
      */
-    function setSidebarOpen(open: boolean): void {
-        isSidebarOpen = open;
+    function handleSidebarOpenChange(): void {
         showHeaderFrom(getPageScrollY());
     }
 
     return {
         setup,
-        setSidebarOpen
+        handleSidebarOpenChange
     };
 }
