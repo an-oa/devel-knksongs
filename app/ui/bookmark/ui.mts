@@ -22,9 +22,8 @@ export type BookmarkUiActionResult = {
 export type BookmarkUiActionCallbackResult = boolean | BookmarkUiActionResult | null | undefined;
 
 export type BookmarkUiCallbacks = {
-    clearSearchDebounce: () => void;
-    scheduleSearch: (options?: { immediate?: boolean }) => void;
-    saveSearchState: () => void;
+    onSelectActiveBookmark: (bookmarkId: string) => BookmarkUiActionCallbackResult;
+    onClearActiveBookmark: () => BookmarkUiActionCallbackResult;
     onAddSongToBookmark: (
         bookmarkId: string,
         songKey: string
@@ -67,9 +66,8 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
     });
     const bookmarkNotifications = createBookmarkNotificationController({ data, ui });
     const {
-        clearSearchDebounce,
-        scheduleSearch,
-        saveSearchState,
+        onSelectActiveBookmark,
+        onClearActiveBookmark,
         onAddSongToBookmark,
         onCreateBookmark,
         onCreateBookmarkAndAdd,
@@ -562,31 +560,18 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
     }
 
     /**
-     * アクティブなブックマークを切り替えて検索を再実行する。
+     * ブックマーク選択の意図を状態管理側へ通知する。
      * @param {string} bookmarkId
      */
     function setActiveBookmark(bookmarkId) {
-        clearSearchDebounce();
-        data.activeBookmark = bookmarkId;
-        renderBookmarks();
-        saveSearchState();
-        scheduleSearch({ immediate: true });
+        onSelectActiveBookmark(bookmarkId);
     }
 
     /**
-     * アクティブなブックマークを解除し、必要に応じて検索を再実行する。
-     * @param {{ shouldSearch?: boolean, shouldPersist?: boolean } | undefined} [options]
+     * ブックマーク選択解除の意図を状態管理側へ通知する。
      */
-    function clearActiveBookmark(options?: { shouldSearch?: boolean, shouldPersist?: boolean }) {
-        if (!data.activeBookmark) return;
-        data.activeBookmark = null;
-        renderBookmarks();
-        if (options?.shouldPersist !== false) {
-            saveSearchState();
-        }
-        if (options?.shouldSearch !== false) {
-            scheduleSearch({ immediate: true });
-        }
+    function clearActiveBookmark() {
+        onClearActiveBookmark();
     }
 
     /**

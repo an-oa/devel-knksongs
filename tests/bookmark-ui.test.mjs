@@ -119,9 +119,8 @@ function createBookmarkHarness(input) {
     };
     const ui = createBookmarkUiState();
     const calls = {
-        clearSearchDebounce: 0,
-        scheduleSearchArgs: [],
-        saveSearchState: 0,
+        selectActiveBookmarkArgs: [],
+        clearActiveBookmark: 0,
         addSongArgs: [],
         createBookmarkArgs: [],
         createBookmarkAndAddArgs: [],
@@ -135,14 +134,13 @@ function createBookmarkHarness(input) {
         savedFiles: []
     };
     const callbacks = {
-        clearSearchDebounce() {
-            calls.clearSearchDebounce += 1;
+        onSelectActiveBookmark(bookmarkId) {
+            calls.selectActiveBookmarkArgs.push(bookmarkId);
+            return { ok: true };
         },
-        scheduleSearch(optionsArg) {
-            calls.scheduleSearchArgs.push(optionsArg);
-        },
-        saveSearchState() {
-            calls.saveSearchState += 1;
+        onClearActiveBookmark() {
+            calls.clearActiveBookmark += 1;
+            return { ok: true };
         },
         onAddSongToBookmark(bookmarkId, songKey) {
             calls.addSongArgs.push([bookmarkId, songKey]);
@@ -218,36 +216,29 @@ function createBookmarkHarness(input) {
     };
 }
 
-test("bookmark ui: selecting a bookmark persists the active search scope", () => {
+test("bookmark ui: selecting a bookmark delegates the intent to state management", () => {
     const restoreDom = installFakeDom();
     try {
-        const { data, ui, calls, controller } = createBookmarkHarness();
+        const { calls, controller } = createBookmarkHarness();
 
         controller.setActiveBookmark("bookmark-1");
 
-        assert.equal(data.activeBookmark, "bookmark-1");
-        assert.equal(calls.clearSearchDebounce, 1);
-        assert.equal(calls.saveSearchState, 1);
-        assert.deepEqual(calls.scheduleSearchArgs, [{ immediate: true }]);
-        assert.equal(findBookmarkItem(ui, "bookmark-1").classList.contains("active"), true);
+        assert.deepEqual(calls.selectActiveBookmarkArgs, ["bookmark-1"]);
     } finally {
         restoreDom();
     }
 });
 
-test("bookmark ui: clearing the active bookmark persists the unselected search scope", () => {
+test("bookmark ui: clearing a bookmark delegates the intent to state management", () => {
     const restoreDom = installFakeDom();
     try {
-        const { data, ui, calls, controller } = createBookmarkHarness({
+        const { calls, controller } = createBookmarkHarness({
             activeBookmark: "bookmark-1"
         });
 
         controller.clearActiveBookmark();
 
-        assert.equal(data.activeBookmark, null);
-        assert.equal(calls.saveSearchState, 1);
-        assert.deepEqual(calls.scheduleSearchArgs, [{ immediate: true }]);
-        assert.equal(findBookmarkItem(ui, "bookmark-1").classList.contains("active"), false);
+        assert.equal(calls.clearActiveBookmark, 1);
     } finally {
         restoreDom();
     }

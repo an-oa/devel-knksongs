@@ -70,10 +70,8 @@ type StorageCallbacksInput = {
 };
 
 type BookmarkUiCallbacksInput = {
-    searchController: ReturnType<typeof createSearchController>;
     storageController: ReturnType<typeof createStorageController>;
     getSidebarController: () => ReturnType<typeof createSidebarController> | null;
-    clearSearchDebounce: () => void;
 };
 
 type SidebarCallbacksInput = {
@@ -154,18 +152,15 @@ function createStorageCallbacks({
 }
 
 /**
- * ブックマーク UI controller から検索・保存・サイドバーへ委譲する callback 群を作成する。
+ * ブックマーク UI controller から状態管理とサイドバーへ委譲する callback 群を作成する。
  */
 function createBookmarkUiCallbacks({
-    searchController,
     storageController,
-    getSidebarController,
-    clearSearchDebounce
+    getSidebarController
 }: BookmarkUiCallbacksInput): Parameters<typeof createBookmarkUiController>[0]["callbacks"] {
     return {
-        clearSearchDebounce,
-        scheduleSearch: (options) => searchController.scheduleSearch(options),
-        saveSearchState: () => storageController.saveSearchState(),
+        onSelectActiveBookmark: (bookmarkId) => storageController.selectActiveBookmark(bookmarkId),
+        onClearActiveBookmark: () => storageController.clearActiveBookmark(),
         onAddSongToBookmark: (bookmarkId, songKey) => storageController.addSongToBookmark(bookmarkId, songKey),
         onCreateBookmark: (bookmarkName) => storageController.createBookmark(bookmarkName),
         onCreateBookmarkAndAdd: (bookmarkName, songKey) => storageController.createBookmarkAndAdd(bookmarkName, songKey),
@@ -272,7 +267,8 @@ function createAppControllers() {
     });
 
     /**
-     * storageController と sidebarController は検索 UI 操作から遅延参照するため、生成後に代入する。
+     * storageController と sidebarController は先に作る controller の callback から
+     * 遅延参照するため、生成後に代入する。
      */
     let storageController: ReturnType<typeof createStorageController>;
     let sidebarController: ReturnType<typeof createSidebarController>;
@@ -282,8 +278,7 @@ function createAppControllers() {
         search: searchUiState,
         searchFiltersController,
         getSearchController: () => searchController,
-        getStorageController: () => storageController,
-        getSidebarController: () => sidebarController
+        getStorageController: () => storageController
     });
 
     /**
@@ -378,10 +373,8 @@ function createAppControllers() {
         data: appDataState,
         ui: appUiState,
         callbacks: createBookmarkUiCallbacks({
-            searchController,
             storageController,
-            getSidebarController: () => sidebarController,
-            clearSearchDebounce: searchUiActions.clearSearchDebounce
+            getSidebarController: () => sidebarController
         })
     });
 
@@ -486,7 +479,7 @@ async function initUI(): Promise<void> {
         onFilterChange: searchUiActions.markFilterTouched
     });
     sidebarController.setupUIHandlers();
-    storageController.loadBookmarks();
+    storageController.restorePersistedState();
     setupTheme({ ui: appUiState });
     playbackSettingsController.setupPlaybackSettings();
     exposePlaybackSettingsConsoleApi();
@@ -499,7 +492,6 @@ async function initUI(): Promise<void> {
         refreshLayout: () => renderController.refreshLayout(),
         setupScrollObserver: () => youtubeController.setupScrollObserver()
     });
-    storageController.restoreSearchState();
     await dataLoader.loadInitialData();
 }
 

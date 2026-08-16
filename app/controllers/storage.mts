@@ -203,9 +203,9 @@ export function createStorageController({
     }
 
     /**
-     * ブックマーク情報をローカルストレージから読み込み、描画を更新する。
+     * ブックマーク情報をローカルストレージから state へ読み込む。
      */
-    function loadBookmarks(): void {
+    function loadBookmarksFromStorage(): void {
         try {
             const stored = localStorage.getItem(BOOKMARK_STORAGE_KEY);
             if (stored) {
@@ -221,7 +221,6 @@ export function createStorageController({
             console.error("Failed to load bookmarks", e);
             data.bookmarks = {};
         }
-        renderBookmarks();
     }
 
     /**
@@ -238,13 +237,13 @@ export function createStorageController({
         const activeBookmarkWasRemoved = Boolean(
             data.activeBookmark && !Object.hasOwn(data.bookmarks, data.activeBookmark)
         );
-        if (activeBookmarkWasRemoved) {
-            data.activeBookmark = null;
-        }
         saveBookmarks();
-        if (activeBookmarkWasRemoved) saveSearchState();
-        renderBookmarks();
-        if (hadActiveBookmark || data.activeBookmark) {
+        if (activeBookmarkWasRemoved) {
+            applyActiveBookmark(null);
+        } else {
+            renderBookmarks();
+        }
+        if (!activeBookmarkWasRemoved && (hadActiveBookmark || data.activeBookmark)) {
             scheduleSearch({ immediate: true });
         }
         return buildActionOk({
@@ -382,11 +381,12 @@ export function createStorageController({
         if (!bookmark) return buildActionFail("bookmark_not_found");
         const wasActive = data.activeBookmark === bookmarkId;
         delete data.bookmarks[bookmarkId];
-        if (wasActive) data.activeBookmark = null;
         saveBookmarks();
-        if (wasActive) saveSearchState();
-        renderBookmarks();
-        if (wasActive) scheduleSearch({ immediate: true });
+        if (wasActive) {
+            applyActiveBookmark(null);
+        } else {
+            renderBookmarks();
+        }
         return buildActionOk({ changed: true });
     }
 
@@ -437,9 +437,45 @@ export function createStorageController({
     }
 
     /**
-     * 保存済み検索条件をUIとstateへ復元する。
+     * アクティブブックマークを変更し、検索状態・一覧表示・検索結果を同期する。
+     * @param {string | null} activeBookmarkId
      */
-    function restoreSearchState(): void {
+    function applyActiveBookmark(activeBookmarkId: string | null): void {
+        data.activeBookmark = activeBookmarkId;
+        saveSearchState();
+        renderBookmarks();
+        scheduleSearch({ immediate: true });
+    }
+
+    /**
+     * 指定ブックマークを検索対象として選択する。
+     * @param {string} bookmarkId
+     * @returns {StorageActionResult}
+     */
+    function selectActiveBookmark(bookmarkId: string): StorageActionResult {
+        if (!Object.hasOwn(data.bookmarks, bookmarkId)) {
+            return buildActionFail("bookmark_not_found");
+        }
+        const changed = data.activeBookmark !== bookmarkId;
+        applyActiveBookmark(bookmarkId);
+        return buildActionOk({ changed });
+    }
+
+    /**
+     * ブックマークによる検索対象の限定を解除する。
+     * 検索条件の一括クリアからも呼ぶため、未選択でも副作用を同期する。
+     * @returns {StorageActionResult}
+     */
+    function clearActiveBookmark(): StorageActionResult {
+        const changed = data.activeBookmark !== null;
+        applyActiveBookmark(null);
+        return buildActionOk({ changed });
+    }
+
+    /**
+     * 保存済み検索条件を UI と state へ復元する。
+     */
+    function restoreSearchStateFromStorage(): void {
         try {
             const raw = localStorage.getItem(SEARCH_STATE_KEY);
             if (!raw) return;
@@ -458,21 +494,38 @@ export function createStorageController({
             if (dateUi.bounds) {
                 applyPendingDateValues();
             }
-            data.activeBookmark = parsed.activeBookmarkId &&
+            const activeBookmarkId = parsed.activeBookmarkId &&
                 Object.hasOwn(data.bookmarks, parsed.activeBookmarkId)
                 ? parsed.activeBookmarkId
                 : null;
-            renderBookmarks();
+            const activeBookmarkWasInvalid = parsed.activeBookmarkId !== null && activeBookmarkId === null;
+            data.activeBookmark = activeBookmarkId;
             searchUiState.userTouchedQuery = true;
             searchUiState.userTouchedFilters = true;
             searchUiState.hasRestoredSearchState = true;
+            if (activeBookmarkWasInvalid) {
+                parsed.activeBookmarkId = null;
+                localStorage.setItem(
+                    SEARCH_STATE_KEY,
+                    JSON.stringify(buildStoredSearchStatePayload(parsed))
+                );
+            }
         } catch (e) {
             console.warn("Failed to restore search state", e);
         }
     }
 
+    /**
+     * ブックマークと検索条件を読み込み、参照を照合して一度だけ一覧を描画する。
+     */
+    function restorePersistedState(): void {
+        loadBookmarksFromStorage();
+        restoreSearchStateFromStorage();
+        renderBookmarks();
+    }
+
     return {
-        loadBookmarks,
+        restorePersistedState,
         saveBookmarks,
         exportBookmarksAsJsonText,
         parseBookmarkImportText,
@@ -484,7 +537,8 @@ export function createStorageController({
         deleteBookmark,
         renameBookmark,
         saveSearchState,
-        restoreSearchState,
+        selectActiveBookmark,
+        clearActiveBookmark,
         removeSongFromBookmark
     };
 }
