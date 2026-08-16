@@ -26,7 +26,7 @@ type SearchActionsStorageController = {
 };
 
 type SearchActionsSidebarController = {
-    clearActiveBookmark: (options: { skipSearch?: boolean }) => void;
+    clearActiveBookmark: (options: { shouldSearch?: boolean; shouldPersist?: boolean }) => void;
 };
 
 type SearchUiActionsInput = {
@@ -104,7 +104,10 @@ export function createSearchUiActions({
      * 検索条件とアクティブブックマークをリセットして保存する。
      */
     function clearSearch(): void {
-        getSidebarController().clearActiveBookmark({ skipSearch: true });
+        getSidebarController().clearActiveBookmark({
+            shouldSearch: false,
+            shouldPersist: false
+        });
         resetSearchConditions(true);
         getStorageController().saveSearchState();
     }

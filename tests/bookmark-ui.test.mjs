@@ -121,6 +121,7 @@ function createBookmarkHarness(input) {
     const calls = {
         clearSearchDebounce: 0,
         scheduleSearchArgs: [],
+        saveSearchState: 0,
         addSongArgs: [],
         createBookmarkArgs: [],
         createBookmarkAndAddArgs: [],
@@ -139,6 +140,9 @@ function createBookmarkHarness(input) {
         },
         scheduleSearch(optionsArg) {
             calls.scheduleSearchArgs.push(optionsArg);
+        },
+        saveSearchState() {
+            calls.saveSearchState += 1;
         },
         onAddSongToBookmark(bookmarkId, songKey) {
             calls.addSongArgs.push([bookmarkId, songKey]);
@@ -213,6 +217,41 @@ function createBookmarkHarness(input) {
         controller: createBookmarkUiController({ data, ui, callbacks })
     };
 }
+
+test("bookmark ui: selecting a bookmark persists the active search scope", () => {
+    const restoreDom = installFakeDom();
+    try {
+        const { data, ui, calls, controller } = createBookmarkHarness();
+
+        controller.setActiveBookmark("bookmark-1");
+
+        assert.equal(data.activeBookmark, "bookmark-1");
+        assert.equal(calls.clearSearchDebounce, 1);
+        assert.equal(calls.saveSearchState, 1);
+        assert.deepEqual(calls.scheduleSearchArgs, [{ immediate: true }]);
+        assert.equal(findBookmarkItem(ui, "bookmark-1").classList.contains("active"), true);
+    } finally {
+        restoreDom();
+    }
+});
+
+test("bookmark ui: clearing the active bookmark persists the unselected search scope", () => {
+    const restoreDom = installFakeDom();
+    try {
+        const { data, ui, calls, controller } = createBookmarkHarness({
+            activeBookmark: "bookmark-1"
+        });
+
+        controller.clearActiveBookmark();
+
+        assert.equal(data.activeBookmark, null);
+        assert.equal(calls.saveSearchState, 1);
+        assert.deepEqual(calls.scheduleSearchArgs, [{ immediate: true }]);
+        assert.equal(findBookmarkItem(ui, "bookmark-1").classList.contains("active"), false);
+    } finally {
+        restoreDom();
+    }
+});
 
 test("bookmark ui: add mode success adds to existing bookmark and closes the panel", () => {
     const restoreDom = installFakeDom();

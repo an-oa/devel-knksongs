@@ -37,8 +37,14 @@ function setupStorageController({
         activeBookmark: activeBookmark || null
     };
     const ui = {
-        selectedFormats: new Set(),
-        el: {}
+        el: {},
+        search: {
+            selectedFormats: new Set()
+        },
+        date: {
+            bounds: null,
+            pendingValues: null
+        }
     };
     const controller = createStorageController({
         data,
@@ -320,6 +326,10 @@ test("importBookmarksFromJsonText: replaces current bookmarks and clears missing
             version: 2,
             bookmarks: data.bookmarks
         });
+        assert.equal(
+            JSON.parse(globalThis.localStorage.getItem("searchStateTest")).activeBookmarkId,
+            null
+        );
     } finally {
         globalThis.localStorage = prevLocalStorage;
     }
@@ -638,6 +648,10 @@ test("deleteBookmark: succeeds and returns action result", () => {
         assert.equal(data.activeBookmark, null);
         assert.equal(getRenderCount(), 1);
         assert.equal(getScheduleCount(), 1);
+        assert.equal(
+            JSON.parse(globalThis.localStorage.getItem("searchStateTest")).activeBookmarkId,
+            null
+        );
     } finally {
         globalThis.localStorage = prevLocalStorage;
     }

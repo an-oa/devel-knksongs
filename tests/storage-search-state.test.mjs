@@ -37,6 +37,55 @@ function createStorageControllerForTest(input) {
     });
 }
 
+/**
+ * 選択中ブックマークの検索状態復元を検証する最小構成を作る。
+ * @param {Record<string, object>} bookmarks
+ * @returns {{ controller: object, data: object, getRenderCount: () => number }}
+ */
+function createActiveBookmarkRestoreHarness(bookmarks) {
+    let renderCount = 0;
+    const data = {
+        allSongsRaw: [],
+        bookmarks,
+        activeBookmark: null
+    };
+    const ui = {
+        el: {
+            searchBox: { value: "" }
+        },
+        search: {
+            selectedFormats: new Set(),
+            userTouchedQuery: false,
+            userTouchedFilters: false,
+            hasRestoredSearchState: false
+        },
+        date: {
+            bounds: null,
+            pendingValues: null
+        }
+    };
+    const controller = createStorageControllerForTest({
+        data,
+        ui,
+        constants: {
+            DEFAULT_FORMATS: ["配信"],
+            SEARCH_STATE_KEY: "searchStateTest",
+            BOOKMARK_STORAGE_KEY: "bookmarksTest"
+        },
+        callbacks: {
+            getDateSelectValue: () => "",
+            applyPendingDateValues: () => {},
+            renderBookmarks: () => { renderCount += 1; },
+            scheduleSearch: () => {}
+        }
+    });
+    return {
+        controller,
+        data,
+        getRenderCount: () => renderCount
+    };
+}
+
 test("restoreSearchState: main branch payload restores into sliced ui state", () => {
     const restoreDom = installFakeDom();
     const prevLocalStorage = globalThis.localStorage;
@@ -140,8 +189,10 @@ test("saveSearchState: writes current schema version", () => {
         const controller = createStorageControllerForTest({
             data: {
                 allSongsRaw: [],
-                bookmarks: {},
-                activeBookmark: null
+                bookmarks: {
+                    "bookmark-1": { name: "Favorites", songs: [], createdAt: 1 }
+                },
+                activeBookmark: "bookmark-1"
             },
             ui,
             constants: {
@@ -162,7 +213,7 @@ test("saveSearchState: writes current schema version", () => {
         controller.saveSearchState();
 
         const parsed = JSON.parse(globalThis.localStorage.getItem("searchStateTest"));
-        assert.equal(parsed.version, 5);
+        assert.equal(parsed.version, 6);
         assert.equal(parsed.query, "群青");
         assert.equal(parsed.collabHostOnly, true);
         assert.equal(parsed.collabGuestOnly, false);
@@ -171,6 +222,49 @@ test("saveSearchState: writes current schema version", () => {
         assert.equal(parsed.dateFrom, "2024");
         assert.equal(parsed.dateTo, "");
         assert.deepEqual(parsed.formats, ["配信", "収録"]);
+        assert.equal(parsed.activeBookmarkId, "bookmark-1");
+    } finally {
+        globalThis.localStorage = prevLocalStorage;
+    }
+});
+
+test("restoreSearchState: restores an existing active bookmark and redraws its selection", () => {
+    const prevLocalStorage = globalThis.localStorage;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        const harness = createActiveBookmarkRestoreHarness({
+            "bookmark-1": { name: "Favorites", songs: [], createdAt: 1 }
+        });
+        globalThis.localStorage.setItem("searchStateTest", JSON.stringify({
+            version: 6,
+            formats: ["配信"],
+            activeBookmarkId: "bookmark-1"
+        }));
+
+        harness.controller.restoreSearchState();
+
+        assert.equal(harness.data.activeBookmark, "bookmark-1");
+        assert.equal(harness.getRenderCount(), 1);
+    } finally {
+        globalThis.localStorage = prevLocalStorage;
+    }
+});
+
+test("restoreSearchState: ignores an active bookmark id that is no longer present", () => {
+    const prevLocalStorage = globalThis.localStorage;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        const harness = createActiveBookmarkRestoreHarness({});
+        globalThis.localStorage.setItem("searchStateTest", JSON.stringify({
+            version: 6,
+            formats: ["配信"],
+            activeBookmarkId: "missing-bookmark"
+        }));
+
+        harness.controller.restoreSearchState();
+
+        assert.equal(harness.data.activeBookmark, null);
+        assert.equal(harness.getRenderCount(), 1);
     } finally {
         globalThis.localStorage = prevLocalStorage;
     }

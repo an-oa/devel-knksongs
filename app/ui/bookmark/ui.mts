@@ -24,6 +24,7 @@ export type BookmarkUiActionCallbackResult = boolean | BookmarkUiActionResult | 
 export type BookmarkUiCallbacks = {
     clearSearchDebounce: () => void;
     scheduleSearch: (options?: { immediate?: boolean }) => void;
+    saveSearchState: () => void;
     onAddSongToBookmark: (
         bookmarkId: string,
         songKey: string
@@ -68,6 +69,7 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
     const {
         clearSearchDebounce,
         scheduleSearch,
+        saveSearchState,
         onAddSongToBookmark,
         onCreateBookmark,
         onCreateBookmarkAndAdd,
@@ -567,18 +569,22 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
         clearSearchDebounce();
         data.activeBookmark = bookmarkId;
         renderBookmarks();
+        saveSearchState();
         scheduleSearch({ immediate: true });
     }
 
     /**
      * アクティブなブックマークを解除し、必要に応じて検索を再実行する。
-     * @param {{ skipSearch?: boolean } | undefined} [options]
+     * @param {{ shouldSearch?: boolean, shouldPersist?: boolean } | undefined} [options]
      */
-    function clearActiveBookmark(options?: { skipSearch?: boolean }) {
+    function clearActiveBookmark(options?: { shouldSearch?: boolean, shouldPersist?: boolean }) {
         if (!data.activeBookmark) return;
         data.activeBookmark = null;
         renderBookmarks();
-        if (!options?.skipSearch) {
+        if (options?.shouldPersist !== false) {
+            saveSearchState();
+        }
+        if (options?.shouldSearch !== false) {
             scheduleSearch({ immediate: true });
         }
     }

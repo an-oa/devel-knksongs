@@ -19,7 +19,8 @@ test("search state schema: builds current version payload", () => {
         collabGuestOnly: false,
         dateFrom: "2024",
         dateTo: "",
-        formats: ["配信", "収録"]
+        formats: ["配信", "収録"],
+        activeBookmarkId: "bookmark-1"
     });
 
     assert.deepEqual(payload, {
@@ -31,7 +32,8 @@ test("search state schema: builds current version payload", () => {
         collabGuestOnly: false,
         dateFrom: "2024",
         dateTo: "",
-        formats: ["配信", "収録"]
+        formats: ["配信", "収録"],
+        activeBookmarkId: "bookmark-1"
     });
 });
 
@@ -63,7 +65,8 @@ test("search state schema: parses saved text into normalized current values", ()
             collabGuestOnly: true,
             dateFrom: "2024-02-10",
             dateTo: "2024-03-05",
-            formats: defaultFormats
+            formats: defaultFormats,
+            activeBookmarkId: null
         }
     );
 });
@@ -81,7 +84,8 @@ test("search state schema: parses invalid saved fields into defaults", () => {
             harmonyOnly: 1,
             dateFrom: false,
             dateTo: {},
-            formats: ["存在しない形式"]
+            formats: ["存在しない形式"],
+            activeBookmarkId: 123
         }), { defaultFormats }),
         {
             version: SEARCH_STATE_CURRENT_VERSION,
@@ -92,9 +96,26 @@ test("search state schema: parses invalid saved fields into defaults", () => {
             collabGuestOnly: true,
             dateFrom: "",
             dateTo: "",
-            formats: defaultFormats
+            formats: defaultFormats,
+            activeBookmarkId: null
         }
     );
+});
+
+test("search state schema: restores active bookmark only from the current schema", () => {
+    const currentPayload = parseStoredSearchStatePayload(JSON.stringify({
+        version: SEARCH_STATE_CURRENT_VERSION,
+        formats: ["配信"],
+        activeBookmarkId: "bookmark-1"
+    }), { defaultFormats: ["配信"] });
+    const previousPayload = parseStoredSearchStatePayload(JSON.stringify({
+        version: 5,
+        formats: ["配信"],
+        activeBookmarkId: "bookmark-1"
+    }), { defaultFormats: ["配信"] });
+
+    assert.equal(currentPayload.activeBookmarkId, "bookmark-1");
+    assert.equal(previousPayload.activeBookmarkId, null);
 });
 
 test("search state schema: migrates legacy collab fields to role filters", () => {

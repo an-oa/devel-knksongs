@@ -1,6 +1,7 @@
-export const SEARCH_STATE_CURRENT_VERSION = 5;
+export const SEARCH_STATE_CURRENT_VERSION = 6;
 export const SEARCH_STATE_V1 = 1;
 export const SEARCH_STATE_V4 = 4;
+export const SEARCH_STATE_V6 = 6;
 
 const SEARCH_STATE_V1_DEFAULT_FORMATS = ["配信", "歌みた", "ショート", "切り抜き"];
 const SEARCH_STATE_FRAME_SCOPE_HOST = "host";
@@ -15,6 +16,7 @@ type StoredSearchStateInput = {
     dateFrom?: string;
     dateTo?: string;
     formats?: string[];
+    activeBookmarkId?: string | null;
 };
 
 type StoredSearchStateParseOptions = {
@@ -32,9 +34,10 @@ type StoredSearchStateParseOptions = {
  *   collabGuestOnly?: boolean,
  *   dateFrom?: string,
  *   dateTo?: string,
- *   formats?: string[]
+ *   formats?: string[],
+ *   activeBookmarkId?: string | null
  * }} input
- * @returns {{ version: number, query: string, relayOnly: boolean, harmonyOnly: boolean, collabHostOnly: boolean, collabGuestOnly: boolean, dateFrom: string, dateTo: string, formats: string[] }}
+ * @returns {{ version: number, query: string, relayOnly: boolean, harmonyOnly: boolean, collabHostOnly: boolean, collabGuestOnly: boolean, dateFrom: string, dateTo: string, formats: string[], activeBookmarkId: string | null }}
  */
 export function buildStoredSearchStatePayload(input: StoredSearchStateInput) {
     return {
@@ -46,7 +49,10 @@ export function buildStoredSearchStatePayload(input: StoredSearchStateInput) {
         collabGuestOnly: Boolean(input.collabGuestOnly),
         dateFrom: typeof input.dateFrom === "string" ? input.dateFrom : "",
         dateTo: typeof input.dateTo === "string" ? input.dateTo : "",
-        formats: Array.isArray(input.formats) ? input.formats.slice() : []
+        formats: Array.isArray(input.formats) ? input.formats.slice() : [],
+        activeBookmarkId: typeof input.activeBookmarkId === "string" && input.activeBookmarkId
+            ? input.activeBookmarkId
+            : null
     };
 }
 
@@ -55,7 +61,7 @@ export function buildStoredSearchStatePayload(input: StoredSearchStateInput) {
  * schema migration の境界条件を単体テストするため export している。
  * @param {string} text
  * @param {{ defaultFormats?: string[] }} options
- * @returns {{ version: number, query: string, relayOnly: boolean, harmonyOnly: boolean, collabHostOnly: boolean, collabGuestOnly: boolean, dateFrom: string, dateTo: string, formats: string[] }}
+ * @returns {{ version: number, query: string, relayOnly: boolean, harmonyOnly: boolean, collabHostOnly: boolean, collabGuestOnly: boolean, dateFrom: string, dateTo: string, formats: string[], activeBookmarkId: string | null }}
  */
 export function parseStoredSearchStatePayload(text, options: StoredSearchStateParseOptions = {}) {
     const parsed = JSON.parse(text);
@@ -74,7 +80,12 @@ export function parseStoredSearchStatePayload(text, options: StoredSearchStatePa
         formats: normalizeStoredSearchFormats(payload.formats, {
             defaultFormats: options.defaultFormats || [],
             searchStateVersion
-        })
+        }),
+        activeBookmarkId: searchStateVersion === SEARCH_STATE_V6 &&
+            typeof payload.activeBookmarkId === "string" &&
+            payload.activeBookmarkId
+            ? payload.activeBookmarkId
+            : null
     };
 }
 

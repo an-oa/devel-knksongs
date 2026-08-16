@@ -235,10 +235,14 @@ export function createStorageController({
 
         const hadActiveBookmark = Boolean(data.activeBookmark);
         data.bookmarks = parsed.bookmarks;
-        if (data.activeBookmark && !data.bookmarks[data.activeBookmark]) {
+        const activeBookmarkWasRemoved = Boolean(
+            data.activeBookmark && !Object.hasOwn(data.bookmarks, data.activeBookmark)
+        );
+        if (activeBookmarkWasRemoved) {
             data.activeBookmark = null;
         }
         saveBookmarks();
+        if (activeBookmarkWasRemoved) saveSearchState();
         renderBookmarks();
         if (hadActiveBookmark || data.activeBookmark) {
             scheduleSearch({ immediate: true });
@@ -380,6 +384,7 @@ export function createStorageController({
         delete data.bookmarks[bookmarkId];
         if (wasActive) data.activeBookmark = null;
         saveBookmarks();
+        if (wasActive) saveSearchState();
         renderBookmarks();
         if (wasActive) scheduleSearch({ immediate: true });
         return buildActionOk({ changed: true });
@@ -422,7 +427,8 @@ export function createStorageController({
                 ...collectSearchBooleanFilterState(ui),
                 dateFrom: getDateSelectValue("from"),
                 dateTo: getDateSelectValue("to"),
-                formats: searchFiltersController.getSelectedFormatValues()
+                formats: searchFiltersController.getSelectedFormatValues(),
+                activeBookmarkId: data.activeBookmark
             });
             localStorage.setItem(SEARCH_STATE_KEY, JSON.stringify(payload));
         } catch (e) {
@@ -452,6 +458,11 @@ export function createStorageController({
             if (dateUi.bounds) {
                 applyPendingDateValues();
             }
+            data.activeBookmark = parsed.activeBookmarkId &&
+                Object.hasOwn(data.bookmarks, parsed.activeBookmarkId)
+                ? parsed.activeBookmarkId
+                : null;
+            renderBookmarks();
             searchUiState.userTouchedQuery = true;
             searchUiState.userTouchedFilters = true;
             searchUiState.hasRestoredSearchState = true;

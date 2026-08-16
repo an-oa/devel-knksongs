@@ -165,6 +165,7 @@ function createBookmarkUiCallbacks({
     return {
         clearSearchDebounce,
         scheduleSearch: (options) => searchController.scheduleSearch(options),
+        saveSearchState: () => storageController.saveSearchState(),
         onAddSongToBookmark: (bookmarkId, songKey) => storageController.addSongToBookmark(bookmarkId, songKey),
         onCreateBookmark: (bookmarkName) => storageController.createBookmark(bookmarkName),
         onCreateBookmarkAndAdd: (bookmarkName, songKey) => storageController.createBookmarkAndAdd(bookmarkName, songKey),
