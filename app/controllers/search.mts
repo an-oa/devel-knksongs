@@ -39,11 +39,20 @@ export function createSearchController({
     const getRecommendedDisplayCount = callbacks.getRecommendedDisplayCount || (() => RANDOM_DISPLAY_COUNT);
 
     /**
+     * 保留中の検索タイマーを解除し、未予約状態へ戻す。
+     */
+    function cancelScheduledSearch(): void {
+        if (!searchUiState.debounceId) return;
+        clearTimeout(searchUiState.debounceId);
+        searchUiState.debounceId = 0;
+    }
+
+    /**
      * デバウンス付きで検索実行を予約し、必要時は即時実行する。
      * @param {{ immediate?: boolean }} [options]
      */
     function scheduleSearch(options?: { immediate?: boolean }): void {
-        if (searchUiState.debounceId) clearTimeout(searchUiState.debounceId);
+        cancelScheduledSearch();
         if (options && options.immediate) {
             search();
             return;
@@ -226,6 +235,7 @@ export function createSearchController({
     }
 
     return {
+        cancelScheduledSearch,
         scheduleSearch,
         search,
         refreshRecommendedDisplay,

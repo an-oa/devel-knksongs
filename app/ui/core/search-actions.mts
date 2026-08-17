@@ -23,10 +23,7 @@ type SearchActionsSearchFiltersController = {
 
 type SearchActionsStorageController = {
     saveSearchState: () => void;
-};
-
-type SearchActionsSidebarController = {
-    clearActiveBookmark: (options: { skipSearch?: boolean }) => void;
+    clearActiveBookmark: () => void;
 };
 
 type SearchUiActionsInput = {
@@ -35,7 +32,6 @@ type SearchUiActionsInput = {
     searchFiltersController: SearchActionsSearchFiltersController;
     getSearchController: () => SearchActionsSearchController;
     getStorageController: () => SearchActionsStorageController;
-    getSidebarController: () => SearchActionsSidebarController;
 };
 
 /**
@@ -48,8 +44,7 @@ export function createSearchUiActions({
     search,
     searchFiltersController,
     getSearchController,
-    getStorageController,
-    getSidebarController
+    getStorageController
 }: SearchUiActionsInput) {
     /**
      * 指定側の日付セレクトをクリアして候補を同期する。
@@ -104,9 +99,8 @@ export function createSearchUiActions({
      * 検索条件とアクティブブックマークをリセットして保存する。
      */
     function clearSearch(): void {
-        getSidebarController().clearActiveBookmark({ skipSearch: true });
-        resetSearchConditions(true);
-        getStorageController().saveSearchState();
+        resetSearchConditions(false);
+        getStorageController().clearActiveBookmark();
     }
 
     /**

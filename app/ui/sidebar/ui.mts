@@ -16,7 +16,6 @@ type SidebarBookmarkUiController = {
         options?: { returnFocusEl?: HTMLElement | null; closeSidebarOnExit?: boolean }
     ) => void;
     removeSongFromActiveBookmark: (songKey: string) => void;
-    clearActiveBookmark: (options?: { skipSearch?: boolean }) => void;
 };
 
 type SidebarControllerInput = {
@@ -116,16 +115,6 @@ export function createSidebarController(input: SidebarControllerInput) {
         const bookmarkUiController = getBookmarkUiController();
         if (!bookmarkUiController) return;
         bookmarkUiController.removeSongFromActiveBookmark(songKey);
-    }
-
-    /**
-     * アクティブブックマーク解除処理を委譲する。
-     * @param {{ skipSearch?: boolean } | undefined} options
-     */
-    function clearActiveBookmark(options?: { skipSearch?: boolean }): void {
-        const bookmarkUiController = getBookmarkUiController();
-        if (!bookmarkUiController) return;
-        bookmarkUiController.clearActiveBookmark(options);
     }
 
     /**
@@ -435,7 +424,6 @@ export function createSidebarController(input: SidebarControllerInput) {
         setupUIHandlers,
         openBookmarkModal,
         removeSongFromActiveBookmark,
-        clearActiveBookmark,
         closeSidebarMenu: () => {
             if (typeof closeSidebarMenu === "function") {
                 closeSidebarMenu();

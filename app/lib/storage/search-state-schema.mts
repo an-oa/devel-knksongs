@@ -1,6 +1,7 @@
-export const SEARCH_STATE_CURRENT_VERSION = 5;
+export const SEARCH_STATE_CURRENT_VERSION = 6;
 export const SEARCH_STATE_V1 = 1;
 export const SEARCH_STATE_V4 = 4;
+export const SEARCH_STATE_V6 = 6;
 
 const SEARCH_STATE_V1_DEFAULT_FORMATS = ["配信", "歌みた", "ショート", "切り抜き"];
 const SEARCH_STATE_FRAME_SCOPE_HOST = "host";
@@ -15,6 +16,20 @@ type StoredSearchStateInput = {
     dateFrom?: string;
     dateTo?: string;
     formats?: string[];
+    activeBookmarkId?: string | null;
+};
+
+export type StoredSearchStatePayload = {
+    version: number;
+    query: string;
+    relayOnly: boolean;
+    harmonyOnly: boolean;
+    collabHostOnly: boolean;
+    collabGuestOnly: boolean;
+    dateFrom: string;
+    dateTo: string;
+    formats: string[];
+    activeBookmarkId: string | null;
 };
 
 type StoredSearchStateParseOptions = {
@@ -24,19 +39,8 @@ type StoredSearchStateParseOptions = {
 /**
  * 現行形式の検索状態保存 payload を組み立てる。
  * payload schema version は localStorage key 名の searchStateV1 とは独立して更新する。
- * @param {{
- *   query?: string,
- *   relayOnly?: boolean,
- *   harmonyOnly?: boolean,
- *   collabHostOnly?: boolean,
- *   collabGuestOnly?: boolean,
- *   dateFrom?: string,
- *   dateTo?: string,
- *   formats?: string[]
- * }} input
- * @returns {{ version: number, query: string, relayOnly: boolean, harmonyOnly: boolean, collabHostOnly: boolean, collabGuestOnly: boolean, dateFrom: string, dateTo: string, formats: string[] }}
  */
-export function buildStoredSearchStatePayload(input: StoredSearchStateInput) {
+export function buildStoredSearchStatePayload(input: StoredSearchStateInput): StoredSearchStatePayload {
     return {
         version: SEARCH_STATE_CURRENT_VERSION,
         query: typeof input.query === "string" ? input.query : "",
@@ -46,20 +50,25 @@ export function buildStoredSearchStatePayload(input: StoredSearchStateInput) {
         collabGuestOnly: Boolean(input.collabGuestOnly),
         dateFrom: typeof input.dateFrom === "string" ? input.dateFrom : "",
         dateTo: typeof input.dateTo === "string" ? input.dateTo : "",
-        formats: Array.isArray(input.formats) ? input.formats.slice() : []
+        formats: Array.isArray(input.formats) ? input.formats.slice() : [],
+        activeBookmarkId: typeof input.activeBookmarkId === "string" && input.activeBookmarkId
+            ? input.activeBookmarkId
+            : null
     };
 }
 
 /**
  * 保存済み検索状態の JSON 文字列を解析し、現行 UI へ渡せる値へ正規化する。
  * schema migration の境界条件を単体テストするため export している。
- * @param {string} text
- * @param {{ defaultFormats?: string[] }} options
- * @returns {{ version: number, query: string, relayOnly: boolean, harmonyOnly: boolean, collabHostOnly: boolean, collabGuestOnly: boolean, dateFrom: string, dateTo: string, formats: string[] }}
  */
-export function parseStoredSearchStatePayload(text, options: StoredSearchStateParseOptions = {}) {
-    const parsed = JSON.parse(text);
-    const payload = parsed && typeof parsed === "object" ? parsed : {};
+export function parseStoredSearchStatePayload(
+    text: string,
+    options: StoredSearchStateParseOptions = {}
+): StoredSearchStatePayload {
+    const parsed: unknown = JSON.parse(text);
+    const payload: Record<string, unknown> = parsed && typeof parsed === "object"
+        ? parsed as Record<string, unknown>
+        : {};
     const searchStateVersion = getStoredSearchStateVersion(payload);
     const collabRoleFilters = normalizeStoredCollabRoleFilters(payload, searchStateVersion);
     return {
@@ -74,7 +83,12 @@ export function parseStoredSearchStatePayload(text, options: StoredSearchStatePa
         formats: normalizeStoredSearchFormats(payload.formats, {
             defaultFormats: options.defaultFormats || [],
             searchStateVersion
-        })
+        }),
+        activeBookmarkId: searchStateVersion === SEARCH_STATE_V6 &&
+            typeof payload.activeBookmarkId === "string" &&
+            payload.activeBookmarkId
+            ? payload.activeBookmarkId
+            : null
     };
 }
 

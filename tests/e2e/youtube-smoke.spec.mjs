@@ -319,6 +319,37 @@ test("bookmark notification toast opens, closes, and auto-dismisses", async ({ p
     await expect(removeToast).toHaveCount(0, { timeout: 6_000 });
 });
 
+test("active bookmark persists across reload", async ({ page }) => {
+    const bookmarkName = "Reload Favorites";
+    await createBookmarkFromSong(page, {
+        bookmarkName,
+        songTitle: "Manual Song"
+    });
+
+    const createToast = await expectBookmarkToast(
+        page,
+        `ブックマーク「${bookmarkName}」を作成し、「Manual Song」を保存しました。`
+    );
+    await createToast.locator(".bookmark-toast-close").click();
+
+    await openBookmarkPanel(page);
+    const bookmarkItem = getBookmarkItem(page, bookmarkName);
+    await bookmarkItem.click();
+    await expect(bookmarkItem).toHaveClass(/active/);
+    await expect(page.locator("#resultCount")).toHaveText(`ブックマーク: ${bookmarkName} (1 件)`);
+    await expect.poll(() => page.evaluate(() => {
+        return JSON.parse(localStorage.getItem("searchStateV1")).activeBookmarkId;
+    })).toBeTruthy();
+
+    await page.reload();
+    await waitForInitialLoad(page);
+
+    await expect(page.locator("#resultCount")).toHaveText(`ブックマーク: ${bookmarkName} (1 件)`);
+    await openSidebar(page);
+    await openBookmarkPanel(page);
+    await expect(getBookmarkItem(page, bookmarkName)).toHaveClass(/active/);
+});
+
 test("bookmark deletion toast shows the deleted bookmark name", async ({ page }) => {
     const bookmarkName = "Delete Toast";
     await createBookmarkFromSong(page, {

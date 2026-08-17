@@ -37,8 +37,15 @@ function setupStorageController({
         activeBookmark: activeBookmark || null
     };
     const ui = {
-        selectedFormats: new Set(),
-        el: {}
+        el: {},
+        search: {
+            selectedFormats: new Set(),
+            dataReady: true
+        },
+        date: {
+            bounds: null,
+            pendingValues: null
+        }
     };
     const controller = createStorageController({
         data,
@@ -57,6 +64,7 @@ function setupStorageController({
             getDateSelectValue: () => "",
             applyPendingDateValues: () => {},
             renderBookmarks: () => { renderCount += 1; },
+            cancelScheduledSearch: () => {},
             scheduleSearch: () => { scheduleCount += 1; }
         }
     });
@@ -68,7 +76,7 @@ function setupStorageController({
     };
 }
 
-test("loadBookmarks: main branch bookmarks payload is restored from bookmarksV1", () => {
+test("restorePersistedState: main branch bookmarks payload is restored from bookmarksV1", () => {
     const restoreDom = installFakeDom();
     const prevLocalStorage = globalThis.localStorage;
     globalThis.localStorage = createFakeLocalStorage();
@@ -87,7 +95,7 @@ test("loadBookmarks: main branch bookmarks payload is restored from bookmarksV1"
         });
         globalThis.localStorage.setItem("bookmarksTest", JSON.stringify(storedBookmarks));
 
-        controller.loadBookmarks();
+        controller.restorePersistedState();
 
         assert.deepEqual(data.bookmarks, storedBookmarks);
         assert.equal(getRenderCount(), 1);
@@ -97,7 +105,7 @@ test("loadBookmarks: main branch bookmarks payload is restored from bookmarksV1"
     }
 });
 
-test("loadBookmarks: invalid bookmark payload is sanitized and deduplicated", () => {
+test("restorePersistedState: invalid bookmark payload is sanitized and deduplicated", () => {
     const restoreDom = installFakeDom();
     const prevLocalStorage = globalThis.localStorage;
     globalThis.localStorage = createFakeLocalStorage();
@@ -124,7 +132,7 @@ test("loadBookmarks: invalid bookmark payload is sanitized and deduplicated", ()
             }
         }));
 
-        controller.loadBookmarks();
+        controller.restorePersistedState();
 
         assert.deepEqual(data.bookmarks, {
             keep: {
@@ -140,7 +148,7 @@ test("loadBookmarks: invalid bookmark payload is sanitized and deduplicated", ()
     }
 });
 
-test("loadBookmarks: existing long bookmark names are preserved", () => {
+test("restorePersistedState: existing long bookmark names are preserved", () => {
     const restoreDom = installFakeDom();
     const prevLocalStorage = globalThis.localStorage;
     globalThis.localStorage = createFakeLocalStorage();
@@ -163,7 +171,7 @@ test("loadBookmarks: existing long bookmark names are preserved", () => {
             }
         }));
 
-        controller.loadBookmarks();
+        controller.restorePersistedState();
 
         assert.equal(data.bookmarks.keep.name, longName);
     } finally {
@@ -205,7 +213,7 @@ test("migrateLegacyBookmarkSongRefs: rewrites old songKey refs to bookmarkSongKe
         ];
         globalThis.localStorage.setItem("bookmarksTest", JSON.stringify(storedBookmarks));
 
-        controller.loadBookmarks();
+        controller.restorePersistedState();
         controller.migrateLegacyBookmarkSongRefs();
 
         assert.deepEqual(data.bookmarks, {
@@ -255,7 +263,7 @@ test("migrateLegacyBookmarkSongRefs: preserves current bookmarkSongKey refs and 
         ];
         globalThis.localStorage.setItem("bookmarksTest", JSON.stringify(storedBookmarks));
 
-        controller.loadBookmarks();
+        controller.restorePersistedState();
         controller.migrateLegacyBookmarkSongRefs();
 
         assert.deepEqual(
@@ -320,6 +328,10 @@ test("importBookmarksFromJsonText: replaces current bookmarks and clears missing
             version: 2,
             bookmarks: data.bookmarks
         });
+        assert.equal(
+            JSON.parse(globalThis.localStorage.getItem("searchStateTest")).activeBookmarkId,
+            null
+        );
     } finally {
         globalThis.localStorage = prevLocalStorage;
     }
@@ -396,7 +408,7 @@ test("migrateLegacyBookmarkSongRefs: emits opt-in debug logs when migration runs
         globalThis.localStorage.setItem("debugBookmarkMigration", "true");
         globalThis.localStorage.setItem("bookmarksTest", JSON.stringify(storedBookmarks));
 
-        controller.loadBookmarks();
+        controller.restorePersistedState();
         controller.migrateLegacyBookmarkSongRefs();
 
         assert.equal(debugCalls.length >= 3, true);
@@ -638,6 +650,10 @@ test("deleteBookmark: succeeds and returns action result", () => {
         assert.equal(data.activeBookmark, null);
         assert.equal(getRenderCount(), 1);
         assert.equal(getScheduleCount(), 1);
+        assert.equal(
+            JSON.parse(globalThis.localStorage.getItem("searchStateTest")).activeBookmarkId,
+            null
+        );
     } finally {
         globalThis.localStorage = prevLocalStorage;
     }

@@ -119,8 +119,8 @@ function createBookmarkHarness(input) {
     };
     const ui = createBookmarkUiState();
     const calls = {
-        clearSearchDebounce: 0,
-        scheduleSearchArgs: [],
+        selectActiveBookmarkArgs: [],
+        clearActiveBookmark: 0,
         addSongArgs: [],
         createBookmarkArgs: [],
         createBookmarkAndAddArgs: [],
@@ -134,11 +134,13 @@ function createBookmarkHarness(input) {
         savedFiles: []
     };
     const callbacks = {
-        clearSearchDebounce() {
-            calls.clearSearchDebounce += 1;
+        onSelectActiveBookmark(bookmarkId) {
+            calls.selectActiveBookmarkArgs.push(bookmarkId);
+            return { ok: true };
         },
-        scheduleSearch(optionsArg) {
-            calls.scheduleSearchArgs.push(optionsArg);
+        onClearActiveBookmark() {
+            calls.clearActiveBookmark += 1;
+            return { ok: true };
         },
         onAddSongToBookmark(bookmarkId, songKey) {
             calls.addSongArgs.push([bookmarkId, songKey]);
@@ -213,6 +215,34 @@ function createBookmarkHarness(input) {
         controller: createBookmarkUiController({ data, ui, callbacks })
     };
 }
+
+test("bookmark ui: selecting a bookmark delegates the intent to state management", () => {
+    const restoreDom = installFakeDom();
+    try {
+        const { calls, controller } = createBookmarkHarness();
+
+        controller.setActiveBookmark("bookmark-1");
+
+        assert.deepEqual(calls.selectActiveBookmarkArgs, ["bookmark-1"]);
+    } finally {
+        restoreDom();
+    }
+});
+
+test("bookmark ui: clearing a bookmark delegates the intent to state management", () => {
+    const restoreDom = installFakeDom();
+    try {
+        const { calls, controller } = createBookmarkHarness({
+            activeBookmark: "bookmark-1"
+        });
+
+        controller.clearActiveBookmark();
+
+        assert.equal(calls.clearActiveBookmark, 1);
+    } finally {
+        restoreDom();
+    }
+});
 
 test("bookmark ui: add mode success adds to existing bookmark and closes the panel", () => {
     const restoreDom = installFakeDom();
