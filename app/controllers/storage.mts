@@ -437,14 +437,16 @@ export function createStorageController({
     }
 
     /**
-     * アクティブブックマークを変更し、検索状態・一覧表示・検索結果を同期する。
+     * アクティブブックマークを変更し、検索状態・一覧表示と検索可能時の結果を同期する。
      * @param {string | null} activeBookmarkId
      */
     function applyActiveBookmark(activeBookmarkId: string | null): void {
         data.activeBookmark = activeBookmarkId;
         saveSearchState();
         renderBookmarks();
-        scheduleSearch({ immediate: true });
+        if (searchUiState.dataReady) {
+            scheduleSearch({ immediate: true });
+        }
     }
 
     /**

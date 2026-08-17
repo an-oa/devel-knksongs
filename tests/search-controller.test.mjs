@@ -86,6 +86,54 @@ function createSearchCallbacks(input) {
     };
 }
 
+test("createSearchController: immediate search clears the pending debounce id", () => {
+    const data = {
+        allSongsRaw: [],
+        bookmarks: {},
+        activeBookmark: null,
+        currentResults: [],
+        displayLimit: 0
+    };
+    const ui = createSearchUiState({
+        el: {
+            searchBox: { value: "" },
+            relayOnly: { checked: false },
+            harmonyOnly: { checked: false },
+            dateFromYear: null,
+            dateFromMonth: null,
+            dateFromDay: null,
+            dateToYear: null,
+            dateToMonth: null,
+            dateToDay: null,
+            resultCount: { innerText: "" }
+        },
+        selectedFormats: new Set(["配信"])
+    });
+    let updateCount = 0;
+    const controller = createSearchControllerForTest({
+        data,
+        ui,
+        constants: {
+            RANDOM_DISPLAY_COUNT: 10,
+            MIN_PERFORMANCE_FOR_RANDOM: 1,
+            RESULT_DISPLAY_BATCH_SIZE: 30,
+            SEARCH_DEBOUNCE_MS: 60_000,
+            DEFAULT_FORMATS: ["配信"]
+        },
+        callbacks: createSearchCallbacks({
+            updateDisplay: () => { updateCount += 1; }
+        })
+    });
+
+    controller.scheduleSearch();
+    assert.notEqual(ui.search.debounceId, 0);
+
+    controller.scheduleSearch({ immediate: true });
+
+    assert.equal(ui.search.debounceId, 0);
+    assert.equal(updateCount, 1);
+});
+
 test("createSearchController: active bookmark also applies search criteria", () => {
     const rows = [
         makeRow({ songKey: "s1", sourceIndex: 1, title: "青い月", artist: "A", format: "配信" }),

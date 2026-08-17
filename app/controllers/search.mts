@@ -43,7 +43,10 @@ export function createSearchController({
      * @param {{ immediate?: boolean }} [options]
      */
     function scheduleSearch(options?: { immediate?: boolean }): void {
-        if (searchUiState.debounceId) clearTimeout(searchUiState.debounceId);
+        if (searchUiState.debounceId) {
+            clearTimeout(searchUiState.debounceId);
+            searchUiState.debounceId = 0;
+        }
         if (options && options.immediate) {
             search();
             return;

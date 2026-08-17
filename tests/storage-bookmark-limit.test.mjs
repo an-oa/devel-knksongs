@@ -39,7 +39,8 @@ function setupStorageController({
     const ui = {
         el: {},
         search: {
-            selectedFormats: new Set()
+            selectedFormats: new Set(),
+            dataReady: true
         },
         date: {
             bounds: null,

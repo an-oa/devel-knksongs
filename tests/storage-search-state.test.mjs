@@ -40,15 +40,16 @@ function createStorageControllerForTest(input) {
 /**
  * 選択中ブックマークの検索状態復元を検証する最小構成を作る。
  * @param {Record<string, object>} bookmarks
+ * @param {{ activeBookmark?: string | null, dataReady?: boolean }} [options]
  * @returns {{ controller: object, data: object, getRenderCount: () => number, getScheduleCount: () => number }}
  */
-function createActiveBookmarkRestoreHarness(bookmarks) {
+function createActiveBookmarkRestoreHarness(bookmarks, options = {}) {
     let renderCount = 0;
     let scheduleCount = 0;
     const data = {
         allSongsRaw: [],
         bookmarks,
-        activeBookmark: null
+        activeBookmark: options.activeBookmark ?? null
     };
     const ui = {
         el: {
@@ -56,6 +57,7 @@ function createActiveBookmarkRestoreHarness(bookmarks) {
         },
         search: {
             selectedFormats: new Set(),
+            dataReady: options.dataReady ?? true,
             userTouchedQuery: false,
             userTouchedFilters: false,
             hasRestoredSearchState: false
@@ -255,6 +257,32 @@ test("active bookmark transitions: state, persistence, rendering, and search sta
         assert.equal(harness.data.activeBookmark, null);
         assert.equal(harness.getRenderCount(), 2);
         assert.equal(harness.getScheduleCount(), 2);
+        assert.equal(
+            JSON.parse(globalThis.localStorage.getItem("searchStateTest")).activeBookmarkId,
+            null
+        );
+    } finally {
+        globalThis.localStorage = prevLocalStorage;
+    }
+});
+
+test("active bookmark transitions: search waits until song data is ready", () => {
+    const prevLocalStorage = globalThis.localStorage;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        const harness = createActiveBookmarkRestoreHarness({
+            "bookmark-1": { name: "Favorites", songs: [], createdAt: 1 }
+        }, {
+            activeBookmark: "bookmark-1",
+            dataReady: false
+        });
+
+        const result = harness.controller.clearActiveBookmark();
+
+        assert.equal(result.ok, true);
+        assert.equal(harness.data.activeBookmark, null);
+        assert.equal(harness.getRenderCount(), 1);
+        assert.equal(harness.getScheduleCount(), 0);
         assert.equal(
             JSON.parse(globalThis.localStorage.getItem("searchStateTest")).activeBookmarkId,
             null
