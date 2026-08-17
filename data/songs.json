@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "contentHash": "sha256:55e957b855981b9eb3e83e711476d64c4d7b518643b8e02a56134936c74af68c",
-  "generatedAt": "2026-08-15T06:03:50.458Z",
+  "contentHash": "sha256:4935ea3720bbe2f55cda3f848eb37fea183519c0f1915f40a4a1f35d5d4ed0ed",
+  "generatedAt": "2026-08-17T14:36:00.303Z",
   "songs": [
     {
       "date": "2026/08/14",
@@ -7869,7 +7869,7 @@
       "streamRole": "",
       "videoOrientation": "vertical",
       "isRelay": false,
-      "isHarmony": true,
+      "isHarmony": false,
       "title": "覚声",
       "artist": "PSYBELL",
       "titleYomi": "カクセイ",
@@ -7895,7 +7895,7 @@
       "streamRole": "",
       "videoOrientation": "vertical",
       "isRelay": false,
-      "isHarmony": true,
+      "isHarmony": false,
       "title": "覚声",
       "artist": "PSYBELL",
       "titleYomi": "カクセイ",
@@ -7921,7 +7921,7 @@
       "streamRole": "",
       "videoOrientation": "landscape",
       "isRelay": false,
-      "isHarmony": true,
+      "isHarmony": false,
       "title": "覚声",
       "artist": "PSYBELL",
       "titleYomi": "カクセイ",
