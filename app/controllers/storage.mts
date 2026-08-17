@@ -46,6 +46,7 @@ type StorageCallbacks = {
     getDateSelectValue: (kind: string) => string;
     applyPendingDateValues: () => void;
     renderBookmarks: () => void;
+    cancelScheduledSearch: () => void;
     scheduleSearch: (options?: { immediate?: boolean }) => void;
 };
 
@@ -97,6 +98,7 @@ export function createStorageController({
         getDateSelectValue,
         applyPendingDateValues,
         renderBookmarks,
+        cancelScheduledSearch,
         scheduleSearch
     } = callbacks;
     let loadedBookmarkStorageVersion = BOOKMARK_STORAGE_VERSION;
@@ -417,6 +419,18 @@ export function createStorageController({
     }
 
     /**
+     * 保存時の日付条件を、UI適用前は保留値から、適用後はselect要素から取得する。
+     * @param {"from" | "to"} kind
+     */
+    function getDateValueForStorage(kind: "from" | "to"): string {
+        if (dateUi.pendingValues) {
+            const pendingValue = dateUi.pendingValues[kind];
+            return typeof pendingValue === "string" ? pendingValue : "";
+        }
+        return getDateSelectValue(kind);
+    }
+
+    /**
      * 現在の検索条件をローカルストレージへ保存する。
      */
     function saveSearchState(): void {
@@ -425,8 +439,8 @@ export function createStorageController({
             const payload = buildStoredSearchStatePayload({
                 query: searchBox && typeof searchBox.value === "string" ? searchBox.value : "",
                 ...collectSearchBooleanFilterState(ui),
-                dateFrom: getDateSelectValue("from"),
-                dateTo: getDateSelectValue("to"),
+                dateFrom: getDateValueForStorage("from"),
+                dateTo: getDateValueForStorage("to"),
                 formats: searchFiltersController.getSelectedFormatValues(),
                 activeBookmarkId: data.activeBookmark
             });
@@ -446,6 +460,8 @@ export function createStorageController({
         renderBookmarks();
         if (searchUiState.dataReady) {
             scheduleSearch({ immediate: true });
+        } else {
+            cancelScheduledSearch();
         }
     }
 

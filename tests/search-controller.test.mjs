@@ -86,7 +86,7 @@ function createSearchCallbacks(input) {
     };
 }
 
-test("createSearchController: immediate search clears the pending debounce id", () => {
+test("createSearchController: cancellation and immediate search clear the pending debounce id", () => {
     const data = {
         allSongsRaw: [],
         bookmarks: {},
@@ -124,6 +124,14 @@ test("createSearchController: immediate search clears the pending debounce id", 
             updateDisplay: () => { updateCount += 1; }
         })
     });
+
+    controller.scheduleSearch();
+    assert.notEqual(ui.search.debounceId, 0);
+
+    controller.cancelScheduledSearch();
+
+    assert.equal(ui.search.debounceId, 0);
+    assert.equal(updateCount, 0);
 
     controller.scheduleSearch();
     assert.notEqual(ui.search.debounceId, 0);

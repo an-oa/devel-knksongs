@@ -147,6 +147,7 @@ function createStorageCallbacks({
             const bookmarkUiController = getBookmarkUiController();
             if (bookmarkUiController) bookmarkUiController.renderBookmarks();
         },
+        cancelScheduledSearch: () => searchController.cancelScheduledSearch(),
         scheduleSearch: (options) => searchController.scheduleSearch(options)
     };
 }

@@ -64,6 +64,7 @@ function setupStorageController({
             getDateSelectValue: () => "",
             applyPendingDateValues: () => {},
             renderBookmarks: () => { renderCount += 1; },
+            cancelScheduledSearch: () => {},
             scheduleSearch: () => { scheduleCount += 1; }
         }
     });

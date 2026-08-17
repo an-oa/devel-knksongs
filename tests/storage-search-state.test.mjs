@@ -30,6 +30,10 @@ function createFakeLocalStorage() {
 function createStorageControllerForTest(input) {
     return createStorageController({
         ...input,
+        callbacks: {
+            cancelScheduledSearch: () => {},
+            ...input.callbacks
+        },
         searchFiltersController: createSearchFiltersController({
             ui: input.ui,
             defaultFormats: input.constants.DEFAULT_FORMATS
@@ -40,12 +44,13 @@ function createStorageControllerForTest(input) {
 /**
  * 選択中ブックマークの検索状態復元を検証する最小構成を作る。
  * @param {Record<string, object>} bookmarks
- * @param {{ activeBookmark?: string | null, dataReady?: boolean }} [options]
- * @returns {{ controller: object, data: object, getRenderCount: () => number, getScheduleCount: () => number }}
+ * @param {{ activeBookmark?: string | null, dataReady?: boolean, pendingValues?: object | null }} [options]
+ * @returns {{ controller: object, data: object, getRenderCount: () => number, getScheduleCount: () => number, getCancelCount: () => number }}
  */
 function createActiveBookmarkRestoreHarness(bookmarks, options = {}) {
     let renderCount = 0;
     let scheduleCount = 0;
+    let cancelCount = 0;
     const data = {
         allSongsRaw: [],
         bookmarks,
@@ -64,7 +69,7 @@ function createActiveBookmarkRestoreHarness(bookmarks, options = {}) {
         },
         date: {
             bounds: null,
-            pendingValues: null
+            pendingValues: options.pendingValues ?? null
         }
     };
     const controller = createStorageControllerForTest({
@@ -79,6 +84,7 @@ function createActiveBookmarkRestoreHarness(bookmarks, options = {}) {
             getDateSelectValue: () => "",
             applyPendingDateValues: () => {},
             renderBookmarks: () => { renderCount += 1; },
+            cancelScheduledSearch: () => { cancelCount += 1; },
             scheduleSearch: () => { scheduleCount += 1; }
         }
     });
@@ -86,7 +92,8 @@ function createActiveBookmarkRestoreHarness(bookmarks, options = {}) {
         controller,
         data,
         getRenderCount: () => renderCount,
-        getScheduleCount: () => scheduleCount
+        getScheduleCount: () => scheduleCount,
+        getCancelCount: () => cancelCount
     };
 }
 
@@ -266,6 +273,32 @@ test("active bookmark transitions: state, persistence, rendering, and search sta
     }
 });
 
+test("active bookmark transitions: pending date conditions survive changes before song data is ready", () => {
+    const prevLocalStorage = globalThis.localStorage;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        const harness = createActiveBookmarkRestoreHarness({
+            "bookmark-1": { name: "Favorites", songs: [], createdAt: 1 }
+        }, {
+            dataReady: false,
+            pendingValues: {
+                from: "2024-02",
+                to: "2024-03"
+            }
+        });
+
+        const result = harness.controller.selectActiveBookmark("bookmark-1");
+
+        assert.equal(result.ok, true);
+        const savedSearchState = JSON.parse(globalThis.localStorage.getItem("searchStateTest"));
+        assert.equal(savedSearchState.dateFrom, "2024-02");
+        assert.equal(savedSearchState.dateTo, "2024-03");
+        assert.equal(savedSearchState.activeBookmarkId, "bookmark-1");
+    } finally {
+        globalThis.localStorage = prevLocalStorage;
+    }
+});
+
 test("active bookmark transitions: search waits until song data is ready", () => {
     const prevLocalStorage = globalThis.localStorage;
     globalThis.localStorage = createFakeLocalStorage();
@@ -283,6 +316,7 @@ test("active bookmark transitions: search waits until song data is ready", () =>
         assert.equal(harness.data.activeBookmark, null);
         assert.equal(harness.getRenderCount(), 1);
         assert.equal(harness.getScheduleCount(), 0);
+        assert.equal(harness.getCancelCount(), 1);
         assert.equal(
             JSON.parse(globalThis.localStorage.getItem("searchStateTest")).activeBookmarkId,
             null
