@@ -167,6 +167,38 @@ function createFailedResponse() {
     };
 }
 
+/**
+ * fetch呼び出しを、タイムアウトsignalを含む公開上の取得条件として比較する。
+ * @param {Array<[string, RequestInit & { priority?: string }]>} actual 実際のfetch呼び出し
+ * @param {Array<[string, { cache: RequestCache, priority?: string }]>} expected 期待するfetch呼び出し
+ */
+function assertFetchCalls(actual, expected) {
+    assert.deepEqual(
+        actual.map(([url, options]) => [url, {
+            cache: options.cache,
+            priority: options.priority,
+            hasAbortSignal: options.signal instanceof AbortSignal
+        }]),
+        expected.map(([url, options]) => [url, {
+            cache: options.cache,
+            priority: options.priority,
+            hasAbortSignal: true
+        }])
+    );
+}
+
+/**
+ * abortされるまで応答しないfetchを返す。
+ * @returns {(url: string, options: RequestInit) => Promise<never>}
+ */
+function createPendingFetch() {
+    return (_url, options) => new Promise((_resolve, reject) => {
+        options.signal?.addEventListener("abort", () => {
+            reject(options.signal.reason);
+        }, { once: true });
+    });
+}
+
 test("songs data source: network csv is used without creating a runtime csv cache", async () => {
     const previousFetch = globalThis.fetch;
     try {
@@ -183,7 +215,7 @@ test("songs data source: network csv is used without creating a runtime csv cach
 
         assert.equal(await dataSource.loadInitialSongs({ onSongsLoaded: (result) => results.push(result) }), true);
 
-        assert.deepEqual(fetchUrls, [
+        assertFetchCalls(fetchUrls, [
             ["https://example.test/songs.csv", { cache: "no-store" }]
         ]);
         assert.equal(results[0].source, "network");
@@ -212,7 +244,7 @@ test("songs data source: network json success stores json and skips csv", async 
 
         assert.equal(await dataSource.loadInitialSongs({ onSongsLoaded: (result) => results.push(result) }), true);
 
-        assert.deepEqual(fetchUrls, [["data/songs.json", { cache: "no-cache" }]]);
+        assertFetchCalls(fetchUrls, [["data/songs.json", { cache: "no-cache" }]]);
         assert.equal(songsJsonCache.peek(), songsJson);
         assert.equal(results[0].source, "network");
         assert.equal(results[0].songs[0].songKey, "json-archive::1");
@@ -242,7 +274,7 @@ test("songs data source: structurally invalid network json is not cached and fal
 
         assert.equal(await dataSource.loadInitialSongs({ onSongsLoaded: (result) => results.push(result) }), true);
 
-        assert.deepEqual(fetchUrls, [
+        assertFetchCalls(fetchUrls, [
             ["data/songs.json", { cache: "no-cache" }],
             ["https://example.test/songs.csv", { cache: "no-store" }]
         ]);
@@ -273,7 +305,10 @@ test("songs data source: matching meta hash uses cached json without fetching th
 
         assert.equal(await dataSource.loadInitialSongs({ onSongsLoaded: (result) => results.push(result) }), true);
 
-        assert.deepEqual(fetchUrls, [["data/songs-meta.json", { cache: "no-cache" }]]);
+        assertFetchCalls(fetchUrls, [[
+            "data/songs-meta.json",
+            { cache: "no-cache", priority: "low" }
+        ]]);
         assert.equal(results[0].source, "cache");
         assert.equal(results[0].songs[0].songKey, "cached-archive::1");
     } finally {
@@ -313,13 +348,17 @@ test("songs data source: newer meta refreshes an older cached json", async () =>
 
         assert.equal(await dataSource.loadInitialSongs({ onSongsLoaded: (result) => results.push(result) }), true);
 
-        assert.deepEqual(fetchUrls, [
-            ["data/songs-meta.json", { cache: "no-cache" }],
-            ["data/songs.json", { cache: "no-cache" }]
+        assertFetchCalls(fetchUrls, [
+            ["data/songs-meta.json", { cache: "no-cache", priority: "low" }],
+            ["data/songs.json", { cache: "no-cache", priority: "low" }]
         ]);
         assert.equal(songsJsonCache.peek(), freshJson);
-        assert.equal(results[0].source, "network");
-        assert.equal(results[0].songs[0].songKey, "fresh-archive::1");
+        assert.equal(results.length, 2);
+        assert.equal(results[0].source, "cache");
+        assert.equal(results[0].songs[0].songKey, "cached-archive::1");
+        assert.equal(results[1].source, "network");
+        assert.equal(results[1].isBackgroundRefresh, true);
+        assert.equal(results[1].songs[0].songKey, "fresh-archive::1");
     } finally {
         globalThis.fetch = previousFetch;
     }
@@ -352,7 +391,10 @@ test("songs data source: cached json newer than meta is accepted without fetchin
 
         assert.equal(await dataSource.loadInitialSongs({ onSongsLoaded: (result) => results.push(result) }), true);
 
-        assert.deepEqual(fetchUrls, [["data/songs-meta.json", { cache: "no-cache" }]]);
+        assertFetchCalls(fetchUrls, [[
+            "data/songs-meta.json",
+            { cache: "no-cache", priority: "low" }
+        ]]);
         assert.equal(results[0].source, "cache");
         assert.equal(results[0].songs[0].songKey, "cached-archive::1");
     } finally {
@@ -393,13 +435,17 @@ test("songs data source: meta fetch failure still tries network json", async () 
 
         assert.equal(await dataSource.loadInitialSongs({ onSongsLoaded: (result) => results.push(result) }), true);
 
-        assert.deepEqual(fetchUrls, [
-            ["data/songs-meta.json", { cache: "no-cache" }],
-            ["data/songs.json", { cache: "no-cache" }]
+        assertFetchCalls(fetchUrls, [
+            ["data/songs-meta.json", { cache: "no-cache", priority: "low" }],
+            ["data/songs.json", { cache: "no-cache", priority: "low" }]
         ]);
         assert.equal(songsJsonCache.peek(), freshJson);
-        assert.equal(results[0].source, "network");
-        assert.equal(results[0].songs[0].songKey, "fresh-archive::1");
+        assert.equal(results.length, 2);
+        assert.equal(results[0].source, "cache");
+        assert.equal(results[0].songs[0].songKey, "cached-archive::1");
+        assert.equal(results[1].source, "network");
+        assert.equal(results[1].isBackgroundRefresh, true);
+        assert.equal(results[1].songs[0].songKey, "fresh-archive::1");
         assert.match(String(warnings[0]?.[0]), /曲データJSONメタ情報の確認に失敗しました/);
     } finally {
         globalThis.fetch = previousFetch;
@@ -439,9 +485,9 @@ test("songs data source: meta fetch failure does not replace newer cache with ol
 
         assert.equal(await dataSource.loadInitialSongs({ onSongsLoaded: (result) => results.push(result) }), true);
 
-        assert.deepEqual(fetchUrls, [
-            ["data/songs-meta.json", { cache: "no-cache" }],
-            ["data/songs.json", { cache: "no-cache" }]
+        assertFetchCalls(fetchUrls, [
+            ["data/songs-meta.json", { cache: "no-cache", priority: "low" }],
+            ["data/songs.json", { cache: "no-cache", priority: "low" }]
         ]);
         assert.equal(songsJsonCache.peek(), cachedJson);
         assert.equal(results[0].source, "cache");
@@ -479,9 +525,9 @@ test("songs data source: json failure uses valid json cache before network csv",
 
         assert.equal(await dataSource.loadInitialSongs({ onSongsLoaded: (result) => results.push(result) }), true);
 
-        assert.deepEqual(fetchUrls, [
-            ["data/songs-meta.json", { cache: "no-cache" }],
-            ["data/songs.json", { cache: "no-cache" }]
+        assertFetchCalls(fetchUrls, [
+            ["data/songs-meta.json", { cache: "no-cache", priority: "low" }],
+            ["data/songs.json", { cache: "no-cache", priority: "low" }]
         ]);
         assert.equal(songsJsonCache.peek(), cachedJson);
         assert.equal(results[0].source, "cache");
@@ -521,7 +567,7 @@ test("songs data source: json newer than stale meta is accepted and cached", asy
 
         assert.equal(await dataSource.loadInitialSongs({ onSongsLoaded: (result) => results.push(result) }), true);
 
-        assert.deepEqual(fetchUrls, [
+        assertFetchCalls(fetchUrls, [
             ["data/songs-meta.json", { cache: "no-cache" }],
             ["data/songs.json", { cache: "no-cache" }]
         ]);
@@ -563,7 +609,7 @@ test("songs data source: json older than meta is not cached and falls back to cs
 
         assert.equal(await dataSource.loadInitialSongs({ onSongsLoaded: (result) => results.push(result) }), true);
 
-        assert.deepEqual(fetchUrls, [
+        assertFetchCalls(fetchUrls, [
             ["data/songs-meta.json", { cache: "no-cache" }],
             ["data/songs.json", { cache: "no-cache" }],
             ["https://example.test/songs.csv", { cache: "no-store" }]
@@ -627,9 +673,9 @@ test("songs data source: initial Version 1 cache remains an undated fallback", a
 
         assert.equal(await dataSource.loadInitialSongs({ onSongsLoaded: (result) => results.push(result) }), true);
 
-        assert.deepEqual(fetchUrls, [
-            ["data/songs-meta.json", { cache: "no-cache" }],
-            ["data/songs.json", { cache: "no-cache" }]
+        assertFetchCalls(fetchUrls, [
+            ["data/songs-meta.json", { cache: "no-cache", priority: "low" }],
+            ["data/songs.json", { cache: "no-cache", priority: "low" }]
         ]);
         assert.equal(songsJsonCache.peek(), legacyJson);
         assert.equal(songsJsonCache.getRemoveCount(), 0);
@@ -745,7 +791,7 @@ test("songs data source: failed json without cache falls back to network csv", a
 
         assert.equal(await dataSource.loadInitialSongs({ onSongsLoaded: (result) => results.push(result) }), true);
 
-        assert.deepEqual(fetchUrls, [
+        assertFetchCalls(fetchUrls, [
             ["data/songs.json", { cache: "no-cache" }],
             ["https://example.test/songs.csv", { cache: "no-store" }]
         ]);
@@ -768,6 +814,76 @@ test("songs data source: all network failures without json cache return false", 
 
         assert.equal(await dataSource.loadInitialSongs({ onSongsLoaded: (result) => results.push(result) }), false);
         assert.deepEqual(results, []);
+    } finally {
+        globalThis.fetch = previousFetch;
+    }
+});
+
+test("songs data source: valid cache is emitted before the background meta request finishes", async () => {
+    const previousFetch = globalThis.fetch;
+    try {
+        const cachedJson = createSongsJson("cached-archive::1", "sha256:cached");
+        const songsJsonCache = createFakeTextCacheStore(cachedJson);
+        let resolveMeta;
+        globalThis.fetch = () => new Promise((resolve) => {
+            resolveMeta = () => resolve(createResponse(
+                createSongsMetaJson("sha256:cached", "2026-08-15T00:00:00.000Z")
+            ));
+        });
+        const results = [];
+        const dataSource = createSongsDataSource({
+            publicSongsJsonUrl: "data/songs.json",
+            publicSongsMetaUrl: "data/songs-meta.json",
+            publicCsvUrl: "https://example.test/songs.csv",
+            songsJsonCache
+        });
+
+        const loadPromise = dataSource.loadInitialSongs({
+            onSongsLoaded: (result) => results.push(result)
+        });
+        await new Promise((resolve) => setImmediate(resolve));
+
+        assert.equal(results.length, 1);
+        assert.equal(results[0].source, "cache");
+        assert.equal(results[0].songs[0].songKey, "cached-archive::1");
+
+        resolveMeta();
+        assert.equal(await loadPromise, true);
+        assert.equal(results.length, 1);
+    } finally {
+        globalThis.fetch = previousFetch;
+    }
+});
+
+test("songs data source: stalled json request times out before falling back to network csv", async () => {
+    const previousFetch = globalThis.fetch;
+    try {
+        const fetchUrls = [];
+        const pendingFetch = createPendingFetch();
+        globalThis.fetch = (url, options) => {
+            fetchUrls.push([url, options]);
+            if (url === "data/songs.json") return pendingFetch(url, options);
+            return Promise.resolve(createResponse(createValidCsv()));
+        };
+        const results = [];
+        const dataSource = createSongsDataSource({
+            publicSongsJsonUrl: "data/songs.json",
+            publicCsvUrl: "https://example.test/songs.csv",
+            songsJsonCache: createFakeTextCacheStore(),
+            songsJsonRequestTimeoutMs: 10,
+            csvRequestTimeoutMs: 50
+        });
+
+        assert.equal(await dataSource.loadInitialSongs({
+            onSongsLoaded: (result) => results.push(result)
+        }), true);
+
+        assertFetchCalls(fetchUrls, [
+            ["data/songs.json", { cache: "no-cache" }],
+            ["https://example.test/songs.csv", { cache: "no-store" }]
+        ]);
+        assert.equal(results.length, 1);
+        assert.equal(results[0].songs[0].songKey, "archive-1::1");
     } finally {
         globalThis.fetch = previousFetch;
     }

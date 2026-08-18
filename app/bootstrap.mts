@@ -56,6 +56,7 @@ import type {
 
 type SearchCallbacksInput = {
     getRenderController: () => ReturnType<typeof createRenderController>;
+    getDataLoader: () => ReturnType<typeof createDataLoader> | null;
     ui: AppUiState;
 };
 
@@ -103,6 +104,7 @@ const youtubeRuntimeState: AppYoutubeRuntimeState = appState.youtube;
  */
 function createSearchCallbacks({
     getRenderController,
+    getDataLoader,
     ui
 }: SearchCallbacksInput): Parameters<typeof createSearchController>[0]["callbacks"] {
     return {
@@ -110,7 +112,8 @@ function createSearchCallbacks({
         scrollResultsPaneToTop: () => scrollResultListToTop(ui.el.resultList),
         getRecommendedDisplayCount: () => estimateMasonryVisibleCardCount(ui.el.resultList, {
             minItemCount: RANDOM_DISPLAY_COUNT
-        })
+        }),
+        applyPendingSongs: () => getDataLoader()?.applyPendingSongs() ?? false
     };
 }
 
@@ -241,6 +244,8 @@ function wireYoutubePlaybackHooks({
  * アプリ controller 群を作成し、相互 callback を同じ composition 境界内で配線する。
  */
 function createAppControllers() {
+    let dataLoader: ReturnType<typeof createDataLoader> | null = null;
+
     /**
      * 形式フィルタの選択状態を appUiState.search.selectedFormats と同期する controller。
      * DEFAULT_FORMATS を基準に、検索条件の収集・復元・リセットから参照される。
@@ -267,6 +272,7 @@ function createAppControllers() {
         },
         callbacks: createSearchCallbacks({
             getRenderController: () => renderController,
+            getDataLoader: () => dataLoader,
             ui: appUiState
         })
     });
@@ -434,10 +440,13 @@ function createAppControllers() {
     /**
      * 初期曲データの読み込み結果を appDataState へ反映し、日付範囲・検索条件・表示を初期化する loader。
      */
-    const dataLoader = createDataLoader({
+    dataLoader = createDataLoader({
         data: appDataState,
         ui: appUiState,
         dataSource: songsDataSource,
+        constants: {
+            minPerformanceCount: MIN_PERFORMANCE_FOR_RANDOM
+        },
         callbacks: {
             migrateLegacyBookmarkSongRefs: () => storageController.migrateLegacyBookmarkSongRefs(),
             applyDateInputRange: (songs) => searchController.applyDateInputRange(songs),

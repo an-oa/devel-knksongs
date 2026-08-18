@@ -37,6 +37,7 @@ export function createSearchController({
     const updateDisplay = callbacks.updateDisplay;
     const scrollResultsPaneToTop = callbacks.scrollResultsPaneToTop;
     const getRecommendedDisplayCount = callbacks.getRecommendedDisplayCount || (() => RANDOM_DISPLAY_COUNT);
+    const applyPendingSongs = callbacks.applyPendingSongs || (() => false);
 
     /**
      * 保留中の検索タイマーを解除し、未予約状態へ戻す。
@@ -67,6 +68,7 @@ export function createSearchController({
      * 検索入力の収集から結果反映までの処理を行う。
      */
     function search(): void {
+        applyPendingSongs();
         const searchInput = collectSearchInput();
         validateSearchQueryInput(ui.el.searchBox, ui.el.searchBoxError, searchInput.parsedQuery);
         const outcome = resolveSearchResults(searchInput.searchState, searchInput.parsedQuery);

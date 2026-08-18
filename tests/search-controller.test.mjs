@@ -82,9 +82,59 @@ function createSearchCallbacks(input) {
     return {
         updateDisplay: callbacks.updateDisplay || (() => {}),
         scrollResultsPaneToTop: callbacks.scrollResultsPaneToTop || (() => {}),
-        getRecommendedDisplayCount: callbacks.getRecommendedDisplayCount
+        getRecommendedDisplayCount: callbacks.getRecommendedDisplayCount,
+        applyPendingSongs: callbacks.applyPendingSongs
     };
 }
+
+test("createSearchController: applies pending songs before collecting search results", () => {
+    const data = {
+        allSongsRaw: [makeRow({ songKey: "old", title: "Old Song", format: "配信" })],
+        bookmarks: {},
+        activeBookmark: null,
+        currentResults: [],
+        displayLimit: 0
+    };
+    const ui = createSearchUiState({
+        el: {
+            searchBox: { value: "Fresh" },
+            relayOnly: { checked: false },
+            harmonyOnly: { checked: false },
+            dateFromYear: null,
+            dateFromMonth: null,
+            dateFromDay: null,
+            dateToYear: null,
+            dateToMonth: null,
+            dateToDay: null,
+            resultCount: { innerText: "" }
+        },
+        selectedFormats: new Set(["配信"])
+    });
+    let applyCount = 0;
+    const controller = createSearchControllerForTest({
+        data,
+        ui,
+        constants: {
+            RANDOM_DISPLAY_COUNT: 10,
+            MIN_PERFORMANCE_FOR_RANDOM: 1,
+            RESULT_DISPLAY_BATCH_SIZE: 30,
+            SEARCH_DEBOUNCE_MS: 200,
+            DEFAULT_FORMATS: ["配信"]
+        },
+        callbacks: createSearchCallbacks({
+            applyPendingSongs: () => {
+                applyCount += 1;
+                data.allSongsRaw = [makeRow({ songKey: "fresh", title: "Fresh Song", format: "配信" })];
+                return true;
+            }
+        })
+    });
+
+    controller.search();
+
+    assert.equal(applyCount, 1);
+    assert.deepEqual(data.currentResults.map((row) => row.songKey), ["fresh"]);
+});
 
 test("createSearchController: cancellation and immediate search clear the pending debounce id", () => {
     const data = {

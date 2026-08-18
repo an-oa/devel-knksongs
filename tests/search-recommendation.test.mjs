@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { pickRecommendedSongs } from "../_build/app/lib/search-recommendation.mjs";
+import {
+    pickRecommendedSongs,
+    reconcileRecommendedSearchCache
+} from "../_build/app/lib/search-recommendation.mjs";
 import { normalizeForSearch } from "../_build/app/lib/search-normalization.mjs";
 
 let autoSongId = 0;
@@ -76,4 +79,152 @@ test("pickRecommendedSongs: keeps the latest row within the same archive", () =>
     } finally {
         Math.random = originalRandom;
     }
+});
+
+test("reconcileRecommendedSearchCache: keeps an admitted song after its archive count falls below the threshold", () => {
+    const cached = makeRow({
+        songKey: "a1::1",
+        archiveId: "a1",
+        sourceIndex: 1,
+        title: "群青",
+        artist: "A",
+        format: "配信"
+    });
+    const latestCachedRow = makeRow({
+        songKey: "a1::1",
+        archiveId: "a1",
+        sourceIndex: 10,
+        title: "群青",
+        artist: "A",
+        format: "配信"
+    });
+    const latestRows = [
+        latestCachedRow,
+        makeRow({ songKey: "a2::1", archiveId: "a2", sourceIndex: 2, title: "群青", artist: "A" })
+    ];
+
+    const reconciled = reconcileRecommendedSearchCache(
+        latestRows,
+        { songs: [cached], requestedCount: 1 },
+        { minPerformanceCount: 3 }
+    );
+
+    assert.equal(reconciled.songs.length, 1);
+    assert.equal(reconciled.songs[0], latestCachedRow);
+    assert.equal(reconciled.requestedCount, 1);
+});
+
+test("reconcileRecommendedSearchCache: replaces a removed archive with the same admitted song below the threshold", () => {
+    const cached = makeRow({
+        songKey: "a1::1",
+        archiveId: "a1",
+        sourceIndex: 1,
+        title: "群青",
+        artist: "A"
+    });
+    const sameSongRows = [
+        makeRow({ songKey: "a2::1", archiveId: "a2", sourceIndex: 2, title: "群青", artist: "A" }),
+        makeRow({ songKey: "a3::1", archiveId: "a3", sourceIndex: 3, title: "群青", artist: "A" })
+    ];
+    const otherEligibleRows = [1, 2, 3].map((index) => makeRow({
+        songKey: `b${index}::1`,
+        archiveId: `b${index}`,
+        sourceIndex: 10 + index,
+        title: "青空",
+        artist: "B"
+    }));
+    const originalRandom = Math.random;
+    Math.random = () => 0;
+    try {
+        const reconciled = reconcileRecommendedSearchCache(
+            [...sameSongRows, ...otherEligibleRows],
+            { songs: [cached], requestedCount: 1 },
+            { minPerformanceCount: 3 }
+        );
+
+        assert.equal(reconciled.songs.length, 1);
+        assert.equal(reconciled.songs[0].titleNorm, normalizeForSearch("群青"));
+        assert.notEqual(reconciled.songs[0].songKey, cached.songKey);
+    } finally {
+        Math.random = originalRandom;
+    }
+});
+
+test("reconcileRecommendedSearchCache: replaces only a vanished song group and preserves other slots", () => {
+    const cachedA = makeRow({ songKey: "a1::1", archiveId: "a1", title: "消えた曲", artist: "A" });
+    const cachedB = makeRow({ songKey: "b1::1", archiveId: "b1", title: "残る曲", artist: "B" });
+    const latestB = makeRow({ songKey: "b1::1", archiveId: "b1", title: "残る曲", artist: "B" });
+    const replacementRows = [1, 2, 3].map((index) => makeRow({
+        songKey: `c${index}::1`,
+        archiveId: `c${index}`,
+        sourceIndex: index,
+        title: "補充曲",
+        artist: "C"
+    }));
+    const originalRandom = Math.random;
+    Math.random = () => 0;
+    try {
+        const reconciled = reconcileRecommendedSearchCache(
+            [latestB, ...replacementRows],
+            { songs: [cachedA, cachedB], requestedCount: 2 },
+            { minPerformanceCount: 3 }
+        );
+
+        assert.deepEqual(
+            reconciled.songs.map((row) => row.titleNorm),
+            [normalizeForSearch("補充曲"), normalizeForSearch("残る曲")]
+        );
+        assert.equal(reconciled.songs[1], latestB);
+    } finally {
+        Math.random = originalRandom;
+    }
+});
+
+test("reconcileRecommendedSearchCache: treats guest-only or missing rows as unavailable", () => {
+    const cachedA = makeRow({ songKey: "a1::1", archiveId: "a1", title: "群青", artist: "A" });
+    const latestRows = [
+        makeRow({
+            songKey: "a1::1",
+            archiveId: "a1",
+            title: "群青",
+            artist: "A",
+            streamRole: "ゲスト"
+        }),
+        makeRow({ songKey: "a2::1", archiveId: "a2", title: "群青", artist: "A" })
+    ];
+
+    const reconciled = reconcileRecommendedSearchCache(
+        latestRows,
+        { songs: [cachedA], requestedCount: 1 },
+        { minPerformanceCount: 3 }
+    );
+
+    assert.equal(reconciled.songs.length, 1);
+    assert.equal(reconciled.songs[0].songKey, "a2::1");
+});
+
+test("reconcileRecommendedSearchCache: keeps a corrected exact songKey even when its identity fields change", () => {
+    const cached = makeRow({ songKey: "a1::1", archiveId: "a1", title: "旧表記", artist: "A" });
+    const corrected = makeRow({ songKey: "a1::1", archiveId: "a1", title: "新表記", artist: "A" });
+
+    const reconciled = reconcileRecommendedSearchCache(
+        [corrected],
+        { songs: [cached], requestedCount: 1 },
+        { minPerformanceCount: 3 }
+    );
+
+    assert.deepEqual(reconciled.songs, [corrected]);
+});
+
+test("reconcileRecommendedSearchCache: reduces the list instead of duplicating when no replacement exists", () => {
+    const cached = makeRow({ songKey: "a1::1", archiveId: "a1", title: "消えた曲", artist: "A" });
+
+    const reconciled = reconcileRecommendedSearchCache(
+        [],
+        { songs: [cached], requestedCount: 1 },
+        { minPerformanceCount: 3 }
+    );
+
+    assert.deepEqual(reconciled.songs, []);
+    assert.equal(reconciled.requestedCount, 1);
 });

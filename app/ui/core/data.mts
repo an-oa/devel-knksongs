@@ -1,14 +1,25 @@
 import type { AppDataState, AppUiState } from "../../state.types";
+import { reconcileRecommendedSearchCache } from "../../lib/search-recommendation.mjs";
 
 type DataSourceLoadResult = {
     songs: Song[];
     source: string;
     resetConditions?: boolean;
+    isBackgroundRefresh?: boolean;
+};
+
+type ApplyLoadedSongsOptions = {
+    resetConditions?: boolean;
+    clearRecommendedCache?: boolean;
+    scheduleSearch?: boolean;
 };
 
 type DataLoaderInput = {
-    data: Pick<AppDataState, "allSongsRaw">;
+    data: Pick<AppDataState, "allSongsRaw" | "pendingSongsRaw">;
     ui: AppUiState;
+    constants: {
+        minPerformanceCount: number;
+    };
     dataSource: {
         loadInitialSongs: (callbacks: {
             onSongsLoaded: (result: DataSourceLoadResult) => void;
@@ -31,6 +42,7 @@ export function createDataLoader(input: DataLoaderInput) {
         data,
         ui,
         dataSource,
+        constants,
         callbacks
     } = input;
     const searchUiState = ui.search;
@@ -47,19 +59,27 @@ export function createDataLoader(input: DataLoaderInput) {
      * 曲配列を状態へ反映して初回検索を行う。
      * @param {Song[]} songs
      * @param {string | null} statusLabel
-     * @param {{ resetConditions?: boolean } | undefined} options
+     * @param options 初期化・検索実行方法
      */
     function applyLoadedSongs(
         songs: Song[],
         statusLabel: string | null,
-        options?: { resetConditions?: boolean }
+        options: ApplyLoadedSongsOptions = {}
     ): void {
-        const shouldResetConditions = options && typeof options.resetConditions === "boolean"
+        const shouldResetConditions = typeof options.resetConditions === "boolean"
             ? options.resetConditions
             : !searchUiState.dataReady;
         data.allSongsRaw = songs;
         migrateLegacyBookmarkSongRefs();
-        searchUiState.recommendedCache = null;
+        if (options.clearRecommendedCache === false) {
+            searchUiState.recommendedCache = reconcileRecommendedSearchCache(
+                songs,
+                searchUiState.recommendedCache,
+                { minPerformanceCount: constants.minPerformanceCount }
+            );
+        } else {
+            searchUiState.recommendedCache = null;
+        }
         const dateBounds = applyDateInputRange(data.allSongsRaw);
         if (dateBounds) {
             clampDateInputsToBounds(dateBounds.minKey, dateBounds.maxKey);
@@ -72,7 +92,9 @@ export function createDataLoader(input: DataLoaderInput) {
         if (shouldResetConditions && !searchUiState.hasRestoredSearchState && !dateUi.pendingValues) {
             resetSearchConditions(false);
         }
-        scheduleSearch({ immediate: true });
+        if (options.scheduleSearch !== false) {
+            scheduleSearch({ immediate: true });
+        }
     }
 
     /**
@@ -80,8 +102,30 @@ export function createDataLoader(input: DataLoaderInput) {
      * @param {{ songs: Song[], source: string, resetConditions?: boolean }} result
      */
     function applyDataSourceResult(result: DataSourceLoadResult): void {
+        if (result.isBackgroundRefresh && searchUiState.dataReady) {
+            data.pendingSongsRaw = result.songs;
+            return;
+        }
+        data.pendingSongsRaw = null;
         const statusLabel = result.source === "cache" ? "キャッシュを表示中" : null;
         applyLoadedSongs(result.songs, statusLabel, { resetConditions: result.resetConditions });
+    }
+
+    /**
+     * バックグラウンド取得した最新曲データを次の検索処理へ同期的に反映する。
+     * 表示更新は呼び出し元の検索処理へ任せ、追加の検索予約は行わない。
+     * @returns 保留データを反映したか
+     */
+    function applyPendingSongs(): boolean {
+        const pendingSongs = data.pendingSongsRaw;
+        if (!pendingSongs) return false;
+        data.pendingSongsRaw = null;
+        applyLoadedSongs(pendingSongs, null, {
+            resetConditions: false,
+            clearRecommendedCache: false,
+            scheduleSearch: false
+        });
+        return true;
     }
 
     /**
@@ -98,6 +142,7 @@ export function createDataLoader(input: DataLoaderInput) {
     }
 
     return {
-        loadInitialData
+        loadInitialData,
+        applyPendingSongs
     };
 }

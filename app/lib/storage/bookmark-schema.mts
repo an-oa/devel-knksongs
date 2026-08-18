@@ -173,6 +173,7 @@ export function migrateLegacyBookmarkSongRefsToCurrent(input: BookmarkMigrationI
                 else {
                     const converted = normalizeLegacySongRefToCurrent(trimmedRef);
                     if (converted && songKeyMap.has(converted)) normalized = songKeyMap.get(converted) || null;
+                    else normalized = trimmedRef;
                 }
             } else if (Number.isFinite(ref)) {
                 normalized = legacyIndexMap.get(Number(ref)) || null;

@@ -21,6 +21,7 @@ function createSong(songKey) {
         bookmarkSongKey: `abc123::${songKey}`,
         legacySongKey: `${songKey}::https://www.youtube.com/watch?v=abc123&t=10s`,
         format: "配信",
+        streamRole: "",
         videoOrientation: "vertical",
         isRelay: false,
         isHarmony: false,
@@ -49,7 +50,8 @@ function createDataLoaderHarness(input) {
     searchBox.disabled = options.searchBoxDisabled ?? true;
 
     const data = {
-        allSongsRaw: []
+        allSongsRaw: [],
+        pendingSongsRaw: null
     };
     const ui = {
         el: {
@@ -106,6 +108,9 @@ function createLoaderWithDataSource(options, harness) {
     return createDataLoader({
         data: harness.data,
         ui: harness.ui,
+        constants: {
+            minPerformanceCount: 3
+        },
         dataSource: {
             async loadInitialSongs(callbacks) {
                 return options.onLoad(callbacks);
@@ -171,7 +176,7 @@ test("data loader: cache source shows cache status and skips reset when pending 
     }
 });
 
-test("data loader: background refresh applies new songs without resetting conditions again", async () => {
+test("data loader: background refresh waits for the next search before applying new songs", async () => {
     const restoreDom = installFakeDom();
     try {
         const harness = createDataLoaderHarness();
@@ -181,7 +186,8 @@ test("data loader: background refresh applies new songs without resetting condit
                 onSongsLoaded({
                     songs: [createSong("fresh-archive::1")],
                     source: "network",
-                    resetConditions: false
+                    resetConditions: false,
+                    isBackgroundRefresh: true
                 });
                 return true;
             }
@@ -189,10 +195,60 @@ test("data loader: background refresh applies new songs without resetting condit
 
         await loader.loadInitialData();
 
-        assert.equal(harness.data.allSongsRaw[0].songKey, "fresh-archive::1");
+        assert.equal(harness.data.allSongsRaw[0].songKey, "cached-archive::1");
+        assert.equal(harness.data.pendingSongsRaw[0].songKey, "fresh-archive::1");
         assert.deepEqual(harness.calls.resetSearchConditionsArgs, [false]);
-        assert.deepEqual(harness.calls.scheduleSearchArgs, [{ immediate: true }, { immediate: true }]);
+        assert.deepEqual(harness.calls.scheduleSearchArgs, [{ immediate: true }]);
+        assert.equal(harness.calls.migrateLegacyBookmarkSongRefs, 1);
+
+        assert.equal(loader.applyPendingSongs(), true);
+
+        assert.equal(harness.data.allSongsRaw[0].songKey, "fresh-archive::1");
+        assert.equal(harness.data.pendingSongsRaw, null);
+        assert.deepEqual(harness.calls.resetSearchConditionsArgs, [false]);
+        assert.deepEqual(harness.calls.scheduleSearchArgs, [{ immediate: true }]);
         assert.equal(harness.calls.migrateLegacyBookmarkSongRefs, 2);
+        assert.equal(loader.applyPendingSongs(), false);
+    } finally {
+        restoreDom();
+    }
+});
+
+test("data loader: applying pending songs reconciles the existing recommendation cache", async () => {
+    const restoreDom = installFakeDom();
+    try {
+        const cachedSong = createSong("cached-archive::1");
+        const freshSong = {
+            ...cachedSong,
+            url: "https://www.youtube.com/watch?v=abc123&t=20s",
+            endSeconds: 600
+        };
+        const harness = createDataLoaderHarness();
+        const loader = createLoaderWithDataSource({
+            onLoad({ onSongsLoaded }) {
+                onSongsLoaded({ songs: [cachedSong], source: "cache" });
+                onSongsLoaded({
+                    songs: [freshSong],
+                    source: "network",
+                    isBackgroundRefresh: true
+                });
+                return true;
+            }
+        }, harness);
+
+        await loader.loadInitialData();
+        harness.ui.search.recommendedCache = {
+            songs: [cachedSong],
+            requestedCount: 4
+        };
+
+        assert.equal(loader.applyPendingSongs(), true);
+
+        assert.deepEqual(harness.ui.search.recommendedCache, {
+            songs: [freshSong],
+            requestedCount: 4
+        });
+        assert.equal(harness.ui.search.recommendedCache.songs[0], freshSong);
     } finally {
         restoreDom();
     }
