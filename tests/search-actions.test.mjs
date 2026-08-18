@@ -26,6 +26,7 @@ test("search actions: clear resets conditions before delegating active bookmark 
     };
     const searchController = {
         syncDateSelectOptions() {},
+        cancelScheduledSearch() {},
         scheduleSearch() {
             calls.directSearch += 1;
         },

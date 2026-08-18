@@ -9,6 +9,7 @@ type SearchActionEventOptions = Event | SearchScheduleOptions;
 
 type SearchActionsSearchController = {
     syncDateSelectOptions: (kind?: string) => void;
+    cancelScheduledSearch: () => void;
     scheduleSearch: (options?: SearchScheduleOptions) => void;
     resetDateSelects: () => void;
     resetDateSelectGroup: (kind: string) => void;
@@ -58,10 +59,7 @@ export function createSearchUiActions({
      * 保留中の検索デバウンスタイマーを解除する。
      */
     function clearSearchDebounce(): void {
-        if (search.debounceId) {
-            clearTimeout(search.debounceId);
-            search.debounceId = 0;
-        }
+        getSearchController().cancelScheduledSearch();
     }
 
     /**

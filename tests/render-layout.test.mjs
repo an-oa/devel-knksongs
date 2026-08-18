@@ -4,6 +4,7 @@ import { createRenderController } from "../_build/app/controllers/render.mjs";
 import { createSearchController } from "../_build/app/controllers/search.mjs";
 import { extractYoutubeInfo } from "../_build/app/controllers/youtube.mjs";
 import { createSearchFiltersController } from "../_build/app/ui/search-filters/controller.mjs";
+import { createDateFilterController } from "../_build/app/ui/date/filter.mjs";
 import {
     createYoutubePlaybackStartResult,
     YOUTUBE_PLAYBACK_START_STATUS
@@ -660,11 +661,11 @@ test("bookmark: observes result tail and increases by RESULT_DISPLAY_BATCH_SIZE 
                 ui,
                 defaultFormats: ["配信", "歌みた", "ショート", "切り抜き"]
             }),
+            dateFilterController: createDateFilterController({ ui }),
             constants: {
                 RANDOM_DISPLAY_COUNT: 48,
                 MIN_PERFORMANCE_FOR_RANDOM: 3,
                 RESULT_DISPLAY_BATCH_SIZE: 48,
-                SEARCH_DEBOUNCE_MS: 0,
                 DEFAULT_FORMATS: ["配信", "歌みた", "ショート", "切り抜き"]
             },
             callbacks: {

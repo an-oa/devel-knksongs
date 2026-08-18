@@ -1,4 +1,3 @@
-import { createDateFilterController } from "../ui/date/filter.mjs";
 import { filterSongsByCriteria } from "../lib/search-filters.mjs";
 import { isValidEmptySearchQuery, parseSearchQuery } from "../lib/search-query.mjs";
 import type { ParsedSearchQuery } from "../lib/search-query.mjs";
@@ -22,53 +21,25 @@ export function createSearchController({
     data,
     ui,
     searchFiltersController,
+    dateFilterController,
     constants,
     callbacks
 }: SearchControllerInput) {
     const {
         RANDOM_DISPLAY_COUNT,
         MIN_PERFORMANCE_FOR_RANDOM,
-        RESULT_DISPLAY_BATCH_SIZE,
-        SEARCH_DEBOUNCE_MS
+        RESULT_DISPLAY_BATCH_SIZE
     } = constants;
     const searchUiState = ui.search;
     const lookupUi = ui.lookup;
-    const dateFilterController = createDateFilterController({ ui });
     const updateDisplay = callbacks.updateDisplay;
     const scrollResultsPaneToTop = callbacks.scrollResultsPaneToTop;
     const getRecommendedDisplayCount = callbacks.getRecommendedDisplayCount || (() => RANDOM_DISPLAY_COUNT);
-    const applyPendingSongs = callbacks.applyPendingSongs || (() => false);
-
-    /**
-     * 保留中の検索タイマーを解除し、未予約状態へ戻す。
-     */
-    function cancelScheduledSearch(): void {
-        if (!searchUiState.debounceId) return;
-        clearTimeout(searchUiState.debounceId);
-        searchUiState.debounceId = 0;
-    }
-
-    /**
-     * デバウンス付きで検索実行を予約し、必要時は即時実行する。
-     * @param {{ immediate?: boolean }} [options]
-     */
-    function scheduleSearch(options?: { immediate?: boolean }): void {
-        cancelScheduledSearch();
-        if (options && options.immediate) {
-            search();
-            return;
-        }
-        searchUiState.debounceId = setTimeout(() => {
-            searchUiState.debounceId = 0;
-            search();
-        }, SEARCH_DEBOUNCE_MS);
-    }
 
     /**
      * 検索入力の収集から結果反映までの処理を行う。
      */
     function search(): void {
-        applyPendingSongs();
         const searchInput = collectSearchInput();
         validateSearchQueryInput(ui.el.searchBox, ui.el.searchBoxError, searchInput.parsedQuery);
         const outcome = resolveSearchResults(searchInput.searchState, searchInput.parsedQuery);
@@ -237,8 +208,6 @@ export function createSearchController({
     }
 
     return {
-        cancelScheduledSearch,
-        scheduleSearch,
         search,
         refreshRecommendedDisplay,
         getSearchState,

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createSearchFiltersController } from "../_build/app/ui/search-filters/controller.mjs";
 import { normalizeForSearch } from "../_build/app/lib/search-normalization.mjs";
 import { createSearchController } from "../_build/app/controllers/search.mjs";
+import { createDateFilterController } from "../_build/app/ui/date/filter.mjs";
 
 let autoSongId = 0;
 
@@ -44,7 +45,8 @@ function createSearchControllerForTest(input) {
         searchFiltersController: createSearchFiltersController({
             ui: input.ui,
             defaultFormats: input.constants.DEFAULT_FORMATS
-        })
+        }),
+        dateFilterController: createDateFilterController({ ui: input.ui })
     });
 }
 
@@ -82,115 +84,9 @@ function createSearchCallbacks(input) {
     return {
         updateDisplay: callbacks.updateDisplay || (() => {}),
         scrollResultsPaneToTop: callbacks.scrollResultsPaneToTop || (() => {}),
-        getRecommendedDisplayCount: callbacks.getRecommendedDisplayCount,
-        applyPendingSongs: callbacks.applyPendingSongs
+        getRecommendedDisplayCount: callbacks.getRecommendedDisplayCount
     };
 }
-
-test("createSearchController: applies pending songs before collecting search results", () => {
-    const data = {
-        allSongsRaw: [makeRow({ songKey: "old", title: "Old Song", format: "配信" })],
-        bookmarks: {},
-        activeBookmark: null,
-        currentResults: [],
-        displayLimit: 0
-    };
-    const ui = createSearchUiState({
-        el: {
-            searchBox: { value: "Fresh" },
-            relayOnly: { checked: false },
-            harmonyOnly: { checked: false },
-            dateFromYear: null,
-            dateFromMonth: null,
-            dateFromDay: null,
-            dateToYear: null,
-            dateToMonth: null,
-            dateToDay: null,
-            resultCount: { innerText: "" }
-        },
-        selectedFormats: new Set(["配信"])
-    });
-    let applyCount = 0;
-    const controller = createSearchControllerForTest({
-        data,
-        ui,
-        constants: {
-            RANDOM_DISPLAY_COUNT: 10,
-            MIN_PERFORMANCE_FOR_RANDOM: 1,
-            RESULT_DISPLAY_BATCH_SIZE: 30,
-            SEARCH_DEBOUNCE_MS: 200,
-            DEFAULT_FORMATS: ["配信"]
-        },
-        callbacks: createSearchCallbacks({
-            applyPendingSongs: () => {
-                applyCount += 1;
-                data.allSongsRaw = [makeRow({ songKey: "fresh", title: "Fresh Song", format: "配信" })];
-                return true;
-            }
-        })
-    });
-
-    controller.search();
-
-    assert.equal(applyCount, 1);
-    assert.deepEqual(data.currentResults.map((row) => row.songKey), ["fresh"]);
-});
-
-test("createSearchController: cancellation and immediate search clear the pending debounce id", () => {
-    const data = {
-        allSongsRaw: [],
-        bookmarks: {},
-        activeBookmark: null,
-        currentResults: [],
-        displayLimit: 0
-    };
-    const ui = createSearchUiState({
-        el: {
-            searchBox: { value: "" },
-            relayOnly: { checked: false },
-            harmonyOnly: { checked: false },
-            dateFromYear: null,
-            dateFromMonth: null,
-            dateFromDay: null,
-            dateToYear: null,
-            dateToMonth: null,
-            dateToDay: null,
-            resultCount: { innerText: "" }
-        },
-        selectedFormats: new Set(["配信"])
-    });
-    let updateCount = 0;
-    const controller = createSearchControllerForTest({
-        data,
-        ui,
-        constants: {
-            RANDOM_DISPLAY_COUNT: 10,
-            MIN_PERFORMANCE_FOR_RANDOM: 1,
-            RESULT_DISPLAY_BATCH_SIZE: 30,
-            SEARCH_DEBOUNCE_MS: 60_000,
-            DEFAULT_FORMATS: ["配信"]
-        },
-        callbacks: createSearchCallbacks({
-            updateDisplay: () => { updateCount += 1; }
-        })
-    });
-
-    controller.scheduleSearch();
-    assert.notEqual(ui.search.debounceId, 0);
-
-    controller.cancelScheduledSearch();
-
-    assert.equal(ui.search.debounceId, 0);
-    assert.equal(updateCount, 0);
-
-    controller.scheduleSearch();
-    assert.notEqual(ui.search.debounceId, 0);
-
-    controller.scheduleSearch({ immediate: true });
-
-    assert.equal(ui.search.debounceId, 0);
-    assert.equal(updateCount, 1);
-});
 
 test("createSearchController: active bookmark also applies search criteria", () => {
     const rows = [
@@ -229,7 +125,6 @@ test("createSearchController: active bookmark also applies search criteria", () 
         RANDOM_DISPLAY_COUNT: 10,
         MIN_PERFORMANCE_FOR_RANDOM: 1,
         RESULT_DISPLAY_BATCH_SIZE: 30,
-        SEARCH_DEBOUNCE_MS: 0,
         DEFAULT_FORMATS: ["配信", "歌みた", "ショート"]
     };
 
@@ -292,7 +187,6 @@ test("createSearchController: direct search synchronizes restored query validati
             RANDOM_DISPLAY_COUNT: 10,
             MIN_PERFORMANCE_FOR_RANDOM: 1,
             RESULT_DISPLAY_BATCH_SIZE: 30,
-            SEARCH_DEBOUNCE_MS: 0,
             DEFAULT_FORMATS: ["配信"]
         },
         callbacks: createSearchCallbacks()
@@ -350,7 +244,6 @@ test("createSearchController: active bookmark resolves rows by bookmarkSongKey",
         RANDOM_DISPLAY_COUNT: 10,
         MIN_PERFORMANCE_FOR_RANDOM: 1,
         RESULT_DISPLAY_BATCH_SIZE: 30,
-        SEARCH_DEBOUNCE_MS: 0,
         DEFAULT_FORMATS: ["配信", "歌みた", "ショート"]
     };
 
@@ -407,7 +300,6 @@ test("createSearchController: active bookmark uses incremental display limit", (
         RANDOM_DISPLAY_COUNT: 10,
         MIN_PERFORMANCE_FOR_RANDOM: 1,
         RESULT_DISPLAY_BATCH_SIZE: 2,
-        SEARCH_DEBOUNCE_MS: 0,
         DEFAULT_FORMATS: ["配信", "歌みた", "ショート"]
     };
 
@@ -457,7 +349,6 @@ test("createSearchController: an empty quoted query uses recommendation mode for
         RANDOM_DISPLAY_COUNT: 10,
         MIN_PERFORMANCE_FOR_RANDOM: 3,
         RESULT_DISPLAY_BATCH_SIZE: 30,
-        SEARCH_DEBOUNCE_MS: 0,
         DEFAULT_FORMATS: ["配信", "歌みた", "ショート", "切り抜き"]
     };
 
@@ -505,7 +396,6 @@ test("createSearchController: single オリ曲 performance is eligible for recom
         RANDOM_DISPLAY_COUNT: 10,
         MIN_PERFORMANCE_FOR_RANDOM: 3,
         RESULT_DISPLAY_BATCH_SIZE: 30,
-        SEARCH_DEBOUNCE_MS: 0,
         DEFAULT_FORMATS: ["配信", "歌みた", "ショート", "切り抜き"]
     };
 
@@ -559,7 +449,6 @@ test("createSearchController: recommendation count expands to the responsive dis
         RANDOM_DISPLAY_COUNT: 10,
         MIN_PERFORMANCE_FOR_RANDOM: 1,
         RESULT_DISPLAY_BATCH_SIZE: 10,
-        SEARCH_DEBOUNCE_MS: 0,
         DEFAULT_FORMATS: ["配信", "歌みた", "ショート"]
     };
     let recommendedDisplayCount = 12;
@@ -675,7 +564,6 @@ test("createSearchController: recommendation expansion dedupes by recommendation
             RANDOM_DISPLAY_COUNT: 1,
             MIN_PERFORMANCE_FOR_RANDOM: 2,
             RESULT_DISPLAY_BATCH_SIZE: 10,
-            SEARCH_DEBOUNCE_MS: 0,
             DEFAULT_FORMATS: ["配信", "歌みた", "ショート"]
         };
         let recommendedDisplayCount = 1;
@@ -742,7 +630,6 @@ test("createSearchController: recommendation count is capped by available recomm
         RANDOM_DISPLAY_COUNT: 10,
         MIN_PERFORMANCE_FOR_RANDOM: 1,
         RESULT_DISPLAY_BATCH_SIZE: 10,
-        SEARCH_DEBOUNCE_MS: 0,
         DEFAULT_FORMATS: ["配信", "歌みた", "ショート"]
     };
     const controller = createSearchControllerForTest({
