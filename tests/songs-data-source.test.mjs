@@ -870,8 +870,8 @@ test("songs data source: stalled json request times out before falling back to n
             publicSongsJsonUrl: "data/songs.json",
             publicCsvUrl: "https://example.test/songs.csv",
             songsJsonCache: createFakeTextCacheStore(),
-            songsJsonRequestTimeoutMs: 10,
-            csvRequestTimeoutMs: 50
+            songsJsonResponseTimeoutMs: 10,
+            csvResponseTimeoutMs: 50
         });
 
         assert.equal(await dataSource.loadInitialSongs({
@@ -882,6 +882,86 @@ test("songs data source: stalled json request times out before falling back to n
             ["data/songs.json", { cache: "no-cache" }],
             ["https://example.test/songs.csv", { cache: "no-store" }]
         ]);
+        assert.equal(results.length, 1);
+        assert.equal(results[0].songs[0].songKey, "archive-1::1");
+    } finally {
+        globalThis.fetch = previousFetch;
+    }
+});
+
+test("songs data source: slow json body may finish after the response timeout", async () => {
+    const previousFetch = globalThis.fetch;
+    try {
+        const songsJson = createSongsJson("slow-json::1");
+        const songsJsonCache = createFakeTextCacheStore();
+        globalThis.fetch = (_url, options) => Promise.resolve({
+            ok: true,
+            text() {
+                return new Promise((resolve, reject) => {
+                    const timerId = setTimeout(() => resolve(songsJson), 20);
+                    options.signal.addEventListener("abort", () => {
+                        clearTimeout(timerId);
+                        reject(options.signal.reason);
+                    }, { once: true });
+                });
+            }
+        });
+        const results = [];
+        const dataSource = createSongsDataSource({
+            publicSongsJsonUrl: "data/songs.json",
+            publicCsvUrl: "https://example.test/songs.csv",
+            songsJsonCache,
+            songsJsonResponseTimeoutMs: 10,
+            songsJsonBodyTimeoutMs: 50,
+            csvResponseTimeoutMs: 10,
+            csvBodyTimeoutMs: 50
+        });
+
+        assert.equal(await dataSource.loadInitialSongs({
+            onSongsLoaded: (result) => results.push(result)
+        }), true);
+
+        assert.equal(results.length, 1);
+        assert.equal(results[0].songs[0].songKey, "slow-json::1");
+        assert.equal(songsJsonCache.peek(), songsJson);
+    } finally {
+        globalThis.fetch = previousFetch;
+    }
+});
+
+test("songs data source: stalled json body times out before falling back to network csv", async () => {
+    const previousFetch = globalThis.fetch;
+    try {
+        globalThis.fetch = (url, options) => {
+            if (url !== "data/songs.json") {
+                return Promise.resolve(createResponse(createValidCsv()));
+            }
+            return Promise.resolve({
+                ok: true,
+                text() {
+                    return new Promise((_resolve, reject) => {
+                        options.signal.addEventListener("abort", () => {
+                            reject(options.signal.reason);
+                        }, { once: true });
+                    });
+                }
+            });
+        };
+        const results = [];
+        const dataSource = createSongsDataSource({
+            publicSongsJsonUrl: "data/songs.json",
+            publicCsvUrl: "https://example.test/songs.csv",
+            songsJsonCache: createFakeTextCacheStore(),
+            songsJsonResponseTimeoutMs: 50,
+            songsJsonBodyTimeoutMs: 10,
+            csvResponseTimeoutMs: 50,
+            csvBodyTimeoutMs: 50
+        });
+
+        assert.equal(await dataSource.loadInitialSongs({
+            onSongsLoaded: (result) => results.push(result)
+        }), true);
+
         assert.equal(results.length, 1);
         assert.equal(results[0].songs[0].songKey, "archive-1::1");
     } finally {

@@ -7,8 +7,11 @@ import {
 } from "./songs-json.mjs";
 import type { SongsJsonArtifactMetadata, SongsJsonPayload } from "./songs-json.mjs";
 
-export const DEFAULT_SONGS_JSON_REQUEST_TIMEOUT_MS = 2000;
-export const DEFAULT_SONGS_CSV_REQUEST_TIMEOUT_MS = 3000;
+export const DEFAULT_SONGS_META_RESPONSE_TIMEOUT_MS = 2000;
+export const DEFAULT_SONGS_JSON_RESPONSE_TIMEOUT_MS = 2000;
+export const DEFAULT_SONGS_JSON_BODY_TIMEOUT_MS = 30000;
+export const DEFAULT_SONGS_CSV_RESPONSE_TIMEOUT_MS = 3000;
+export const DEFAULT_SONGS_CSV_BODY_TIMEOUT_MS = 30000;
 
 type SongsJsonCache = {
     getText: () => Promise<string | null>;
@@ -21,8 +24,11 @@ type SongsDataSourceInput = {
     publicSongsMetaUrl?: string;
     publicCsvUrl: string;
     songsJsonCache?: SongsJsonCache;
-    songsJsonRequestTimeoutMs?: number;
-    csvRequestTimeoutMs?: number;
+    songsMetaResponseTimeoutMs?: number;
+    songsJsonResponseTimeoutMs?: number;
+    songsJsonBodyTimeoutMs?: number;
+    csvResponseTimeoutMs?: number;
+    csvBodyTimeoutMs?: number;
 };
 
 type SongsLoadedResult = {
@@ -53,26 +59,35 @@ export function createSongsDataSource(input: SongsDataSourceInput) {
         publicSongsMetaUrl,
         publicCsvUrl,
         songsJsonCache,
-        songsJsonRequestTimeoutMs = DEFAULT_SONGS_JSON_REQUEST_TIMEOUT_MS,
-        csvRequestTimeoutMs = DEFAULT_SONGS_CSV_REQUEST_TIMEOUT_MS
+        songsMetaResponseTimeoutMs = DEFAULT_SONGS_META_RESPONSE_TIMEOUT_MS,
+        songsJsonResponseTimeoutMs = DEFAULT_SONGS_JSON_RESPONSE_TIMEOUT_MS,
+        songsJsonBodyTimeoutMs = DEFAULT_SONGS_JSON_BODY_TIMEOUT_MS,
+        csvResponseTimeoutMs = DEFAULT_SONGS_CSV_RESPONSE_TIMEOUT_MS,
+        csvBodyTimeoutMs = DEFAULT_SONGS_CSV_BODY_TIMEOUT_MS
     } = input;
 
     /**
-     * fetch全体に期限を設け、応答停止時に次の取得元へ進めるようにする。
+     * response受信待ちと本文読込に別々の期限を設ける。
+     * response受信後は短い待機期限を解除し、大きい本文を低速回線でも読み切れるようにする。
      * @param url 取得URL
      * @param cacheMode fetch cache mode
-     * @param timeoutMs 取得期限
+     * @param responseTimeoutMs response受信までの期限
+     * @param bodyTimeoutMs response本文読込の期限
      * @param isBackgroundRequest 初期表示後の低優先度取得か
      * @returns response本文
      */
     async function fetchTextWithTimeout(
         url: string,
         cacheMode: RequestCache,
-        timeoutMs: number,
+        responseTimeoutMs: number,
+        bodyTimeoutMs: number,
         isBackgroundRequest: boolean
     ): Promise<string> {
         const abortController = new AbortController();
-        const timeoutId = setTimeout(() => abortController.abort(), timeoutMs);
+        let timeoutId: ReturnType<typeof setTimeout> | null = setTimeout(
+            () => abortController.abort(),
+            responseTimeoutMs
+        );
         const requestInit: FetchRequestInit = {
             cache: cacheMode,
             signal: abortController.signal
@@ -80,10 +95,13 @@ export function createSongsDataSource(input: SongsDataSourceInput) {
         if (isBackgroundRequest) requestInit.priority = "low";
         try {
             const response = await fetch(url, requestInit);
+            clearTimeout(timeoutId);
+            timeoutId = null;
             if (!response.ok) throw new Error(`fetch failed: ${url}`);
+            timeoutId = setTimeout(() => abortController.abort(), bodyTimeoutMs);
             return await response.text();
         } finally {
-            clearTimeout(timeoutId);
+            if (timeoutId !== null) clearTimeout(timeoutId);
         }
     }
 
@@ -137,7 +155,8 @@ export function createSongsDataSource(input: SongsDataSourceInput) {
         return fetchTextWithTimeout(
             publicSongsJsonUrl,
             "no-cache",
-            songsJsonRequestTimeoutMs,
+            songsJsonResponseTimeoutMs,
+            songsJsonBodyTimeoutMs,
             isBackgroundRequest
         );
     }
@@ -151,7 +170,8 @@ export function createSongsDataSource(input: SongsDataSourceInput) {
         return fetchTextWithTimeout(
             publicSongsMetaUrl,
             "no-cache",
-            songsJsonRequestTimeoutMs,
+            songsMetaResponseTimeoutMs,
+            songsMetaResponseTimeoutMs,
             isBackgroundRequest
         );
     }
@@ -161,7 +181,13 @@ export function createSongsDataSource(input: SongsDataSourceInput) {
      * @returns CSV文字列
      */
     async function fetchCsvText(): Promise<string> {
-        return fetchTextWithTimeout(publicCsvUrl, "no-store", csvRequestTimeoutMs, false);
+        return fetchTextWithTimeout(
+            publicCsvUrl,
+            "no-store",
+            csvResponseTimeoutMs,
+            csvBodyTimeoutMs,
+            false
+        );
     }
 
     /**

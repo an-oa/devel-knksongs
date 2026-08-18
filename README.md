@@ -136,7 +136,9 @@ flowchart TD
 - 手元のJSONキャッシュがmetaと同じ内容か、metaより新しいと判断できれば、大きい `songs.json` の再取得を避けます。
   meta取得失敗時もJSON本体を試し、JSONキャッシュがある場合は両者を直接比較して古いJSONへの巻き戻りを防ぎます。
   最新JSONを取得した場合はIndexedDBへ保存しますが、表示中のカードは自動更新せず、次の検索操作時に反映します。
-- metaとJSON本体には2秒、CSVには3秒の取得期限を設け、応答が止まった取得元から後続の取得元へ進めるようにします。
+- metaはresponse受信と本文読込に各2秒、JSON本体はresponse受信に2秒・本文読込に30秒、CSVは
+  response受信に3秒・本文読込に30秒の期限を設けます。大きい本文を2～3秒で切断せず、responseや本文が
+  停止した場合は期限後に後続の取得元へ進みます。
 - 実際に配布された全期間のVersion 1 JSONキャッシュはフォールバックとして読み込みます。
   初期形式に存在しない `contentHash` は比較不能、`streamRole` は空文字として扱い、現在の必須構造へ正規化します。
 - 公開スプレッドシートのCSVは、事前生成JSONの元データかつJSON取得失敗時のフォールバックとして参照します(`app/config.mts` の `PUBLIC_CSV_URL` で指定し、実行時は `_build/app/config.mjs` に生成された module を読みます)。

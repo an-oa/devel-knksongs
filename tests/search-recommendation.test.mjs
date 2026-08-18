@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
     pickRecommendedSongs,
+    pickRecommendedSongsWithCache,
     reconcileRecommendedSearchCache
 } from "../_build/app/lib/search-recommendation.mjs";
 import { normalizeForSearch } from "../_build/app/lib/search-normalization.mjs";
@@ -226,5 +227,30 @@ test("reconcileRecommendedSearchCache: reduces the list instead of duplicating w
     );
 
     assert.deepEqual(reconciled.songs, []);
-    assert.equal(reconciled.requestedCount, 1);
+    assert.equal(reconciled.requestedCount, 0);
+});
+
+test("pickRecommendedSongsWithCache: refills a recommendation cache after reconciled slots were missing", () => {
+    const cached = makeRow({ songKey: "a1::1", archiveId: "a1", title: "消えた曲", artist: "A" });
+    const reconciled = reconcileRecommendedSearchCache(
+        [],
+        { songs: [cached], requestedCount: 1 },
+        { minPerformanceCount: 3 }
+    );
+    const restoredRows = [1, 2, 3].map((index) => makeRow({
+        songKey: `b${index}::1`,
+        archiveId: `b${index}`,
+        title: "復帰曲",
+        artist: "B"
+    }));
+
+    const result = pickRecommendedSongsWithCache(restoredRows, {
+        count: 1,
+        minPerformanceCount: 3,
+        currentCache: reconciled
+    });
+
+    assert.equal(result.songs.length, 1);
+    assert.equal(result.songs[0].titleNorm, normalizeForSearch("復帰曲"));
+    assert.equal(result.cache.requestedCount, 1);
 });

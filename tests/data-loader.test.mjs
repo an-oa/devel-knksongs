@@ -246,7 +246,7 @@ test("data loader: applying pending songs reconciles the existing recommendation
 
         assert.deepEqual(harness.ui.search.recommendedCache, {
             songs: [freshSong],
-            requestedCount: 4
+            requestedCount: 1
         });
         assert.equal(harness.ui.search.recommendedCache.songs[0], freshSong);
     } finally {

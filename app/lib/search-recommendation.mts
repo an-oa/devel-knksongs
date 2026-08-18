@@ -10,7 +10,7 @@ import {
 export type RecommendedSearchCache = {
     /** 抽出済みのおすすめ曲。 */
     songs: Song[];
-    /** この cache が満たしている要求件数。 */
+    /** この cache で抽出済みとして扱える要求件数。欠損時は実際の曲数まで下げる。 */
     requestedCount: number;
 };
 
@@ -133,9 +133,10 @@ export function reconcileRecommendedSearchCache(
         usedGroupKeys.add(replacementGroup.key);
     }
 
+    const nextSongs = nextSlots.filter((row): row is Song => row !== null);
     return createRecommendedCacheState(
-        nextSlots.filter((row): row is Song => row !== null),
-        getRecommendedCacheRequestedCount(currentCache)
+        nextSongs,
+        Math.min(getRecommendedCacheRequestedCount(currentCache), nextSongs.length)
     );
 }
 
