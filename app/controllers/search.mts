@@ -213,17 +213,6 @@ export function createSearchController({
         getSearchState,
         isRecommendedMode,
         areAllFormatsSelected: searchFiltersController.areAllFormatsSelected,
-        areFormatsDefault: searchFiltersController.areFormatsDefault,
-        hasDateSelection: dateFilterController.hasDateSelection,
-        getDateSelectValue: dateFilterController.getDateSelectValue,
-        applyDateSelectValue: dateFilterController.applyDateSelectValue,
-        resetDateSelects: dateFilterController.resetDateSelects,
-        resetDateSelectGroup: dateFilterController.resetDateSelectGroup,
-        getPartialDateRange: dateFilterController.getPartialDateRange,
-        syncDateSelectOptions: dateFilterController.syncDateSelectOptions,
-        applyPendingDateValues: dateFilterController.applyPendingDateValues,
-        applyDateInputRange: dateFilterController.applyDateInputRange,
-        clampDateInputsToBounds: dateFilterController.clampDateInputsToBounds,
-        clampDateInputsIfNeeded: dateFilterController.clampDateInputsIfNeeded
+        areFormatsDefault: searchFiltersController.areFormatsDefault
     };
 }

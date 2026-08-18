@@ -329,12 +329,14 @@ stateDiagram-v2
 
 ## 関連関数の責務一覧（おすすめ）
 - `createBrowserSongsDataSource()`：ブラウザの IndexedDB / localStorage を使う曲データ取得元を作る
-- `createSongsDataSource()`：生成済みJSON、JSONキャッシュ、meta hash、CSVフォールバックをまとめた曲データ取得の中核
-- `createDataLoader()`：取得した曲データを状態へ反映し、検索更新をスケジュールする
+- `createSongsDataSource()`：生成済みJSON、JSONキャッシュ、meta hash、CSVフォールバックをまとめ、
+  初期スナップショット取得と更新取得を分離して提供する
+- `createDataLoader()`：初期スナップショットを状態へ反映し、バックグラウンド更新を次回検索まで保留する
+- `createSearchCoordinator()`：保留データを検索直前に反映し、検索実行とデバウンスを順序付ける
 - `applyLoadedSongs()`：曲データ読込後の初期化と、保留データ適用時のおすすめキャッシュ補修
 - `pickRecommendedSongsWithCache()`：おすすめ候補の抽出とシャッフル、キャッシュ利用の中心
 - `reconcileRecommendedSearchCache()`：最新曲データへ切り替える際に既存おすすめの参照と欠けた枠を補修する
-- `scheduleSearch()`：検索/絞り込みの実行をデバウンスして呼び出す
+- `scheduleSearch()`：search coordinator が検索/絞り込みの実行をデバウンスして呼び出す
 - `search()`：条件取得と検索語の1回限りの解析→検証→フィルタ→表示までの入口
 - `updateDisplay()`：結果のカード表示と「おすすめ/ヒット件数」表示の切替
 ## 状態管理

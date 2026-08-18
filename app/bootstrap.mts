@@ -68,8 +68,8 @@ type RenderCallbacksInput = {
 };
 
 type StorageCallbacksInput = {
-    searchController: ReturnType<typeof createSearchController>;
-    getSearchCoordinator: () => ReturnType<typeof createSearchCoordinator>;
+    dateFilterController: ReturnType<typeof createDateFilterController>;
+    searchCoordinator: ReturnType<typeof createSearchCoordinator>;
     getBookmarkUiController: () => ReturnType<typeof createBookmarkUiController> | null;
 };
 
@@ -81,7 +81,7 @@ type BookmarkUiCallbacksInput = {
 type SidebarCallbacksInput = {
     getBookmarkUiController: () => ReturnType<typeof createBookmarkUiController> | null;
     youtubeController: ReturnType<typeof createYoutubeController>;
-    searchController: ReturnType<typeof createSearchController>;
+    dateFilterController: ReturnType<typeof createDateFilterController>;
     markFilterTouched: ReturnType<typeof createSearchUiActions>["markFilterTouched"];
     markQueryTouched: ReturnType<typeof createSearchUiActions>["markQueryTouched"];
     resetDateSelectGroup: ReturnType<typeof createSearchUiActions>["resetDateSelectGroup"];
@@ -139,22 +139,22 @@ function createRenderCallbacks({
 }
 
 /**
- * storage controller から検索とブックマーク UI へ委譲する callback 群を作成する。
+ * storage controller から日付・検索実行・ブックマーク UI へ委譲する callback 群を作成する。
  */
 function createStorageCallbacks({
-    searchController,
-    getSearchCoordinator,
+    dateFilterController,
+    searchCoordinator,
     getBookmarkUiController
 }: StorageCallbacksInput): Parameters<typeof createStorageController>[0]["callbacks"] {
     return {
-        getDateSelectValue: (kind) => searchController.getDateSelectValue(kind),
-        applyPendingDateValues: () => searchController.applyPendingDateValues(),
+        getDateSelectValue: (kind) => dateFilterController.getDateSelectValue(kind),
+        applyPendingDateValues: () => dateFilterController.applyPendingDateValues(),
         renderBookmarks: () => {
             const bookmarkUiController = getBookmarkUiController();
             if (bookmarkUiController) bookmarkUiController.renderBookmarks();
         },
-        cancelScheduledSearch: () => getSearchCoordinator().cancelScheduledSearch(),
-        scheduleSearch: (options) => getSearchCoordinator().scheduleSearch(options)
+        cancelScheduledSearch: () => searchCoordinator.cancelScheduledSearch(),
+        scheduleSearch: (options) => searchCoordinator.scheduleSearch(options)
     };
 }
 
@@ -190,7 +190,7 @@ function createBookmarkUiCallbacks({
 function createSidebarCallbacks({
     getBookmarkUiController,
     youtubeController,
-    searchController,
+    dateFilterController,
     markFilterTouched,
     markQueryTouched,
     resetDateSelectGroup,
@@ -202,8 +202,8 @@ function createSidebarCallbacks({
         isIOSWebKit: () => youtubeController.isIOSWebKit(),
         markFilterTouched,
         markQueryTouched,
-        clampDateInputsIfNeeded: () => searchController.clampDateInputsIfNeeded(),
-        syncDateSelectOptions: (kind) => searchController.syncDateSelectOptions(kind),
+        clampDateInputsIfNeeded: () => dateFilterController.clampDateInputsIfNeeded(),
+        syncDateSelectOptions: (kind) => dateFilterController.syncDateSelectOptions(kind),
         resetDateSelectGroup,
         clearSearch,
         onOpenChange
@@ -245,8 +245,6 @@ function wireYoutubePlaybackHooks({
  * アプリ controller 群を作成し、相互 callback を同じ composition 境界内で配線する。
  */
 function createAppControllers() {
-    let searchCoordinator: ReturnType<typeof createSearchCoordinator>;
-
     /**
      * 形式フィルタの選択状態を appUiState.search.selectedFormats と同期する controller。
      * DEFAULT_FORMATS を基準に、検索条件の収集・復元・リセットから参照される。
@@ -288,21 +286,6 @@ function createAppControllers() {
      */
     let storageController: ReturnType<typeof createStorageController>;
     let sidebarController: ReturnType<typeof createSidebarController>;
-
-    const searchUiActions = createSearchUiActions({
-        ui: appUiState,
-        search: searchUiState,
-        searchFiltersController,
-        getSearchController: () => ({
-            syncDateSelectOptions: searchController.syncDateSelectOptions,
-            cancelScheduledSearch: searchCoordinator.cancelScheduledSearch,
-            scheduleSearch: searchCoordinator.scheduleSearch,
-            resetDateSelects: searchController.resetDateSelects,
-            resetDateSelectGroup: searchController.resetDateSelectGroup,
-            hasDateSelection: searchController.hasDateSelection
-        }),
-        getStorageController: () => storageController
-    });
 
     /**
      * appDataState.currentResults を DOM の検索結果カードへ反映する controller。
@@ -366,6 +349,46 @@ function createAppControllers() {
     let bookmarkUiController: ReturnType<typeof createBookmarkUiController> | null = null;
 
     /**
+     * 曲データの取得元を束ねる data source。
+     * 公開 JSON とmetaによる鮮度確認を優先し、失敗時は保存済みJSON、公開CSVへfallbackする。
+     */
+    const songsDataSource = createBrowserSongsDataSource({
+        publicSongsJsonUrl: PUBLIC_SONGS_JSON_URL,
+        publicSongsMetaUrl: PUBLIC_SONGS_META_URL,
+        publicCsvUrl: PUBLIC_CSV_URL,
+        songsJsonCacheKey: SONGS_JSON_CACHE_KEY,
+        obsoleteCsvCacheKey: CSV_CACHE_KEY,
+        obsoleteLegacyCsvCacheKey: LEGACY_CSV_CACHE_KEY
+    });
+
+    /**
+     * 初期曲データと保留中の更新データを appDataState へ反映する loader。
+     */
+    const dataLoader = createDataLoader({
+        data: appDataState,
+        ui: appUiState,
+        dataSource: songsDataSource,
+        constants: {
+            minPerformanceCount: MIN_PERFORMANCE_FOR_RANDOM
+        },
+        callbacks: {
+            migrateLegacyBookmarkSongRefs: () => storageController.migrateLegacyBookmarkSongRefs(),
+            applyDateInputRange: (songs) => dateFilterController.applyDateInputRange(songs),
+            clampDateInputsToBounds: (minKey, maxKey) => dateFilterController.clampDateInputsToBounds(minKey, maxKey)
+        }
+    });
+
+    /**
+     * 最新曲データの反映と検索実行を一つの操作として調整する coordinator。
+     */
+    const searchCoordinator = createSearchCoordinator({
+        search: searchUiState,
+        debounceMs: SEARCH_DEBOUNCE_MS,
+        searchController,
+        dataLoader
+    });
+
+    /**
      * localStorage 上の検索状態・ブックマーク保存データを読み書きする controller。
      * bookmark schema version の移行、インポート/エクスポート、保存後の再描画をまとめて扱う。
      */
@@ -383,8 +406,8 @@ function createAppControllers() {
             MAX_BOOKMARK_NAME_LENGTH
         },
         callbacks: createStorageCallbacks({
-            searchController,
-            getSearchCoordinator: () => searchCoordinator,
+            dateFilterController,
+            searchCoordinator,
             getBookmarkUiController: () => bookmarkUiController
         })
     });
@@ -411,6 +434,18 @@ function createAppControllers() {
     });
 
     /**
+     * 日付入力、検索実行、保存を明示的な依存として受け取り、検索 UI 操作を束ねる。
+     */
+    const searchUiActions = createSearchUiActions({
+        ui: appUiState,
+        search: searchUiState,
+        searchFiltersController,
+        dateFilterController,
+        searchCoordinator,
+        storageController
+    });
+
+    /**
      * サイドバー全体の開閉、設定パネル、ブックマークパネル、検索リセット導線を扱う controller。
      */
     sidebarController = createSidebarController({
@@ -418,7 +453,7 @@ function createAppControllers() {
         callbacks: createSidebarCallbacks({
             getBookmarkUiController: () => bookmarkUiController,
             youtubeController,
-            searchController,
+            dateFilterController,
             markFilterTouched: searchUiActions.markFilterTouched,
             markQueryTouched: searchUiActions.markQueryTouched,
             resetDateSelectGroup: searchUiActions.resetDateSelectGroup,
@@ -435,46 +470,6 @@ function createAppControllers() {
         syncSearchUI: searchUiActions.syncSearchUI,
         applyThemeFromStorage: () => applyThemeFromStorage({ ui: appUiState }),
         applyPlaybackSettingsFromStorage: () => playbackSettingsController.applyPlaybackSettingsFromStorage()
-    });
-
-    /**
-     * 曲データの取得元を束ねる data source。
-     * 公開 JSON とmetaによる鮮度確認を優先し、失敗時は保存済みJSON、公開CSVへfallbackする。
-     */
-    const songsDataSource = createBrowserSongsDataSource({
-        publicSongsJsonUrl: PUBLIC_SONGS_JSON_URL,
-        publicSongsMetaUrl: PUBLIC_SONGS_META_URL,
-        publicCsvUrl: PUBLIC_CSV_URL,
-        songsJsonCacheKey: SONGS_JSON_CACHE_KEY,
-        obsoleteCsvCacheKey: CSV_CACHE_KEY,
-        obsoleteLegacyCsvCacheKey: LEGACY_CSV_CACHE_KEY
-    });
-
-    /**
-     * 初期曲データの読み込み結果を appDataState へ反映し、日付範囲・検索条件・表示を初期化する loader。
-     */
-    const dataLoader = createDataLoader({
-        data: appDataState,
-        ui: appUiState,
-        dataSource: songsDataSource,
-        constants: {
-            minPerformanceCount: MIN_PERFORMANCE_FOR_RANDOM
-        },
-        callbacks: {
-            migrateLegacyBookmarkSongRefs: () => storageController.migrateLegacyBookmarkSongRefs(),
-            applyDateInputRange: (songs) => dateFilterController.applyDateInputRange(songs),
-            clampDateInputsToBounds: (minKey, maxKey) => dateFilterController.clampDateInputsToBounds(minKey, maxKey)
-        }
-    });
-
-    /**
-     * 最新曲データの反映と検索実行を一つの操作として調整する coordinator。
-     */
-    searchCoordinator = createSearchCoordinator({
-        search: searchUiState,
-        debounceMs: SEARCH_DEBOUNCE_MS,
-        searchController,
-        dataLoader
     });
 
     wireYoutubePlaybackHooks({
