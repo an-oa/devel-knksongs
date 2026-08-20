@@ -332,7 +332,8 @@ stateDiagram-v2
 - `createSongsDataSource()`：生成済みJSON、JSONキャッシュ、meta hash、CSVフォールバックをまとめ、
   初期スナップショット取得と更新取得を分離して提供する
 - `createDataLoader()`：初期スナップショットを状態へ反映し、バックグラウンド更新を次回検索まで保留する
-- `createSearchCoordinator()`：保留データを検索直前に反映し、検索実行とデバウンスを順序付ける
+- `createBookmarkPersistenceController()`：ブックマーク本体の読込・保存と、曲データ反映後の旧参照移行を扱う
+- `createSearchCoordinator()`：保留データの反映、ブックマーク参照移行、検索実行とデバウンスを順序付ける
 - `applyLoadedSongs()`：曲データ読込後の初期化と、保留データ適用時のおすすめキャッシュ補修
 - `pickRecommendedSongsWithCache()`：おすすめ候補の抽出とシャッフル、キャッシュ利用の中心
 - `reconcileRecommendedSearchCache()`：最新曲データへ切り替える際に既存おすすめの参照と欠けた枠を補修する

@@ -9,6 +9,9 @@ type SearchCoordinatorInput = {
     dataLoader: {
         commitPendingSnapshot: () => boolean;
     };
+    callbacks: {
+        reconcileBookmarksAfterSongsCommitted: () => void;
+    };
 };
 
 /**
@@ -18,7 +21,8 @@ export function createSearchCoordinator({
     search,
     debounceMs,
     searchController,
-    dataLoader
+    dataLoader,
+    callbacks
 }: SearchCoordinatorInput) {
     /**
      * 保留中の検索タイマーを解除し、未予約状態へ戻す。
@@ -33,7 +37,9 @@ export function createSearchCoordinator({
      * 最新スナップショットを反映してから検索を実行する。
      */
     function runSearch(): void {
-        dataLoader.commitPendingSnapshot();
+        if (dataLoader.commitPendingSnapshot()) {
+            callbacks.reconcileBookmarksAfterSongsCommitted();
+        }
         searchController.search();
     }
 

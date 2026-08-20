@@ -69,16 +69,12 @@ function createDataLoaderHarness(input) {
     };
 
     const calls = {
-        migrateLegacyBookmarkSongRefs: 0,
         applyDateInputRangeArgs: [],
         clampDateInputsToBoundsArgs: [],
         refreshSnapshotArgs: []
     };
 
     const callbacks = {
-        migrateLegacyBookmarkSongRefs() {
-            calls.migrateLegacyBookmarkSongRefs += 1;
-        },
         applyDateInputRange(songs) {
             calls.applyDateInputRangeArgs.push(songs);
             return options.dateBounds ?? { minKey: 20260311, maxKey: 20260311 };
@@ -130,7 +126,6 @@ test("data loader: loaded songs enable search and report that initial conditions
 
         assert.equal(harness.data.allSongsRaw.length, 1);
         assert.equal(harness.data.allSongsRaw[0], song);
-        assert.equal(harness.calls.migrateLegacyBookmarkSongRefs, 1);
         assert.equal(harness.calls.applyDateInputRangeArgs.length, 1);
         assert.equal(harness.calls.applyDateInputRangeArgs[0], harness.data.allSongsRaw);
         assert.deepEqual(harness.calls.clampDateInputsToBoundsArgs, [[20260311, 20260311]]);
@@ -195,7 +190,6 @@ test("data loader: background refresh waits for the next search before applying 
         assert.deepEqual(result, { loaded: true, shouldResetConditions: true });
         assert.equal(harness.data.allSongsRaw[0].songKey, "cached-archive::1");
         assert.equal(harness.data.pendingSongsRaw, null);
-        assert.equal(harness.calls.migrateLegacyBookmarkSongRefs, 1);
 
         resolveRefresh({
             songs: [createSong("fresh-archive::1")],
@@ -209,7 +203,6 @@ test("data loader: background refresh waits for the next search before applying 
 
         assert.equal(harness.data.allSongsRaw[0].songKey, "fresh-archive::1");
         assert.equal(harness.data.pendingSongsRaw, null);
-        assert.equal(harness.calls.migrateLegacyBookmarkSongRefs, 2);
         assert.equal(loader.commitPendingSnapshot(), false);
     } finally {
         restoreDom();

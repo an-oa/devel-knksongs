@@ -31,6 +31,7 @@ import { createRenderController } from "./controllers/render.mjs";
 import { createPlaybackSessionController } from "./controllers/playback-session.mjs";
 import { createPlaybackSettingsController } from "./controllers/playback-settings.mjs";
 import { createYoutubeController, extractYoutubeInfo } from "./controllers/youtube.mjs";
+import { createBookmarkPersistenceController } from "./controllers/bookmark-persistence.mjs";
 import { createStorageController } from "./controllers/storage.mjs";
 import { createBookmarkUiController } from "./ui/bookmark/ui.mjs";
 import { scrollResultListToTop } from "./lib/results-scroll.mjs";
@@ -362,6 +363,18 @@ function createAppControllers() {
     });
 
     /**
+     * ブックマーク本体の永続化と、曲データ反映後の旧参照移行を扱う controller。
+     * DataLoader より先に生成し、曲データの取得・反映と保存処理の生成順を分離する。
+     */
+    const bookmarkPersistenceController = createBookmarkPersistenceController({
+        data: appDataState,
+        constants: {
+            storageKey: BOOKMARK_STORAGE_KEY,
+            storageVersion: BOOKMARK_STORAGE_VERSION
+        }
+    });
+
+    /**
      * 初期曲データと保留中の更新データを appDataState へ反映する loader。
      */
     const dataLoader = createDataLoader({
@@ -372,7 +385,6 @@ function createAppControllers() {
             minPerformanceCount: MIN_PERFORMANCE_FOR_RANDOM
         },
         callbacks: {
-            migrateLegacyBookmarkSongRefs: () => storageController.migrateLegacyBookmarkSongRefs(),
             applyDateInputRange: (songs) => dateFilterController.applyDateInputRange(songs),
             clampDateInputsToBounds: (minKey, maxKey) => dateFilterController.clampDateInputsToBounds(minKey, maxKey)
         }
@@ -385,21 +397,26 @@ function createAppControllers() {
         search: searchUiState,
         debounceMs: SEARCH_DEBOUNCE_MS,
         searchController,
-        dataLoader
+        dataLoader,
+        callbacks: {
+            reconcileBookmarksAfterSongsCommitted: () => {
+                bookmarkPersistenceController.migrateLegacyBookmarkSongRefs();
+            }
+        }
     });
 
     /**
      * localStorage 上の検索状態・ブックマーク保存データを読み書きする controller。
-     * bookmark schema version の移行、インポート/エクスポート、保存後の再描画をまとめて扱う。
+     * ブックマークの操作、インポート/エクスポート、保存後の再描画をまとめて扱う。
      */
     storageController = createStorageController({
         data: appDataState,
         ui: appUiState,
         searchFiltersController,
+        bookmarkPersistenceController,
         constants: {
             SEARCH_STATE_KEY,
             DEFAULT_FORMATS,
-            BOOKMARK_STORAGE_KEY,
             BOOKMARK_STORAGE_VERSION,
             MAX_BOOKMARK_COUNT,
             MAX_SONGS_PER_BOOKMARK,
@@ -490,7 +507,8 @@ function createAppControllers() {
         sidebarController,
         uiSyncController,
         searchUiActions,
-        dataLoader
+        dataLoader,
+        bookmarkPersistenceController
     };
 }
 
@@ -506,7 +524,8 @@ const {
     sidebarController,
     uiSyncController,
     searchUiActions,
-    dataLoader
+    dataLoader,
+    bookmarkPersistenceController
 } = createAppControllers();
 
 let resultsViewportRefreshCleanup: (() => void) | null = null;
@@ -538,6 +557,7 @@ async function initUI(): Promise<void> {
     });
     const initialData = await dataLoader.loadInitialData();
     if (!initialData.loaded) return;
+    bookmarkPersistenceController.migrateLegacyBookmarkSongRefs();
     if (initialData.shouldResetConditions) {
         searchUiActions.resetSearchConditions(false);
     }

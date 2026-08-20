@@ -21,7 +21,6 @@ type DataLoaderInput = {
         refreshSnapshot: (reference: SongsSnapshot) => Promise<SongsSnapshot | null>;
     };
     callbacks: {
-        migrateLegacyBookmarkSongRefs: () => void;
         applyDateInputRange: (songs: Song[]) => SearchDateRange | null;
         clampDateInputsToBounds: (minKey: number, maxKey: number) => void;
     };
@@ -41,7 +40,6 @@ export function createDataLoader(input: DataLoaderInput) {
     const searchUiState = ui.search;
     const dateUi = ui.date;
     const {
-        migrateLegacyBookmarkSongRefs,
         applyDateInputRange,
         clampDateInputsToBounds
     } = callbacks;
@@ -58,7 +56,6 @@ export function createDataLoader(input: DataLoaderInput) {
         options: ApplyLoadedSongsOptions = {}
     ): void {
         data.allSongsRaw = songs;
-        migrateLegacyBookmarkSongRefs();
         if (options.clearRecommendedCache === false) {
             searchUiState.recommendedCache = reconcileRecommendedSearchCache(
                 songs,

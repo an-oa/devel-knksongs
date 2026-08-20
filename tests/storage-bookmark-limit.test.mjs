@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createBookmarkPersistenceController } from "../_build/app/controllers/bookmark-persistence.mjs";
 import { createStorageController } from "../_build/app/controllers/storage.mjs";
 import { createSearchFiltersController } from "../_build/app/ui/search-filters/controller.mjs";
 import { installFakeDom } from "./test-helpers.mjs";
@@ -47,10 +48,18 @@ function setupStorageController({
             pendingValues: null
         }
     };
+    const bookmarkPersistenceController = createBookmarkPersistenceController({
+        data,
+        constants: {
+            storageKey: "bookmarksTest",
+            storageVersion: 2
+        }
+    });
     const controller = createStorageController({
         data,
         ui,
         searchFiltersController: createSearchFiltersController({ ui }),
+        bookmarkPersistenceController,
         constants: {
             DEFAULT_FORMATS: [],
             SEARCH_STATE_KEY: "searchStateTest",
@@ -70,6 +79,7 @@ function setupStorageController({
     });
     return {
         controller,
+        bookmarkPersistenceController,
         data,
         getRenderCount: () => renderCount,
         getScheduleCount: () => scheduleCount
@@ -192,7 +202,7 @@ test("migrateLegacyBookmarkSongRefs: rewrites old songKey refs to bookmarkSongKe
                 createdAt: 1710000000000
             }
         };
-        const { controller, data } = setupStorageController({
+        const { controller, bookmarkPersistenceController, data } = setupStorageController({
             bookmarks: {},
             maxBookmarkCount: 20,
             maxSongsPerBookmark: 120
@@ -214,7 +224,7 @@ test("migrateLegacyBookmarkSongRefs: rewrites old songKey refs to bookmarkSongKe
         globalThis.localStorage.setItem("bookmarksTest", JSON.stringify(storedBookmarks));
 
         controller.restorePersistedState();
-        controller.migrateLegacyBookmarkSongRefs();
+        bookmarkPersistenceController.migrateLegacyBookmarkSongRefs();
 
         assert.deepEqual(data.bookmarks, {
             p_1: {
@@ -248,7 +258,7 @@ test("migrateLegacyBookmarkSongRefs: preserves current bookmarkSongKey refs and 
                 createdAt: 1710000000000
             }
         };
-        const { controller, data } = setupStorageController({
+        const { controller, bookmarkPersistenceController, data } = setupStorageController({
             bookmarks: {},
             maxBookmarkCount: 20,
             maxSongsPerBookmark: 120
@@ -264,7 +274,7 @@ test("migrateLegacyBookmarkSongRefs: preserves current bookmarkSongKey refs and 
         globalThis.localStorage.setItem("bookmarksTest", JSON.stringify(storedBookmarks));
 
         controller.restorePersistedState();
-        controller.migrateLegacyBookmarkSongRefs();
+        bookmarkPersistenceController.migrateLegacyBookmarkSongRefs();
 
         assert.deepEqual(
             JSON.parse(globalThis.localStorage.getItem("bookmarksTest")),
@@ -392,7 +402,7 @@ test("migrateLegacyBookmarkSongRefs: emits opt-in debug logs when migration runs
                 createdAt: 1710000000000
             }
         };
-        const { controller, data } = setupStorageController({
+        const { controller, bookmarkPersistenceController, data } = setupStorageController({
             bookmarks: {},
             maxBookmarkCount: 20,
             maxSongsPerBookmark: 120
@@ -409,7 +419,7 @@ test("migrateLegacyBookmarkSongRefs: emits opt-in debug logs when migration runs
         globalThis.localStorage.setItem("bookmarksTest", JSON.stringify(storedBookmarks));
 
         controller.restorePersistedState();
-        controller.migrateLegacyBookmarkSongRefs();
+        bookmarkPersistenceController.migrateLegacyBookmarkSongRefs();
 
         assert.equal(debugCalls.length >= 3, true);
         assert.deepEqual(debugCalls[0], [

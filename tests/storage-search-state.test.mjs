@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createBookmarkPersistenceController } from "../_build/app/controllers/bookmark-persistence.mjs";
 import { createStorageController } from "../_build/app/controllers/storage.mjs";
 import { createSearchFiltersController } from "../_build/app/ui/search-filters/controller.mjs";
 import { installFakeDom } from "./test-helpers.mjs";
@@ -28,8 +29,16 @@ function createFakeLocalStorage() {
  * @returns {object}
  */
 function createStorageControllerForTest(input) {
+    const bookmarkPersistenceController = createBookmarkPersistenceController({
+        data: input.data,
+        constants: {
+            storageKey: input.constants.BOOKMARK_STORAGE_KEY ?? "bookmarksTest",
+            storageVersion: input.constants.BOOKMARK_STORAGE_VERSION ?? 1
+        }
+    });
     return createStorageController({
         ...input,
+        bookmarkPersistenceController,
         callbacks: {
             cancelScheduledSearch: () => {},
             ...input.callbacks
