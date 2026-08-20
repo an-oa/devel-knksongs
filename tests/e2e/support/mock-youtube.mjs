@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { readFile } from "node:fs/promises";
 import { parseCsvToSongs } from "../../../_build/app/lib/csv-parser.mjs";
 import { buildSongsJsonMetaPayload, buildSongsJsonPayload } from "../../../_build/app/lib/songs-json.mjs";
+import { SONGS_JSON_CACHE_KEY } from "../../../_build/app/config.mjs";
 import { createSongsContentHash } from "../../../scripts/songs-content-hash.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -12,11 +13,11 @@ const csvFixturePromise = readFile(fixtureCsvPath, "utf8");
 /**
  * 曲配列から songs.json と meta.json の mock payload を作る。
  * @param {unknown[]} songs
+ * @param {string} [generatedAt]
  * @returns {{ json: string, meta: string }}
  */
-function buildSongsJsonFixture(songs) {
+function buildSongsJsonFixture(songs, generatedAt = "2026-08-14T00:00:00.000Z") {
     const contentHash = createSongsContentHash(songs);
-    const generatedAt = "2026-08-14T00:00:00.000Z";
     return {
         json: JSON.stringify(buildSongsJsonPayload(songs, contentHash, generatedAt)),
         meta: JSON.stringify(buildSongsJsonMetaPayload(contentHash, generatedAt))
@@ -214,6 +215,63 @@ export async function routeSongsJsonFixture(page, songs) {
             body: songsJsonFixture.json
         });
     });
+}
+
+/**
+ * より新しいsongs.jsonの応答を、テスト側が明示的に解放するまで保留する。
+ * @param {import("@playwright/test").Page} page
+ * @param {unknown[]} songs
+ * @returns {Promise<{ requestStarted: Promise<void>, releaseResponse: () => void }>}
+ */
+export async function routeDeferredSongsJsonFixture(page, songs) {
+    const songsJsonFixture = buildSongsJsonFixture(songs, "2026-08-15T00:00:00.000Z");
+    let markRequestStarted = () => {};
+    let releaseResponse = () => {};
+    const requestStarted = new Promise((resolve) => {
+        markRequestStarted = resolve;
+    });
+    const responseRelease = new Promise((resolve) => {
+        releaseResponse = resolve;
+    });
+
+    await page.unroute("**/data/songs-meta.json*");
+    await page.unroute("**/data/songs.json*");
+    await page.route("**/data/songs-meta.json*", async (route) => {
+        await route.fulfill({
+            status: 200,
+            contentType: "application/json; charset=utf-8",
+            body: songsJsonFixture.meta
+        });
+    });
+    await page.route("**/data/songs.json*", async (route) => {
+        markRequestStarted();
+        await responseRelease;
+        await route.fulfill({
+            status: 200,
+            contentType: "application/json; charset=utf-8",
+            body: songsJsonFixture.json
+        });
+    });
+
+    return {
+        requestStarted,
+        releaseResponse
+    };
+}
+
+/**
+ * 実ブラウザのIndexedDBから現在の曲データJSONキャッシュを読み込む。
+ * @param {import("@playwright/test").Page} page
+ * @returns {Promise<string | null>}
+ */
+export async function readSongsJsonCacheText(page) {
+    return page.evaluate(async (cacheKey) => {
+        const { createIndexedDbSongsJsonCacheStore } = await import(
+            "/app/lib/storage/songs-json-cache.mjs"
+        );
+        const cache = createIndexedDbSongsJsonCacheStore({ cacheKey });
+        return cache.getText();
+    }, SONGS_JSON_CACHE_KEY);
 }
 
 /**
