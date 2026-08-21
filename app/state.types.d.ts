@@ -20,6 +20,8 @@ export type BookmarkRecord = {
 export type AppDataState = {
   /** 読み込み済みの全曲データ。 */
   allSongsRaw: Song[];
+  /** バックグラウンド取得後、次の検索実行まで表示反映を保留している最新曲データ。 */
+  pendingSongsRaw: Song[] | null;
   /** 現在の検索条件やブックマークで表示対象になっている曲データ。 */
   currentResults: Song[];
   /** 現在 DOM に表示する検索結果の上限件数。 */

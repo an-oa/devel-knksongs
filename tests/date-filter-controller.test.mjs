@@ -145,6 +145,29 @@ test("createDateFilterController: applyDateSelectValue restores partial date val
     }
 });
 
+test("createDateFilterController: reapplying date bounds preserves complete selections", () => {
+    const restoreDom = installFakeDom();
+    try {
+        const ui = createDateUiState();
+        const controller = createDateFilterController({ ui });
+        const rows = [
+            makeRow({ dateKey: 20250315 }),
+            makeRow({ dateKey: 20250420 })
+        ];
+
+        controller.applyDateInputRange(rows);
+        controller.applyDateSelectValue("from", "2025-03-15");
+        controller.applyDateSelectValue("to", "2025-04-20");
+
+        controller.applyDateInputRange(rows);
+
+        assert.equal(controller.getDateSelectValue("from"), "2025-03-15");
+        assert.equal(controller.getDateSelectValue("to"), "2025-04-20");
+    } finally {
+        restoreDom();
+    }
+});
+
 test("createDateFilterController: applyDateSelectValue rounds unavailable saved days to month precision", () => {
     const restoreDom = installFakeDom();
     try {

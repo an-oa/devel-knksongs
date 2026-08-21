@@ -7,6 +7,12 @@ import {
 } from "./songs-json.mjs";
 import type { SongsJsonArtifactMetadata, SongsJsonPayload } from "./songs-json.mjs";
 
+export const DEFAULT_SONGS_META_RESPONSE_TIMEOUT_MS = 2000;
+export const DEFAULT_SONGS_JSON_RESPONSE_TIMEOUT_MS = 2000;
+export const DEFAULT_SONGS_JSON_BODY_TIMEOUT_MS = 30000;
+export const DEFAULT_SONGS_CSV_RESPONSE_TIMEOUT_MS = 3000;
+export const DEFAULT_SONGS_CSV_BODY_TIMEOUT_MS = 30000;
+
 type SongsJsonCache = {
     getText: () => Promise<string | null>;
     setText: (value: string) => Promise<boolean>;
@@ -18,15 +24,33 @@ type SongsDataSourceInput = {
     publicSongsMetaUrl?: string;
     publicCsvUrl: string;
     songsJsonCache?: SongsJsonCache;
+    songsMetaResponseTimeoutMs?: number;
+    songsJsonResponseTimeoutMs?: number;
+    songsJsonBodyTimeoutMs?: number;
+    csvResponseTimeoutMs?: number;
+    csvBodyTimeoutMs?: number;
 };
 
-type SongsLoadedResult = {
-    songs: Song[];
-    source: string;
-    resetConditions?: boolean;
+export type SongsSnapshot =
+    | {
+        songs: Song[];
+        source: "cache";
+        artifact: SongsJsonPayload;
+    }
+    | {
+        songs: Song[];
+        source: "network";
+        artifact: SongsJsonPayload | null;
+    };
+
+type FetchRequestInit = RequestInit & {
+    priority?: "low";
 };
 
-type SongsLoadedCallback = (result: SongsLoadedResult) => void;
+type NetworkSongsJsonCandidate = {
+    jsonText: string;
+    payload: SongsJsonPayload;
+};
 
 /**
  * 曲データの取得元とJSONキャッシュ更新を扱う data source を作成する。
@@ -37,8 +61,52 @@ export function createSongsDataSource(input: SongsDataSourceInput) {
         publicSongsJsonUrl,
         publicSongsMetaUrl,
         publicCsvUrl,
-        songsJsonCache
+        songsJsonCache,
+        songsMetaResponseTimeoutMs = DEFAULT_SONGS_META_RESPONSE_TIMEOUT_MS,
+        songsJsonResponseTimeoutMs = DEFAULT_SONGS_JSON_RESPONSE_TIMEOUT_MS,
+        songsJsonBodyTimeoutMs = DEFAULT_SONGS_JSON_BODY_TIMEOUT_MS,
+        csvResponseTimeoutMs = DEFAULT_SONGS_CSV_RESPONSE_TIMEOUT_MS,
+        csvBodyTimeoutMs = DEFAULT_SONGS_CSV_BODY_TIMEOUT_MS
     } = input;
+
+    /**
+     * response受信待ちと本文読込に別々の期限を設ける。
+     * response受信後は短い待機期限を解除し、大きい本文を低速回線でも読み切れるようにする。
+     * @param url 取得URL
+     * @param cacheMode fetch cache mode
+     * @param responseTimeoutMs response受信までの期限
+     * @param bodyTimeoutMs response本文読込の期限
+     * @param isBackgroundRequest 初期表示後の低優先度取得か
+     * @returns response本文
+     */
+    async function fetchTextWithTimeout(
+        url: string,
+        cacheMode: RequestCache,
+        responseTimeoutMs: number,
+        bodyTimeoutMs: number,
+        isBackgroundRequest: boolean
+    ): Promise<string> {
+        const abortController = new AbortController();
+        let timeoutId: ReturnType<typeof setTimeout> | null = setTimeout(
+            () => abortController.abort(),
+            responseTimeoutMs
+        );
+        const requestInit: FetchRequestInit = {
+            cache: cacheMode,
+            signal: abortController.signal
+        };
+        if (isBackgroundRequest) requestInit.priority = "low";
+        try {
+            const response = await fetch(url, requestInit);
+            clearTimeout(timeoutId);
+            timeoutId = null;
+            if (!response.ok) throw new Error(`fetch failed: ${url}`);
+            timeoutId = setTimeout(() => abortController.abort(), bodyTimeoutMs);
+            return await response.text();
+        } finally {
+            if (timeoutId !== null) clearTimeout(timeoutId);
+        }
+    }
 
     /**
      * 非同期ストアから曲データJSONキャッシュを読み込む。
@@ -85,22 +153,30 @@ export function createSongsDataSource(input: SongsDataSourceInput) {
      * 曲データJSONを取得する。
      * @returns JSON文字列
      */
-    async function fetchSongsJsonText(): Promise<string> {
+    async function fetchSongsJsonText(isBackgroundRequest: boolean): Promise<string> {
         if (!publicSongsJsonUrl) throw new Error("songs json url is not configured");
-        const response = await fetch(publicSongsJsonUrl, { cache: "no-cache" });
-        if (!response.ok) throw new Error("json fetch failed");
-        return response.text();
+        return fetchTextWithTimeout(
+            publicSongsJsonUrl,
+            "no-cache",
+            songsJsonResponseTimeoutMs,
+            songsJsonBodyTimeoutMs,
+            isBackgroundRequest
+        );
     }
 
     /**
      * 曲データJSONのメタ情報を取得する。
      * @returns JSON文字列
      */
-    async function fetchSongsMetaText(): Promise<string> {
+    async function fetchSongsMetaText(isBackgroundRequest: boolean): Promise<string> {
         if (!publicSongsMetaUrl) throw new Error("songs meta url is not configured");
-        const response = await fetch(publicSongsMetaUrl, { cache: "no-cache" });
-        if (!response.ok) throw new Error("json meta fetch failed");
-        return response.text();
+        return fetchTextWithTimeout(
+            publicSongsMetaUrl,
+            "no-cache",
+            songsMetaResponseTimeoutMs,
+            songsMetaResponseTimeoutMs,
+            isBackgroundRequest
+        );
     }
 
     /**
@@ -108,25 +184,27 @@ export function createSongsDataSource(input: SongsDataSourceInput) {
      * @returns CSV文字列
      */
     async function fetchCsvText(): Promise<string> {
-        const response = await fetch(publicCsvUrl, { cache: "no-store" });
-        if (!response.ok) throw new Error("fetch failed");
-        return response.text();
+        return fetchTextWithTimeout(
+            publicCsvUrl,
+            "no-store",
+            csvResponseTimeoutMs,
+            csvBodyTimeoutMs,
+            false
+        );
     }
 
     /**
      * ネットワークCSVを最後の取得手段として読み込む。
      * CSVは実行時キャッシュへ保存せず、そのセッションだけで使用する。
-     * @param onSongsLoaded 読み込み結果の通知先
-     * @returns 読み込めたか
+     * @returns 読み込んだスナップショット
      */
-    async function loadCsvFallback(onSongsLoaded: SongsLoadedCallback): Promise<boolean> {
+    async function loadCsvFallback(): Promise<SongsSnapshot | null> {
         try {
             const csvText = await fetchCsvText();
             const songs = parseCsvToSongs(csvText);
-            onSongsLoaded({ songs, source: "network" });
-            return true;
+            return { songs, source: "network", artifact: null };
         } catch {
-            return false;
+            return null;
         }
     }
 
@@ -146,18 +224,34 @@ export function createSongsDataSource(input: SongsDataSourceInput) {
     }
 
     /**
-     * 曲データJSONをネットワークから読み込み、比較対象との鮮度確認後に保存・表示する。
-     * metaを取得できなかった場合は、既存のJSONキャッシュを比較対象にして巻き戻りを防ぐ。
-     * @param freshnessReference 比較対象のmetaまたはJSONキャッシュ
-     * @param onSongsLoaded 読み込み結果の通知先
-     * @returns 読み込めたか
+     * 曲データJSONをネットワークから取得して構造を検証する。
+     * 鮮度比較・保存・通知は呼び出し側で行う。
+     * @param isBackgroundRequest 初期表示後の低優先度取得か
+     * @returns 検証済みネットワークJSON候補
      */
-    async function loadNetworkSongsJson(
+    async function loadNetworkSongsJsonCandidate(
+        isBackgroundRequest: boolean
+    ): Promise<NetworkSongsJsonCandidate> {
+        const jsonText = await fetchSongsJsonText(isBackgroundRequest);
+        return {
+            jsonText,
+            payload: parseSongsJsonPayload(jsonText)
+        };
+    }
+
+    /**
+     * 検証済みネットワークJSONを保存し、内容が変わった場合だけスナップショットを返す。
+     * @param candidate ネットワークJSON候補
+     * @param freshnessReference 鮮度比較対象
+     * @param previousPayload 先に表示したJSONキャッシュ
+     * @returns 表示内容が変わる場合は新しいスナップショット
+     */
+    async function acceptNetworkSongsJson(
+        candidate: NetworkSongsJsonCandidate,
         freshnessReference: SongsJsonArtifactMetadata | null,
-        onSongsLoaded: SongsLoadedCallback
-    ): Promise<boolean> {
-        const jsonText = await fetchSongsJsonText();
-        const payload = parseSongsJsonPayload(jsonText);
+        previousPayload: SongsJsonPayload | null
+    ): Promise<SongsSnapshot | null> {
+        const { jsonText, payload } = candidate;
         if (payload.schemaVersion !== SONGS_JSON_SCHEMA_VERSION) {
             throw new Error("network songs json must use the current schemaVersion");
         }
@@ -165,8 +259,17 @@ export function createSongsDataSource(input: SongsDataSourceInput) {
             throw new Error("songs json is older than or inconsistent with the freshness reference");
         }
         await setCachedSongsJsonText(jsonText);
-        onSongsLoaded({ songs: payload.songs, source: "network" });
-        return true;
+        const hasSameDisplayedContent = Boolean(
+            previousPayload &&
+            previousPayload.contentHash !== null &&
+            previousPayload.contentHash === payload.contentHash
+        );
+        if (hasSameDisplayedContent) return null;
+        return {
+            songs: payload.songs,
+            source: "network",
+            artifact: payload
+        };
     }
 
     /**
@@ -189,10 +292,12 @@ export function createSongsDataSource(input: SongsDataSourceInput) {
      * metaを取得して検証する。取得・検証に失敗してもJSON本体の取得は継続する。
      * @returns 検証済みmeta
      */
-    async function loadSongsJsonMeta(): Promise<SongsJsonArtifactMetadata | null> {
+    async function loadSongsJsonMeta(
+        isBackgroundRequest: boolean
+    ): Promise<SongsJsonArtifactMetadata | null> {
         if (!publicSongsMetaUrl) return null;
         try {
-            return parseSongsJsonMetaPayload(await fetchSongsMetaText());
+            return parseSongsJsonMetaPayload(await fetchSongsMetaText(isBackgroundRequest));
         } catch (error) {
             console.warn("曲データJSONメタ情報の確認に失敗しました", error);
             return null;
@@ -200,46 +305,65 @@ export function createSongsDataSource(input: SongsDataSourceInput) {
     }
 
     /**
-     * JSONを優先して読み込み、有効なJSONキャッシュ、ネットワークCSVの順にフォールバックする。
-     * @param onSongsLoaded 読み込み結果の通知先
-     * @returns 読み込めたか
+     * 先に表示したJSONキャッシュを基準に、最新JSONを低優先度で確認する。
+     * 取得失敗時は表示済みキャッシュを維持し、CSVへは進まない。
+     * @param reference 初期表示に使ったスナップショット
+     * @returns 内容が変わった場合は最新スナップショット
      */
-    async function loadJsonOrCsvData(onSongsLoaded: SongsLoadedCallback): Promise<boolean> {
-        const cachedPayload = await loadValidatedSongsJsonCache();
-        const meta = await loadSongsJsonMeta();
-
-        if (cachedPayload && meta && isCurrentJsonCandidate(cachedPayload, meta)) {
-            onSongsLoaded({ songs: cachedPayload.songs, source: "cache" });
-            return true;
+    async function refreshSnapshot(reference: SongsSnapshot): Promise<SongsSnapshot | null> {
+        if (reference.source !== "cache" || !publicSongsJsonUrl) return null;
+        const cachedPayload = reference.artifact;
+        const meta = await loadSongsJsonMeta(true);
+        if (meta && isCurrentJsonCandidate(cachedPayload, meta)) return null;
+        try {
+            const candidate = await loadNetworkSongsJsonCandidate(true);
+            return await acceptNetworkSongsJson(
+                candidate,
+                meta ?? cachedPayload,
+                cachedPayload
+            );
+        } catch {
+            // 表示済みの有効なJSONキャッシュを維持する。
+            return null;
         }
-
-        if (publicSongsJsonUrl) {
-            try {
-                return await loadNetworkSongsJson(meta ?? cachedPayload, onSongsLoaded);
-            } catch {
-                // 有効なJSONキャッシュがあればCSVより先に使用する。
-            }
-        }
-
-        if (cachedPayload) {
-            onSongsLoaded({ songs: cachedPayload.songs, source: "cache" });
-            return true;
-        }
-        return loadCsvFallback(onSongsLoaded);
     }
 
     /**
-     * 曲データを取得し、取得できた場合はcallbackへ曲配列を渡す。
-     * @param callbacks 読み込み結果のcallback
-     * @returns 読み込めたか
+     * JSONキャッシュがない場合、metaとJSON本体を並行取得して待ち時間を抑える。
+     * @returns 採用したネットワークJSONのスナップショット
      */
-    async function loadInitialSongs(
-        callbacks: { onSongsLoaded: SongsLoadedCallback }
-    ): Promise<boolean> {
-        return loadJsonOrCsvData(callbacks.onSongsLoaded);
+    async function loadInitialNetworkSongsJson(): Promise<SongsSnapshot | null> {
+        if (!publicSongsJsonUrl) return null;
+        try {
+            const [meta, candidate] = await Promise.all([
+                loadSongsJsonMeta(false),
+                loadNetworkSongsJsonCandidate(false)
+            ]);
+            return await acceptNetworkSongsJson(candidate, meta, null);
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * JSONを優先して読み込み、有効なJSONキャッシュ、ネットワークCSVの順にフォールバックする。
+     * @returns 初期表示に使うスナップショット
+     */
+    async function loadInitialSnapshot(): Promise<SongsSnapshot | null> {
+        const cachedPayload = await loadValidatedSongsJsonCache();
+        if (cachedPayload) {
+            return {
+                songs: cachedPayload.songs,
+                source: "cache",
+                artifact: cachedPayload
+            };
+        }
+        const networkSnapshot = await loadInitialNetworkSongsJson();
+        return networkSnapshot ?? await loadCsvFallback();
     }
 
     return {
-        loadInitialSongs
+        loadInitialSnapshot,
+        refreshSnapshot
     };
 }

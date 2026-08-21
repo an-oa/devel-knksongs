@@ -1,9 +1,4 @@
 import {
-    buildStoredBookmarksPayload,
-    migrateLegacyBookmarkSongRefsToCurrent,
-    parseStoredBookmarksPayload
-} from "../lib/storage/bookmark-schema.mjs";
-import {
     exportBookmarksAsJsonText as buildBookmarkExportJsonText,
     parseBookmarkImportText as parseBookmarkImportJsonText
 } from "../lib/storage/bookmark-transfer.mjs";
@@ -30,7 +25,6 @@ type StorageUiState = Pick<AppUiState, "search" | "date"> & {
 type StorageConstants = {
     SEARCH_STATE_KEY: string;
     DEFAULT_FORMATS?: string[];
-    BOOKMARK_STORAGE_KEY: string;
     BOOKMARK_STORAGE_VERSION?: number;
     MAX_BOOKMARK_COUNT?: number;
     MAX_SONGS_PER_BOOKMARK?: number;
@@ -68,6 +62,10 @@ type StorageControllerInput = {
     data: StorageDataState;
     ui: StorageUiState;
     searchFiltersController: StorageSearchFiltersController;
+    bookmarkPersistenceController: {
+        loadBookmarksFromStorage: () => void;
+        saveBookmarks: () => void;
+    };
     constants: StorageConstants;
     callbacks: StorageCallbacks;
 };
@@ -80,6 +78,7 @@ export function createStorageController({
     data,
     ui,
     searchFiltersController,
+    bookmarkPersistenceController,
     constants,
     callbacks
 }: StorageControllerInput) {
@@ -88,12 +87,15 @@ export function createStorageController({
     const {
         SEARCH_STATE_KEY,
         DEFAULT_FORMATS = [],
-        BOOKMARK_STORAGE_KEY,
         BOOKMARK_STORAGE_VERSION = 1,
         MAX_BOOKMARK_COUNT = Number.POSITIVE_INFINITY,
         MAX_SONGS_PER_BOOKMARK = Number.POSITIVE_INFINITY,
         MAX_BOOKMARK_NAME_LENGTH = Number.POSITIVE_INFINITY
     } = constants;
+    const {
+        loadBookmarksFromStorage,
+        saveBookmarks
+    } = bookmarkPersistenceController;
     const {
         getDateSelectValue,
         applyPendingDateValues,
@@ -101,35 +103,6 @@ export function createStorageController({
         cancelScheduledSearch,
         scheduleSearch
     } = callbacks;
-    let loadedBookmarkStorageVersion = BOOKMARK_STORAGE_VERSION;
-
-    /**
-     * ブックマーク移行デバッグログの有効状態を返す。
-     * @returns {boolean}
-     */
-    function isBookmarkMigrationDebugEnabled(): boolean {
-        try {
-            if (window.__KNK_DEBUG_BOOKMARK_MIGRATION__ === true) return true;
-            return localStorage.getItem("debugBookmarkMigration") === "true";
-        } catch {
-            return false;
-        }
-    }
-
-    /**
-     * ブックマーク移行まわりのデバッグログを出力する。
-     * @param {string} message
-     * @param {unknown} details
-     */
-    function debugBookmarkMigration(message: string, details?: unknown): void {
-        if (!isBookmarkMigrationDebugEnabled()) return;
-        if (details === undefined) {
-            console.debug("[bookmark-migration]", message);
-            return;
-        }
-        console.debug("[bookmark-migration]", message, details);
-    }
-
     /**
      * 成功時の共通レスポンスを組み立てる。
      * @param {Partial<StorageActionResult> | undefined} [extra]
@@ -190,42 +163,6 @@ export function createStorageController({
     }
 
     /**
-     * ブックマーク情報をローカルストレージへ保存する。
-     */
-    function saveBookmarks(): void {
-        try {
-            localStorage.setItem(
-                BOOKMARK_STORAGE_KEY,
-                JSON.stringify(buildStoredBookmarksPayload(data.bookmarks, BOOKMARK_STORAGE_VERSION))
-            );
-            loadedBookmarkStorageVersion = BOOKMARK_STORAGE_VERSION;
-        } catch (e) {
-            console.error("Failed to save bookmarks", e);
-        }
-    }
-
-    /**
-     * ブックマーク情報をローカルストレージから state へ読み込む。
-     */
-    function loadBookmarksFromStorage(): void {
-        try {
-            const stored = localStorage.getItem(BOOKMARK_STORAGE_KEY);
-            if (stored) {
-                const parsed = parseStoredBookmarksPayload(JSON.parse(stored));
-                data.bookmarks = parsed.bookmarks;
-                loadedBookmarkStorageVersion = parsed.version;
-                debugBookmarkMigration("loaded bookmarks payload", {
-                    storedVersion: parsed.version,
-                    bookmarkCount: Object.keys(parsed.bookmarks).length
-                });
-            }
-        } catch (e) {
-            console.error("Failed to load bookmarks", e);
-            data.bookmarks = {};
-        }
-    }
-
-    /**
      * JSON 文字列からブックマークを全置き換えでインポートする。
      * @param {unknown} text
      * @returns {StorageActionResult}
@@ -251,37 +188,6 @@ export function createStorageController({
         return buildActionOk({
             bookmarkCount: parsed.bookmarkCount,
             songCount: parsed.songCount
-        });
-    }
-
-    /**
-     * 旧参照形式のブックマーク曲IDを現行の `bookmarkSongKey` へ移行する。
-     */
-    function migrateLegacyBookmarkSongRefs(): void {
-        debugBookmarkMigration("start bookmark ref migration", {
-            storedVersion: loadedBookmarkStorageVersion,
-            targetVersion: BOOKMARK_STORAGE_VERSION,
-            bookmarkCount: Object.keys(data.bookmarks).length,
-            songRowCount: Array.isArray(data.allSongsRaw) ? data.allSongsRaw.length : 0
-        });
-        const migration = migrateLegacyBookmarkSongRefsToCurrent({
-            bookmarks: data.bookmarks,
-            songRows: data.allSongsRaw
-        });
-        migration.changes.forEach((change) => {
-            debugBookmarkMigration("bookmark refs migrated", change);
-        });
-        if (migration.updated || loadedBookmarkStorageVersion !== BOOKMARK_STORAGE_VERSION) {
-            saveBookmarks();
-            debugBookmarkMigration("saved migrated bookmarks payload", {
-                changedBookmarkIds: migration.changedBookmarkIds,
-                upgradedVersion: BOOKMARK_STORAGE_VERSION
-            });
-            return;
-        }
-        debugBookmarkMigration("bookmark ref migration skipped", {
-            changedBookmarkIds: [],
-            currentVersion: loadedBookmarkStorageVersion
         });
     }
 
@@ -548,7 +454,6 @@ export function createStorageController({
         exportBookmarksAsJsonText,
         parseBookmarkImportText,
         importBookmarksFromJsonText,
-        migrateLegacyBookmarkSongRefs,
         addSongToBookmark,
         createBookmark,
         createBookmarkAndAdd,

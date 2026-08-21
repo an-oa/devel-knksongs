@@ -106,7 +106,7 @@ test("bookmark storage migration: rewrites legacy refs to current bookmark song 
 
     assert.equal(result.updated, true);
     assert.deepEqual(result.changedBookmarkIds, ["p_1"]);
-    assert.deepEqual(bookmarks.p_1.songs, ["videoA::1", "videoB::2"]);
+    assert.deepEqual(bookmarks.p_1.songs, ["videoA::1", "videoB::2", "missing"]);
     assert.deepEqual(result.changes, [
         {
             bookmarkId: "p_1",
@@ -117,9 +117,24 @@ test("bookmark storage migration: rewrites legacy refs to current bookmark song 
                 0,
                 "missing"
             ],
-            after: ["videoA::1", "videoB::2"]
+            after: ["videoA::1", "videoB::2", "missing"]
         }
     ]);
+});
+
+test("bookmark storage migration: preserves unresolved string refs for temporarily missing songs", () => {
+    const bookmarks = {
+        p_1: {
+            name: "Unavailable song",
+            songs: ["removedVideo::3"],
+            createdAt: 1
+        }
+    };
+
+    const result = migrateLegacyBookmarkSongRefsToCurrent({ bookmarks, songRows: [] });
+
+    assert.equal(result.updated, false);
+    assert.deepEqual(bookmarks.p_1.songs, ["removedVideo::3"]);
 });
 
 test("bookmark storage migration: keeps current refs without marking changes", () => {

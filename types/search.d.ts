@@ -33,7 +33,6 @@ type SearchConstants = {
   RANDOM_DISPLAY_COUNT: number;
   MIN_PERFORMANCE_FOR_RANDOM: number;
   RESULT_DISPLAY_BATCH_SIZE: number;
-  SEARCH_DEBOUNCE_MS: number;
   DEFAULT_FORMATS?: string[];
 };
 
@@ -53,6 +52,7 @@ type SearchControllerInput = {
   data: SearchDataState;
   ui: SearchUiState;
   searchFiltersController: SearchFiltersController;
+  dateFilterController: ReturnType<typeof import("../app/ui/date/filter.mjs").createDateFilterController>;
   constants: SearchConstants;
   callbacks: SearchControllerCallbacks;
 };

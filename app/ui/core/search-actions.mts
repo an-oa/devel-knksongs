@@ -7,12 +7,15 @@ type SearchScheduleOptions = {
 
 type SearchActionEventOptions = Event | SearchScheduleOptions;
 
-type SearchActionsSearchController = {
-    syncDateSelectOptions: (kind?: string) => void;
-    scheduleSearch: (options?: SearchScheduleOptions) => void;
+type SearchActionsDateFilterController = {
     resetDateSelects: () => void;
     resetDateSelectGroup: (kind: string) => void;
     hasDateSelection: () => boolean;
+};
+
+type SearchActionsSearchCoordinator = {
+    cancelScheduledSearch: () => void;
+    scheduleSearch: (options?: SearchScheduleOptions) => void;
 };
 
 type SearchActionsSearchFiltersController = {
@@ -30,38 +33,36 @@ type SearchUiActionsInput = {
     ui: AppUiState;
     search: SearchUiRuntimeState;
     searchFiltersController: SearchActionsSearchFiltersController;
-    getSearchController: () => SearchActionsSearchController;
-    getStorageController: () => SearchActionsStorageController;
+    dateFilterController: SearchActionsDateFilterController;
+    searchCoordinator: SearchActionsSearchCoordinator;
+    storageController: SearchActionsStorageController;
 };
 
 /**
- * bootstrap から渡された controller 群を使い、検索 UI のリセット・同期操作を束ねる。
- * controller 同士の生成順に依存しすぎないよう、相互参照は getter で遅延解決する。
+ * 日付・検索実行・保存の各 controller を使い、検索 UI のリセット・同期操作を束ねる。
  * @param {SearchUiActionsInput} input
  */
 export function createSearchUiActions({
     ui,
     search,
     searchFiltersController,
-    getSearchController,
-    getStorageController
+    dateFilterController,
+    searchCoordinator,
+    storageController
 }: SearchUiActionsInput) {
     /**
      * 指定側の日付セレクトをクリアして候補を同期する。
      * @param {string} kind
      */
     function resetDateSelectGroup(kind: string): void {
-        getSearchController().resetDateSelectGroup(kind);
+        dateFilterController.resetDateSelectGroup(kind);
     }
 
     /**
      * 保留中の検索デバウンスタイマーを解除する。
      */
     function clearSearchDebounce(): void {
-        if (search.debounceId) {
-            clearTimeout(search.debounceId);
-            search.debounceId = 0;
-        }
+        searchCoordinator.cancelScheduledSearch();
     }
 
     /**
@@ -78,7 +79,7 @@ export function createSearchUiActions({
      */
     function resetSearchFilters(): void {
         searchFiltersController.resetFiltersToDefault({
-            resetDateSelects: () => getSearchController().resetDateSelects()
+            resetDateSelects: () => dateFilterController.resetDateSelects()
         });
     }
 
@@ -91,7 +92,7 @@ export function createSearchUiActions({
         resetSearchQuery();
         resetSearchFilters();
         if (shouldSearch && search.dataReady) {
-            getSearchController().scheduleSearch({ immediate: true });
+            searchCoordinator.scheduleSearch({ immediate: true });
         }
     }
 
@@ -100,7 +101,7 @@ export function createSearchUiActions({
      */
     function clearSearch(): void {
         resetSearchConditions(false);
-        getStorageController().clearActiveBookmark();
+        storageController.clearActiveBookmark();
     }
 
     /**
@@ -110,8 +111,8 @@ export function createSearchUiActions({
     function markFilterTouched(options?: SearchActionEventOptions): void {
         search.userTouchedFilters = true;
         const scheduleOptions = options && "immediate" in options ? options : undefined;
-        getSearchController().scheduleSearch(scheduleOptions);
-        getStorageController().saveSearchState();
+        searchCoordinator.scheduleSearch(scheduleOptions);
+        storageController.saveSearchState();
     }
 
     /**
@@ -119,8 +120,8 @@ export function createSearchUiActions({
      */
     function markQueryTouched(): void {
         search.userTouchedQuery = true;
-        getSearchController().scheduleSearch();
-        getStorageController().saveSearchState();
+        searchCoordinator.scheduleSearch();
+        storageController.saveSearchState();
     }
 
     /**
@@ -143,7 +144,7 @@ export function createSearchUiActions({
         searchFiltersController.syncFormatCheckboxesFromState();
         if (search.userTouchedFilters) return false;
         if (!searchFiltersController.needsFilterReset({
-            hasDateSelection: () => getSearchController().hasDateSelection()
+            hasDateSelection: () => dateFilterController.hasDateSelection()
         })) {
             return false;
         }
@@ -157,7 +158,7 @@ export function createSearchUiActions({
     function syncSearchUI(): void {
         const shouldSearch = syncSearchQueryIfNeeded() || syncSearchFiltersIfNeeded();
         if (shouldSearch && search.dataReady) {
-            getSearchController().scheduleSearch({ immediate: true });
+            searchCoordinator.scheduleSearch({ immediate: true });
         }
     }
 

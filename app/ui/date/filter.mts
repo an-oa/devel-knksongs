@@ -413,6 +413,9 @@ export function createDateFilterController({ ui }: { ui: DateFilterUiState }) {
         const fromElements = getDateSelectElements("from");
         const toElements = getDateSelectElements("to");
         if (!hasCompleteDateSelectElements(fromElements) || !hasCompleteDateSelectElements(toElements)) return null;
+        const currentFromValue = getDateSelectValue("from");
+        const currentToValue = getDateSelectValue("to");
+        const hasPendingValues = Boolean(dateUi.pendingValues);
         let minKey: number | null = null;
         let maxKey: number | null = null;
         for (const row of songs) {
@@ -425,6 +428,10 @@ export function createDateFilterController({ ui }: { ui: DateFilterUiState }) {
         dateUi.bounds = bounds;
         dateUi.index = buildDateIndex(songs);
         initDateSelects(bounds);
+        if (!hasPendingValues) {
+            if (currentFromValue) applyDateSelectValue("from", currentFromValue);
+            if (currentToValue) applyDateSelectValue("to", currentToValue);
+        }
         return bounds;
     }
 

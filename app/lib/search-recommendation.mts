@@ -10,7 +10,7 @@ import {
 export type RecommendedSearchCache = {
     /** 抽出済みのおすすめ曲。 */
     songs: Song[];
-    /** この cache が満たしている要求件数。 */
+    /** この cache で抽出済みとして扱える要求件数。欠損時は実際の曲数まで下げる。 */
     requestedCount: number;
 };
 
@@ -25,12 +25,33 @@ type RecommendedCacheSelectionResult = {
     cache: RecommendedSearchCache;
 };
 
+type RecommendedSongGroupEntry = {
+    rows: Song[];
+    utamitaRows: Song[];
+    orisongRows: Song[];
+    streamRows: Song[];
+    shortRows: Song[];
+};
+
+type RecommendedSongGroup = {
+    key: string;
+    latestRows: Song[];
+};
+
+type RecommendedCacheReconcileOptions = {
+    minPerformanceCount: number;
+};
+
 /**
  * おすすめ表示に使う曲一覧を抽選して返す。
- * @param {*} songs
- * @param {{ count: number, minPerformanceCount: number }} options
+ * @param songs 抽選元の曲配列
+ * @param options 抽選件数と通常曲に必要な歌唱回数
+ * @returns 抽選したおすすめ曲
  */
-export function pickRecommendedSongs(songs, { count, minPerformanceCount }) {
+export function pickRecommendedSongs(
+    songs: Song[],
+    { count, minPerformanceCount }: { count: number; minPerformanceCount: number }
+): Song[] {
     const groups = buildRecommendedGroups(songs, minPerformanceCount);
     return selectRecommendedSongs(groups, count);
 }
@@ -63,6 +84,60 @@ export function pickRecommendedSongsWithCache(
         songs: nextSongs,
         cache: createRecommendedCacheState(nextSongs, count)
     };
+}
+
+/**
+ * 最新の曲データへ切り替える際、既存おすすめの曲順を保ちながら無効な行だけ補修する。
+ * N回条件は新規抽選時の入場条件とし、一度選ばれた曲は有効な行が残る限り維持する。
+ * @param songs 最新の曲配列
+ * @param currentCache 現在表示に使っているおすすめcache
+ * @param options おすすめ候補の入場条件
+ * @returns 最新データへ参照を更新したおすすめcache
+ */
+export function reconcileRecommendedSearchCache(
+    songs: Song[],
+    currentCache: RecommendedSearchCache | null | undefined,
+    { minPerformanceCount }: RecommendedCacheReconcileOptions
+): RecommendedSearchCache | null {
+    const cachedSongs = getRecommendedCacheSongs(currentCache);
+    if (!cachedSongs || !currentCache) return null;
+
+    const dedupedRows = collapseRecommendedRowsByArchive(songs);
+    const groups = groupRecommendedRowsBySong(dedupedRows);
+    const rowsBySongKey = new Map(dedupedRows.map((row) => [row.songKey, row]));
+    const usedGroupKeys = new Set<string>();
+    const nextSlots: Array<Song | null> = cachedSongs.map((cachedRow) => {
+        const exactRow = rowsBySongKey.get(cachedRow.songKey) || null;
+        const groupKey = exactRow
+            ? getRecommendedSongKey(exactRow)
+            : getRecommendedSongKey(cachedRow);
+        const entry = groups.get(groupKey);
+        if (!entry || usedGroupKeys.has(groupKey)) return null;
+
+        const retainedRow = exactRow || pickReplacementRowFromSameGroup(entry, cachedRow, minPerformanceCount);
+        if (!retainedRow) return null;
+        usedGroupKeys.add(groupKey);
+        return retainedRow;
+    });
+
+    const replacementGroups = collectEligibleRecommendedGroups(groups, minPerformanceCount)
+        .filter((group) => !usedGroupKeys.has(group.key));
+    shuffleInPlace(replacementGroups);
+    for (let index = 0; index < nextSlots.length; index++) {
+        if (nextSlots[index]) continue;
+        const replacementGroup = replacementGroups.pop();
+        if (!replacementGroup) continue;
+        const replacementRow = pickRandomEntry(replacementGroup.latestRows);
+        if (!replacementRow) continue;
+        nextSlots[index] = replacementRow;
+        usedGroupKeys.add(replacementGroup.key);
+    }
+
+    const nextSongs = nextSlots.filter((row): row is Song => row !== null);
+    return createRecommendedCacheState(
+        nextSongs,
+        Math.min(getRecommendedCacheRequestedCount(currentCache), nextSongs.length)
+    );
 }
 
 /**
@@ -132,13 +207,27 @@ function expandRecommendedCache(
 
 /**
  * おすすめ抽選に使う曲グループを構築する。
- * @param {*} songs
- * @param {*} minPerformanceCount
+ * @param songs 抽選元の曲配列
+ * @param minPerformanceCount 通常曲に必要な歌唱回数
+ * @returns 新規抽選可能なおすすめグループ
  */
-function buildRecommendedGroups(songs, minPerformanceCount) {
+function buildRecommendedGroups(songs: Song[], minPerformanceCount: number): RecommendedSongGroup[] {
     const dedupedRows = collapseRecommendedRowsByArchive(songs);
     const groups = groupRecommendedRowsBySong(dedupedRows);
-    const result = [];
+    return collectEligibleRecommendedGroups(groups, minPerformanceCount);
+}
+
+/**
+ * 曲グループから、新規おすすめへ入場できるグループだけを抽出する。
+ * @param groups 曲同一性キーごとの候補行
+ * @param minPerformanceCount 通常曲に必要な歌唱回数
+ * @returns 新規抽選可能なおすすめグループ
+ */
+function collectEligibleRecommendedGroups(
+    groups: Map<string, RecommendedSongGroupEntry>,
+    minPerformanceCount: number
+): RecommendedSongGroup[] {
+    const result: RecommendedSongGroup[] = [];
     for (const [key, entry] of groups.entries()) {
         if (!isRecommendedGroupEligible(entry, minPerformanceCount)) continue;
         const latestRows = pickRecommendedLatestRows(entry, minPerformanceCount);
@@ -150,10 +239,11 @@ function buildRecommendedGroups(songs, minPerformanceCount) {
 
 /**
  * 同一アーカイブ内の候補を最新行へ集約する。
- * @param {*} songs
+ * @param songs 抽選元の曲配列
+ * @returns 同一曲・同一アーカイブ単位に集約した行
  */
-function collapseRecommendedRowsByArchive(songs) {
-    const songRowsByArchive = new Map();
+function collapseRecommendedRowsByArchive(songs: Song[]): Song[] {
+    const songRowsByArchive = new Map<string, Song>();
     for (const row of songs) {
         if (isGuestStreamRole(row.streamRole)) continue;
         if (!isRecommendedCountFormat(row.format)) continue;
@@ -168,16 +258,17 @@ function collapseRecommendedRowsByArchive(songs) {
 
 /**
  * 曲同一性キーで候補をグループ化し形式別に分類する。
- * @param {*} rows
+ * @param rows アーカイブ単位に集約した曲配列
+ * @returns 曲同一性キーごとの候補行
  */
-function groupRecommendedRowsBySong(rows) {
-    const groups = new Map();
+function groupRecommendedRowsBySong(rows: Song[]): Map<string, RecommendedSongGroupEntry> {
+    const groups = new Map<string, RecommendedSongGroupEntry>();
     for (const row of rows) {
         const key = getRecommendedSongKey(row);
         if (!groups.has(key)) {
             groups.set(key, { rows: [], utamitaRows: [], orisongRows: [], streamRows: [], shortRows: [] });
         }
-        const entry = groups.get(key);
+        const entry = groups.get(key) as RecommendedSongGroupEntry;
         entry.rows.push(row);
         if (isUtamitaEquivalentFormat(row.format)) entry.utamitaRows.push(row);
         if (isOriginalSongFormat(row.format)) entry.orisongRows.push(row);
@@ -190,20 +281,28 @@ function groupRecommendedRowsBySong(rows) {
 /**
  * おすすめ候補グループが抽選対象かどうかを判定する。
  * オリ曲が含まれる曲は1回でも候補に含める。
- * @param {*} entry
- * @param {*} minPerformanceCount
+ * @param entry 同一曲の候補行
+ * @param minPerformanceCount 通常曲に必要な歌唱回数
+ * @returns 新規おすすめへ入場できるか
  */
-function isRecommendedGroupEligible(entry, minPerformanceCount) {
+function isRecommendedGroupEligible(
+    entry: RecommendedSongGroupEntry,
+    minPerformanceCount: number
+): boolean {
     if (entry.rows.length >= minPerformanceCount) return true;
     return entry.orisongRows.length > 0;
 }
 
 /**
  * 優先ルールに従ってグループから採用候補行を選ぶ。
- * @param {*} entry
- * @param {*} minPerformanceCount
+ * @param entry 同一曲の候補行
+ * @param minPerformanceCount 通常曲に必要な歌唱回数
+ * @returns 表示候補として優先する行
  */
-function pickRecommendedLatestRows(entry, minPerformanceCount) {
+function pickRecommendedLatestRows(
+    entry: RecommendedSongGroupEntry,
+    minPerformanceCount: number
+): Song[] {
     if (entry.utamitaRows.length > 0) {
         return entry.utamitaRows.slice(0, 1);
     }
@@ -217,20 +316,43 @@ function pickRecommendedLatestRows(entry, minPerformanceCount) {
 }
 
 /**
- * 候補グループからランダム抽出して表示曲を決定する。
- * @param {*} groups
- * @param {*} count
+ * 表示していた行がなくなった場合に、同じ曲の有効な別行を選ぶ。
+ * 同じアーカイブの代表行が残っていれば優先し、それ以外は既存の形式優先規則を使う。
+ * @param entry 最新データ上の同一曲グループ
+ * @param cachedRow 以前表示していた行
+ * @param minPerformanceCount 通常曲に必要な歌唱回数
+ * @returns 同じ曲の代替行
  */
-function selectRecommendedSongs(groups, count) {
+function pickReplacementRowFromSameGroup(
+    entry: RecommendedSongGroupEntry,
+    cachedRow: Song,
+    minPerformanceCount: number
+): Song | null {
+    const sameArchiveRow = entry.rows.find((row) => row.archiveId === cachedRow.archiveId);
+    if (sameArchiveRow) return sameArchiveRow;
+    return pickRandomEntry(pickRecommendedLatestRows(entry, minPerformanceCount));
+}
+
+/**
+ * 候補グループからランダム抽出して表示曲を決定する。
+ * @param groups 新規抽選可能なおすすめグループ
+ * @param count 抽選件数
+ * @returns グループごとに1行を選んだおすすめ曲
+ */
+function selectRecommendedSongs(groups: RecommendedSongGroup[], count: number): Song[] {
     const pickedGroups = shuffleInPlace(groups.slice()).slice(0, count);
-    return pickedGroups.map((group) => pickRandomEntry(group.latestRows));
+    return pickedGroups.flatMap((group) => {
+        const row = pickRandomEntry(group.latestRows);
+        return row ? [row] : [];
+    });
 }
 
 /**
  * 配列を Fisher-Yates 法でインプレースシャッフルする。
- * @param {*} list
+ * @param list 並べ替える配列
+ * @returns 同じ配列参照
  */
-function shuffleInPlace(list) {
+function shuffleInPlace<T>(list: T[]): T[] {
     for (let i = list.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [list[i], list[j]] = [list[j], list[i]];
@@ -240,9 +362,11 @@ function shuffleInPlace(list) {
 
 /**
  * 配列からランダムに 1 件選択する。
- * @param {*} list
+ * @param list 抽選元の配列
+ * @returns 抽選した要素、または空配列の場合はnull
  */
-function pickRandomEntry(list) {
+function pickRandomEntry<T>(list: T[]): T | null {
+    if (list.length === 0) return null;
     const idx = Math.floor(Math.random() * list.length);
     return list[idx];
 }
@@ -250,9 +374,10 @@ function pickRandomEntry(list) {
 /**
  * おすすめ抽選で使う同一曲判定用の正規化キーを生成する。
  * cache 拡張時も同じ単位で重複除外するため export している。
- * @param {*} row
+ * @param row 曲行
+ * @returns 曲同一性キー
  */
-export function getRecommendedSongKey(row) {
+export function getRecommendedSongKey(row: Song): string {
     return [
         row.titleNorm || "",
         row.artistNorm || "",
@@ -263,18 +388,20 @@ export function getRecommendedSongKey(row) {
 
 /**
  * 曲キーとアーカイブ ID を組み合わせた集約キーを生成する。
- * @param {*} row
+ * @param row 曲行
+ * @returns 曲とアーカイブの集約キー
  */
-function getRecommendedSongArchiveKey(row) {
+function getRecommendedSongArchiveKey(row: Song): string {
     return `${getRecommendedSongKey(row)}|||${row.archiveId || ""}`;
 }
 
 /**
  * 候補行が現在行より新しい順序かどうかを判定する。
- * @param {*} candidate
- * @param {*} current
+ * @param candidate 比較候補行
+ * @param current 現在の代表行
+ * @returns 比較候補を代表行にするか
  */
-function isHigherArchiveOrder(candidate, current) {
+function isHigherArchiveOrder(candidate: Song, current: Song): boolean {
     const candidateOrder = candidate.archiveOrder ?? -1;
     const currentOrder = current.archiveOrder ?? -1;
     if (candidateOrder !== currentOrder) return candidateOrder > currentOrder;
@@ -283,8 +410,9 @@ function isHigherArchiveOrder(candidate, current) {
 
 /**
  * おすすめ集計対象の形式かどうかを判定する。
- * @param {*} format
+ * @param format 曲形式
+ * @returns おすすめ集計対象か
  */
-function isRecommendedCountFormat(format) {
+function isRecommendedCountFormat(format: unknown): boolean {
     return isStreamFormat(format) || isUtamitaEquivalentFormat(format) || isShortFormat(format);
 }

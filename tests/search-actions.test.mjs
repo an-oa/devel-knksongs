@@ -6,6 +6,7 @@ test("search actions: clear resets conditions before delegating active bookmark 
     const calls = {
         filterReset: 0,
         dateReset: 0,
+        cancelSearch: 0,
         directSearch: 0,
         directSave: 0,
         activeBookmarkClear: 0,
@@ -24,17 +25,21 @@ test("search actions: clear resets conditions before delegating active bookmark 
         userTouchedQuery: true,
         userTouchedFilters: true
     };
-    const searchController = {
-        syncDateSelectOptions() {},
-        scheduleSearch() {
-            calls.directSearch += 1;
-        },
+    const dateFilterController = {
         resetDateSelects() {
             calls.dateReset += 1;
         },
         resetDateSelectGroup() {},
         hasDateSelection() {
             return false;
+        }
+    };
+    const searchCoordinator = {
+        cancelScheduledSearch() {
+            calls.cancelSearch += 1;
+        },
+        scheduleSearch() {
+            calls.directSearch += 1;
         }
     };
     const storageController = {
@@ -60,8 +65,9 @@ test("search actions: clear resets conditions before delegating active bookmark 
                 return false;
             }
         },
-        getSearchController: () => searchController,
-        getStorageController: () => storageController
+        dateFilterController,
+        searchCoordinator,
+        storageController
     });
 
     controller.clearSearch();
@@ -70,6 +76,7 @@ test("search actions: clear resets conditions before delegating active bookmark 
     assert.equal(search.userTouchedQuery, false);
     assert.equal(calls.filterReset, 1);
     assert.equal(calls.dateReset, 1);
+    assert.equal(calls.cancelSearch, 1);
     assert.equal(calls.activeBookmarkClear, 1);
     assert.equal(calls.queryAtActiveBookmarkClear, "");
     assert.equal(calls.filterResetAtActiveBookmarkClear, 1);
