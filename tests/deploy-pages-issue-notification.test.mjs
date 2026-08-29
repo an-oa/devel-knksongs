@@ -259,11 +259,18 @@ test("deploy issue API client: reads unordered deployment guards and creates its
         requests.push(request);
 
         if (request.path.endsWith("/actions/workflows/deploy-pages.yml/runs")) {
+            if (new URL(requestUrl).searchParams.get("page") === "2") {
+                return Response.json({
+                    workflow_runs: [{ run_number: 100, run_attempt: 1 }]
+                });
+            }
             return Response.json({
-                workflow_runs: [
-                    { run_number: 99, run_attempt: 4 },
-                    { run_number: 100, run_attempt: 1 }
-                ]
+                workflow_runs: [{ run_number: 99, run_attempt: 4 }]
+            }, {
+                headers: {
+                    link: "<https://api.github.test/repos/an-oa/knksongs/actions/workflows/" +
+                        "deploy-pages.yml/runs?per_page=100&page=2>; rel=\"next\""
+                }
             });
         }
         if (request.path.endsWith("/git/ref/heads/main")) {
@@ -299,12 +306,13 @@ test("deploy issue API client: reads unordered deployment guards and creates its
 
     assert.deepEqual(requests.map(({ method, path, search }) => [method, path, search]), [
         ["GET", "/repos/an-oa/knksongs/actions/workflows/deploy-pages.yml/runs", "?per_page=100"],
+        ["GET", "/repos/an-oa/knksongs/actions/workflows/deploy-pages.yml/runs", "?per_page=100&page=2"],
         ["GET", "/repos/an-oa/knksongs/git/ref/heads/main", ""],
         ["GET", `/repos/an-oa/knksongs/labels/${DEPLOYMENT_FAILURE_LABEL}`, ""],
         ["POST", "/repos/an-oa/knksongs/labels", ""],
         ["GET", `/repos/an-oa/knksongs/labels/${DEPLOYMENT_FAILURE_LABEL}`, ""]
     ]);
-    assert.deepEqual(requests[3].body, {
+    assert.deepEqual(requests[4].body, {
         name: DEPLOYMENT_FAILURE_LABEL,
         color: "D73A4A",
         description: "Open while the Deploy Pages workflow is failing"

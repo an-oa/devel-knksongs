@@ -405,17 +405,36 @@ export function createGitHubIssueClient(options) {
         return items;
     }
 
+    /**
+     * paginationされたworkflow run responseをすべて取得する。
+     * @param {string} path
+     * @returns {Promise<unknown[]>}
+     */
+    async function listAllWorkflowRuns(path) {
+        const runs = [];
+        /** @type {string | null} */
+        let nextUrl = path;
+        while (nextUrl) {
+            const response = await request(nextUrl);
+            const pageRuns = response.data !== null && typeof response.data === "object" &&
+                "workflow_runs" in response.data && Array.isArray(response.data.workflow_runs)
+                ? response.data.workflow_runs
+                : null;
+            if (!pageRuns) {
+                throw new Error(`GitHub API workflow runs response was invalid: ${nextUrl}`);
+            }
+            runs.push(...pageRuns);
+            nextUrl = findNextPageUrl(response.headers.get("link"));
+        }
+        return runs;
+    }
+
     return {
         async getLatestWorkflowRun(workflowFile) {
             const query = new URLSearchParams({ per_page: String(WORKFLOW_RUN_PAGE_SIZE) });
-            const response = await request(
+            const runs = await listAllWorkflowRuns(
                 `repos/${repositoryPath}/actions/workflows/${encodeURIComponent(workflowFile)}/runs?${query}`
             );
-            /** @type {unknown[]} */
-            const runs = response.data !== null && typeof response.data === "object" &&
-                "workflow_runs" in response.data && Array.isArray(response.data.workflow_runs)
-                ? response.data.workflow_runs
-                : [];
             const runOrders = runs.map((run) => {
                 if (!run || typeof run !== "object" ||
                     !("run_number" in run) || !("run_attempt" in run)) {
