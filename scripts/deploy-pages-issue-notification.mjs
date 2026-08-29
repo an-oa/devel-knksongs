@@ -8,12 +8,14 @@ export const DEPLOYMENT_FAILURE_TITLE = "[Workflow Failure] Deploy Pages";
 
 /** @typedef {{ resolve: string, build: string, freshness: string, deploy: string }} DeploymentJobResults */
 /** @typedef {{ runNumber: string, runAttempt: string }} WorkflowRunOrder */
+/** @typedef {WorkflowRunOrder & { runId: string, status: string }} WorkflowRunSummary */
 /** @typedef {{ number: number, body?: string | null, labels?: Array<string | { name?: string }> }} ManagedIssue */
 
 const DEFAULT_RETRY_ATTEMPTS = 3;
 const DEFAULT_RETRY_DELAY_MS = 2_000;
 const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
 const WORKFLOW_RUN_PAGE_SIZE = 100;
+const NOTIFY_JOB_NAME = "notify";
 /** @type {Array<keyof DeploymentJobResults>} */
 const JOB_NAMES = ["resolve", "build", "freshness", "deploy"];
 const JOB_RESULTS = new Set(["success", "failure", "cancelled", "skipped"]);
@@ -145,17 +147,40 @@ export function isNewerWorkflowRun(candidate, reference) {
 }
 
 /**
- * APIの配列順序に依存せず、run番号とattemptが最大のworkflow runを選ぶ。
- * 境界条件を単体テストするためexportしている。
- * @param {WorkflowRunOrder[]} workflowRuns
- * @returns {WorkflowRunOrder}
+ * REST APIのjob conclusionをneeds contextと同じ4状態へ正規化する。
+ * @param {unknown} conclusion
+ * @returns {"success" | "failure" | "cancelled" | "skipped" | null}
  */
-export function selectNewestWorkflowRun(workflowRuns) {
-    if (workflowRuns.length === 0) throw new Error("No workflow runs found");
-    return workflowRuns.slice(1).reduce(
-        (newest, candidate) => isNewerWorkflowRun(candidate, newest) ? candidate : newest,
-        workflowRuns[0]
-    );
+function normalizeJobResult(conclusion) {
+    if (conclusion === "success" || conclusion === "cancelled" || conclusion === "skipped") {
+        return conclusion;
+    }
+    return typeof conclusion === "string" && conclusion ? "failure" : null;
+}
+
+/**
+ * 完了済みrunのjob一覧から、failureまたはrecovery通知が成功したか判定する。
+ * 境界条件を単体テストするためexportしている。
+ * @param {unknown[]} jobs
+ * @returns {boolean}
+ */
+export function hasReportedDeploymentState(jobs) {
+    const conclusions = new Map();
+    for (const job of jobs) {
+        if (!job || typeof job !== "object" ||
+            !("name" in job) || typeof job.name !== "string" || !("conclusion" in job)) {
+            continue;
+        }
+        conclusions.set(job.name, job.conclusion);
+    }
+    if (conclusions.get(NOTIFY_JOB_NAME) !== "success") return false;
+
+    const resolve = normalizeJobResult(conclusions.get("resolve"));
+    const build = normalizeJobResult(conclusions.get("build"));
+    const freshness = normalizeJobResult(conclusions.get("freshness"));
+    const deploy = normalizeJobResult(conclusions.get("deploy"));
+    if (resolve === null || build === null || freshness === null || deploy === null) return false;
+    return classifyDeploymentState({ resolve, build, freshness, deploy }) !== "noop";
 }
 
 /**
@@ -316,7 +341,10 @@ function findNextPageUrl(linkHeader) {
  * }} options
  * @returns {{
  *   ensureLabel: () => Promise<void>,
- *   getLatestWorkflowRun: (workflowFile: string) => Promise<WorkflowRunOrder>,
+ *   getNewestSupersedingWorkflowRun: (
+ *     workflowFile: string,
+ *     reference: WorkflowRunOrder
+ *   ) => Promise<WorkflowRunSummary | null>,
  *   getBranchSha: (branch: string) => Promise<string>,
  *   listOpenIssues: () => Promise<Array<*>>,
  *   createIssue: (body: string, assignee: string) => Promise<void>,
@@ -429,26 +457,72 @@ export function createGitHubIssueClient(options) {
         return runs;
     }
 
+    /**
+     * paginationされたworkflow job responseをすべて取得する。
+     * @param {string} path
+     * @returns {Promise<unknown[]>}
+     */
+    async function listAllWorkflowJobs(path) {
+        const jobs = [];
+        /** @type {string | null} */
+        let nextUrl = path;
+        while (nextUrl) {
+            const response = await request(nextUrl);
+            const pageJobs = response.data !== null && typeof response.data === "object" &&
+                "jobs" in response.data && Array.isArray(response.data.jobs)
+                ? response.data.jobs
+                : null;
+            if (!pageJobs) {
+                throw new Error(`GitHub API workflow jobs response was invalid: ${nextUrl}`);
+            }
+            jobs.push(...pageJobs);
+            nextUrl = findNextPageUrl(response.headers.get("link"));
+        }
+        return jobs;
+    }
+
     return {
-        async getLatestWorkflowRun(workflowFile) {
+        async getNewestSupersedingWorkflowRun(workflowFile, reference) {
             const query = new URLSearchParams({ per_page: String(WORKFLOW_RUN_PAGE_SIZE) });
             const runs = await listAllWorkflowRuns(
                 `repos/${repositoryPath}/actions/workflows/${encodeURIComponent(workflowFile)}/runs?${query}`
             );
-            const runOrders = runs.map((run) => {
+            const runSummaries = runs.map((run) => {
                 if (!run || typeof run !== "object" ||
-                    !("run_number" in run) || !("run_attempt" in run)) {
-                    throw new Error(`Workflow run order is missing for ${workflowFile}`);
+                    !("id" in run) || !("run_number" in run) ||
+                    !("run_attempt" in run) || !("status" in run)) {
+                    throw new Error(`Workflow run state is missing for ${workflowFile}`);
                 }
-                return {
+                /** @type {WorkflowRunSummary} */
+                const summary = {
+                    runId: String(run.id),
                     runNumber: String(run.run_number),
-                    runAttempt: String(run.run_attempt)
+                    runAttempt: String(run.run_attempt),
+                    status: String(run.status)
                 };
+                if (!/^[1-9][0-9]*$/.test(summary.runId)) {
+                    throw new Error(`Workflow run ID must be a positive integer: ${summary.runId}`);
+                }
+                return summary;
             });
-            if (runOrders.length === 0) {
-                throw new Error(`No workflow runs found for ${workflowFile}`);
+            const completedNewerRuns = runSummaries
+                .filter((run) => run.status === "completed" && isNewerWorkflowRun(run, reference))
+                .sort((left, right) => {
+                    if (isNewerWorkflowRun(left, right)) return -1;
+                    if (isNewerWorkflowRun(right, left)) return 1;
+                    return 0;
+                });
+            for (const run of completedNewerRuns) {
+                const jobQuery = new URLSearchParams({
+                    filter: "latest",
+                    per_page: String(WORKFLOW_RUN_PAGE_SIZE)
+                });
+                const jobs = await listAllWorkflowJobs(
+                    `repos/${repositoryPath}/actions/runs/${run.runId}/jobs?${jobQuery}`
+                );
+                if (hasReportedDeploymentState(jobs)) return run;
             }
-            return selectNewestWorkflowRun(runOrders);
+            return null;
         },
 
         async getBranchSha(branch) {
@@ -590,15 +664,15 @@ export async function updateDeploymentFailureIssue(context, client, options = {}
     const retryOptions = options.retry || {};
     const targetBranch = context.targetBranch || "main";
     const workflowFile = context.workflowFile || "deploy-pages.yml";
-    const latestRun = await retryOperation(
-        "Check the latest Deploy Pages workflow run",
-        () => client.getLatestWorkflowRun(workflowFile),
+    const supersedingRun = await retryOperation(
+        "Check newer Deploy Pages workflow runs",
+        () => client.getNewestSupersedingWorkflowRun(workflowFile, context),
         retryOptions
     );
-    if (isNewerWorkflowRun(latestRun, context)) {
+    if (supersedingRun && isNewerWorkflowRun(supersedingRun, context)) {
         console.log(
             `Skip stale notification run ${context.runNumber}/${context.runAttempt}; ` +
-            `latest run is ${latestRun.runNumber}/${latestRun.runAttempt}.`
+            `newer reporting run is ${supersedingRun.runNumber}/${supersedingRun.runAttempt}.`
         );
         return "noop";
     }

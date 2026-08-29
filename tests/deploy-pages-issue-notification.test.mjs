@@ -8,11 +8,11 @@ import {
     classifyDeploymentState,
     createGitHubIssueClient,
     createRunMarker,
+    hasReportedDeploymentState,
     hasRunNotification,
     isNewerWorkflowRun,
     retryOperation,
     selectManagedIssues,
-    selectNewestWorkflowRun,
     updateDeploymentFailureIssue
 } from "../scripts/deploy-pages-issue-notification.mjs";
 
@@ -32,12 +32,7 @@ const BASE_CONTEXT = {
 };
 
 const CURRENT_DEPLOYMENT_METHODS = {
-    async getLatestWorkflowRun() {
-        return {
-            runNumber: BASE_CONTEXT.runNumber,
-            runAttempt: BASE_CONTEXT.runAttempt
-        };
-    },
+    async getNewestSupersedingWorkflowRun() { return null; },
     async getBranchSha() {
         return BASE_CONTEXT.deploySha;
     }
@@ -207,14 +202,37 @@ test("deploy issue ordering: compares new runs before attempts of the same run",
         ),
         false
     );
-    assert.deepEqual(
-        selectNewestWorkflowRun([
-            { runNumber: "100", runAttempt: "3" },
-            { runNumber: "101", runAttempt: "1" },
-            { runNumber: "101", runAttempt: "2" }
-        ]),
-        { runNumber: "101", runAttempt: "2" }
-    );
+});
+
+test("deploy issue ordering: only completed notification jobs carry deployment state", () => {
+    assert.equal(hasReportedDeploymentState([
+        { name: "resolve", conclusion: "skipped" },
+        { name: "build", conclusion: "skipped" },
+        { name: "freshness", conclusion: "skipped" },
+        { name: "deploy", conclusion: "skipped" },
+        { name: "notify", conclusion: "success" }
+    ]), false);
+    assert.equal(hasReportedDeploymentState([
+        { name: "resolve", conclusion: "cancelled" },
+        { name: "build", conclusion: "skipped" },
+        { name: "freshness", conclusion: "skipped" },
+        { name: "deploy", conclusion: "skipped" },
+        { name: "notify", conclusion: "cancelled" }
+    ]), false);
+    assert.equal(hasReportedDeploymentState([
+        { name: "resolve", conclusion: "failure" },
+        { name: "build", conclusion: "skipped" },
+        { name: "freshness", conclusion: "skipped" },
+        { name: "deploy", conclusion: "skipped" },
+        { name: "notify", conclusion: "success" }
+    ]), true);
+    assert.equal(hasReportedDeploymentState([
+        { name: "resolve", conclusion: "success" },
+        { name: "build", conclusion: "success" },
+        { name: "freshness", conclusion: "success" },
+        { name: "deploy", conclusion: "success" },
+        { name: "notify", conclusion: "success" }
+    ]), true);
 });
 
 test("deploy issue API: retries temporary failures with exponential delays", async () => {
@@ -243,7 +261,7 @@ test("deploy issue API: retries temporary failures with exponential delays", asy
     assert.deepEqual(waitDelays, [10, 20]);
 });
 
-test("deploy issue API client: reads unordered deployment guards and creates its label once", async () => {
+test("deploy issue API client: skips newer queued, cancelled, and no-op runs", async () => {
     /** @type {Array<{ method: string, path: string, search: string, body: Record<string, *> | null }>} */
     const requests = [];
     let labelExists = false;
@@ -261,16 +279,55 @@ test("deploy issue API client: reads unordered deployment guards and creates its
         if (request.path.endsWith("/actions/workflows/deploy-pages.yml/runs")) {
             if (new URL(requestUrl).searchParams.get("page") === "2") {
                 return Response.json({
-                    workflow_runs: [{ run_number: 100, run_attempt: 1 }]
+                    workflow_runs: [
+                        { id: 105, run_number: 105, run_attempt: 1, status: "queued" },
+                        { id: 104, run_number: 104, run_attempt: 1, status: "completed" }
+                    ]
                 });
             }
             return Response.json({
-                workflow_runs: [{ run_number: 99, run_attempt: 4 }]
+                workflow_runs: [
+                    { id: 103, run_number: 103, run_attempt: 1, status: "completed" },
+                    { id: 102, run_number: 102, run_attempt: 1, status: "completed" }
+                ]
             }, {
                 headers: {
                     link: "<https://api.github.test/repos/an-oa/knksongs/actions/workflows/" +
                         "deploy-pages.yml/runs?per_page=100&page=2>; rel=\"next\""
                 }
+            });
+        }
+        if (request.path.endsWith("/actions/runs/104/jobs")) {
+            return Response.json({
+                jobs: [
+                    { name: "resolve", conclusion: "cancelled" },
+                    { name: "build", conclusion: "skipped" },
+                    { name: "freshness", conclusion: "skipped" },
+                    { name: "deploy", conclusion: "skipped" },
+                    { name: "notify", conclusion: "cancelled" }
+                ]
+            });
+        }
+        if (request.path.endsWith("/actions/runs/103/jobs")) {
+            return Response.json({
+                jobs: [
+                    { name: "resolve", conclusion: "skipped" },
+                    { name: "build", conclusion: "skipped" },
+                    { name: "freshness", conclusion: "skipped" },
+                    { name: "deploy", conclusion: "skipped" },
+                    { name: "notify", conclusion: "success" }
+                ]
+            });
+        }
+        if (request.path.endsWith("/actions/runs/102/jobs")) {
+            return Response.json({
+                jobs: [
+                    { name: "resolve", conclusion: "success" },
+                    { name: "build", conclusion: "success" },
+                    { name: "freshness", conclusion: "success" },
+                    { name: "deploy", conclusion: "success" },
+                    { name: "notify", conclusion: "success" }
+                ]
             });
         }
         if (request.path.endsWith("/git/ref/heads/main")) {
@@ -296,9 +353,14 @@ test("deploy issue API client: reads unordered deployment guards and creates its
         fetchImpl
     });
 
-    assert.deepEqual(await client.getLatestWorkflowRun("deploy-pages.yml"), {
-        runNumber: "100",
-        runAttempt: "1"
+    assert.deepEqual(await client.getNewestSupersedingWorkflowRun(
+        "deploy-pages.yml",
+        BASE_CONTEXT
+    ), {
+        runId: "102",
+        runNumber: "102",
+        runAttempt: "1",
+        status: "completed"
     });
     assert.equal(await client.getBranchSha("main"), BASE_CONTEXT.deploySha);
     await client.ensureLabel();
@@ -307,12 +369,15 @@ test("deploy issue API client: reads unordered deployment guards and creates its
     assert.deepEqual(requests.map(({ method, path, search }) => [method, path, search]), [
         ["GET", "/repos/an-oa/knksongs/actions/workflows/deploy-pages.yml/runs", "?per_page=100"],
         ["GET", "/repos/an-oa/knksongs/actions/workflows/deploy-pages.yml/runs", "?per_page=100&page=2"],
+        ["GET", "/repos/an-oa/knksongs/actions/runs/104/jobs", "?filter=latest&per_page=100"],
+        ["GET", "/repos/an-oa/knksongs/actions/runs/103/jobs", "?filter=latest&per_page=100"],
+        ["GET", "/repos/an-oa/knksongs/actions/runs/102/jobs", "?filter=latest&per_page=100"],
         ["GET", "/repos/an-oa/knksongs/git/ref/heads/main", ""],
         ["GET", `/repos/an-oa/knksongs/labels/${DEPLOYMENT_FAILURE_LABEL}`, ""],
         ["POST", "/repos/an-oa/knksongs/labels", ""],
         ["GET", `/repos/an-oa/knksongs/labels/${DEPLOYMENT_FAILURE_LABEL}`, ""]
     ]);
-    assert.deepEqual(requests[4].body, {
+    assert.deepEqual(requests[7].body, {
         name: DEPLOYMENT_FAILURE_LABEL,
         color: "D73A4A",
         description: "Open while the Deploy Pages workflow is failing"
@@ -413,8 +478,13 @@ test("deploy issue update: ignores an older run even when it targets the same co
     let issueWrites = 0;
     const client = {
         ...CURRENT_DEPLOYMENT_METHODS,
-        async getLatestWorkflowRun() {
-            return { runNumber: "101", runAttempt: "1" };
+        async getNewestSupersedingWorkflowRun() {
+            return {
+                runId: "67890",
+                runNumber: "101",
+                runAttempt: "1",
+                status: "completed"
+            };
         },
         async getBranchSha() {
             branchChecks++;
@@ -440,6 +510,31 @@ test("deploy issue update: ignores an older run even when it targets the same co
     assert.equal(state, "noop");
     assert.equal(branchChecks, 0);
     assert.equal(issueWrites, 0);
+});
+
+test("deploy issue update: keeps a failure when newer runs did not report state", async () => {
+    let createdIssues = 0;
+    const client = {
+        ...CURRENT_DEPLOYMENT_METHODS,
+        async ensureLabel() {},
+        async listOpenIssues() { return []; },
+        async createIssue() { createdIssues++; },
+        async addAssignee() {},
+        async listComments() { return []; },
+        async commentIssue() {},
+        async closeIssue() {}
+    };
+
+    const state = await updateDeploymentFailureIssue(
+        {
+            ...BASE_CONTEXT,
+            results: { ...BASE_CONTEXT.results, deploy: "failure" }
+        },
+        client
+    );
+
+    assert.equal(state, "failure");
+    assert.equal(createdIssues, 1);
 });
 
 test("deploy issue update: ignores a run whose commit is no longer main", async () => {
