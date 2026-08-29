@@ -8,6 +8,7 @@ import {
     createGitHubIssueClient,
     createRunMarker,
     hasRunNotification,
+    isNewerWorkflowRun,
     retryOperation,
     selectManagedIssues,
     updateDeploymentFailureIssue
@@ -17,6 +18,7 @@ const BASE_CONTEXT = {
     deploySha: "c2abca650af9fca8ff7a2ab28627ea3c3620d9b9",
     repositoryOwner: "an-oa",
     runId: "12345",
+    runNumber: "100",
     runAttempt: "1",
     runUrl: "https://github.com/an-oa/knksongs/actions/runs/12345",
     results: {
@@ -24,6 +26,18 @@ const BASE_CONTEXT = {
         build: "success",
         freshness: "success",
         deploy: "success"
+    }
+};
+
+const CURRENT_DEPLOYMENT_METHODS = {
+    async getLatestWorkflowRun() {
+        return {
+            runNumber: BASE_CONTEXT.runNumber,
+            runAttempt: BASE_CONTEXT.runAttempt
+        };
+    },
+    async getBranchSha() {
+        return BASE_CONTEXT.deploySha;
     }
 };
 
@@ -169,7 +183,32 @@ test("deploy issue comments: treat another attempt of the same run as already re
     assert.equal(hasRunNotification("", comments, "recovery", "67890"), false);
 });
 
+test("deploy issue ordering: compares new runs before attempts of the same run", () => {
+    assert.equal(
+        isNewerWorkflowRun(
+            { runNumber: "101", runAttempt: "1" },
+            { runNumber: "100", runAttempt: "20" }
+        ),
+        true
+    );
+    assert.equal(
+        isNewerWorkflowRun(
+            { runNumber: "100", runAttempt: "2" },
+            { runNumber: "100", runAttempt: "1" }
+        ),
+        true
+    );
+    assert.equal(
+        isNewerWorkflowRun(
+            { runNumber: "100", runAttempt: "1" },
+            { runNumber: "100", runAttempt: "1" }
+        ),
+        false
+    );
+});
+
 test("deploy issue API: retries temporary failures with exponential delays", async () => {
+    /** @type {number[]} */
     const waitDelays = [];
     let calls = 0;
 
@@ -183,7 +222,9 @@ test("deploy issue API: retries temporary failures with exponential delays", asy
         {
             attempts: 3,
             delayMs: 10,
-            wait: async (delayMs) => waitDelays.push(delayMs)
+            wait: async (delayMs) => {
+                waitDelays.push(delayMs);
+            }
         }
     );
 
@@ -192,49 +233,124 @@ test("deploy issue API: retries temporary failures with exponential delays", asy
     assert.deepEqual(waitDelays, [10, 20]);
 });
 
-test("deploy issue API client: creates its dedicated label without overwriting it", async () => {
+test("deploy issue API client: reads deployment guards and creates its label once", async () => {
+    /** @type {Array<{ method: string, path: string, body: Record<string, *> | null }>} */
     const requests = [];
     let labelExists = false;
+    /** @type {typeof fetch} */
+    const fetchImpl = async (url, init = {}) => {
+        const requestUrl = url instanceof Request ? url.url : String(url);
+        const request = {
+            method: init.method || "GET",
+            path: new URL(requestUrl).pathname,
+            body: typeof init.body === "string" ? JSON.parse(init.body) : null
+        };
+        requests.push(request);
+
+        if (request.path.endsWith("/actions/workflows/deploy-pages.yml/runs")) {
+            return Response.json({
+                workflow_runs: [{ run_number: 100, run_attempt: 1 }]
+            });
+        }
+        if (request.path.endsWith("/git/ref/heads/main")) {
+            return Response.json({ object: { sha: BASE_CONTEXT.deploySha } });
+        }
+        if (request.path.endsWith(`/labels/${DEPLOYMENT_FAILURE_LABEL}`)) {
+            return labelExists
+                ? Response.json({ name: DEPLOYMENT_FAILURE_LABEL })
+                : Response.json({ message: "Not Found" }, { status: 404 });
+        }
+        if (request.path.endsWith("/labels") && request.method === "POST") {
+            labelExists = true;
+            return Response.json(request.body, { status: 201 });
+        }
+        throw new Error(`Unexpected request: ${request.method} ${request.path}`);
+    };
     const client = createGitHubIssueClient({
         apiUrl: "https://api.github.test",
         repository: "an-oa/knksongs",
         token: "test-token",
         requestTimeoutMs: 100,
         createTimeoutSignal: () => new AbortController().signal,
-        fetchImpl: async (url, init) => {
-            const request = {
-                method: init.method,
-                path: new URL(url).pathname,
-                body: init.body ? JSON.parse(init.body) : null
-            };
-            requests.push(request);
-
-            if (request.path.endsWith(`/labels/${DEPLOYMENT_FAILURE_LABEL}`)) {
-                return labelExists
-                    ? Response.json({ name: DEPLOYMENT_FAILURE_LABEL })
-                    : Response.json({ message: "Not Found" }, { status: 404 });
-            }
-            if (request.path.endsWith("/labels") && request.method === "POST") {
-                labelExists = true;
-                return Response.json(request.body, { status: 201 });
-            }
-            throw new Error(`Unexpected request: ${request.method} ${request.path}`);
-        }
+        fetchImpl
     });
 
+    assert.deepEqual(await client.getLatestWorkflowRun("deploy-pages.yml"), {
+        runNumber: "100",
+        runAttempt: "1"
+    });
+    assert.equal(await client.getBranchSha("main"), BASE_CONTEXT.deploySha);
     await client.ensureLabel();
     await client.ensureLabel();
 
     assert.deepEqual(requests.map(({ method, path }) => [method, path]), [
+        ["GET", "/repos/an-oa/knksongs/actions/workflows/deploy-pages.yml/runs"],
+        ["GET", "/repos/an-oa/knksongs/git/ref/heads/main"],
         ["GET", `/repos/an-oa/knksongs/labels/${DEPLOYMENT_FAILURE_LABEL}`],
         ["POST", "/repos/an-oa/knksongs/labels"],
         ["GET", `/repos/an-oa/knksongs/labels/${DEPLOYMENT_FAILURE_LABEL}`]
     ]);
-    assert.deepEqual(requests[1].body, {
+    assert.deepEqual(requests[3].body, {
         name: DEPLOYMENT_FAILURE_LABEL,
         color: "D73A4A",
         description: "Open while the Deploy Pages workflow is failing"
     });
+});
+
+test("deploy issue update: ignores an older run even when it targets the same commit", async () => {
+    let branchChecks = 0;
+    let issueWrites = 0;
+    const client = {
+        ...CURRENT_DEPLOYMENT_METHODS,
+        async getLatestWorkflowRun() {
+            return { runNumber: "101", runAttempt: "1" };
+        },
+        async getBranchSha() {
+            branchChecks++;
+            return BASE_CONTEXT.deploySha;
+        },
+        async ensureLabel() { issueWrites++; },
+        async listOpenIssues() { issueWrites++; return []; },
+        async createIssue() { issueWrites++; },
+        async addAssignee() { issueWrites++; },
+        async listComments() { issueWrites++; return []; },
+        async commentIssue() { issueWrites++; },
+        async closeIssue() { issueWrites++; }
+    };
+
+    const state = await updateDeploymentFailureIssue(
+        {
+            ...BASE_CONTEXT,
+            results: { ...BASE_CONTEXT.results, deploy: "failure" }
+        },
+        client
+    );
+
+    assert.equal(state, "noop");
+    assert.equal(branchChecks, 0);
+    assert.equal(issueWrites, 0);
+});
+
+test("deploy issue update: ignores a run whose commit is no longer main", async () => {
+    let issueWrites = 0;
+    const client = {
+        ...CURRENT_DEPLOYMENT_METHODS,
+        async getBranchSha() {
+            return "1111111111111111111111111111111111111111";
+        },
+        async ensureLabel() { issueWrites++; },
+        async listOpenIssues() { issueWrites++; return []; },
+        async createIssue() { issueWrites++; },
+        async addAssignee() { issueWrites++; },
+        async listComments() { issueWrites++; return []; },
+        async commentIssue() { issueWrites++; },
+        async closeIssue() { issueWrites++; }
+    };
+
+    const state = await updateDeploymentFailureIssue(BASE_CONTEXT, client);
+
+    assert.equal(state, "noop");
+    assert.equal(issueWrites, 0);
 });
 
 test("deploy issue update: updates every matching issue when duplicates exist", async () => {
@@ -243,15 +359,24 @@ test("deploy issue update: updates every matching issue when duplicates exist", 
         body: DEPLOYMENT_FAILURE_MARKER,
         labels: [{ name: DEPLOYMENT_FAILURE_LABEL }]
     }));
+    /** @type {Array<[number, string]>} */
     const assigned = [];
+    /** @type {Array<[number, string]>} */
     const commented = [];
     const client = {
+        ...CURRENT_DEPLOYMENT_METHODS,
         async ensureLabel() {},
         async listOpenIssues() { return issues; },
         async createIssue() { throw new Error("must not create"); },
-        async addAssignee(issueNumber, assignee) { assigned.push([issueNumber, assignee]); },
+        async addAssignee(
+            /** @type {number} */ issueNumber,
+            /** @type {string} */ assignee
+        ) { assigned.push([issueNumber, assignee]); },
         async listComments() { return []; },
-        async commentIssue(issueNumber, body) { commented.push([issueNumber, body]); },
+        async commentIssue(
+            /** @type {number} */ issueNumber,
+            /** @type {string} */ body
+        ) { commented.push([issueNumber, body]); },
         async closeIssue() { throw new Error("must not close"); }
     };
 
@@ -270,13 +395,15 @@ test("deploy issue update: updates every matching issue when duplicates exist", 
 });
 
 test("deploy issue creation: locates an issue created before a transient response failure", async () => {
+    /** @type {Array<{ number: number, body: string, labels: Array<{ name: string }> }>} */
     let issues = [];
     let createCalls = 0;
     let commentCalls = 0;
     const client = {
+        ...CURRENT_DEPLOYMENT_METHODS,
         async ensureLabel() {},
         async listOpenIssues() { return issues; },
-        async createIssue(body) {
+        async createIssue(/** @type {string} */ body) {
             createCalls++;
             issues = [{
                 number: 10,
@@ -315,10 +442,12 @@ test("deploy issue recovery: retries close and avoids duplicate comments across 
         body: DEPLOYMENT_FAILURE_MARKER,
         labels: [{ name: DEPLOYMENT_FAILURE_LABEL }]
     };
+    /** @type {number[]} */
     const waitDelays = [];
     let closeCalls = 0;
     let commentCalls = 0;
     const client = {
+        ...CURRENT_DEPLOYMENT_METHODS,
         async ensureLabel() {},
         async listOpenIssues() { return [issue]; },
         async createIssue() { throw new Error("must not create"); },
@@ -339,7 +468,9 @@ test("deploy issue recovery: retries close and avoids duplicate comments across 
             retry: {
                 attempts: 3,
                 delayMs: 10,
-                wait: async (delayMs) => waitDelays.push(delayMs)
+                wait: async (delayMs) => {
+                    waitDelays.push(delayMs);
+                }
             }
         }
     );
@@ -357,6 +488,7 @@ test("deploy issue recovery: fails when closing the issue never succeeds", async
         labels: [{ name: DEPLOYMENT_FAILURE_LABEL }]
     };
     const client = {
+        ...CURRENT_DEPLOYMENT_METHODS,
         async ensureLabel() {},
         async listOpenIssues() { return [issue]; },
         async createIssue() { throw new Error("must not create"); },

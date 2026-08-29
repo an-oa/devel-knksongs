@@ -15,7 +15,9 @@
     "lint": "npm run build:ts && npm run lint:raw",
     "lint:raw": "eslint .",
     "typecheck": "npm run build:ts && npm run typecheck:raw",
-    "typecheck:raw": "tsc --project tsconfig.json",
+    "typecheck:raw": "npm run typecheck:app:raw && npm run typecheck:scripts:raw",
+    "typecheck:app:raw": "tsc --project tsconfig.json",
+    "typecheck:scripts:raw": "tsc --project tsconfig.scripts.json",
     "test:unit": "npm run build:ts && npm run test:unit:raw",
     "test:unit:raw": "node --test tests/*.mjs",
     "test:e2e": "npm run build && playwright test",
@@ -25,6 +27,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.4",
     "@playwright/test": "^1.53.0",
+    "@types/node": "^24.13.3",
     "eslint": "^9.39.4",
     "globals": "^17.6.0",
     "typescript": "^6.0.3"

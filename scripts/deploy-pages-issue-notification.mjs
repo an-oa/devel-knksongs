@@ -6,9 +6,14 @@ export const DEPLOYMENT_FAILURE_LABEL = "deploy-pages-failure";
 export const DEPLOYMENT_FAILURE_MARKER = "<!-- knksongs:deploy-pages-failure -->";
 export const DEPLOYMENT_FAILURE_TITLE = "[Workflow Failure] Deploy Pages";
 
+/** @typedef {{ resolve: string, build: string, freshness: string, deploy: string }} DeploymentJobResults */
+/** @typedef {{ runNumber: string, runAttempt: string }} WorkflowRunOrder */
+/** @typedef {{ number: number, body?: string | null, labels?: Array<string | { name?: string }> }} ManagedIssue */
+
 const DEFAULT_RETRY_ATTEMPTS = 3;
 const DEFAULT_RETRY_DELAY_MS = 2_000;
 const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
+/** @type {Array<keyof DeploymentJobResults>} */
 const JOB_NAMES = ["resolve", "build", "freshness", "deploy"];
 const JOB_RESULTS = new Set(["success", "failure", "cancelled", "skipped"]);
 
@@ -77,7 +82,7 @@ export async function retryOperation(label, operation, options = {}) {
 /**
  * job結果からIssueへ反映する状態遷移を決める。
  * 古いdeploy対象によるskipは無視し、cancelは未完了としてfailure扱いにする。
- * @param {{ resolve: string, build: string, freshness: string, deploy: string }} results
+ * @param {DeploymentJobResults} results
  * @returns {"failure" | "recovery" | "noop"}
  */
 export function classifyDeploymentState(results) {
@@ -113,6 +118,32 @@ export function createRunMarker(kind, runId, runAttempt) {
 }
 
 /**
+ * workflow runの連番と再実行回数を比較する。
+ * run_numberは新規runごと、run_attemptは同じrunの再実行ごとに増加する。
+ * @param {WorkflowRunOrder} candidate
+ * @param {WorkflowRunOrder} reference
+ * @returns {boolean}
+ */
+export function isNewerWorkflowRun(candidate, reference) {
+    for (const value of [
+        candidate.runNumber,
+        candidate.runAttempt,
+        reference.runNumber,
+        reference.runAttempt
+    ]) {
+        if (!/^[1-9][0-9]*$/.test(value)) {
+            throw new Error(`Workflow run order must be a positive integer: ${value || "(empty)"}`);
+        }
+    }
+    const candidateRunNumber = BigInt(candidate.runNumber);
+    const referenceRunNumber = BigInt(reference.runNumber);
+    if (candidateRunNumber !== referenceRunNumber) {
+        return candidateRunNumber > referenceRunNumber;
+    }
+    return BigInt(candidate.runAttempt) > BigInt(reference.runAttempt);
+}
+
+/**
  * 同じworkflow runの通知を識別するmarker prefixを作る。
  * @param {"failure" | "recovery"} kind
  * @param {string} runId
@@ -140,7 +171,7 @@ function formatTimestamp(date) {
  *   runId: string,
  *   runAttempt: string,
  *   runUrl: string,
- *   results: { resolve: string, build: string, freshness: string, deploy: string }
+ *   results: DeploymentJobResults
  * }} context
  * @param {Date} [detectedAt]
  * @returns {string}
@@ -187,8 +218,8 @@ export function buildRecoveryReport(context, recoveredAt = new Date()) {
 /**
  * 専用labelと本文markerの両方を持つ自動管理Issueだけを抽出する。
  * タイトルは利用者が変更できる表示情報として識別には使わない。
- * @param {Array<{ number: number, body?: string | null, labels?: Array<string | { name?: string }> }>} issues
- * @returns {Array<{ number: number, body?: string | null, labels?: Array<string | { name?: string }> }>}
+ * @param {ManagedIssue[]} issues
+ * @returns {ManagedIssue[]}
  */
 export function selectManagedIssues(issues) {
     return issues
@@ -270,6 +301,8 @@ function findNextPageUrl(linkHeader) {
  * }} options
  * @returns {{
  *   ensureLabel: () => Promise<void>,
+ *   getLatestWorkflowRun: (workflowFile: string) => Promise<WorkflowRunOrder>,
+ *   getBranchSha: (branch: string) => Promise<string>,
  *   listOpenIssues: () => Promise<Array<*>>,
  *   createIssue: (body: string, assignee: string) => Promise<void>,
  *   addAssignee: (issueNumber: number, assignee: string) => Promise<void>,
@@ -344,6 +377,7 @@ export function createGitHubIssueClient(options) {
      */
     async function listAll(path) {
         const items = [];
+        /** @type {string | null} */
         let nextUrl = path;
         while (nextUrl) {
             const response = await request(nextUrl);
@@ -357,6 +391,43 @@ export function createGitHubIssueClient(options) {
     }
 
     return {
+        async getLatestWorkflowRun(workflowFile) {
+            const query = new URLSearchParams({ per_page: "1" });
+            const response = await request(
+                `repos/${repositoryPath}/actions/workflows/${encodeURIComponent(workflowFile)}/runs?${query}`
+            );
+            const runs = response.data !== null && typeof response.data === "object" &&
+                "workflow_runs" in response.data && Array.isArray(response.data.workflow_runs)
+                ? response.data.workflow_runs
+                : [];
+            const latestRun = runs[0];
+            if (!latestRun || typeof latestRun !== "object") {
+                throw new Error(`No workflow runs found for ${workflowFile}`);
+            }
+            if (!("run_number" in latestRun) || !("run_attempt" in latestRun)) {
+                throw new Error(`Workflow run order is missing for ${workflowFile}`);
+            }
+            return {
+                runNumber: String(latestRun.run_number),
+                runAttempt: String(latestRun.run_attempt)
+            };
+        },
+
+        async getBranchSha(branch) {
+            const response = await request(
+                `repos/${repositoryPath}/git/ref/heads/${encodeURIComponent(branch)}`
+            );
+            const sha = response.data !== null && typeof response.data === "object" &&
+                "object" in response.data && response.data.object !== null &&
+                typeof response.data.object === "object" && "sha" in response.data.object
+                ? response.data.object.sha
+                : null;
+            if (typeof sha !== "string" || !sha) {
+                throw new Error(`Branch SHA is missing for ${branch}`);
+            }
+            return sha;
+        },
+
         async ensureLabel() {
             const labelPath = `repos/${repositoryPath}/labels/${encodeURIComponent(DEPLOYMENT_FAILURE_LABEL)}`;
             try {
@@ -456,9 +527,12 @@ async function ensureRunComment(client, issue, kind, context, report, retryOptio
  *   deploySha: string,
  *   repositoryOwner: string,
  *   runId: string,
+ *   runNumber: string,
  *   runAttempt: string,
  *   runUrl: string,
- *   results: { resolve: string, build: string, freshness: string, deploy: string }
+ *   results: DeploymentJobResults,
+ *   targetBranch?: string,
+ *   workflowFile?: string
  * }} context
  * @param {ReturnType<typeof createGitHubIssueClient>} client
  * @param {{
@@ -476,6 +550,34 @@ export async function updateDeploymentFailureIssue(context, client, options = {}
 
     const now = options.now || (() => new Date());
     const retryOptions = options.retry || {};
+    const targetBranch = context.targetBranch || "main";
+    const workflowFile = context.workflowFile || "deploy-pages.yml";
+    const latestRun = await retryOperation(
+        "Check the latest Deploy Pages workflow run",
+        () => client.getLatestWorkflowRun(workflowFile),
+        retryOptions
+    );
+    if (isNewerWorkflowRun(latestRun, context)) {
+        console.log(
+            `Skip stale notification run ${context.runNumber}/${context.runAttempt}; ` +
+            `latest run is ${latestRun.runNumber}/${latestRun.runAttempt}.`
+        );
+        return "noop";
+    }
+
+    const currentBranchSha = await retryOperation(
+        `Check current ${targetBranch} commit`,
+        () => client.getBranchSha(targetBranch),
+        retryOptions
+    );
+    if (currentBranchSha !== context.deploySha) {
+        console.log(
+            `Skip stale notification target ${context.deploySha}; ` +
+            `current ${targetBranch} is ${currentBranchSha}.`
+        );
+        return "noop";
+    }
+
     await retryOperation(
         "Ensure deployment failure label",
         () => client.ensureLabel(),
@@ -484,6 +586,7 @@ export async function updateDeploymentFailureIssue(context, client, options = {}
 
     if (state === "failure") {
         const report = buildFailureReport(context, now());
+        /** @type {ManagedIssue[]} */
         let existingIssues = [];
         const created = await retryOperation(
             "Create or locate deployment failure issue",
@@ -562,6 +665,7 @@ if (import.meta.url === entryPointUrl) {
             deploySha: requireEnvironmentVariable("DEPLOY_SHA"),
             repositoryOwner: requireEnvironmentVariable("REPOSITORY_OWNER"),
             runId: requireEnvironmentVariable("GITHUB_RUN_ID"),
+            runNumber: requireEnvironmentVariable("GITHUB_RUN_NUMBER"),
             runAttempt: requireEnvironmentVariable("GITHUB_RUN_ATTEMPT"),
             runUrl: requireEnvironmentVariable("RUN_URL"),
             results: {
