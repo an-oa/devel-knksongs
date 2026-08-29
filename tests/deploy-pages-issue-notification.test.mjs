@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
     DEPLOYMENT_FAILURE_LABEL,
     DEPLOYMENT_FAILURE_MARKER,
+    DEPLOYMENT_FAILURE_TITLE,
     buildFailureReport,
     classifyDeploymentState,
     createGitHubIssueClient,
@@ -11,6 +12,7 @@ import {
     isNewerWorkflowRun,
     retryOperation,
     selectManagedIssues,
+    selectNewestWorkflowRun,
     updateDeploymentFailureIssue
 } from "../scripts/deploy-pages-issue-notification.mjs";
 
@@ -205,6 +207,14 @@ test("deploy issue ordering: compares new runs before attempts of the same run",
         ),
         false
     );
+    assert.deepEqual(
+        selectNewestWorkflowRun([
+            { runNumber: "100", runAttempt: "3" },
+            { runNumber: "101", runAttempt: "1" },
+            { runNumber: "101", runAttempt: "2" }
+        ]),
+        { runNumber: "101", runAttempt: "2" }
+    );
 });
 
 test("deploy issue API: retries temporary failures with exponential delays", async () => {
@@ -233,8 +243,8 @@ test("deploy issue API: retries temporary failures with exponential delays", asy
     assert.deepEqual(waitDelays, [10, 20]);
 });
 
-test("deploy issue API client: reads deployment guards and creates its label once", async () => {
-    /** @type {Array<{ method: string, path: string, body: Record<string, *> | null }>} */
+test("deploy issue API client: reads unordered deployment guards and creates its label once", async () => {
+    /** @type {Array<{ method: string, path: string, search: string, body: Record<string, *> | null }>} */
     const requests = [];
     let labelExists = false;
     /** @type {typeof fetch} */
@@ -243,13 +253,17 @@ test("deploy issue API client: reads deployment guards and creates its label onc
         const request = {
             method: init.method || "GET",
             path: new URL(requestUrl).pathname,
+            search: new URL(requestUrl).search,
             body: typeof init.body === "string" ? JSON.parse(init.body) : null
         };
         requests.push(request);
 
         if (request.path.endsWith("/actions/workflows/deploy-pages.yml/runs")) {
             return Response.json({
-                workflow_runs: [{ run_number: 100, run_attempt: 1 }]
+                workflow_runs: [
+                    { run_number: 99, run_attempt: 4 },
+                    { run_number: 100, run_attempt: 1 }
+                ]
             });
         }
         if (request.path.endsWith("/git/ref/heads/main")) {
@@ -283,18 +297,107 @@ test("deploy issue API client: reads deployment guards and creates its label onc
     await client.ensureLabel();
     await client.ensureLabel();
 
-    assert.deepEqual(requests.map(({ method, path }) => [method, path]), [
-        ["GET", "/repos/an-oa/knksongs/actions/workflows/deploy-pages.yml/runs"],
-        ["GET", "/repos/an-oa/knksongs/git/ref/heads/main"],
-        ["GET", `/repos/an-oa/knksongs/labels/${DEPLOYMENT_FAILURE_LABEL}`],
-        ["POST", "/repos/an-oa/knksongs/labels"],
-        ["GET", `/repos/an-oa/knksongs/labels/${DEPLOYMENT_FAILURE_LABEL}`]
+    assert.deepEqual(requests.map(({ method, path, search }) => [method, path, search]), [
+        ["GET", "/repos/an-oa/knksongs/actions/workflows/deploy-pages.yml/runs", "?per_page=100"],
+        ["GET", "/repos/an-oa/knksongs/git/ref/heads/main", ""],
+        ["GET", `/repos/an-oa/knksongs/labels/${DEPLOYMENT_FAILURE_LABEL}`, ""],
+        ["POST", "/repos/an-oa/knksongs/labels", ""],
+        ["GET", `/repos/an-oa/knksongs/labels/${DEPLOYMENT_FAILURE_LABEL}`, ""]
     ]);
     assert.deepEqual(requests[3].body, {
         name: DEPLOYMENT_FAILURE_LABEL,
         color: "D73A4A",
         description: "Open while the Deploy Pages workflow is failing"
     });
+});
+
+test("deploy issue API client: uses the expected Issue paths, methods, and payloads", async () => {
+    /** @type {Array<{ method: string, path: string, search: string, body: Record<string, *> | null }>} */
+    const requests = [];
+    /** @type {typeof fetch} */
+    const fetchImpl = async (url, init = {}) => {
+        const requestUrl = url instanceof Request ? url.url : String(url);
+        const parsedUrl = new URL(requestUrl);
+        const request = {
+            method: init.method || "GET",
+            path: parsedUrl.pathname,
+            search: parsedUrl.search,
+            body: typeof init.body === "string" ? JSON.parse(init.body) : null
+        };
+        requests.push(request);
+
+        if (request.method === "GET" && request.path.endsWith("/issues")) {
+            return Response.json([
+                { number: 7, body: DEPLOYMENT_FAILURE_MARKER, labels: [] },
+                { number: 8, pull_request: { url: "https://api.github.test/pulls/8" } }
+            ]);
+        }
+        if (request.method === "GET" && request.path.endsWith("/comments")) {
+            return Response.json([{ body: "existing comment" }]);
+        }
+        return Response.json({}, { status: request.method === "POST" ? 201 : 200 });
+    };
+    const client = createGitHubIssueClient({
+        apiUrl: "https://api.github.test",
+        repository: "an-oa/knksongs",
+        token: "test-token",
+        requestTimeoutMs: 100,
+        createTimeoutSignal: () => new AbortController().signal,
+        fetchImpl
+    });
+
+    assert.deepEqual(await client.listOpenIssues(), [
+        { number: 7, body: DEPLOYMENT_FAILURE_MARKER, labels: [] }
+    ]);
+    await client.createIssue("failure report", "an-oa");
+    await client.addAssignee(7, "an-oa");
+    assert.deepEqual(await client.listComments(7), [{ body: "existing comment" }]);
+    await client.commentIssue(7, "recovery report");
+    await client.closeIssue(7);
+
+    assert.deepEqual(requests, [
+        {
+            method: "GET",
+            path: "/repos/an-oa/knksongs/issues",
+            search: `?state=open&labels=${DEPLOYMENT_FAILURE_LABEL}&per_page=100`,
+            body: null
+        },
+        {
+            method: "POST",
+            path: "/repos/an-oa/knksongs/issues",
+            search: "",
+            body: {
+                title: DEPLOYMENT_FAILURE_TITLE,
+                body: `${DEPLOYMENT_FAILURE_MARKER}\nfailure report`,
+                assignees: ["an-oa"],
+                labels: [DEPLOYMENT_FAILURE_LABEL]
+            }
+        },
+        {
+            method: "POST",
+            path: "/repos/an-oa/knksongs/issues/7/assignees",
+            search: "",
+            body: { assignees: ["an-oa"] }
+        },
+        {
+            method: "GET",
+            path: "/repos/an-oa/knksongs/issues/7/comments",
+            search: "?per_page=100",
+            body: null
+        },
+        {
+            method: "POST",
+            path: "/repos/an-oa/knksongs/issues/7/comments",
+            search: "",
+            body: { body: "recovery report" }
+        },
+        {
+            method: "PATCH",
+            path: "/repos/an-oa/knksongs/issues/7",
+            search: "",
+            body: { state: "closed", state_reason: "completed" }
+        }
+    ]);
 });
 
 test("deploy issue update: ignores an older run even when it targets the same commit", async () => {

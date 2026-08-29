@@ -13,6 +13,7 @@ export const DEPLOYMENT_FAILURE_TITLE = "[Workflow Failure] Deploy Pages";
 const DEFAULT_RETRY_ATTEMPTS = 3;
 const DEFAULT_RETRY_DELAY_MS = 2_000;
 const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
+const WORKFLOW_RUN_PAGE_SIZE = 100;
 /** @type {Array<keyof DeploymentJobResults>} */
 const JOB_NAMES = ["resolve", "build", "freshness", "deploy"];
 const JOB_RESULTS = new Set(["success", "failure", "cancelled", "skipped"]);
@@ -141,6 +142,20 @@ export function isNewerWorkflowRun(candidate, reference) {
         return candidateRunNumber > referenceRunNumber;
     }
     return BigInt(candidate.runAttempt) > BigInt(reference.runAttempt);
+}
+
+/**
+ * APIの配列順序に依存せず、run番号とattemptが最大のworkflow runを選ぶ。
+ * 境界条件を単体テストするためexportしている。
+ * @param {WorkflowRunOrder[]} workflowRuns
+ * @returns {WorkflowRunOrder}
+ */
+export function selectNewestWorkflowRun(workflowRuns) {
+    if (workflowRuns.length === 0) throw new Error("No workflow runs found");
+    return workflowRuns.slice(1).reduce(
+        (newest, candidate) => isNewerWorkflowRun(candidate, newest) ? candidate : newest,
+        workflowRuns[0]
+    );
 }
 
 /**
@@ -392,25 +407,29 @@ export function createGitHubIssueClient(options) {
 
     return {
         async getLatestWorkflowRun(workflowFile) {
-            const query = new URLSearchParams({ per_page: "1" });
+            const query = new URLSearchParams({ per_page: String(WORKFLOW_RUN_PAGE_SIZE) });
             const response = await request(
                 `repos/${repositoryPath}/actions/workflows/${encodeURIComponent(workflowFile)}/runs?${query}`
             );
+            /** @type {unknown[]} */
             const runs = response.data !== null && typeof response.data === "object" &&
                 "workflow_runs" in response.data && Array.isArray(response.data.workflow_runs)
                 ? response.data.workflow_runs
                 : [];
-            const latestRun = runs[0];
-            if (!latestRun || typeof latestRun !== "object") {
+            const runOrders = runs.map((run) => {
+                if (!run || typeof run !== "object" ||
+                    !("run_number" in run) || !("run_attempt" in run)) {
+                    throw new Error(`Workflow run order is missing for ${workflowFile}`);
+                }
+                return {
+                    runNumber: String(run.run_number),
+                    runAttempt: String(run.run_attempt)
+                };
+            });
+            if (runOrders.length === 0) {
                 throw new Error(`No workflow runs found for ${workflowFile}`);
             }
-            if (!("run_number" in latestRun) || !("run_attempt" in latestRun)) {
-                throw new Error(`Workflow run order is missing for ${workflowFile}`);
-            }
-            return {
-                runNumber: String(latestRun.run_number),
-                runAttempt: String(latestRun.run_attempt)
-            };
+            return selectNewestWorkflowRun(runOrders);
         },
 
         async getBranchSha(branch) {
