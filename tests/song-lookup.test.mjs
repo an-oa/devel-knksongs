@@ -18,7 +18,7 @@ function createLookupUiState() {
     };
 }
 
-test("song lookup: resolves bookmark and song keys without resolving legacy numbers", () => {
+test("song lookup: resolves bookmark and song keys", () => {
     const lookupUi = createLookupUiState();
     const rows = [
         {
@@ -35,7 +35,6 @@ test("song lookup: resolves bookmark and song keys without resolving legacy numb
 
     assert.equal(resolveSongRef(lookupUi, rows, "videoA::1"), rows[0]);
     assert.equal(resolveSongRef(lookupUi, rows, "arch2::2"), rows[1]);
-    assert.equal(resolveSongRef(lookupUi, rows, 1), null);
     assert.equal(resolveSongRef(lookupUi, rows, "missing"), null);
 });
 

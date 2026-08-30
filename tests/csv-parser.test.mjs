@@ -140,3 +140,28 @@ test("csv: invalid non-empty URLs stop conversion and identify the master row", 
         /CSV 3行目「Broken Song」: url host must be a supported YouTube host/
     );
 });
+
+test("csv: archiveOrder must contain an integer only", () => {
+    const csv = [
+        "#,配信日,配信上の立場,画面の向き,公開範囲,形態,歌枠リレー？,ハモリあり？,##,曲名,アーティスト名,キョクメイ,アーティストメイ,URL,終了時刻,メモ",
+        "1,2026/03/11,,横,全体,配信,,,1st,Broken Order,Artist,ブロークンオーダー,アーティスト,https://www.youtube.com/watch?v=abc123def45,,"
+    ].join("\n");
+
+    assert.throws(
+        () => parseCsvToSongs(csv),
+        /CSV 2行目「Broken Order」: archiveOrder must be an integer/
+    );
+});
+
+test("csv: duplicate song keys report both source rows", () => {
+    const csv = [
+        "#,配信日,配信上の立場,画面の向き,公開範囲,形態,歌枠リレー？,ハモリあり？,##,曲名,アーティスト名,キョクメイ,アーティストメイ,URL,終了時刻,メモ",
+        "1,2026/03/11,,横,全体,配信,,,1,First Take,Artist,ファーストテイク,アーティスト,https://www.youtube.com/watch?v=abc123def45,,",
+        "1,2026/03/11,,横,全体,配信,,,1,Retake,Artist,リテイク,アーティスト,https://www.youtube.com/watch?v=xyz123def45,,"
+    ].join("\n");
+
+    assert.throws(
+        () => parseCsvToSongs(csv),
+        /CSV 3行目「Retake」: songKey .* duplicates CSV 2行目「First Take」/
+    );
+});

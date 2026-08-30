@@ -5,6 +5,7 @@ import { scheduleScrollElementIntoView } from "../lib/results-scroll.mjs";
 import { createBookmarkDragReorderController } from "../lib/render/drag-reorder.mjs";
 import { applyMasonryLayout } from "../lib/render/masonry-layout.mjs";
 import { createResultTailObserver } from "../lib/render/result-tail-observer.mjs";
+import { getBookmarkSongRef } from "../lib/song-identity.mjs";
 import {
     createYoutubePlaybackStartResult,
     YOUTUBE_PLAYBACK_START_STATUS
@@ -224,19 +225,6 @@ export function createRenderController({
     }
 
     /**
-     * 行データからブックマーク保存に使う参照キーを返す。
-     * @param {Song | null | undefined} row
-     * @returns {string}
-     */
-    function getBookmarkSongRef(row) {
-        if (!row || typeof row !== "object") return "";
-        if (typeof row.bookmarkSongKey === "string" && row.bookmarkSongKey) {
-            return row.bookmarkSongKey;
-        }
-        return typeof row.songKey === "string" ? row.songKey : "";
-    }
-
-    /**
      * 曲行からサムネイル/埋め込み再生に必要な YouTube 情報を組み立てる。
      * @param {Song} row
      * @returns {YoutubeTarget}
@@ -377,7 +365,7 @@ export function createRenderController({
      */
     function getCardEntryBySongKey(songKey) {
         if (!songKey) return null;
-        return renderUi.cardEntriesBySourceKey.get(`song:${songKey}`) || null;
+        return renderUi.cardEntriesBySongKey.get(songKey) || null;
     }
 
     /**
@@ -482,13 +470,13 @@ export function createRenderController({
      * @returns {ResultNodeBuildResult}
      */
     function buildResultNodes(results: Song[]): ResultNodeBuildResult {
-        const nextEntriesBySourceKey = new Map();
+        const nextEntriesBySongKey = new Map<string, RenderCardEntry>();
         const entries = [];
         const nodes = [];
         for (let i = 0; i < results.length; i++) {
             const row = results[i];
-            const rowKey = `song:${row.songKey}`;
-            let entry = renderUi.cardEntriesBySourceKey.get(rowKey);
+            const rowKey = row.songKey;
+            let entry = renderUi.cardEntriesBySongKey.get(rowKey);
             if (!entry) entry = createCardElements();
 
             entry.card.dataset.songKey = row.songKey;
@@ -499,11 +487,11 @@ export function createRenderController({
             entry.dragHandle.draggable = isBookmarkActive;
 
             updateCardFromRow(entry, results[i], i);
-            nextEntriesBySourceKey.set(rowKey, entry);
+            nextEntriesBySongKey.set(rowKey, entry);
             entries.push(entry);
             nodes.push(entry.card);
         }
-        renderUi.cardEntriesBySourceKey = nextEntriesBySourceKey;
+        renderUi.cardEntriesBySongKey = nextEntriesBySongKey;
         return { nodes, entries };
     }
 

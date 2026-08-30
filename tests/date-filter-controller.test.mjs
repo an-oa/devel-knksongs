@@ -36,7 +36,7 @@ function makeRow(input) {
     const songKey = input.songKey ?? `song-${++autoSongId}`;
     return {
         archiveId: input.archiveId ?? "",
-        archiveOrder: input.archiveOrder ?? null,
+        archiveOrder: input.archiveOrder ?? 1,
         songKey,
         bookmarkSongKey: input.bookmarkSongKey ?? songKey,
         dateKey: input.dateKey ?? null,

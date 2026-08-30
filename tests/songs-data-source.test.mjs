@@ -85,7 +85,7 @@ function createSongsJson(
             archiveOrder: 1,
             videoId: "abc123def45",
             songKey,
-            bookmarkSongKey: `abc123def45::${songKey}`,
+            bookmarkSongKey: "abc123def45::1",
             legacySongKey: `${songKey}::https://www.youtube.com/watch?v=abc123def45&t=10s`,
             format: "配信",
             streamRole: "",

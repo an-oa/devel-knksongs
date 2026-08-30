@@ -3,10 +3,10 @@ import assert from "node:assert/strict";
 import {
     buildStoredBookmarksPayload,
     migrateLegacyBookmarkSongRefsToCurrent,
-    normalizeLegacySongRefToCurrent,
     parseStoredBookmarksPayload,
     sanitizeBookmarks
 } from "../_build/app/lib/storage/bookmark-schema.mjs";
+import { normalizeLegacySongRefToCurrent } from "../_build/app/lib/song-identity.mjs";
 
 test("bookmark storage schema: parses legacy and versioned payloads with sanitization", () => {
     assert.deepEqual(
@@ -30,7 +30,7 @@ test("bookmark storage schema: parses legacy and versioned payloads with sanitiz
             bookmarks: {
                 keep: {
                     name: "Saved List",
-                    songs: ["song-1", 4],
+                    songs: ["song-1"],
                     createdAt: 1710000000000
                 }
             }
@@ -67,8 +67,8 @@ test("bookmark storage schema: builds versioned storage payload", () => {
         }
     };
 
-    assert.deepEqual(buildStoredBookmarksPayload(bookmarks, 2), {
-        version: 2,
+    assert.deepEqual(buildStoredBookmarksPayload(bookmarks, 3), {
+        version: 3,
         bookmarks
     });
 });
@@ -104,7 +104,7 @@ test("bookmark storage migration: rewrites legacy refs to current bookmark song 
 
     assert.equal(result.updated, true);
     assert.deepEqual(result.changedBookmarkIds, ["p_1"]);
-    assert.deepEqual(bookmarks.p_1.songs, ["videoA::1", "videoB::2", 0, "missing"]);
+    assert.deepEqual(bookmarks.p_1.songs, ["videoA::1", "videoB::2", "missing"]);
     assert.deepEqual(result.changes, [
         {
             bookmarkId: "p_1",
@@ -115,7 +115,7 @@ test("bookmark storage migration: rewrites legacy refs to current bookmark song 
                 0,
                 "missing"
             ],
-            after: ["videoA::1", "videoB::2", 0, "missing"]
+            after: ["videoA::1", "videoB::2", "missing"]
         }
     ]);
 });
@@ -161,7 +161,7 @@ test("bookmark storage migration: keeps current refs without marking changes", (
 
 test("bookmark storage schema: normalizes legacy song refs by archive and order", () => {
     assert.equal(normalizeLegacySongRefToCurrent(" arch1 :: 001 :: https://youtu.be/videoA"), "arch1::1");
-    assert.equal(normalizeLegacySongRefToCurrent("arch1::not-number"), "arch1::");
+    assert.equal(normalizeLegacySongRefToCurrent("arch1::not-number"), null);
     assert.equal(normalizeLegacySongRefToCurrent("::1"), null);
     assert.equal(normalizeLegacySongRefToCurrent(null), null);
 });

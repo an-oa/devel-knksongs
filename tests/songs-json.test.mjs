@@ -28,10 +28,9 @@ test("songs json: builds and parses current schema payload", () => {
     });
 });
 
-test("songs json: accepts nullable numeric fields and empty orientation", () => {
+test("songs json: accepts nullable date and end fields with empty orientation", () => {
     const song = createSongFixture({
         dateKey: null,
-        archiveOrder: null,
         endSeconds: null,
         videoOrientation: ""
     });
@@ -65,6 +64,7 @@ test("songs json: rejects non-object songs and invalid field types", () => {
         [null, /songs\[0\] must be an object/],
         [createSongFixture({ title: 42 }), /songs\[0\]\.title must be a string/],
         [createSongFixture({ dateKey: "20260311" }), /songs\[0\]\.dateKey must be a finite number or null/],
+        [createSongFixture({ archiveOrder: null }), /songs\[0\]\.archiveOrder must be an integer/],
         [createSongFixture({ isRelay: 0 }), /songs\[0\]\.isRelay must be a boolean/],
         [createSongFixture({ videoOrientation: "square" }), /songs\[0\]\.videoOrientation must be one of/]
     ];
@@ -78,6 +78,43 @@ test("songs json: rejects non-object songs and invalid field types", () => {
         };
         assert.throws(() => parseSongsJsonPayload(JSON.stringify(payload)), expected);
     }
+});
+
+test("songs json: rejects fields outside the current Song schema", () => {
+    const payload = {
+        schemaVersion: SONGS_JSON_SCHEMA_VERSION,
+        contentHash: "sha256:test",
+        generatedAt: GENERATED_AT,
+        songs: [{ ...createSongFixture(), sourceIndex: 12 }]
+    };
+
+    assert.throws(
+        () => parseSongsJsonPayload(JSON.stringify(payload)),
+        /songs\[0\]\.sourceIndex is not allowed/
+    );
+});
+
+test("songs json: rejects duplicate song and bookmark keys", () => {
+    const first = createSongFixture();
+    const duplicateSongKey = createSongFixture({
+        videoId: "xyz123def45",
+        bookmarkSongKey: "xyz123def45::1",
+        title: "Retake"
+    });
+    const duplicateBookmarkKey = createSongFixture({
+        archiveId: "archive-2",
+        songKey: "archive-2::1",
+        legacySongKey: "archive-2::1::https://www.youtube.com/watch?v=abc123def45&t=10s"
+    });
+
+    assert.throws(
+        () => buildSongsJsonPayload([first, duplicateSongKey], "sha256:test", GENERATED_AT),
+        /songs\[1\]\.songKey .* duplicates .*songs\[0\]\.songKey/
+    );
+    assert.throws(
+        () => buildSongsJsonPayload([first, duplicateBookmarkKey], "sha256:test", GENERATED_AT),
+        /songs\[1\]\.bookmarkSongKey .* duplicates .*songs\[0\]\.bookmarkSongKey/
+    );
 });
 
 test("songs json: builder rejects structurally incomplete songs", () => {

@@ -22,7 +22,7 @@ type BookmarkDragEvent = {
 
 type BookmarkDragReorderControllerInput = {
     data: BookmarkDragReorderDataState;
-    getBookmarkSongRef: (row: Song) => string | number | null | undefined;
+    getBookmarkSongRef: (row: Song) => string;
     saveBookmarks: () => void;
     updateDisplay: () => void;
 };

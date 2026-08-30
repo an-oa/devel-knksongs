@@ -1,3 +1,5 @@
+import { validateSongIdentities, type SongIdentityIssue } from "./song-identity.mjs";
+
 export const SONGS_JSON_SCHEMA_VERSION = 3;
 
 export type SongsJsonArtifactMetadata = {
@@ -16,13 +18,13 @@ export type SongsJsonArtifactFreshness =
     | "candidate-older"
     | "incomparable";
 
-type SongFieldKind = "string" | "number" | "nullable-number" | "boolean" | "video-orientation";
+type SongFieldKind = "string" | "integer" | "nullable-number" | "boolean" | "video-orientation";
 
 const SONG_FIELD_KINDS = {
     date: "string",
     dateKey: "nullable-number",
     archiveId: "string",
-    archiveOrder: "nullable-number",
+    archiveOrder: "integer",
     videoId: "string",
     songKey: "string",
     bookmarkSongKey: "string",
@@ -107,7 +109,7 @@ function parseSupportedSchemaVersion(schemaVersion: unknown): typeof SONGS_JSON_
  */
 function matchesSongFieldKind(fieldKind: SongFieldKind, value: unknown): boolean {
     if (fieldKind === "string") return typeof value === "string";
-    if (fieldKind === "number") return typeof value === "number" && Number.isFinite(value);
+    if (fieldKind === "integer") return typeof value === "number" && Number.isSafeInteger(value);
     if (fieldKind === "nullable-number") {
         return value === null || (typeof value === "number" && Number.isFinite(value));
     }
@@ -122,7 +124,7 @@ function matchesSongFieldKind(fieldKind: SongFieldKind, value: unknown): boolean
  */
 function describeSongFieldKind(fieldKind: SongFieldKind): string {
     if (fieldKind === "string") return "a string";
-    if (fieldKind === "number") return "a finite number";
+    if (fieldKind === "integer") return "an integer";
     if (fieldKind === "nullable-number") return "a finite number or null";
     if (fieldKind === "boolean") return "a boolean";
     return 'one of "", "vertical", or "landscape"';
@@ -140,6 +142,11 @@ function assertSongStructure(song: unknown, index: number): asserts song is Song
         throw new Error(`${location} must be an object`);
     }
     const songRecord = song as Record<string, unknown>;
+    for (const fieldName of Object.keys(songRecord)) {
+        if (!Object.hasOwn(SONG_FIELD_KINDS, fieldName)) {
+            throw new Error(`${location}.${fieldName} is not allowed`);
+        }
+    }
     for (const fieldName of Object.keys(SONG_FIELD_KINDS) as (keyof Song)[]) {
         if (!Object.hasOwn(songRecord, fieldName)) {
             throw new Error(`${location}.${fieldName} is required`);
@@ -149,6 +156,19 @@ function assertSongStructure(song: unknown, index: number): asserts song is Song
             throw new Error(`${location}.${fieldName} must be ${describeSongFieldKind(fieldKind)}`);
         }
     }
+}
+
+/** 曲識別子の問題をJSON配列位置付きの診断へ変換する。 */
+function formatSongIdentityIssue(issue: SongIdentityIssue): string {
+    const location = `songs json payload songs[${issue.index}]`;
+    if (issue.kind === "invalid-archive-order") {
+        return `${location}.archiveOrder must be an integer`;
+    }
+    if (issue.kind === "mismatched-key") {
+        return `${location}.${issue.fieldName} must equal ${JSON.stringify(issue.expected)}`;
+    }
+    return `${location}.${issue.fieldName} ${JSON.stringify(issue.value)} duplicates ` +
+        `songs json payload songs[${issue.firstIndex}].${issue.fieldName}`;
 }
 
 /**
@@ -161,6 +181,10 @@ function parseSongsArray(songs: unknown): Song[] {
         throw new Error("songs json payload requires a songs array");
     }
     songs.forEach((song, index) => assertSongStructure(song, index));
+    const identityIssue = validateSongIdentities(songs)[0];
+    if (identityIssue) {
+        throw new Error(formatSongIdentityIssue(identityIssue));
+    }
     return songs;
 }
 

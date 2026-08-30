@@ -6,7 +6,7 @@ import {
 
 type BookmarkImportEntry = {
     name?: string;
-    songs?: Array<string | number>;
+    songs?: string[];
 };
 
 type BookmarkImportLimits = {
@@ -163,7 +163,7 @@ export function exportBookmarksAsJsonText(bookmarks, version) {
     const payload = buildStoredBookmarksPayload(safeBookmarks, version);
     return buildActionOk({
         text: `${JSON.stringify(payload, null, 2)}\n`,
-        bookmarkCount: Object.keys(safeBookmarks).length,
-        songCount: countBookmarkSongs(safeBookmarks)
+        bookmarkCount: Object.keys(payload.bookmarks).length,
+        songCount: countBookmarkSongs(payload.bookmarks)
     });
 }

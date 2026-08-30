@@ -52,7 +52,7 @@ function setupStorageController({
         data,
         constants: {
             storageKey: "bookmarksTest",
-            storageVersion: 2
+            storageVersion: 3
         }
     });
     const controller = createStorageController({
@@ -64,7 +64,7 @@ function setupStorageController({
             DEFAULT_FORMATS: [],
             SEARCH_STATE_KEY: "searchStateTest",
             BOOKMARK_STORAGE_KEY: "bookmarksTest",
-            BOOKMARK_STORAGE_VERSION: 2,
+            BOOKMARK_STORAGE_VERSION: 3,
             MAX_BOOKMARK_COUNT: maxBookmarkCount,
             MAX_SONGS_PER_BOOKMARK: maxSongsPerBookmark,
             MAX_BOOKMARK_NAME_LENGTH: maxBookmarkNameLength
@@ -147,7 +147,7 @@ test("restorePersistedState: invalid bookmark payload is sanitized and deduplica
         assert.deepEqual(data.bookmarks, {
             keep: {
                 name: "Saved List",
-                songs: ["song-1", 4],
+                songs: ["song-1"],
                 createdAt: 1710000000000
             }
         });
@@ -234,7 +234,7 @@ test("migrateLegacyBookmarkSongRefs: rewrites old songKey refs to bookmarkSongKe
         assert.deepEqual(
             JSON.parse(globalThis.localStorage.getItem("bookmarksTest")),
             {
-                version: 2,
+                version: 3,
                 bookmarks: data.bookmarks
             }
         );
@@ -276,7 +276,7 @@ test("migrateLegacyBookmarkSongRefs: preserves current bookmarkSongKey refs and 
         assert.deepEqual(
             JSON.parse(globalThis.localStorage.getItem("bookmarksTest")),
             {
-                version: 2,
+                version: 3,
                 bookmarks: data.bookmarks
             }
         );
@@ -331,7 +331,7 @@ test("importBookmarksFromJsonText: replaces current bookmarks and clears missing
         assert.equal(getRenderCount(), 1);
         assert.equal(getScheduleCount(), 1);
         assert.deepEqual(JSON.parse(globalThis.localStorage.getItem("bookmarksTest")), {
-            version: 2,
+            version: 3,
             bookmarks: data.bookmarks
         });
         assert.equal(
@@ -430,7 +430,7 @@ test("migrateLegacyBookmarkSongRefs: emits opt-in debug logs when migration runs
             "start bookmark ref migration",
             {
                 storedVersion: 1,
-                targetVersion: 2,
+                targetVersion: 3,
                 bookmarkCount: 1,
                 songRowCount: 1
             }
@@ -449,7 +449,7 @@ test("migrateLegacyBookmarkSongRefs: emits opt-in debug logs when migration runs
             "saved migrated bookmarks payload",
             {
                 changedBookmarkIds: ["p_1"],
-                upgradedVersion: 2
+                upgradedVersion: 3
             }
         ]);
     } finally {

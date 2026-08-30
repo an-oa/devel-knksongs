@@ -179,7 +179,7 @@ function createBookmarkHarness(input) {
             calls.exportBookmarkCount += 1;
             return options.onExportBookmarksResult || {
                 ok: true,
-                text: "{\"version\":2,\"bookmarks\":{}}\n"
+                text: "{\"version\":3,\"bookmarks\":{}}\n"
             };
         },
         onPreviewBookmarkImport(text) {
@@ -528,7 +528,7 @@ test("bookmark ui: export button saves the JSON payload with a default filename"
 
         assert.equal(calls.exportBookmarkCount, 1);
         assert.equal(calls.savedFiles.length, 1);
-        assert.equal(calls.savedFiles[0].text, "{\"version\":2,\"bookmarks\":{}}\n");
+        assert.equal(calls.savedFiles[0].text, "{\"version\":3,\"bookmarks\":{}}\n");
         assert.match(calls.savedFiles[0].fileName, /^knksongs-bookmarks-\d{8}\.json$/);
         assert.equal(calls.savedFiles[0].mimeType, "application/json");
         assert.equal(ui.el.bookmarkPanelError.hidden, true);

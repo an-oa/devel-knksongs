@@ -1,4 +1,5 @@
 import type { LookupUiRuntimeState } from "../state.types";
+import { buildSongReferenceIndex } from "./song-identity.mjs";
 
 /**
  * 曲参照用の検索マップが最新の曲配列を指しているかを返す。
@@ -23,13 +24,9 @@ export function ensureSongLookupMaps(
     const rows = Array.isArray(songRows) ? songRows : [];
     if (hasCurrentSongLookupMaps(lookupUi, rows)) return;
 
-    lookupUi.songMapByBookmarkKey = new Map();
-    lookupUi.songMapByKey = new Map(rows.map((row) => [row.songKey, row]));
-    rows.forEach((row) => {
-        if (typeof row.bookmarkSongKey === "string" && row.bookmarkSongKey) {
-            lookupUi.songMapByBookmarkKey.set(row.bookmarkSongKey, row);
-        }
-    });
+    const referenceIndex = buildSongReferenceIndex(rows);
+    lookupUi.songMapByBookmarkKey = referenceIndex.songByBookmarkKey;
+    lookupUi.songMapByKey = referenceIndex.songByKey;
     lookupUi.songLookupSourceRef = rows;
 }
 
@@ -39,7 +36,7 @@ export function ensureSongLookupMaps(
 export function resolveSongRef(
     lookupUi: LookupUiRuntimeState,
     songRows: Song[],
-    songRef: string | number | null | undefined
+    songRef: string | null | undefined
 ): Song | null {
     ensureSongLookupMaps(lookupUi, songRows);
     if (typeof songRef === "string") {
@@ -54,7 +51,7 @@ export function resolveSongRef(
 export function resolveSongRefs(
     lookupUi: LookupUiRuntimeState,
     songRows: Song[],
-    songRefs: Array<string | number> | null | undefined
+    songRefs: string[] | null | undefined
 ): Song[] {
     const refs = Array.isArray(songRefs) ? songRefs : [];
     const resolvedSongs: Song[] = [];

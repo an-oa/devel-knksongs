@@ -53,7 +53,7 @@ function createRenderUiState(input) {
             scrollObserver: input.scrollObserver ?? null
         },
         render: {
-            cardEntriesBySourceKey: input.cardEntriesBySourceKey ?? new Map()
+            cardEntriesBySongKey: input.cardEntriesBySongKey ?? new Map()
         },
         lookup: {
             songMapByBookmarkKey: new Map(),
@@ -144,7 +144,7 @@ test("render: active card kept in next nodes does not stop playback", () => {
         });
 
         controller.updateDisplay();
-        const entry = ui.render.cardEntriesBySourceKey.get(`song:${row.songKey}`);
+        const entry = ui.render.cardEntriesBySongKey.get(row.songKey);
         assert.ok(entry);
 
         ui.playback.activeThumb = entry.thumbDiv;
@@ -186,7 +186,7 @@ test("render: active card hidden from next nodes stops playback", () => {
         });
 
         controller.updateDisplay();
-        const entryA = ui.render.cardEntriesBySourceKey.get(`song:${rowA.songKey}`);
+        const entryA = ui.render.cardEntriesBySongKey.get(rowA.songKey);
         assert.ok(entryA);
         ui.playback.activeThumb = entryA.thumbDiv;
         ui.playback.activeThumb.appendChild(document.createElement("iframe"));
@@ -267,8 +267,8 @@ test("render: cards keep fixed columns while preserving DOM order", () => {
         ui.el.resultList._rect = { top: 0, bottom: 200, left: 0, right: 700, width: 700, height: 200 };
 
         controller.updateDisplay();
-        const entryA = ui.render.cardEntriesBySourceKey.get(`song:${rowA.songKey}`);
-        const entryB = ui.render.cardEntriesBySourceKey.get(`song:${rowB.songKey}`);
+        const entryA = ui.render.cardEntriesBySongKey.get(rowA.songKey);
+        const entryB = ui.render.cardEntriesBySongKey.get(rowB.songKey);
         assert.equal(ui.el.resultList.children[0], entryA.card);
         assert.equal(ui.el.resultList.children[1], entryB.card);
         assert.equal(entryA.card.style.width, "344px");
@@ -315,10 +315,10 @@ test("render: card height changes only shift cards in the same column", () => {
         ui.el.resultList._rect = { top: 0, bottom: 200, left: 0, right: 700, width: 700, height: 200 };
 
         controller.updateDisplay();
-        const entryA = ui.render.cardEntriesBySourceKey.get("song:a::1");
-        const entryB = ui.render.cardEntriesBySourceKey.get("song:b::2");
-        const entryC = ui.render.cardEntriesBySourceKey.get("song:c::3");
-        const entryD = ui.render.cardEntriesBySourceKey.get("song:d::4");
+        const entryA = ui.render.cardEntriesBySongKey.get("a::1");
+        const entryB = ui.render.cardEntriesBySongKey.get("b::2");
+        const entryC = ui.render.cardEntriesBySongKey.get("c::3");
+        const entryD = ui.render.cardEntriesBySongKey.get("d::4");
         assert.ok(entryA);
         assert.ok(entryB);
         assert.ok(entryC);
@@ -372,7 +372,7 @@ test("render: refreshLayout shrinks container height after card height decreases
         });
 
         controller.updateDisplay();
-        const entry = ui.render.cardEntriesBySourceKey.get(`song:${row.songKey}`);
+        const entry = ui.render.cardEntriesBySongKey.get(row.songKey);
         entry.card._scrollHeight = 400;
         controller.refreshLayout();
         assert.equal(ui.el.resultList.style.height, "400px");
@@ -418,8 +418,8 @@ test("render: adds footer tags for collaboration, relay, and harmony", () => {
 
         controller.updateDisplay();
 
-        const collabEntry = ui.render.cardEntriesBySourceKey.get("song:song:collab");
-        const soloEntry = ui.render.cardEntriesBySourceKey.get("song:song:solo");
+        const collabEntry = ui.render.cardEntriesBySongKey.get("song:collab");
+        const soloEntry = ui.render.cardEntriesBySongKey.get("song:solo");
         const collabTags = Array.from(collabEntry.card.querySelectorAll(".tag")).map((tag) => tag.textContent);
         const soloTags = Array.from(soloEntry.card.querySelectorAll(".tag")).map((tag) => tag.textContent);
 
@@ -517,7 +517,7 @@ test("render: playSongByKey expands display limit and starts playback for hidden
         assert.deepEqual(playCalls[0].options, {
             playbackMode: "autoplay"
         });
-        const entry = ui.render.cardEntriesBySourceKey.get("song:song:3");
+        const entry = ui.render.cardEntriesBySongKey.get("song:3");
         assert.ok(entry);
         assert.equal(playCalls[0].thumbDiv, entry.thumbDiv);
     } finally {
@@ -853,7 +853,7 @@ test("render: drag handle is bookmark-only and reorder works in both directions 
         });
 
         controller.updateDisplay();
-        const normalEntryA = ui.render.cardEntriesBySourceKey.get(`song:${rowA.songKey}`);
+        const normalEntryA = ui.render.cardEntriesBySongKey.get(rowA.songKey);
         assert.ok(normalEntryA);
         assert.equal(normalEntryA.dragHandle.hidden, true);
         assert.equal(normalEntryA.dragHandle.draggable, false);
@@ -862,8 +862,8 @@ test("render: drag handle is bookmark-only and reorder works in both directions 
 
         data.activeBookmark = "bm1";
         controller.updateDisplay();
-        const entryA = ui.render.cardEntriesBySourceKey.get(`song:${rowA.songKey}`);
-        const entryB = ui.render.cardEntriesBySourceKey.get(`song:${rowB.songKey}`);
+        const entryA = ui.render.cardEntriesBySongKey.get(rowA.songKey);
+        const entryB = ui.render.cardEntriesBySongKey.get(rowB.songKey);
         assert.ok(entryA);
         assert.ok(entryB);
         assert.equal(entryA.dragHandle.hidden, false);
@@ -939,8 +939,8 @@ test("render: active playback card can move back left without jumping to the end
         });
 
         controller.updateDisplay();
-        const entryA = ui.render.cardEntriesBySourceKey.get(`song:${rowA.songKey}`);
-        const entryB = ui.render.cardEntriesBySourceKey.get(`song:${rowB.songKey}`);
+        const entryA = ui.render.cardEntriesBySongKey.get(rowA.songKey);
+        const entryB = ui.render.cardEntriesBySongKey.get(rowB.songKey);
         assert.ok(entryA);
         assert.ok(entryB);
 
