@@ -80,6 +80,16 @@ test("bookmark storage schema: rejects future payloads without normalizing their
     });
     assert.equal(raw.bookmarks.future.name, " Future ");
     assert.deepEqual(raw.bookmarks.future.songs, ["song-1", "song-1"]);
+
+    assert.deepEqual(parseStoredBookmarksPayload({
+        version: 4,
+        collections: {
+            future: { futureField: true }
+        }
+    }, 3), {
+        supported: false,
+        version: 4
+    });
 });
 
 test("bookmark storage schema: builds versioned storage payload", () => {

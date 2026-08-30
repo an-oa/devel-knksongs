@@ -86,11 +86,11 @@ export function parseStoredBookmarksPayload(
         return { supported: true, version: 1, bookmarks: {} };
     }
     const payload = raw as { version?: unknown, bookmarks?: unknown };
+    const version = Number.isFinite(payload.version) ? Number(payload.version) : 1;
+    if (version > maxSupportedVersion) {
+        return { supported: false, version };
+    }
     if (Object.prototype.hasOwnProperty.call(payload, "bookmarks")) {
-        const version = Number.isFinite(payload.version) ? Number(payload.version) : 1;
-        if (version > maxSupportedVersion) {
-            return { supported: false, version };
-        }
         return {
             supported: true,
             version,

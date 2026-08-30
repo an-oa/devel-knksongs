@@ -294,6 +294,58 @@ test("createBookmark: future payload blocks creation without changing state", ()
     }
 });
 
+test("createBookmark: future payload written after restore blocks creation without changing state", () => {
+    const restoreDom = installFakeDom();
+    const prevLocalStorage = globalThis.localStorage;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        const currentPayload = {
+            version: 3,
+            bookmarks: {
+                current: {
+                    name: "Current payload",
+                    songs: ["song-1"],
+                    createdAt: 1
+                }
+            }
+        };
+        const futurePayloadText = JSON.stringify({
+            version: 4,
+            futureMetadata: { mode: "v4" },
+            collections: {
+                future: {
+                    name: "Future payload",
+                    songs: ["future-song"],
+                    createdAt: 2,
+                    futureField: true
+                }
+            }
+        });
+        const { controller, data, getRenderCount } = setupStorageController({
+            bookmarks: {},
+            maxBookmarkCount: 20,
+            maxSongsPerBookmark: 120
+        });
+        globalThis.localStorage.setItem("bookmarksTest", JSON.stringify(currentPayload));
+        controller.restorePersistedState();
+
+        globalThis.localStorage.setItem("bookmarksTest", futurePayloadText);
+        const result = controller.createBookmark("Not persisted");
+
+        assert.deepEqual(result, {
+            ok: false,
+            reason: "unsupported_storage_version",
+            version: 4
+        });
+        assert.deepEqual(data.bookmarks, currentPayload.bookmarks);
+        assert.equal(globalThis.localStorage.getItem("bookmarksTest"), futurePayloadText);
+        assert.equal(getRenderCount(), 1);
+    } finally {
+        globalThis.localStorage = prevLocalStorage;
+        restoreDom();
+    }
+});
+
 test("restorePersistedState: existing long bookmark names are preserved", () => {
     const restoreDom = installFakeDom();
     const prevLocalStorage = globalThis.localStorage;
@@ -416,6 +468,63 @@ test("migrateLegacyBookmarkSongRefs: preserves current bookmarkSongKey refs and 
                 bookmarks: data.bookmarks
             }
         );
+    } finally {
+        globalThis.localStorage = prevLocalStorage;
+        restoreDom();
+    }
+});
+
+test("migrateLegacyBookmarkSongRefs: retries unresolved legacy refs after songs return", () => {
+    const restoreDom = installFakeDom();
+    const prevLocalStorage = globalThis.localStorage;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        const legacySongKey = "arch1::1::https://youtu.be/videoA";
+        const storedBookmarks = {
+            p_1: {
+                name: "temporarily unresolved ref",
+                songs: [legacySongKey],
+                createdAt: 1710000000000
+            }
+        };
+        const { controller, bookmarkPersistenceController, data } = setupStorageController({
+            bookmarks: {},
+            maxBookmarkCount: 20,
+            maxSongsPerBookmark: 120
+        });
+        globalThis.localStorage.setItem("bookmarksTest", JSON.stringify({
+            version: 2,
+            bookmarks: storedBookmarks
+        }));
+
+        controller.restorePersistedState();
+        bookmarkPersistenceController.migrateLegacyBookmarkSongRefs();
+
+        assert.deepEqual(JSON.parse(globalThis.localStorage.getItem("bookmarksTest")), {
+            version: 3,
+            bookmarks: storedBookmarks
+        });
+
+        data.allSongsRaw = [
+            {
+                songKey: "arch1::1",
+                bookmarkSongKey: "videoA::1",
+                legacySongKey
+            }
+        ];
+        bookmarkPersistenceController.migrateLegacyBookmarkSongRefs();
+
+        assert.deepEqual(data.bookmarks, {
+            p_1: {
+                name: "temporarily unresolved ref",
+                songs: ["videoA::1"],
+                createdAt: 1710000000000
+            }
+        });
+        assert.deepEqual(JSON.parse(globalThis.localStorage.getItem("bookmarksTest")), {
+            version: 3,
+            bookmarks: data.bookmarks
+        });
     } finally {
         globalThis.localStorage = prevLocalStorage;
         restoreDom();
