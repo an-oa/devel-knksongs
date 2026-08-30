@@ -420,6 +420,37 @@ test("bookmark ui: create form success notifies created bookmark", () => {
     }
 });
 
+test("bookmark ui: unsupported storage version shows an error without a success notification", () => {
+    const restoreDom = installFakeDom();
+    const previousAlert = globalThis.alert;
+    const alerts = [];
+    globalThis.alert = (message) => {
+        alerts.push(String(message));
+    };
+    try {
+        const { ui, controller } = createBookmarkHarness({
+            onCreateBookmark: () => ({
+                ok: false,
+                reason: "unsupported_storage_version",
+                version: 4
+            })
+        });
+        controller.setupBookmarkHandlers();
+        ui.el.bookmarkPanelNewName.value = "Not persisted";
+
+        invokeListener(ui.el.bookmarkPanelCreateBtn, "click", {});
+
+        assert.deepEqual(alerts, [
+            "このアプリより新しい形式のブックマークが保存されているため、変更できません。"
+        ]);
+        assert.equal(ui.el.bookmarkPanelNewName.value, "Not persisted");
+        assert.equal(ui.el.bookmarkNotificationRegion.childElementCount, 0);
+    } finally {
+        globalThis.alert = previousAlert;
+        restoreDom();
+    }
+});
+
 test("bookmark ui: removing a song from active bookmark notifies bookmark name and song title", () => {
     const restoreDom = installFakeDom();
     try {

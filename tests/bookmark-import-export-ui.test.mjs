@@ -23,6 +23,10 @@ test("bookmark import export ui: maps import results to user-facing messages", (
         "このアプリより新しい形式のブックマークファイルは読み込めません。"
     );
     assert.equal(
+        getBookmarkImportErrorMessage({ ok: false, reason: "storage_write_failed" }),
+        "インポートしたブックマークを保存できませんでした。"
+    );
+    assert.equal(
         getBookmarkImportErrorMessage({ ok: false, reason: "max_bookmark_count", limit: 20 }),
         "インポートできるブックマークは最大20件です。"
     );

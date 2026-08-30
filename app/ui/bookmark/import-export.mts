@@ -106,6 +106,9 @@ export function getBookmarkImportErrorMessage(result: BookmarkImportMessageResul
     if (result.reason === "unsupported_version") {
         return "このアプリより新しい形式のブックマークファイルは読み込めません。";
     }
+    if (result.reason === "storage_write_failed") {
+        return "インポートしたブックマークを保存できませんでした。";
+    }
     if (result.reason === "max_bookmark_count") {
         const limit = Number.isFinite(result.limit) ? result.limit : null;
         return limit === null

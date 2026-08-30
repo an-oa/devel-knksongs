@@ -3,7 +3,20 @@ import {
     migrateLegacyBookmarkSongRefsToCurrent,
     parseStoredBookmarksPayload
 } from "../lib/storage/bookmark-schema.mjs";
-import type { AppDataState } from "../state.types";
+import type { AppDataState, BookmarkRecord } from "../state.types";
+
+export type BookmarkSaveFailure =
+    | {
+        ok: false;
+        reason: "unsupported_storage_version";
+        version: number;
+    }
+    | {
+        ok: false;
+        reason: "storage_write_failed";
+    };
+
+export type BookmarkSaveResult = { ok: true } | BookmarkSaveFailure;
 
 type BookmarkPersistenceInput = {
     data: Pick<AppDataState, "allSongsRaw" | "bookmarks">;
@@ -51,25 +64,57 @@ export function createBookmarkPersistenceController({
     }
 
     /**
-     * 現在のブックマークを現行 schema でローカルストレージへ保存する。
+     * 指定したブックマークを保存し、成功後に保存 version の状態を更新する。
+     * @param bookmarks 保存候補
+     * @param allowUnsupportedFutureOverwrite 確認済みインポートによる将来形式の置換を許可するか
      */
-    function saveBookmarks(): void {
-        if (hasUnsupportedFutureStorage) {
+    function writeBookmarks(
+        bookmarks: Record<string, BookmarkRecord>,
+        allowUnsupportedFutureOverwrite: boolean
+    ): BookmarkSaveResult {
+        if (hasUnsupportedFutureStorage && !allowUnsupportedFutureOverwrite) {
             debugBookmarkMigration("bookmark save skipped for unsupported future payload", {
                 storedVersion: loadedStorageVersion,
                 currentVersion: storageVersion
             });
-            return;
+            return {
+                ok: false,
+                reason: "unsupported_storage_version",
+                version: loadedStorageVersion
+            };
         }
         try {
             localStorage.setItem(
                 storageKey,
-                JSON.stringify(buildStoredBookmarksPayload(data.bookmarks, storageVersion))
+                JSON.stringify(buildStoredBookmarksPayload(bookmarks, storageVersion))
             );
             loadedStorageVersion = storageVersion;
+            hasUnsupportedFutureStorage = false;
+            return { ok: true };
         } catch (error) {
             console.error("Failed to save bookmarks", error);
+            return { ok: false, reason: "storage_write_failed" };
         }
+    }
+
+    /**
+     * 現在または指定されたブックマークを現行 schema でローカルストレージへ保存する。
+     * @param bookmarks 保存候補。省略時は現在の state を保存する。
+     */
+    function saveBookmarks(
+        bookmarks: Record<string, BookmarkRecord> = data.bookmarks
+    ): BookmarkSaveResult {
+        return writeBookmarks(bookmarks, false);
+    }
+
+    /**
+     * 利用者が置換を確認したインポート内容を保存し、未対応の将来形式を明示的に置き換える。
+     * @param bookmarks 確認済みのインポート内容
+     */
+    function replaceBookmarksFromConfirmedImport(
+        bookmarks: Record<string, BookmarkRecord>
+    ): BookmarkSaveResult {
+        return writeBookmarks(bookmarks, true);
     }
 
     /**
@@ -131,7 +176,11 @@ export function createBookmarkPersistenceController({
         migration.changes.forEach((change) => {
             debugBookmarkMigration("bookmark refs migrated", change);
         });
-        saveBookmarks();
+        const saveResult = saveBookmarks();
+        if (!saveResult.ok) {
+            debugBookmarkMigration("failed to save migrated bookmarks payload", saveResult);
+            return;
+        }
         debugBookmarkMigration("saved migrated bookmarks payload", {
             changedBookmarkIds: migration.changedBookmarkIds,
             upgradedVersion: storageVersion
@@ -141,6 +190,7 @@ export function createBookmarkPersistenceController({
     return {
         loadBookmarksFromStorage,
         saveBookmarks,
+        replaceBookmarksFromConfirmedImport,
         migrateLegacyBookmarkSongRefs
     };
 }

@@ -8,6 +8,10 @@ import {
 } from "../lib/storage/search-state-schema.mjs";
 import { collectSearchBooleanFilterState } from "../lib/search-boolean-filters.mjs";
 import type {
+    BookmarkSaveFailure,
+    BookmarkSaveResult
+} from "./bookmark-persistence.mjs";
+import type {
     AppDataState,
     AppUiState,
     AppUiElements,
@@ -65,7 +69,10 @@ type StorageControllerInput = {
     searchFiltersController: StorageSearchFiltersController;
     bookmarkPersistenceController: {
         loadBookmarksFromStorage: () => void;
-        saveBookmarks: () => void;
+        saveBookmarks: (bookmarks?: Record<string, BookmarkRecord>) => BookmarkSaveResult;
+        replaceBookmarksFromConfirmedImport: (
+            bookmarks: Record<string, BookmarkRecord>
+        ) => BookmarkSaveResult;
     };
     constants: StorageConstants;
     callbacks: StorageCallbacks;
@@ -95,7 +102,8 @@ export function createStorageController({
     } = constants;
     const {
         loadBookmarksFromStorage,
-        saveBookmarks
+        saveBookmarks,
+        replaceBookmarksFromConfirmedImport
     } = bookmarkPersistenceController;
     const {
         getDateSelectValue,
@@ -124,6 +132,17 @@ export function createStorageController({
         extra: Partial<StorageActionResult> | undefined = undefined
     ): StorageActionResult {
         return { ok: false, reason, ...(extra || {}) };
+    }
+
+    /**
+     * 永続化層の保存失敗をブックマーク操作の失敗結果へ変換する。
+     * @param result 保存失敗の内容
+     */
+    function buildBookmarkSaveFailure(result: BookmarkSaveFailure): StorageActionResult {
+        return buildActionFail(
+            result.reason,
+            "version" in result ? { version: result.version } : undefined
+        );
     }
 
     /**
@@ -173,12 +192,15 @@ export function createStorageController({
         const parsed = parseBookmarkImportText(text);
         if (!parsed.ok) return parsed;
 
+        const importedBookmarks = parsed.bookmarks || {};
+        const saveResult = replaceBookmarksFromConfirmedImport(importedBookmarks);
+        if (saveResult.ok === false) return buildBookmarkSaveFailure(saveResult);
+
         const hadActiveBookmark = Boolean(data.activeBookmark);
-        data.bookmarks = parsed.bookmarks;
+        data.bookmarks = importedBookmarks;
         const activeBookmarkWasRemoved = Boolean(
             data.activeBookmark && !Object.hasOwn(data.bookmarks, data.activeBookmark)
         );
-        saveBookmarks();
         if (activeBookmarkWasRemoved) {
             applyActiveBookmark(null);
         } else {
@@ -207,8 +229,15 @@ export function createStorageController({
         if (songIndex <= -1) {
             return buildActionFail("song_not_found");
         }
-        bookmark.songs.splice(songIndex, 1);
-        saveBookmarks();
+        const nextSongs = bookmark.songs.slice();
+        nextSongs.splice(songIndex, 1);
+        const nextBookmarks = {
+            ...data.bookmarks,
+            [bookmarkId]: { ...bookmark, songs: nextSongs }
+        };
+        const saveResult = saveBookmarks(nextBookmarks);
+        if (saveResult.ok === false) return buildBookmarkSaveFailure(saveResult);
+        data.bookmarks = nextBookmarks;
         renderBookmarks();
         if (data.activeBookmark === bookmarkId) {
             scheduleSearch({ immediate: true });
@@ -229,8 +258,13 @@ export function createStorageController({
         if (bookmark.songs.length >= MAX_SONGS_PER_BOOKMARK) {
             return buildActionFail("max_songs_per_bookmark", { limit: MAX_SONGS_PER_BOOKMARK });
         }
-        bookmark.songs.push(songKey);
-        saveBookmarks();
+        const nextBookmarks = {
+            ...data.bookmarks,
+            [bookmarkId]: { ...bookmark, songs: [...bookmark.songs, songKey] }
+        };
+        const saveResult = saveBookmarks(nextBookmarks);
+        if (saveResult.ok === false) return buildBookmarkSaveFailure(saveResult);
+        data.bookmarks = nextBookmarks;
         renderBookmarks();
         if (data.activeBookmark === bookmarkId) {
             scheduleSearch({ immediate: true });
@@ -252,12 +286,17 @@ export function createStorageController({
         if (!nameValidation.ok) return nameValidation;
         const now = Date.now();
         const newId = `p_${now}`;
-        data.bookmarks[newId] = {
-            name: nameValidation.name,
-            songs: Array.isArray(initialSongs) ? initialSongs.slice() : [],
-            createdAt: now
+        const nextBookmarks = {
+            ...data.bookmarks,
+            [newId]: {
+                name: nameValidation.name,
+                songs: Array.isArray(initialSongs) ? initialSongs.slice() : [],
+                createdAt: now
+            }
         };
-        saveBookmarks();
+        const saveResult = saveBookmarks(nextBookmarks);
+        if (saveResult.ok === false) return buildBookmarkSaveFailure(saveResult);
+        data.bookmarks = nextBookmarks;
         renderBookmarks();
         return buildActionOk({ id: newId });
     }
@@ -290,8 +329,11 @@ export function createStorageController({
         const bookmark = data.bookmarks[bookmarkId];
         if (!bookmark) return buildActionFail("bookmark_not_found");
         const wasActive = data.activeBookmark === bookmarkId;
-        delete data.bookmarks[bookmarkId];
-        saveBookmarks();
+        const nextBookmarks = { ...data.bookmarks };
+        delete nextBookmarks[bookmarkId];
+        const saveResult = saveBookmarks(nextBookmarks);
+        if (saveResult.ok === false) return buildBookmarkSaveFailure(saveResult);
+        data.bookmarks = nextBookmarks;
         if (wasActive) {
             applyActiveBookmark(null);
         } else {
@@ -317,8 +359,13 @@ export function createStorageController({
             return buildActionOk({ changed: false });
         }
 
-        bookmark.name = nameValidation.name;
-        saveBookmarks();
+        const nextBookmarks = {
+            ...data.bookmarks,
+            [bookmarkId]: { ...bookmark, name: nameValidation.name }
+        };
+        const saveResult = saveBookmarks(nextBookmarks);
+        if (saveResult.ok === false) return buildBookmarkSaveFailure(saveResult);
+        data.bookmarks = nextBookmarks;
         renderBookmarks();
         if (data.activeBookmark === bookmarkId) {
             scheduleSearch({ immediate: true });
