@@ -209,13 +209,11 @@ test("migrateLegacyBookmarkSongRefs: rewrites old songKey refs to bookmarkSongKe
         });
         data.allSongsRaw = [
             {
-                sourceIndex: 0,
                 songKey: "arch1::1",
                 bookmarkSongKey: "videoA::1",
                 legacySongKey: "arch1::1::https://youtu.be/videoA"
             },
             {
-                sourceIndex: 1,
                 songKey: "arch2::2",
                 bookmarkSongKey: "videoB::2",
                 legacySongKey: "arch2::2::https://youtu.be/videoB"
@@ -265,7 +263,6 @@ test("migrateLegacyBookmarkSongRefs: preserves current bookmarkSongKey refs and 
         });
         data.allSongsRaw = [
             {
-                sourceIndex: 0,
                 songKey: "arch1::1",
                 bookmarkSongKey: "videoA::1",
                 legacySongKey: "arch1::1::https://youtu.be/videoA"
@@ -303,7 +300,6 @@ test("importBookmarksFromJsonText: replaces current bookmarks and clears missing
         });
         data.allSongsRaw = [
             {
-                sourceIndex: 0,
                 songKey: "arch1::1",
                 bookmarkSongKey: "videoA::1",
                 legacySongKey: "arch1::1::https://youtu.be/videoA"
@@ -409,7 +405,6 @@ test("migrateLegacyBookmarkSongRefs: emits opt-in debug logs when migration runs
         });
         data.allSongsRaw = [
             {
-                sourceIndex: 0,
                 songKey: "arch1::1",
                 bookmarkSongKey: "videoA::1",
                 legacySongKey: "arch1::1::https://youtu.be/videoA"

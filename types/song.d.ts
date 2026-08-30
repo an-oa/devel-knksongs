@@ -5,7 +5,6 @@ type Song = {
   dateKey: number | null;
   archiveId: string;
   archiveOrder: number | null;
-  sourceIndex: number;
   videoId: string;
   songKey: string;
   bookmarkSongKey: string;

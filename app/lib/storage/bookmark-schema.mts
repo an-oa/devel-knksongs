@@ -2,7 +2,6 @@ type BookmarkSongRow = {
     bookmarkSongKey?: string;
     songKey?: string;
     legacySongKey?: string;
-    sourceIndex?: number;
 };
 
 type StoredBookmarkRecord = {
@@ -20,6 +19,12 @@ type RawBookmarkRecord = {
 type BookmarkMigrationInput = {
     bookmarks?: Record<string, { songs?: unknown }>;
     songRows?: BookmarkSongRow[];
+};
+
+type BookmarkMigrationChange = {
+    bookmarkId: string;
+    before: unknown[];
+    after: Array<string | number>;
 };
 
 /**
@@ -126,9 +131,10 @@ export function normalizeLegacySongRefToCurrent(ref) {
 }
 
 /**
- * 旧参照形式のブックマーク曲IDを現行の bookmarkSongKey へ移行する。
+ * 旧文字列形式のブックマーク曲IDを現行の bookmarkSongKey へ移行する。
+ * 安定して復元できない旧数値参照は誤変換を避けるためそのまま保持する。
  * @param {{ bookmarks: Record<string, *>, songRows: Array<*> }} input
- * @returns {{ updated: boolean, changedBookmarkIds: Array<string>, changes: Array<{ bookmarkId: string, before: Array<*>, after: Array<string> }> }}
+ * @returns {{ updated: boolean, changedBookmarkIds: string[], changes: BookmarkMigrationChange[] }}
  */
 export function migrateLegacyBookmarkSongRefsToCurrent(input: BookmarkMigrationInput) {
     const bookmarks: Record<string, { songs?: unknown }> =
@@ -136,18 +142,14 @@ export function migrateLegacyBookmarkSongRefsToCurrent(input: BookmarkMigrationI
             ? input.bookmarks
             : {};
     const songRows = Array.isArray(input && input.songRows) ? input.songRows : [];
-    const legacyIndexMap = new Map<number, string>();
     const legacySongKeyMap = new Map<string, string>();
     const songKeyMap = new Map<string, string>();
     const bookmarkSongKeySet = new Set<string>();
     const changedBookmarkIds: string[] = [];
-    const changes: Array<{ bookmarkId: string, before: Array<unknown>, after: string[] }> = [];
+    const changes: BookmarkMigrationChange[] = [];
 
     songRows.forEach((row) => {
         const bookmarkSongRef = getBookmarkSongRefFromRow(row);
-        if (Number.isFinite(row && row.sourceIndex) && bookmarkSongRef) {
-            legacyIndexMap.set(row.sourceIndex, bookmarkSongRef);
-        }
         if (bookmarkSongRef) bookmarkSongKeySet.add(bookmarkSongRef);
         if (row && typeof row.songKey === "string" && row.songKey && bookmarkSongRef) {
             songKeyMap.set(row.songKey, bookmarkSongRef);
@@ -159,12 +161,12 @@ export function migrateLegacyBookmarkSongRefsToCurrent(input: BookmarkMigrationI
 
     let updated = false;
     Object.entries(bookmarks).forEach(([bookmarkId, bookmark]) => {
-        const nextSongs: string[] = [];
+        const nextSongs: Array<string | number> = [];
         const seen = new Set<string>();
         const rawBookmarkSongs = bookmark.songs;
         const prevSongs: unknown[] = Array.isArray(rawBookmarkSongs) ? rawBookmarkSongs : [];
         prevSongs.forEach((ref) => {
-            let normalized: string | null = null;
+            let normalized: string | number | null = null;
             if (typeof ref === "string") {
                 const trimmedRef = ref.trim();
                 if (bookmarkSongKeySet.has(trimmedRef)) normalized = trimmedRef;
@@ -175,12 +177,11 @@ export function migrateLegacyBookmarkSongRefsToCurrent(input: BookmarkMigrationI
                     if (converted && songKeyMap.has(converted)) normalized = songKeyMap.get(converted) || null;
                     else normalized = trimmedRef;
                 }
-            } else if (Number.isFinite(ref)) {
-                normalized = legacyIndexMap.get(Number(ref)) || null;
-            }
-            if (!normalized) return;
-            if (seen.has(normalized)) return;
-            seen.add(normalized);
+            } else if (Number.isFinite(ref)) normalized = Number(ref);
+            if (normalized === null) return;
+            const dedupeKey = typeof normalized === "number" ? `n:${normalized}` : `s:${normalized}`;
+            if (seen.has(dedupeKey)) return;
+            seen.add(dedupeKey);
             nextSongs.push(normalized);
         });
         if (prevSongs.length !== nextSongs.length || prevSongs.some((ref, idx) => ref !== nextSongs[idx])) {

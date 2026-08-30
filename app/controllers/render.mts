@@ -487,9 +487,7 @@ export function createRenderController({
         const nodes = [];
         for (let i = 0; i < results.length; i++) {
             const row = results[i];
-            const rowKey = row && typeof row.songKey === "string" && row.songKey
-                ? `song:${row.songKey}`
-                : (row && Number.isFinite(row.sourceIndex) ? `src:${row.sourceIndex}` : `idx:${i}`);
+            const rowKey = `song:${row.songKey}`;
             let entry = renderUi.cardEntriesBySourceKey.get(rowKey);
             if (!entry) entry = createCardElements();
 

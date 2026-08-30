@@ -89,13 +89,11 @@ test("bookmark storage migration: rewrites legacy refs to current bookmark song 
     };
     const songRows = [
         {
-            sourceIndex: 0,
             songKey: "arch1::1",
             bookmarkSongKey: "videoA::1",
             legacySongKey: "arch1::1::https://youtu.be/videoA"
         },
         {
-            sourceIndex: 1,
             songKey: "arch2::2",
             bookmarkSongKey: "videoB::2",
             legacySongKey: "arch2::2::https://youtu.be/videoB"
@@ -106,7 +104,7 @@ test("bookmark storage migration: rewrites legacy refs to current bookmark song 
 
     assert.equal(result.updated, true);
     assert.deepEqual(result.changedBookmarkIds, ["p_1"]);
-    assert.deepEqual(bookmarks.p_1.songs, ["videoA::1", "videoB::2", "missing"]);
+    assert.deepEqual(bookmarks.p_1.songs, ["videoA::1", "videoB::2", 0, "missing"]);
     assert.deepEqual(result.changes, [
         {
             bookmarkId: "p_1",
@@ -117,7 +115,7 @@ test("bookmark storage migration: rewrites legacy refs to current bookmark song 
                 0,
                 "missing"
             ],
-            after: ["videoA::1", "videoB::2", "missing"]
+            after: ["videoA::1", "videoB::2", 0, "missing"]
         }
     ]);
 });
@@ -150,7 +148,6 @@ test("bookmark storage migration: keeps current refs without marking changes", (
         bookmarks,
         songRows: [
             {
-                sourceIndex: 0,
                 songKey: "arch1::1",
                 bookmarkSongKey: "videoA::1"
             }

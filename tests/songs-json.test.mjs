@@ -64,7 +64,6 @@ test("songs json: rejects non-object songs and invalid field types", () => {
     const cases = [
         [null, /songs\[0\] must be an object/],
         [createSongFixture({ title: 42 }), /songs\[0\]\.title must be a string/],
-        [createSongFixture({ sourceIndex: "0" }), /songs\[0\]\.sourceIndex must be a finite number/],
         [createSongFixture({ dateKey: "20260311" }), /songs\[0\]\.dateKey must be a finite number or null/],
         [createSongFixture({ isRelay: 0 }), /songs\[0\]\.isRelay must be a boolean/],
         [createSongFixture({ videoOrientation: "square" }), /songs\[0\]\.videoOrientation must be one of/]
@@ -105,71 +104,21 @@ test("songs json: builds and parses meta payload", () => {
     });
 });
 
-test("songs json: parses final Version 1 payloads as undated legacy cache entries", () => {
-    const songs = [createSongFixture()];
-    assert.deepEqual(parseSongsJsonPayload(JSON.stringify({
-        schemaVersion: 1,
+test("songs json: rejects payload and meta from older schema versions", () => {
+    const legacyPayload = {
+        schemaVersion: SONGS_JSON_SCHEMA_VERSION - 1,
         contentHash: "sha256:legacy",
-        songs
-    })), {
-        schemaVersion: 1,
-        contentHash: "sha256:legacy",
-        generatedAt: null,
-        songs
-    });
-    assert.deepEqual(parseSongsJsonMetaPayload(JSON.stringify({
-        schemaVersion: 1,
-        contentHash: "sha256:legacy"
-    })), {
-        schemaVersion: 1,
-        contentHash: "sha256:legacy",
-        generatedAt: null
-    });
-});
-
-test("songs json: normalizes fields omitted across early Version 1 payloads", () => {
-    const legacySong = createSongFixture();
-    delete legacySong.streamRole;
-
-    assert.deepEqual(parseSongsJsonPayload(JSON.stringify({
-        schemaVersion: 1,
-        contentHash: "sha256:legacy",
-        songs: [legacySong]
-    })), {
-        schemaVersion: 1,
-        contentHash: "sha256:legacy",
-        generatedAt: null,
-        songs: [{ ...legacySong, streamRole: "" }]
-    });
-    assert.deepEqual(parseSongsJsonPayload(JSON.stringify({
-        schemaVersion: 1,
-        songs: [legacySong]
-    })), {
-        schemaVersion: 1,
-        contentHash: null,
-        generatedAt: null,
-        songs: [{ ...legacySong, streamRole: "" }]
-    });
-    assert.deepEqual(parseSongsJsonMetaPayload(JSON.stringify({
-        schemaVersion: 1
-    })), {
-        schemaVersion: 1,
-        contentHash: null,
-        generatedAt: null
-    });
-});
-
-test("songs json: Version 1 normalization does not hide unrelated structural errors", () => {
-    const incompleteSong = createSongFixture();
-    delete incompleteSong.streamRole;
-    delete incompleteSong.title;
+        generatedAt: GENERATED_AT,
+        songs: [createSongFixture()]
+    };
 
     assert.throws(
-        () => parseSongsJsonPayload(JSON.stringify({
-            schemaVersion: 1,
-            songs: [incompleteSong]
-        })),
-        /songs\[0\]\.title is required/
+        () => parseSongsJsonPayload(JSON.stringify(legacyPayload)),
+        /unsupported songs json schema/
+    );
+    assert.throws(
+        () => parseSongsJsonMetaPayload(JSON.stringify(legacyPayload)),
+        /unsupported songs json schema/
     );
 });
 
@@ -209,20 +158,6 @@ test("songs json: compares generated timestamps only for mismatched hashes", () 
         ...reference,
         contentHash: "sha256:conflict"
     }, reference), "incomparable");
-    assert.equal(compareSongsJsonArtifactFreshness({
-        ...reference,
-        contentHash: "sha256:legacy",
-        generatedAt: null
-    }, reference), "incomparable");
-    assert.equal(compareSongsJsonArtifactFreshness({
-        schemaVersion: 1,
-        contentHash: null,
-        generatedAt: null
-    }, {
-        schemaVersion: 1,
-        contentHash: null,
-        generatedAt: null
-    }), "incomparable");
 });
 
 test("songs json: rejects unsupported schema versions", () => {
@@ -256,7 +191,7 @@ test("songs json: rejects payloads without content hash", () => {
     );
 });
 
-test("songs json: rejects missing or non-canonical Version 2 generated timestamps", () => {
+test("songs json: rejects missing or non-canonical generated timestamps", () => {
     for (const generatedAt of [undefined, "2026-08-14", "2026-08-14T09:00:00+09:00"]) {
         const payload = {
             schemaVersion: SONGS_JSON_SCHEMA_VERSION,

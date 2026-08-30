@@ -18,9 +18,9 @@ function createDragHarness() {
             }
         },
         currentResults: [
-            makeRenderRow({ songKey: "a", bookmarkSongKey: "song-a", sourceIndex: 1 }),
-            makeRenderRow({ songKey: "b", bookmarkSongKey: "song-b", sourceIndex: 2 }),
-            makeRenderRow({ songKey: "c", bookmarkSongKey: "song-c", sourceIndex: 3 })
+            makeRenderRow({ songKey: "a", bookmarkSongKey: "song-a"}),
+            makeRenderRow({ songKey: "b", bookmarkSongKey: "song-b"}),
+            makeRenderRow({ songKey: "c", bookmarkSongKey: "song-c"})
         ]
     };
     const calls = {

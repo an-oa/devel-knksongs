@@ -167,6 +167,7 @@ export function parseCsvToSongs(csvText) {
     const endTimeIndex = header.includes("終了時刻") ? idx("終了時刻") : -1;
     const streamRoleIndex = header.includes("配信上の立場") ? idx("配信上の立場") : -1;
     const songs = [];
+    const csvRowNumbers: number[] = [];
     for (let i = 0; i < body.length; i++) {
         const r = body[i];
         const memo = r[idx("メモ")] || "";
@@ -185,12 +186,12 @@ export function parseCsvToSongs(csvText) {
         const archiveOrder = parseArchiveOrder(r[idx("##")]);
         const { videoId } = extractYoutubeInfo(url);
         const legacySongKey = buildLegacySongKey({ archiveId, archiveOrder, url });
+        csvRowNumbers.push(i + 2);
         songs.push({
             date: r[idx("配信日")],
             dateKey: parseDateKey(r[idx("配信日")]),
             archiveId,
             archiveOrder,
-            sourceIndex: i,
             videoId,
             songKey: buildSongKey({ archiveId, archiveOrder }),
             bookmarkSongKey: buildBookmarkSongKey({ videoId, archiveId, archiveOrder }),
@@ -212,6 +213,6 @@ export function parseCsvToSongs(csvText) {
             artistYomiNorm: normalizeForSearch(artistYomi)
         });
     }
-    assertSongsDataQuality(songs);
+    assertSongsDataQuality(songs, csvRowNumbers);
     return songs;
 }

@@ -20,7 +20,6 @@ function makeRow(input) {
         archiveOrder: input.archiveOrder ?? null,
         songKey,
         bookmarkSongKey: input.bookmarkSongKey ?? songKey,
-        sourceIndex: input.sourceIndex ?? 0,
         dateKey: input.dateKey ?? null,
         format: input.format ?? "配信",
         streamRole: input.streamRole ?? "",

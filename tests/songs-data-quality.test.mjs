@@ -12,7 +12,6 @@ import {
  */
 function makeSong(overrides = {}) {
     return {
-        sourceIndex: 0,
         title: "Song",
         artist: "Artist",
         url: "https://www.youtube.com/watch?v=7fOw-4QeB7M&t=349s",
@@ -31,6 +30,14 @@ test("songs data quality: rejects invalid YouTube hosts with the CSV row", () =>
     ]);
     assert.match(issues.join("\n"), /url host must be a supported YouTube host/);
     assert.match(issues.join("\n"), /CSV 2行目「Song」/);
+});
+
+test("songs data quality: uses transient source row numbers after excluded CSV rows", () => {
+    const issues = validateSongsDataQuality([
+        makeSong({ url: "https://example.com/watch?v=7fOw-4QeB7M&t=349s" })
+    ], [27]);
+
+    assert.match(issues.join("\n"), /CSV 27行目「Song」/);
 });
 
 test("songs data quality: rejects invalid extracted video IDs", () => {

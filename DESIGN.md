@@ -179,15 +179,14 @@ flowchart TD
 - 公開スプレッドシートのCSVを唯一のマスターデータとする。JSONを直接修正する更新経路や、
   JSONからCSVへ戻す経路は持たない
 - `songs.json` / `songs-meta.json` は、現在表示・再生可能な曲を配信する派生成果物とする
-- 両JSONはschema Version 2として、同じ `contentHash` とUTC ISO 8601形式の `generatedAt` を持つ。
+- 両JSONはschema Version 3として、同じ `contentHash` とUTC ISO 8601形式の `generatedAt` を持つ。
   `generatedAt` はcontentHashが変わった場合だけ更新し、同じ内容の定期生成では引き継ぐ
-- 実行時は実際に配布された全期間のVersion 1 JSONキャッシュもフォールバックとして読み込む。
-  初期形式で省略されていた `contentHash` は `null`、各曲の `streamRole` は空文字へ正規化する。
-  Version 1は生成日時を持たず、初期形式はhashも持たないため、比較不能な場合は新旧判定に使用しない
+- 実行時は現行schemaだけを受け付け、旧schemaのJSONキャッシュは削除して未キャッシュと同じ取得経路へ進む
 - 公開対象でもURLが空の行は、現在再生できない曲の履歴としてCSVへ残し、エラーにせず派生JSONから除外する。
   URLが非空で不正な場合は品質エラーとして生成を停止する
 - CSVから公開対象曲へ変換した直後に、必須文字列、YouTube URL・動画ID、再生範囲を全件検証する。
   問題はCSV行番号と曲名でまとめて報告し、検証成功前はどちらのJSONも書き換えない
+- CSV行番号は変換中の一時配列に保持し、`SongRow`や派生JSONには含めない
 - 開始位置`0`と終了位置`null`は、ショート・切り抜き・歌みたなどの動画全体を再生する正常値とする。
   非空の不正な終了時刻・画面の向きに対する既存の警告とフォールバックは維持する
 - ブラウザのCSVフォールバックも同じ変換・品質検証を通し、CSVは検証前後を問わず保存しない
@@ -197,7 +196,7 @@ flowchart TD
 
 ## データモデル（概要）
 `SongRow`
-- date / dateKey / archiveId / archiveOrder / sourceIndex
+- date / dateKey / archiveId / archiveOrder
 - videoId / songKey / bookmarkSongKey / legacySongKey / format / streamRole / videoOrientation / isRelay / isHarmony
 - title / artist / titleYomi / artistYomi
 - endSeconds
@@ -207,7 +206,8 @@ flowchart TD
 ### 曲参照キーの役割分担
 - `songKey`: `archiveId::archiveOrder` を使う内部参照キー。カード再利用、描画更新、既存の画面内処理で利用する。
 - `bookmarkSongKey`: `videoId::archiveOrder` を優先するブックマーク保存用キー。`videoId` を抽出できない場合は `songKey` へフォールバックする。
-- ブックマーク検索では `bookmarkSongKey` を優先して曲行へ解決し、旧ブックマークの `songKey` / `legacySongKey` / 数値 index も移行対象として読み取る。
+- ブックマーク検索では `bookmarkSongKey` を優先して曲行へ解決し、旧ブックマークの `songKey` / `legacySongKey` は現行キーへ移行する。
+- 旧数値参照はCSV行位置の変化で別の曲を指し得るため解決せず、誤変換しないよう保存値をそのまま残す。
 
 ## 検索・絞り込みロジック
 - 検索語：NFKC・読み・大小文字・連続空白を正規化したAND検索。曲データ側にも同じ空白正規化を適用する。
@@ -308,7 +308,8 @@ stateDiagram-v2
 - おすすめ候補の集計対象は配信上の立場が `ゲスト` 以外の行に限定し、対象形式は `配信` / `歌みた`（`オリ曲` を含む） / `ショート` とする
 - 通常は同一曲が一定回数以上歌われている場合のみ、おすすめ候補に含める
 - ただし `オリ曲` を含む曲は1回でもおすすめ候補に含める
-- 同一曲・同一アーカイブの重複候補は、`archiveOrder` と `sourceIndex` を用いて代表行へ集約する
+- 同一曲・同一アーカイブの重複候補は、最大の `archiveOrder` を持つ歌い直し後の行へ集約する。
+  `archiveOrder` まで同じ場合はCSVで上にある行を代表とする
 
 ### シャッフルタイミング
 - 初回データ読み込み時におすすめを抽出・シャッフル
@@ -377,7 +378,7 @@ flowchart LR
 - ブックマーク情報（ブックマーク名・曲参照/順序・作成日時）
 - ブックマーク保存 payload は `version` を持ち、旧参照形式は曲データ読み込み後に現行の `bookmarkSongKey` へ保存し直す
 - 最新曲データで解決できない文字列の曲参照は削除せず保持し、将来同じ参照の曲が復帰したときに再解決する。
-  旧形式の数値 index は安定した識別子ではないため、解決できない場合は従来どおり保持しない
+  旧形式の数値参照は安定した識別子ではないため、曲へは解決せず保存値だけ維持する
 - エクスポートするJSONはブックマーク保存 payload と同じ構造にし、インポート時は同じ検証/移行を通してから全置き換えで保存する
 
 IndexedDB保存：

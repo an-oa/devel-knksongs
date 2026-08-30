@@ -9,8 +9,7 @@ function hasCurrentSongLookupMaps(
 ): boolean {
     return lookupUi.songLookupSourceRef === songRows &&
         lookupUi.songMapByBookmarkKey instanceof Map &&
-        lookupUi.songMapByKey instanceof Map &&
-        lookupUi.songMapByLegacyIndex instanceof Map;
+        lookupUi.songMapByKey instanceof Map;
 }
 
 /**
@@ -31,7 +30,6 @@ export function ensureSongLookupMaps(
             lookupUi.songMapByBookmarkKey.set(row.bookmarkSongKey, row);
         }
     });
-    lookupUi.songMapByLegacyIndex = new Map(rows.map((row) => [row.sourceIndex, row]));
     lookupUi.songLookupSourceRef = rows;
 }
 
@@ -46,9 +44,6 @@ export function resolveSongRef(
     ensureSongLookupMaps(lookupUi, songRows);
     if (typeof songRef === "string") {
         return lookupUi.songMapByBookmarkKey.get(songRef) || lookupUi.songMapByKey.get(songRef) || null;
-    }
-    if (typeof songRef === "number" && Number.isFinite(songRef)) {
-        return lookupUi.songMapByLegacyIndex.get(songRef) || null;
     }
     return null;
 }

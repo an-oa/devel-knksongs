@@ -74,7 +74,6 @@ function createBookmarkUiState() {
         lookup: {
             songMapByBookmarkKey: new Map(),
             songMapByKey: new Map(),
-            songMapByLegacyIndex: new Map(),
             songLookupSourceRef: null
         },
         bookmarkPanel: {
@@ -107,7 +106,6 @@ function createBookmarkHarness(input) {
             {
                 songKey: "song-z",
                 bookmarkSongKey: "song-z",
-                sourceIndex: 30,
                 title: "透明な朝"
             }
         ],

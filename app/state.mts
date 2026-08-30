@@ -67,7 +67,6 @@ export const appState: AppState = {
         lookup: {
             songMapByBookmarkKey: new Map(),
             songMapByKey: new Map(),
-            songMapByLegacyIndex: new Map(),
             songLookupSourceRef: null
         },
         render: {

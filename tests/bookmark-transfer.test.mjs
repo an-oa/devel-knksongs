@@ -34,7 +34,6 @@ test("bookmark transfer: parses and migrates import payloads", () => {
     }), {
         songRows: [
             {
-                sourceIndex: 0,
                 songKey: "arch1::1",
                 bookmarkSongKey: "videoA::1",
                 legacySongKey: "arch1::1::https://youtu.be/videoA"

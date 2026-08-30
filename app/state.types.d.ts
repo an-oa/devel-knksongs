@@ -10,7 +10,7 @@ import type { RecommendedSearchCache } from "./lib/search-recommendation.mjs";
 export type BookmarkRecord = {
   /** ユーザーが付けたブックマーク名。 */
   name: string;
-  /** 曲を指す現在形式のキー、または旧形式の sourceIndex。 */
+  /** 曲を指す現在形式のキー、または復元不能な旧形式の数値参照。 */
   songs: Array<string | number>;
   /** ブックマーク作成時刻。旧データでは存在しない場合がある。 */
   createdAt?: number;
@@ -165,8 +165,6 @@ export type LookupUiRuntimeState = {
   songMapByBookmarkKey: Map<string, Song>;
   /** 現在の songKey から曲を引くマップ。 */
   songMapByKey: Map<string, Song>;
-  /** 旧形式の sourceIndex から曲を引くマップ。 */
-  songMapByLegacyIndex: Map<number, Song>;
   /** ルックアップマップの元になった曲配列参照。 */
   songLookupSourceRef: Song[] | null;
 };

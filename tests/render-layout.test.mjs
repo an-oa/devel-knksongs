@@ -58,7 +58,6 @@ function createRenderUiState(input) {
         lookup: {
             songMapByBookmarkKey: new Map(),
             songMapByKey: new Map(),
-            songMapByLegacyIndex: new Map(),
             songLookupSourceRef: null
         }
     };
@@ -120,7 +119,7 @@ test("render: empty results stop active playback", () => {
 test("render: active card kept in next nodes does not stop playback", () => {
     const cleanup = installFakeDom();
     try {
-        const row = makeRenderRow({ songKey: "a::1", sourceIndex: 1 });
+        const row = makeRenderRow({ songKey: "a::1"});
         const data = {
             currentResults: [row],
             displayLimit: 10,
@@ -161,8 +160,8 @@ test("render: active card kept in next nodes does not stop playback", () => {
 test("render: active card hidden from next nodes stops playback", () => {
     const cleanup = installFakeDom();
     try {
-        const rowA = makeRenderRow({ songKey: "a::1", sourceIndex: 1 });
-        const rowB = makeRenderRow({ songKey: "b::2", sourceIndex: 2, url: "https://youtu.be/video2" });
+        const rowA = makeRenderRow({ songKey: "a::1"});
+        const rowB = makeRenderRow({ songKey: "b::2", url: "https://youtu.be/video2" });
         const data = {
             currentResults: [rowA],
             displayLimit: 10,
@@ -245,8 +244,8 @@ test("render: result cards and empty state use list semantics", () => {
 test("render: cards keep fixed columns while preserving DOM order", () => {
     const cleanup = installFakeDom();
     try {
-        const rowA = makeRenderRow({ songKey: "a::1", sourceIndex: 1 });
-        const rowB = makeRenderRow({ songKey: "b::2", sourceIndex: 2, url: "https://www.youtube.com/shorts/video2" });
+        const rowA = makeRenderRow({ songKey: "a::1"});
+        const rowB = makeRenderRow({ songKey: "b::2", url: "https://www.youtube.com/shorts/video2" });
         const data = {
             currentResults: [rowA, rowB],
             displayLimit: 10,
@@ -290,10 +289,10 @@ test("render: card height changes only shift cards in the same column", () => {
     const cleanup = installFakeDom();
     try {
         const rows = [
-            makeRenderRow({ songKey: "a::1", sourceIndex: 1 }),
-            makeRenderRow({ songKey: "b::2", sourceIndex: 2 }),
-            makeRenderRow({ songKey: "c::3", sourceIndex: 3 }),
-            makeRenderRow({ songKey: "d::4", sourceIndex: 4 })
+            makeRenderRow({ songKey: "a::1"}),
+            makeRenderRow({ songKey: "b::2"}),
+            makeRenderRow({ songKey: "c::3"}),
+            makeRenderRow({ songKey: "d::4"})
         ];
         const data = {
             currentResults: rows,
@@ -353,7 +352,7 @@ test("render: card height changes only shift cards in the same column", () => {
 test("render: refreshLayout shrinks container height after card height decreases", () => {
     const cleanup = installFakeDom();
     try {
-        const row = makeRenderRow({ songKey: "a::1", sourceIndex: 1 });
+        const row = makeRenderRow({ songKey: "a::1"});
         const data = {
             currentResults: [row],
             displayLimit: 10,
@@ -391,14 +390,12 @@ test("render: adds footer tags for collaboration, relay, and harmony", () => {
     try {
         const collabRow = makeRenderRow({
             songKey: "song:collab",
-            sourceIndex: 1,
             streamRole: "ホスト"
         });
         collabRow.isRelay = true;
         collabRow.isHarmony = true;
         const soloRow = makeRenderRow({
             songKey: "song:solo",
-            sourceIndex: 2,
             streamRole: ""
         });
         const data = {
@@ -441,7 +438,6 @@ test("render: explicit video orientation overrides URL heuristic", () => {
     try {
         const row = makeRenderRow({
             songKey: "a::1",
-            sourceIndex: 1,
             url: "https://youtu.be/video1",
             videoOrientation: "vertical"
         });
@@ -480,9 +476,9 @@ test("render: playSongByKey expands display limit and starts playback for hidden
     const cleanup = installFakeDom();
     try {
         const rows = [
-            makeRenderRow({ songKey: "song:1", sourceIndex: 1, url: "https://youtu.be/video1" }),
-            makeRenderRow({ songKey: "song:2", sourceIndex: 2, url: "https://youtu.be/video2" }),
-            makeRenderRow({ songKey: "song:3", sourceIndex: 3, url: "https://youtu.be/video3" })
+            makeRenderRow({ songKey: "song:1", url: "https://youtu.be/video1" }),
+            makeRenderRow({ songKey: "song:2", url: "https://youtu.be/video2" }),
+            makeRenderRow({ songKey: "song:3", url: "https://youtu.be/video3" })
         ];
         const data = {
             currentResults: rows,
@@ -533,11 +529,11 @@ test("render: playSongByKey expands display limit in increment-sized chunks", as
     const cleanup = installFakeDom();
     try {
         const rows = [
-            makeRenderRow({ songKey: "song:1", sourceIndex: 1 }),
-            makeRenderRow({ songKey: "song:2", sourceIndex: 2 }),
-            makeRenderRow({ songKey: "song:3", sourceIndex: 3 }),
-            makeRenderRow({ songKey: "song:4", sourceIndex: 4 }),
-            makeRenderRow({ songKey: "song:5", sourceIndex: 5 })
+            makeRenderRow({ songKey: "song:1"}),
+            makeRenderRow({ songKey: "song:2"}),
+            makeRenderRow({ songKey: "song:3"}),
+            makeRenderRow({ songKey: "song:4"}),
+            makeRenderRow({ songKey: "song:5"})
         ];
         const data = {
             currentResults: rows,
@@ -598,7 +594,6 @@ test("bookmark: observes result tail and increases by RESULT_DISPLAY_BATCH_SIZE 
     };
     try {
         const rows = Array.from({ length: 100 }, (_, index) => ({
-            sourceIndex: index + 1,
             songKey: `song-${index + 1}`,
             title: `曲${index + 1}`,
             artist: "artist",
@@ -705,7 +700,6 @@ test("render: result tail fallback increases display limit without IntersectionO
     };
     try {
         const rows = Array.from({ length: 60 }, (_, index) => makeRenderRow({
-            sourceIndex: index + 1,
             songKey: `song-${index + 1}`,
             url: `https://youtu.be/video${index + 1}`
         }));
@@ -761,7 +755,6 @@ test("render: result tail fallback listens to the nearest scrollable ancestor", 
     };
     try {
         const rows = Array.from({ length: 60 }, (_, index) => makeRenderRow({
-            sourceIndex: index + 1,
             songKey: `song-${index + 1}`,
             url: `https://youtu.be/video${index + 1}`
         }));
@@ -828,8 +821,8 @@ test("render: result tail fallback listens to the nearest scrollable ancestor", 
 test("render: drag handle is bookmark-only and reorder works in both directions with persistence", () => {
     const cleanup = installFakeDom();
     try {
-        const rowA = makeRenderRow({ songKey: "a::1", sourceIndex: 1, title: "A" });
-        const rowB = makeRenderRow({ songKey: "b::2", sourceIndex: 2, title: "B", url: "https://youtu.be/video2" });
+        const rowA = makeRenderRow({ songKey: "a::1", title: "A" });
+        const rowB = makeRenderRow({ songKey: "b::2", title: "B", url: "https://youtu.be/video2" });
         const data = {
             currentResults: [rowA, rowB],
             displayLimit: 10,
@@ -915,10 +908,10 @@ test("render: drag handle is bookmark-only and reorder works in both directions 
 test("render: active playback card can move back left without jumping to the end", () => {
     const cleanup = installFakeDom();
     try {
-        const rowA = makeRenderRow({ songKey: "a::1", bookmarkSongKey: "videoA::1", sourceIndex: 1, title: "A" });
-        const rowB = makeRenderRow({ songKey: "b::2", bookmarkSongKey: "videoB::2", sourceIndex: 2, title: "B" });
-        const rowC = makeRenderRow({ songKey: "c::3", bookmarkSongKey: "videoC::3", sourceIndex: 3, title: "C" });
-        const rowD = makeRenderRow({ songKey: "d::4", bookmarkSongKey: "videoD::4", sourceIndex: 4, title: "D" });
+        const rowA = makeRenderRow({ songKey: "a::1", bookmarkSongKey: "videoA::1", title: "A" });
+        const rowB = makeRenderRow({ songKey: "b::2", bookmarkSongKey: "videoB::2", title: "B" });
+        const rowC = makeRenderRow({ songKey: "c::3", bookmarkSongKey: "videoC::3", title: "C" });
+        const rowD = makeRenderRow({ songKey: "d::4", bookmarkSongKey: "videoD::4", title: "D" });
         const data = {
             currentResults: [rowA, rowB, rowC, rowD],
             displayLimit: 10,
