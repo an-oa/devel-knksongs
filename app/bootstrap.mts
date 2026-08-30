@@ -135,7 +135,7 @@ function createRenderCallbacks({
         openBookmarkModal: (songKey) => getSidebarController().openBookmarkModal(songKey),
         setupScrollObserver: () => getYoutubeController().setupScrollObserver(),
         removeSongFromActiveBookmark: (songKey) => getSidebarController().removeSongFromActiveBookmark(songKey),
-        saveBookmarks: () => getStorageController().saveBookmarks()
+        saveBookmarks: (bookmarks) => getStorageController().saveBookmarks(bookmarks)
     };
 }
 

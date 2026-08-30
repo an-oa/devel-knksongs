@@ -78,7 +78,7 @@ function createRenderCallbacks(input) {
         openBookmarkModal: callbacks.openBookmarkModal || (() => {}),
         setupScrollObserver: callbacks.setupScrollObserver || (() => {}),
         removeSongFromActiveBookmark: callbacks.removeSongFromActiveBookmark || (() => {}),
-        saveBookmarks: callbacks.saveBookmarks || (() => {})
+        saveBookmarks: callbacks.saveBookmarks || (() => ({ ok: true }))
     };
 }
 
@@ -848,6 +848,7 @@ test("render: drag handle is bookmark-only and reorder works in both directions 
             callbacks: createRenderCallbacks({
                 saveBookmarks: () => {
                     saveCount += 1;
+                    return { ok: true };
                 }
             })
         });
@@ -934,7 +935,7 @@ test("render: active playback card can move back left without jumping to the end
             ui,
             isAllFormatsSelected: () => true,
             callbacks: createRenderCallbacks({
-                saveBookmarks: () => {}
+                saveBookmarks: () => ({ ok: true })
             })
         });
 

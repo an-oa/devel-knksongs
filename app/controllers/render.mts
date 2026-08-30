@@ -73,7 +73,7 @@ type RenderCallbacks = {
     openBookmarkModal: (songKey: string) => void;
     setupScrollObserver: () => void;
     removeSongFromActiveBookmark: (songKey: string) => void;
-    saveBookmarks: () => void;
+    saveBookmarks: (bookmarks: AppDataState["bookmarks"]) => { ok: boolean };
 };
 
 type RenderControllerInput = {
