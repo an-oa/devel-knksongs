@@ -294,7 +294,7 @@ test("createBookmark: future payload blocks creation without changing state", ()
     }
 });
 
-test("createBookmark: future payload written after restore blocks creation without changing state", () => {
+test("createBookmark: blocks a future payload and resumes after storage returns to the current schema", () => {
     const restoreDom = installFakeDom();
     const prevLocalStorage = globalThis.localStorage;
     globalThis.localStorage = createFakeLocalStorage();
@@ -309,6 +309,7 @@ test("createBookmark: future payload written after restore blocks creation witho
                 }
             }
         };
+        const currentPayloadText = JSON.stringify(currentPayload);
         const futurePayloadText = JSON.stringify({
             version: 4,
             futureMetadata: { mode: "v4" },
@@ -326,13 +327,13 @@ test("createBookmark: future payload written after restore blocks creation witho
             maxBookmarkCount: 20,
             maxSongsPerBookmark: 120
         });
-        globalThis.localStorage.setItem("bookmarksTest", JSON.stringify(currentPayload));
+        globalThis.localStorage.setItem("bookmarksTest", currentPayloadText);
         controller.restorePersistedState();
 
         globalThis.localStorage.setItem("bookmarksTest", futurePayloadText);
-        const result = controller.createBookmark("Not persisted");
+        const blockedResult = controller.createBookmark("Blocked");
 
-        assert.deepEqual(result, {
+        assert.deepEqual(blockedResult, {
             ok: false,
             reason: "unsupported_storage_version",
             version: 4
@@ -340,7 +341,179 @@ test("createBookmark: future payload written after restore blocks creation witho
         assert.deepEqual(data.bookmarks, currentPayload.bookmarks);
         assert.equal(globalThis.localStorage.getItem("bookmarksTest"), futurePayloadText);
         assert.equal(getRenderCount(), 1);
+
+        globalThis.localStorage.setItem("bookmarksTest", currentPayloadText);
+        const recoveredResult = controller.createBookmark("Recovered");
+
+        assert.equal(recoveredResult.ok, true);
+        assert.equal(typeof recoveredResult.id, "string");
+        assert.deepEqual(data.bookmarks[recoveredResult.id], {
+            name: "Recovered",
+            songs: [],
+            createdAt: Number(recoveredResult.id.slice(2))
+        });
+        assert.deepEqual(JSON.parse(globalThis.localStorage.getItem("bookmarksTest")), {
+            version: 3,
+            bookmarks: data.bookmarks
+        });
+        assert.equal(getRenderCount(), 2);
     } finally {
+        globalThis.localStorage = prevLocalStorage;
+        restoreDom();
+    }
+});
+
+test("migrateLegacyBookmarkSongRefs: keeps an external legacy payload after a failed save from future-loaded state", () => {
+    const restoreDom = installFakeDom();
+    const prevLocalStorage = globalThis.localStorage;
+    const previousConsoleError = console.error;
+    const storage = createFakeLocalStorage();
+    globalThis.localStorage = storage;
+    console.error = () => {};
+    try {
+        const futurePayloadText = JSON.stringify({
+            version: 4,
+            collections: {
+                future: {
+                    name: "Future payload",
+                    songs: ["future-song"],
+                    createdAt: 1
+                }
+            }
+        });
+        const externalLegacyPayload = {
+            version: 2,
+            bookmarks: {
+                victim: {
+                    name: "External legacy payload",
+                    songs: ["song-1"],
+                    createdAt: 2
+                }
+            }
+        };
+        const externalLegacyPayloadText = JSON.stringify(externalLegacyPayload);
+        storage.setItem("bookmarksTest", futurePayloadText);
+        const { controller, bookmarkPersistenceController, data, getRenderCount } = setupStorageController({
+            bookmarks: {},
+            maxBookmarkCount: 20,
+            maxSongsPerBookmark: 120
+        });
+
+        controller.restorePersistedState();
+        storage.setItem("bookmarksTest", externalLegacyPayloadText);
+
+        const setItem = storage.setItem.bind(storage);
+        let shouldFailNextBookmarkWrite = true;
+        storage.setItem = (key, value) => {
+            if (key === "bookmarksTest" && shouldFailNextBookmarkWrite) {
+                shouldFailNextBookmarkWrite = false;
+                throw new Error("temporary bookmark write failure");
+            }
+            setItem(key, value);
+        };
+
+        const saveResult = controller.createBookmark("Not persisted");
+
+        assert.deepEqual(saveResult, {
+            ok: false,
+            reason: "storage_write_failed"
+        });
+        assert.deepEqual(data.bookmarks, {});
+        assert.equal(storage.getItem("bookmarksTest"), externalLegacyPayloadText);
+        assert.equal(getRenderCount(), 1);
+
+        bookmarkPersistenceController.migrateLegacyBookmarkSongRefs();
+
+        assert.deepEqual(data.bookmarks, {});
+        assert.deepEqual(JSON.parse(storage.getItem("bookmarksTest")), externalLegacyPayload);
+        assert.equal(getRenderCount(), 1);
+    } finally {
+        console.error = previousConsoleError;
+        globalThis.localStorage = prevLocalStorage;
+        restoreDom();
+    }
+});
+
+test("createBookmark: replaces the same malformed payload observed during restore", () => {
+    const restoreDom = installFakeDom();
+    const prevLocalStorage = globalThis.localStorage;
+    const previousConsoleError = console.error;
+    globalThis.localStorage = createFakeLocalStorage();
+    console.error = () => {};
+    try {
+        const malformedPayloadText = '{"version":3,"bookmarks":';
+        const { controller, data, getRenderCount } = setupStorageController({
+            bookmarks: {},
+            maxBookmarkCount: 20,
+            maxSongsPerBookmark: 120
+        });
+        globalThis.localStorage.setItem("bookmarksTest", malformedPayloadText);
+
+        controller.restorePersistedState();
+
+        assert.deepEqual(data.bookmarks, {});
+        assert.equal(globalThis.localStorage.getItem("bookmarksTest"), malformedPayloadText);
+        assert.equal(getRenderCount(), 1);
+
+        const result = controller.createBookmark("Recovered");
+
+        assert.equal(result.ok, true);
+        assert.equal(typeof result.id, "string");
+        assert.deepEqual(data.bookmarks[result.id], {
+            name: "Recovered",
+            songs: [],
+            createdAt: Number(result.id.slice(2))
+        });
+        assert.deepEqual(JSON.parse(globalThis.localStorage.getItem("bookmarksTest")), {
+            version: 3,
+            bookmarks: data.bookmarks
+        });
+        assert.equal(getRenderCount(), 2);
+    } finally {
+        console.error = previousConsoleError;
+        globalThis.localStorage = prevLocalStorage;
+        restoreDom();
+    }
+});
+
+test("createBookmark: does not replace a malformed payload first observed after restore", () => {
+    const restoreDom = installFakeDom();
+    const prevLocalStorage = globalThis.localStorage;
+    const previousConsoleError = console.error;
+    globalThis.localStorage = createFakeLocalStorage();
+    console.error = () => {};
+    try {
+        const currentPayload = {
+            version: 3,
+            bookmarks: {
+                current: {
+                    name: "Current payload",
+                    songs: ["song-1"],
+                    createdAt: 1
+                }
+            }
+        };
+        const malformedPayloadText = '{"version":3,"bookmarks":';
+        const { controller, data, getRenderCount } = setupStorageController({
+            bookmarks: {},
+            maxBookmarkCount: 20,
+            maxSongsPerBookmark: 120
+        });
+        globalThis.localStorage.setItem("bookmarksTest", JSON.stringify(currentPayload));
+        controller.restorePersistedState();
+
+        globalThis.localStorage.setItem("bookmarksTest", malformedPayloadText);
+        const result = controller.createBookmark("Not persisted");
+
+        assert.deepEqual(result, {
+            ok: false,
+            reason: "storage_write_failed"
+        });
+        assert.deepEqual(data.bookmarks, currentPayload.bookmarks);
+        assert.equal(globalThis.localStorage.getItem("bookmarksTest"), malformedPayloadText);
+        assert.equal(getRenderCount(), 1);
+    } finally {
+        console.error = previousConsoleError;
         globalThis.localStorage = prevLocalStorage;
         restoreDom();
     }

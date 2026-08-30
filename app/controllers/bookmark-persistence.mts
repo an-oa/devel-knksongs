@@ -43,7 +43,7 @@ export function createBookmarkPersistenceController({
 }: BookmarkPersistenceInput) {
     const { storageKey, storageVersion } = constants;
     let loadedStorageVersion = storageVersion;
-    let hasUnsupportedFutureStorage = false;
+    let recoverableMalformedStorageText: string | null = null;
 
     /**
      * ブックマーク移行デバッグログの有効状態を返す。
@@ -73,36 +73,47 @@ export function createBookmarkPersistenceController({
 
     /**
      * 通常保存の直前に現在の保存データを再検査し、別タブが書いた将来形式を保護する。
+     * 起動時に読み込めなかった破損データは、同じ文字列が残っている場合だけ復旧のため置換する。
      */
     function inspectCurrentStorageBeforeWrite(): BookmarkSaveFailure | null {
-        if (hasUnsupportedFutureStorage) {
-            return {
-                ok: false,
-                reason: "unsupported_storage_version",
-                version: loadedStorageVersion
-            };
-        }
+        let stored: string | null;
         try {
-            const stored = localStorage.getItem(storageKey);
-            if (!stored) return null;
-            const parsed = parseStoredBookmarksPayload(JSON.parse(stored), storageVersion);
-            if (parsed.supported) return null;
-
-            loadedStorageVersion = parsed.version;
-            hasUnsupportedFutureStorage = true;
-            debugBookmarkMigration("unsupported future bookmarks payload detected before save", {
-                storedVersion: parsed.version,
-                currentVersion: storageVersion
-            });
-            return {
-                ok: false,
-                reason: "unsupported_storage_version",
-                version: parsed.version
-            };
+            stored = localStorage.getItem(storageKey);
         } catch (error) {
             console.error("Failed to inspect bookmarks before saving", error);
             return { ok: false, reason: "storage_write_failed" };
         }
+        if (!stored) {
+            recoverableMalformedStorageText = null;
+            return null;
+        }
+
+        let rawPayload: unknown;
+        try {
+            rawPayload = JSON.parse(stored);
+        } catch (error) {
+            if (stored !== recoverableMalformedStorageText) {
+                console.error("Failed to parse bookmarks before saving", error);
+                return { ok: false, reason: "storage_write_failed" };
+            }
+            debugBookmarkMigration("malformed bookmarks payload will be replaced", { error });
+            return null;
+        }
+
+        const parsed = parseStoredBookmarksPayload(rawPayload, storageVersion);
+        recoverableMalformedStorageText = null;
+        if (parsed.supported) return null;
+
+        loadedStorageVersion = parsed.version;
+        debugBookmarkMigration("unsupported future bookmarks payload detected before save", {
+            storedVersion: parsed.version,
+            currentVersion: storageVersion
+        });
+        return {
+            ok: false,
+            reason: "unsupported_storage_version",
+            version: parsed.version
+        };
     }
 
     /**
@@ -127,7 +138,7 @@ export function createBookmarkPersistenceController({
                 JSON.stringify(buildStoredBookmarksPayload(bookmarks, storageVersion))
             );
             loadedStorageVersion = storageVersion;
-            hasUnsupportedFutureStorage = false;
+            recoverableMalformedStorageText = null;
             return { ok: true };
         } catch (error) {
             console.error("Failed to save bookmarks", error);
@@ -159,41 +170,50 @@ export function createBookmarkPersistenceController({
      * ブックマークをローカルストレージから state へ読み込む。
      */
     function loadBookmarksFromStorage(): BookmarkLoadResult {
+        let stored: string | null;
         try {
-            const stored = localStorage.getItem(storageKey);
-            loadedStorageVersion = storageVersion;
-            hasUnsupportedFutureStorage = false;
-            if (stored) {
-                const parsed = parseStoredBookmarksPayload(JSON.parse(stored), storageVersion);
-                loadedStorageVersion = parsed.version;
-                if (!parsed.supported) {
-                    data.bookmarks = {};
-                    hasUnsupportedFutureStorage = true;
-                    debugBookmarkMigration("unsupported future bookmarks payload preserved", {
-                        storedVersion: parsed.version,
-                        currentVersion: storageVersion
-                    });
-                    return {
-                        supported: false,
-                        reason: "unsupported_storage_version",
-                        version: parsed.version
-                    };
-                }
-                data.bookmarks = parsed.bookmarks;
-                hasUnsupportedFutureStorage = false;
-                debugBookmarkMigration("loaded bookmarks payload", {
-                    storedVersion: parsed.version,
-                    bookmarkCount: Object.keys(parsed.bookmarks).length
-                });
-            }
-            return { supported: true };
+            stored = localStorage.getItem(storageKey);
         } catch (error) {
             console.error("Failed to load bookmarks", error);
             data.bookmarks = {};
             loadedStorageVersion = storageVersion;
-            hasUnsupportedFutureStorage = false;
+            recoverableMalformedStorageText = null;
             return { supported: true };
         }
+        loadedStorageVersion = storageVersion;
+        recoverableMalformedStorageText = null;
+        if (!stored) return { supported: true };
+
+        let rawPayload: unknown;
+        try {
+            rawPayload = JSON.parse(stored);
+        } catch (error) {
+            console.error("Failed to load bookmarks", error);
+            data.bookmarks = {};
+            recoverableMalformedStorageText = stored;
+            return { supported: true };
+        }
+
+        const parsed = parseStoredBookmarksPayload(rawPayload, storageVersion);
+        loadedStorageVersion = parsed.version;
+        if (!parsed.supported) {
+            data.bookmarks = {};
+            debugBookmarkMigration("unsupported future bookmarks payload preserved", {
+                storedVersion: parsed.version,
+                currentVersion: storageVersion
+            });
+            return {
+                supported: false,
+                reason: "unsupported_storage_version",
+                version: parsed.version
+            };
+        }
+        data.bookmarks = parsed.bookmarks;
+        debugBookmarkMigration("loaded bookmarks payload", {
+            storedVersion: parsed.version,
+            bookmarkCount: Object.keys(parsed.bookmarks).length
+        });
+        return { supported: true };
     }
 
     /**
