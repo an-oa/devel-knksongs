@@ -11,6 +11,17 @@ type StoredBookmarkRecord = {
     songs: string[];
 };
 
+type ParsedStoredBookmarksPayload =
+    | {
+        supported: true;
+        version: number;
+        bookmarks: Record<string, StoredBookmarkRecord>;
+    }
+    | {
+        supported: false;
+        version: number;
+    };
+
 type RawBookmarkRecord = {
     name?: unknown;
     createdAt?: unknown;
@@ -59,23 +70,35 @@ export function sanitizeBookmarks(raw) {
 }
 
 /**
- * 保存済みブックマーク payload を解析し、version と本体を取り出す。
- * @param {*} raw
- * @returns {{ version: number, bookmarks: Record<string, { name: string, createdAt: number, songs: string[] }> }}
+ * 保存済みブックマーク payload を解析し、対応済み version の本体だけを取り出す。
+ * 現行より新しい version は未知フィールドを失わないよう正規化せず、未対応として返す。
+ * @param raw 保存済み payload
+ * @param currentVersion 現在対応している schema version
  */
-export function parseStoredBookmarksPayload(raw) {
+export function parseStoredBookmarksPayload(
+    raw: unknown,
+    currentVersion: number
+): ParsedStoredBookmarksPayload {
+    const maxSupportedVersion = Number.isFinite(currentVersion)
+        ? Number(currentVersion)
+        : 1;
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
-        return { version: 1, bookmarks: {} };
+        return { supported: true, version: 1, bookmarks: {} };
     }
     const payload = raw as { version?: unknown, bookmarks?: unknown };
     if (Object.prototype.hasOwnProperty.call(payload, "bookmarks")) {
         const version = Number.isFinite(payload.version) ? Number(payload.version) : 1;
+        if (version > maxSupportedVersion) {
+            return { supported: false, version };
+        }
         return {
+            supported: true,
             version,
             bookmarks: sanitizeBookmarks(payload.bookmarks)
         };
     }
     return {
+        supported: true,
         version: 1,
         bookmarks: sanitizeBookmarks(raw)
     };

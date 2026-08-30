@@ -158,6 +158,42 @@ test("restorePersistedState: invalid bookmark payload is sanitized and deduplica
     }
 });
 
+test("restorePersistedState: future bookmark payload remains untouched and unsupported", () => {
+    const restoreDom = installFakeDom();
+    const prevLocalStorage = globalThis.localStorage;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        const futurePayloadText = JSON.stringify({
+            version: 4,
+            futureMetadata: { mode: "v4" },
+            bookmarks: {
+                future: {
+                    name: "Future payload",
+                    songs: ["future-song"],
+                    createdAt: 1710000000000,
+                    futureField: true
+                }
+            }
+        });
+        const { controller, bookmarkPersistenceController, data } = setupStorageController({
+            bookmarks: {},
+            maxBookmarkCount: 20,
+            maxSongsPerBookmark: 120
+        });
+        globalThis.localStorage.setItem("bookmarksTest", futurePayloadText);
+
+        controller.restorePersistedState();
+        bookmarkPersistenceController.migrateLegacyBookmarkSongRefs();
+        bookmarkPersistenceController.saveBookmarks();
+
+        assert.deepEqual(data.bookmarks, {});
+        assert.equal(globalThis.localStorage.getItem("bookmarksTest"), futurePayloadText);
+    } finally {
+        globalThis.localStorage = prevLocalStorage;
+        restoreDom();
+    }
+});
+
 test("restorePersistedState: existing long bookmark names are preserved", () => {
     const restoreDom = installFakeDom();
     const prevLocalStorage = globalThis.localStorage;

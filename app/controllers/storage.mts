@@ -56,6 +56,7 @@ type StorageActionResult = {
     songCount?: number;
     limit?: number;
     bookmarkName?: string;
+    version?: number;
 };
 
 type StorageControllerInput = {
@@ -148,6 +149,7 @@ export function createStorageController({
     function parseBookmarkImportText(text: unknown): StorageActionResult {
         return parseBookmarkImportJsonText(text, {
             songRows: data.allSongsRaw,
+            storageVersion: BOOKMARK_STORAGE_VERSION,
             maxBookmarkCount: MAX_BOOKMARK_COUNT,
             maxSongsPerBookmark: MAX_SONGS_PER_BOOKMARK,
             maxBookmarkNameLength: MAX_BOOKMARK_NAME_LENGTH

@@ -32,6 +32,7 @@ test("bookmark transfer: drops unresolved numeric refs before applying song limi
             }
         }
     }), {
+        storageVersion: 3,
         songRows: [{ songKey: "s1", bookmarkSongKey: "s1" }],
         maxBookmarkCount: 20,
         maxSongsPerBookmark: 1
@@ -62,6 +63,7 @@ test("bookmark transfer: parses and migrates import payloads", () => {
             }
         }
     }), {
+        storageVersion: 3,
         songRows: [
             {
                 songKey: "arch1::1",
@@ -87,6 +89,7 @@ test("bookmark transfer: parses and migrates import payloads", () => {
 
 test("bookmark transfer: rejects invalid JSON and import files over limits", () => {
     const options = {
+        storageVersion: 3,
         songRows: [
             { songKey: "s1", bookmarkSongKey: "s1" },
             { songKey: "s2", bookmarkSongKey: "s2" }
@@ -135,5 +138,22 @@ test("bookmark transfer: rejects invalid JSON and import files over limits", () 
         ok: false,
         reason: "max_bookmark_name_length",
         limit: 64
+    });
+});
+
+test("bookmark transfer: rejects payloads from a future storage version", () => {
+    const result = parseBookmarkImportText(JSON.stringify({
+        version: 4,
+        bookmarks: {
+            future: { name: "Future", songs: ["s1"], createdAt: 1 }
+        }
+    }), {
+        storageVersion: 3
+    });
+
+    assert.deepEqual(result, {
+        ok: false,
+        reason: "unsupported_version",
+        version: 4
     });
 });

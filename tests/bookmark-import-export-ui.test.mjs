@@ -19,6 +19,10 @@ test("bookmark import export ui: maps import results to user-facing messages", (
         "JSONとして読み込めないファイルです。"
     );
     assert.equal(
+        getBookmarkImportErrorMessage({ ok: false, reason: "unsupported_version", version: 4 }),
+        "このアプリより新しい形式のブックマークファイルは読み込めません。"
+    );
+    assert.equal(
         getBookmarkImportErrorMessage({ ok: false, reason: "max_bookmark_count", limit: 20 }),
         "インポートできるブックマークは最大20件です。"
     );

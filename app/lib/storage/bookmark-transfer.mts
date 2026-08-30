@@ -17,6 +17,7 @@ type BookmarkImportLimits = {
 
 type BookmarkImportOptions = BookmarkImportLimits & {
     songRows?: Array<Record<string, unknown>>;
+    storageVersion: number;
 };
 
 /**
@@ -97,13 +98,14 @@ function validateBookmarkImportLimits(
  * @param {*} text
  * @param {{
  *   songRows?: Array<*>,
+ *   storageVersion: number,
  *   maxBookmarkCount?: number,
  *   maxSongsPerBookmark?: number,
  *   maxBookmarkNameLength?: number
  * }} options
  * @returns {{ ok: boolean, reason?: string, bookmarks?: Record<string, *>, bookmarkCount?: number, songCount?: number, limit?: number, bookmarkName?: string }}
  */
-export function parseBookmarkImportText(text, options: BookmarkImportOptions = {}) {
+export function parseBookmarkImportText(text, options: BookmarkImportOptions) {
     if (typeof text !== "string") return buildActionFail("invalid_text");
 
     let raw;
@@ -127,7 +129,10 @@ export function parseBookmarkImportText(text, options: BookmarkImportOptions = {
         return buildActionFail("invalid_bookmark_file");
     }
 
-    const parsed = parseStoredBookmarksPayload(raw);
+    const parsed = parseStoredBookmarksPayload(raw, options.storageVersion);
+    if (!parsed.supported) {
+        return buildActionFail("unsupported_version", { version: parsed.version });
+    }
     const bookmarks = parsed.bookmarks;
     const bookmarkCount = Object.keys(bookmarks).length;
     if ((!isVersionedPayload || rawEntryCount > 0) && bookmarkCount === 0) {

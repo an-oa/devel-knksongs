@@ -24,8 +24,9 @@ test("bookmark storage schema: parses legacy and versioned payloads with sanitiz
                     createdAt: 1710000000001
                 }
             }
-        }),
+        }, 3),
         {
+            supported: true,
             version: 2,
             bookmarks: {
                 keep: {
@@ -44,8 +45,9 @@ test("bookmark storage schema: parses legacy and versioned payloads with sanitiz
                 songs: ["arch1::1"],
                 createdAt: 10
             }
-        }),
+        }, 3),
         {
+            supported: true,
             version: 1,
             bookmarks: {
                 legacy: {
@@ -56,6 +58,28 @@ test("bookmark storage schema: parses legacy and versioned payloads with sanitiz
             }
         }
     );
+});
+
+test("bookmark storage schema: rejects future payloads without normalizing their contents", () => {
+    const raw = {
+        version: 4,
+        futureMetadata: { mode: "v4" },
+        bookmarks: {
+            future: {
+                name: " Future ",
+                songs: ["song-1", "song-1"],
+                createdAt: 1,
+                futureField: true
+            }
+        }
+    };
+
+    assert.deepEqual(parseStoredBookmarksPayload(raw, 3), {
+        supported: false,
+        version: 4
+    });
+    assert.equal(raw.bookmarks.future.name, " Future ");
+    assert.deepEqual(raw.bookmarks.future.songs, ["song-1", "song-1"]);
 });
 
 test("bookmark storage schema: builds versioned storage payload", () => {

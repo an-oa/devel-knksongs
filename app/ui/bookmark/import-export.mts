@@ -1,5 +1,6 @@
 type BookmarkImportMessageResult = {
     reason?: string;
+    version?: number;
     limit?: number;
     bookmarkName?: string;
     bookmarkCount?: number;
@@ -101,6 +102,9 @@ export function getBookmarkImportErrorMessage(result: BookmarkImportMessageResul
     }
     if (result.reason === "invalid_bookmark_file" || result.reason === "invalid_text") {
         return "ブックマークの形式ではないファイルです。";
+    }
+    if (result.reason === "unsupported_version") {
+        return "このアプリより新しい形式のブックマークファイルは読み込めません。";
     }
     if (result.reason === "max_bookmark_count") {
         const limit = Number.isFinite(result.limit) ? result.limit : null;

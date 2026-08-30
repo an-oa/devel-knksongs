@@ -22,6 +22,7 @@ export function createBookmarkPersistenceController({
 }: BookmarkPersistenceInput) {
     const { storageKey, storageVersion } = constants;
     let loadedStorageVersion = storageVersion;
+    let hasUnsupportedFutureStorage = false;
 
     /**
      * ブックマーク移行デバッグログの有効状態を返す。
@@ -53,6 +54,13 @@ export function createBookmarkPersistenceController({
      * 現在のブックマークを現行 schema でローカルストレージへ保存する。
      */
     function saveBookmarks(): void {
+        if (hasUnsupportedFutureStorage) {
+            debugBookmarkMigration("bookmark save skipped for unsupported future payload", {
+                storedVersion: loadedStorageVersion,
+                currentVersion: storageVersion
+            });
+            return;
+        }
         try {
             localStorage.setItem(
                 storageKey,
@@ -70,10 +78,22 @@ export function createBookmarkPersistenceController({
     function loadBookmarksFromStorage(): void {
         try {
             const stored = localStorage.getItem(storageKey);
+            loadedStorageVersion = storageVersion;
+            hasUnsupportedFutureStorage = false;
             if (stored) {
-                const parsed = parseStoredBookmarksPayload(JSON.parse(stored));
-                data.bookmarks = parsed.bookmarks;
+                const parsed = parseStoredBookmarksPayload(JSON.parse(stored), storageVersion);
                 loadedStorageVersion = parsed.version;
+                if (!parsed.supported) {
+                    data.bookmarks = {};
+                    hasUnsupportedFutureStorage = true;
+                    debugBookmarkMigration("unsupported future bookmarks payload preserved", {
+                        storedVersion: parsed.version,
+                        currentVersion: storageVersion
+                    });
+                    return;
+                }
+                data.bookmarks = parsed.bookmarks;
+                hasUnsupportedFutureStorage = false;
                 debugBookmarkMigration("loaded bookmarks payload", {
                     storedVersion: parsed.version,
                     bookmarkCount: Object.keys(parsed.bookmarks).length
@@ -82,6 +102,8 @@ export function createBookmarkPersistenceController({
         } catch (error) {
             console.error("Failed to load bookmarks", error);
             data.bookmarks = {};
+            loadedStorageVersion = storageVersion;
+            hasUnsupportedFutureStorage = false;
         }
     }
 
@@ -95,6 +117,13 @@ export function createBookmarkPersistenceController({
             bookmarkCount: Object.keys(data.bookmarks).length,
             songRowCount: Array.isArray(data.allSongsRaw) ? data.allSongsRaw.length : 0
         });
+        if (loadedStorageVersion >= storageVersion) {
+            debugBookmarkMigration("bookmark ref migration skipped", {
+                changedBookmarkIds: [],
+                currentVersion: loadedStorageVersion
+            });
+            return;
+        }
         const migration = migrateLegacyBookmarkSongRefsToCurrent({
             bookmarks: data.bookmarks,
             songRows: data.allSongsRaw
@@ -102,17 +131,10 @@ export function createBookmarkPersistenceController({
         migration.changes.forEach((change) => {
             debugBookmarkMigration("bookmark refs migrated", change);
         });
-        if (migration.updated || loadedStorageVersion !== storageVersion) {
-            saveBookmarks();
-            debugBookmarkMigration("saved migrated bookmarks payload", {
-                changedBookmarkIds: migration.changedBookmarkIds,
-                upgradedVersion: storageVersion
-            });
-            return;
-        }
-        debugBookmarkMigration("bookmark ref migration skipped", {
-            changedBookmarkIds: [],
-            currentVersion: loadedStorageVersion
+        saveBookmarks();
+        debugBookmarkMigration("saved migrated bookmarks payload", {
+            changedBookmarkIds: migration.changedBookmarkIds,
+            upgradedVersion: storageVersion
         });
     }
 
