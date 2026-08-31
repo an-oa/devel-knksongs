@@ -451,6 +451,36 @@ test("bookmark ui: unsupported storage version shows an error without a success 
     }
 });
 
+test("bookmark ui: stale loaded storage state asks for a reload without a success notification", () => {
+    const restoreDom = installFakeDom();
+    const previousAlert = globalThis.alert;
+    const alerts = [];
+    globalThis.alert = (message) => {
+        alerts.push(String(message));
+    };
+    try {
+        const { ui, controller } = createBookmarkHarness({
+            onCreateBookmark: () => ({
+                ok: false,
+                reason: "storage_reload_required"
+            })
+        });
+        controller.setupBookmarkHandlers();
+        ui.el.bookmarkPanelNewName.value = "Not persisted";
+
+        invokeListener(ui.el.bookmarkPanelCreateBtn, "click", {});
+
+        assert.deepEqual(alerts, [
+            "別のタブでブックマークが更新された可能性があります。画面を再読み込みしてから、もう一度お試しください。"
+        ]);
+        assert.equal(ui.el.bookmarkPanelNewName.value, "Not persisted");
+        assert.equal(ui.el.bookmarkNotificationRegion.childElementCount, 0);
+    } finally {
+        globalThis.alert = previousAlert;
+        restoreDom();
+    }
+});
+
 test("bookmark ui: removing a song from active bookmark notifies bookmark name and song title", () => {
     const restoreDom = installFakeDom();
     try {

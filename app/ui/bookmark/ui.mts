@@ -149,6 +149,10 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
             alert("このアプリより新しい形式のブックマークが保存されているため、変更できません。");
             return true;
         }
+        if (result.reason === "storage_reload_required") {
+            alert("別のタブでブックマークが更新された可能性があります。画面を再読み込みしてから、もう一度お試しください。");
+            return true;
+        }
         if (result.reason === "storage_write_failed") {
             alert("ブックマークを保存できませんでした。ブラウザのストレージ設定をご確認ください。");
             return true;

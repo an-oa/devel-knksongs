@@ -343,6 +343,10 @@ test("restorePersistedState: restores an existing active bookmark and draws once
         const harness = createActiveBookmarkRestoreHarness({
             "bookmark-1": { name: "Favorites", songs: [], createdAt: 1 }
         });
+        globalThis.localStorage.setItem(
+            "bookmarksTest",
+            JSON.stringify(harness.data.bookmarks)
+        );
         globalThis.localStorage.setItem("searchStateTest", JSON.stringify({
             version: 6,
             formats: ["配信"],

@@ -13,6 +13,10 @@ export type BookmarkSaveFailure =
     }
     | {
         ok: false;
+        reason: "storage_reload_required";
+    }
+    | {
+        ok: false;
         reason: "storage_write_failed";
     };
 
@@ -44,6 +48,7 @@ export function createBookmarkPersistenceController({
     const { storageKey, storageVersion } = constants;
     let loadedStorageVersion = storageVersion;
     let recoverableMalformedStorageText: string | null = null;
+    let bookmarkStorageSnapshot: string | null | undefined = null;
 
     /**
      * ブックマーク移行デバッグログの有効状態を返す。
@@ -72,8 +77,20 @@ export function createBookmarkPersistenceController({
     }
 
     /**
+     * 保存候補の基礎となった保存データと現在値が一致しなければ、再読込要求を返す。
+     * @param stored 現在の保存データ。未保存の場合はnull。
+     */
+    function getBookmarkStorageSnapshotFailure(
+        stored: string | null
+    ): BookmarkSaveFailure | null {
+        if (bookmarkStorageSnapshot === stored) return null;
+        return { ok: false, reason: "storage_reload_required" };
+    }
+
+    /**
      * 通常保存の直前に現在の保存データを再検査し、別タブが書いた将来形式を保護する。
      * 起動時に読み込めなかった破損データは、同じ文字列が残っている場合だけ復旧のため置換する。
+     * 現在値が読込・保存成功時のsnapshotと異なる場合は、対応形式でも再読込を求める。
      */
     function inspectCurrentStorageBeforeWrite(): BookmarkSaveFailure | null {
         let stored: string | null;
@@ -85,7 +102,7 @@ export function createBookmarkPersistenceController({
         }
         if (!stored) {
             recoverableMalformedStorageText = null;
-            return null;
+            return getBookmarkStorageSnapshotFailure(null);
         }
 
         let rawPayload: unknown;
@@ -102,9 +119,8 @@ export function createBookmarkPersistenceController({
 
         const parsed = parseStoredBookmarksPayload(rawPayload, storageVersion);
         recoverableMalformedStorageText = null;
-        if (parsed.supported) return null;
+        if (parsed.supported) return getBookmarkStorageSnapshotFailure(stored);
 
-        loadedStorageVersion = parsed.version;
         debugBookmarkMigration("unsupported future bookmarks payload detected before save", {
             storedVersion: parsed.version,
             currentVersion: storageVersion
@@ -133,12 +149,11 @@ export function createBookmarkPersistenceController({
             }
         }
         try {
-            localStorage.setItem(
-                storageKey,
-                JSON.stringify(buildStoredBookmarksPayload(bookmarks, storageVersion))
-            );
+            const stored = JSON.stringify(buildStoredBookmarksPayload(bookmarks, storageVersion));
+            localStorage.setItem(storageKey, stored);
             loadedStorageVersion = storageVersion;
             recoverableMalformedStorageText = null;
+            bookmarkStorageSnapshot = stored;
             return { ok: true };
         } catch (error) {
             console.error("Failed to save bookmarks", error);
@@ -170,19 +185,22 @@ export function createBookmarkPersistenceController({
      * ブックマークをローカルストレージから state へ読み込む。
      */
     function loadBookmarksFromStorage(): BookmarkLoadResult {
+        loadedStorageVersion = storageVersion;
+        recoverableMalformedStorageText = null;
+        bookmarkStorageSnapshot = undefined;
         let stored: string | null;
         try {
             stored = localStorage.getItem(storageKey);
         } catch (error) {
             console.error("Failed to load bookmarks", error);
             data.bookmarks = {};
-            loadedStorageVersion = storageVersion;
-            recoverableMalformedStorageText = null;
             return { supported: true };
         }
-        loadedStorageVersion = storageVersion;
-        recoverableMalformedStorageText = null;
-        if (!stored) return { supported: true };
+        if (!stored) {
+            data.bookmarks = {};
+            bookmarkStorageSnapshot = null;
+            return { supported: true };
+        }
 
         let rawPayload: unknown;
         try {
@@ -209,6 +227,7 @@ export function createBookmarkPersistenceController({
             };
         }
         data.bookmarks = parsed.bookmarks;
+        bookmarkStorageSnapshot = stored;
         debugBookmarkMigration("loaded bookmarks payload", {
             storedVersion: parsed.version,
             bookmarkCount: Object.keys(parsed.bookmarks).length
@@ -226,7 +245,7 @@ export function createBookmarkPersistenceController({
             bookmarkCount: Object.keys(data.bookmarks).length,
             songRowCount: Array.isArray(data.allSongsRaw) ? data.allSongsRaw.length : 0
         });
-        if (loadedStorageVersion > storageVersion) {
+        if (bookmarkStorageSnapshot === undefined || loadedStorageVersion > storageVersion) {
             debugBookmarkMigration("bookmark ref migration skipped", {
                 changedBookmarkIds: [],
                 currentVersion: loadedStorageVersion
