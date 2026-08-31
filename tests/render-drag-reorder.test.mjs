@@ -26,7 +26,8 @@ function createDragHarness(options = {}) {
     const calls = {
         save: 0,
         update: 0,
-        savedBookmarks: []
+        savedBookmarks: [],
+        saveFailures: []
     };
     const controller = createBookmarkDragReorderController({
         data,
@@ -35,6 +36,9 @@ function createDragHarness(options = {}) {
             calls.save += 1;
             calls.savedBookmarks.push(bookmarks);
             return options.saveResult || { ok: true };
+        },
+        onSaveFailure: (result) => {
+            calls.saveFailures.push(result);
         },
         updateDisplay: () => {
             calls.update += 1;
@@ -72,13 +76,14 @@ test("render drag reorder: drop reorders results and persists bookmark order", (
         assert.deepEqual(data.bookmarks["bookmark-1"].songs, ["song-b", "song-c", "song-a"]);
         assert.equal(calls.save, 1);
         assert.deepEqual(calls.savedBookmarks[0]["bookmark-1"].songs, ["song-b", "song-c", "song-a"]);
+        assert.deepEqual(calls.saveFailures, []);
         assert.equal(calls.update, 1);
     } finally {
         cleanup();
     }
 });
 
-test("render drag reorder: failed persistence leaves result and bookmark order unchanged", () => {
+test("render drag reorder: failed persistence is reported without changing order", () => {
     const cleanup = installFakeDom();
     try {
         const { data, calls, controller } = createDragHarness({
@@ -108,6 +113,9 @@ test("render drag reorder: failed persistence leaves result and bookmark order u
         assert.deepEqual(data.currentResults.map((row) => row.songKey), ["a", "b", "c"]);
         assert.deepEqual(data.bookmarks["bookmark-1"].songs, ["song-a", "song-b", "song-c"]);
         assert.deepEqual(calls.savedBookmarks[0]["bookmark-1"].songs, ["song-b", "song-c", "song-a"]);
+        assert.deepEqual(calls.saveFailures, [
+            { ok: false, reason: "storage_write_failed" }
+        ]);
         assert.equal(calls.save, 1);
         assert.equal(calls.update, 0);
     } finally {

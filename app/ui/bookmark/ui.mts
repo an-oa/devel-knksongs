@@ -161,6 +161,13 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
     }
 
     /**
+     * 外部操作から受け取ったブックマーク保存失敗を共通文言で通知する。
+     */
+    function notifyBookmarkSaveError(result: BookmarkUiActionCallbackResult): boolean {
+        return notifyIfBookmarkSaveError(normalizeActionResult(result));
+    }
+
+    /**
      * リネーム失敗時に理由別メッセージを表示し、通知したかどうかを返す。
      * @param {BookmarkUiActionResult} result
      * @returns {boolean}
@@ -628,6 +635,7 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
         closeBookmarkModal,
         setActiveBookmark,
         clearActiveBookmark,
+        notifyBookmarkSaveError,
         removeSongFromActiveBookmark
     };
 }

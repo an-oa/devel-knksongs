@@ -3,6 +3,10 @@ import { hasStreamRole } from "../lib/stream-role.mjs";
 import { tracePlayback } from "../lib/playback-debug.mjs";
 import { scheduleScrollElementIntoView } from "../lib/results-scroll.mjs";
 import { createBookmarkDragReorderController } from "../lib/render/drag-reorder.mjs";
+import type {
+    BookmarkDragReorderSaveFailure,
+    BookmarkDragReorderSaveResult
+} from "../lib/render/drag-reorder.mjs";
 import { applyMasonryLayout } from "../lib/render/masonry-layout.mjs";
 import { createResultTailObserver } from "../lib/render/result-tail-observer.mjs";
 import { getBookmarkSongRef } from "../lib/song-identity.mjs";
@@ -73,7 +77,10 @@ type RenderCallbacks = {
     openBookmarkModal: (songKey: string) => void;
     setupScrollObserver: () => void;
     removeSongFromActiveBookmark: (songKey: string) => void;
-    saveBookmarks: (bookmarks: AppDataState["bookmarks"]) => { ok: boolean };
+    saveBookmarks: (
+        bookmarks: AppDataState["bookmarks"]
+    ) => BookmarkDragReorderSaveResult;
+    notifyBookmarkSaveError: (result: BookmarkDragReorderSaveFailure) => void;
 };
 
 type RenderControllerInput = {
@@ -106,6 +113,7 @@ export function createRenderController({
     const setupScrollObserver = callbacks.setupScrollObserver;
     const removeSongFromActiveBookmark = callbacks.removeSongFromActiveBookmark;
     const saveBookmarks = callbacks.saveBookmarks;
+    const notifyBookmarkSaveError = callbacks.notifyBookmarkSaveError;
     const displayBatchSize = Number.isFinite(resultDisplayBatchSize) && resultDisplayBatchSize > 0
         ? Math.max(1, Math.floor(resultDisplayBatchSize))
         : DEFAULT_RESULT_DISPLAY_BATCH_SIZE;
@@ -113,6 +121,7 @@ export function createRenderController({
         data,
         getBookmarkSongRef: (row) => getBookmarkSongRef(row),
         saveBookmarks,
+        onSaveFailure: notifyBookmarkSaveError,
         updateDisplay: () => updateDisplay()
     });
     const resultTailObservationController = createResultTailObserver({

@@ -481,6 +481,31 @@ test("bookmark ui: stale loaded storage state asks for a reload without a succes
     }
 });
 
+test("bookmark ui: public save error notifier asks for a reload", () => {
+    const restoreDom = installFakeDom();
+    const previousAlert = globalThis.alert;
+    const alerts = [];
+    globalThis.alert = (message) => {
+        alerts.push(String(message));
+    };
+    try {
+        const { controller } = createBookmarkHarness();
+
+        const didNotify = controller.notifyBookmarkSaveError({
+            ok: false,
+            reason: "storage_reload_required"
+        });
+
+        assert.equal(didNotify, true);
+        assert.deepEqual(alerts, [
+            "別のタブでブックマークが更新された可能性があります。画面を再読み込みしてから、もう一度お試しください。"
+        ]);
+    } finally {
+        globalThis.alert = previousAlert;
+        restoreDom();
+    }
+});
+
 test("bookmark ui: removing a song from active bookmark notifies bookmark name and song title", () => {
     const restoreDom = installFakeDom();
     try {

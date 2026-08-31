@@ -20,10 +20,23 @@ type BookmarkDragEvent = {
     preventDefault: () => void;
 };
 
+export type BookmarkDragReorderSaveFailure = {
+    ok: false;
+    reason: string;
+    version?: number;
+};
+
+export type BookmarkDragReorderSaveResult =
+    | { ok: true }
+    | BookmarkDragReorderSaveFailure;
+
 type BookmarkDragReorderControllerInput = {
     data: BookmarkDragReorderDataState;
     getBookmarkSongRef: (row: Song) => string;
-    saveBookmarks: (bookmarks: Record<string, BookmarkRecord>) => { ok: boolean };
+    saveBookmarks: (
+        bookmarks: Record<string, BookmarkRecord>
+    ) => BookmarkDragReorderSaveResult;
+    onSaveFailure: (result: BookmarkDragReorderSaveFailure) => void;
     updateDisplay: () => void;
 };
 
@@ -40,10 +53,15 @@ function getSongCardFromTarget(target: unknown): HTMLElement | null {
 
 /**
  * ブックマーク表示中のカードドラッグ並べ替えを扱うコントローラーを作成する。
- * @param {{ data: *, getBookmarkSongRef: Function, saveBookmarks: Function, updateDisplay: Function }} input
  */
 export function createBookmarkDragReorderController(input: BookmarkDragReorderControllerInput) {
-    const { data, getBookmarkSongRef, saveBookmarks, updateDisplay } = input;
+    const {
+        data,
+        getBookmarkSongRef,
+        saveBookmarks,
+        onSaveFailure,
+        updateDisplay
+    } = input;
 
     /**
      * 指定した結果順を反映したブックマーク曲順の候補を作る。
@@ -165,7 +183,10 @@ export function createBookmarkDragReorderController(input: BookmarkDragReorderCo
             [bookmarkId]: { ...bookmark, songs: nextSongs }
         };
         const saveResult = saveBookmarks(nextBookmarks);
-        if (!saveResult.ok) return;
+        if (saveResult.ok === false) {
+            onSaveFailure(saveResult);
+            return;
+        }
 
         data.currentResults.splice(0, data.currentResults.length, ...nextResults);
         data.bookmarks = nextBookmarks;

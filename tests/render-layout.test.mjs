@@ -78,7 +78,8 @@ function createRenderCallbacks(input) {
         openBookmarkModal: callbacks.openBookmarkModal || (() => {}),
         setupScrollObserver: callbacks.setupScrollObserver || (() => {}),
         removeSongFromActiveBookmark: callbacks.removeSongFromActiveBookmark || (() => {}),
-        saveBookmarks: callbacks.saveBookmarks || (() => ({ ok: true }))
+        saveBookmarks: callbacks.saveBookmarks || (() => ({ ok: true })),
+        notifyBookmarkSaveError: callbacks.notifyBookmarkSaveError || (() => {})
     };
 }
 
@@ -901,6 +902,67 @@ test("render: drag handle is bookmark-only and reorder works in both directions 
         assert.deepEqual(data.currentResults.map((row) => row.songKey), [rowA.songKey, rowB.songKey]);
         assert.deepEqual(data.bookmarks.bm1.songs, [rowA.songKey, rowB.songKey]);
         assert.equal(saveCount, 2);
+    } finally {
+        cleanup();
+    }
+});
+
+test("render: drag reorder forwards reload-required save failures without changing state", () => {
+    const cleanup = installFakeDom();
+    try {
+        const rowA = makeRenderRow({ songKey: "a::1", title: "A" });
+        const rowB = makeRenderRow({ songKey: "b::2", title: "B" });
+        const data = {
+            currentResults: [rowA, rowB],
+            displayLimit: 10,
+            activeBookmark: "bm1",
+            bookmarks: {
+                bm1: {
+                    name: "test",
+                    songs: [rowA.songKey, rowB.songKey]
+                }
+            }
+        };
+        const ui = createRenderUiState({
+            el: {
+                resultList: document.createElement("div"),
+                resultTailSentinel: document.createElement("div")
+            }
+        });
+        const saveFailure = { ok: false, reason: "storage_reload_required" };
+        const notifiedFailures = [];
+        const controller = createRenderController({
+            data,
+            ui,
+            isAllFormatsSelected: () => true,
+            callbacks: createRenderCallbacks({
+                saveBookmarks: () => saveFailure,
+                notifyBookmarkSaveError: (result) => notifiedFailures.push(result)
+            })
+        });
+
+        controller.updateDisplay();
+        const entryA = ui.render.cardEntriesBySongKey.get(rowA.songKey);
+        const entryB = ui.render.cardEntriesBySongKey.get(rowB.songKey);
+        assert.ok(entryA);
+        assert.ok(entryB);
+
+        const transfer = createDataTransferMock();
+        invokeListener(entryA.dragHandle, "dragstart", {
+            currentTarget: entryA.dragHandle,
+            target: entryA.dragHandle,
+            dataTransfer: transfer,
+            preventDefault() {}
+        });
+        invokeListener(entryB.card, "drop", {
+            target: entryB.card,
+            dataTransfer: transfer,
+            preventDefault() {}
+        });
+
+        assert.deepEqual(data.currentResults.map((row) => row.songKey), [rowA.songKey, rowB.songKey]);
+        assert.deepEqual(data.bookmarks.bm1.songs, [rowA.songKey, rowB.songKey]);
+        assert.deepEqual(notifiedFailures, [saveFailure]);
     } finally {
         cleanup();
     }
