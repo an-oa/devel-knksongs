@@ -49,8 +49,7 @@ function createDataLoaderHarness(input) {
     searchBox.disabled = options.searchBoxDisabled ?? true;
 
     const data = {
-        allSongsRaw: [],
-        pendingSongsRaw: null
+        allSongsRaw: []
     };
     const ui = {
         el: {
@@ -69,8 +68,7 @@ function createDataLoaderHarness(input) {
 
     const calls = {
         applyDateInputRangeArgs: [],
-        clampDateInputsToBoundsArgs: [],
-        refreshSnapshotArgs: []
+        clampDateInputsToBoundsArgs: []
     };
 
     const callbacks = {
@@ -88,7 +86,7 @@ function createDataLoaderHarness(input) {
 
 /**
  * dataSource から返すスナップショットを指定して data loader を作る。
- * @param {{ initialSnapshot?: object | null, onRefresh?: Function }} options
+ * @param {{ initialSnapshot?: object | null }} options
  * @param {*} harness
  * @returns {*}
  */
@@ -96,16 +94,9 @@ function createLoaderWithDataSource(options, harness) {
     return createDataLoader({
         data: harness.data,
         ui: harness.ui,
-        constants: {
-            minPerformanceCount: 3
-        },
         dataSource: {
             async loadInitialSnapshot() {
                 return options.initialSnapshot ?? null;
-            },
-            async refreshSnapshot(reference) {
-                harness.calls.refreshSnapshotArgs.push(reference);
-                return options.onRefresh ? options.onRefresh(reference) : null;
             }
         },
         callbacks: harness.callbacks
@@ -118,7 +109,7 @@ test("data loader: loaded songs enable search and report that initial conditions
         const song = createSong("archive-1::1");
         const harness = createDataLoaderHarness();
         const loader = createLoaderWithDataSource({
-            initialSnapshot: { songs: [song], source: "network", artifact: null }
+            initialSnapshot: { songs: [song], source: "network" }
         }, harness);
 
         const result = await loader.loadInitialData();
@@ -129,7 +120,6 @@ test("data loader: loaded songs enable search and report that initial conditions
         assert.equal(harness.calls.applyDateInputRangeArgs[0], harness.data.allSongsRaw);
         assert.deepEqual(harness.calls.clampDateInputsToBoundsArgs, [[20260311, 20260311]]);
         assert.deepEqual(result, { loaded: true, shouldResetConditions: true });
-        assert.deepEqual(harness.calls.refreshSnapshotArgs, []);
         assert.equal(harness.ui.search.recommendedCache, null);
         assert.equal(harness.ui.search.dataReady, true);
         assert.equal(harness.ui.el.searchBox.disabled, false);
@@ -147,8 +137,7 @@ test("data loader: cache source shows cache status and skips reset when pending 
         const loader = createLoaderWithDataSource({
             initialSnapshot: {
                 songs: [createSong("cached-archive::1")],
-                source: "cache",
-                artifact: {}
+                source: "cache"
             }
         }, harness);
 
@@ -159,90 +148,38 @@ test("data loader: cache source shows cache status and skips reset when pending 
         assert.equal(harness.ui.search.dataReady, true);
         assert.equal(harness.ui.el.searchBox.disabled, false);
         assert.deepEqual(result, { loaded: true, shouldResetConditions: false });
-        assert.equal(harness.calls.refreshSnapshotArgs.length, 1);
     } finally {
         restoreDom();
     }
 });
 
-test("data loader: background refresh waits for the next search before applying new songs", async () => {
+test("data loader: search stays disabled until the initial public snapshot is ready", async () => {
     const restoreDom = installFakeDom();
     try {
         const harness = createDataLoaderHarness();
-        let resolveRefresh;
-        const refreshPromise = new Promise((resolve) => {
-            resolveRefresh = resolve;
-        });
-        const loader = createLoaderWithDataSource({
-            initialSnapshot: {
-                songs: [createSong("cached-archive::1")],
-                source: "cache",
-                artifact: {}
-            },
-            onRefresh() {
-                return refreshPromise;
+        let resolveSnapshot;
+        let loadCount = 0;
+        const loader = createDataLoader({
+            data: harness.data,
+            ui: harness.ui,
+            callbacks: harness.callbacks,
+            dataSource: {
+                loadInitialSnapshot() {
+                    loadCount += 1;
+                    return new Promise((resolve) => { resolveSnapshot = resolve; });
+                }
             }
-        }, harness);
-
-        const result = await loader.loadInitialData();
-
-        assert.deepEqual(result, { loaded: true, shouldResetConditions: true });
-        assert.equal(harness.data.allSongsRaw[0].songKey, "cached-archive::1");
-        assert.equal(harness.data.pendingSongsRaw, null);
-
-        resolveRefresh({
-            songs: [createSong("fresh-archive::1")],
-            source: "network",
-            artifact: {}
         });
-        await new Promise((resolve) => setImmediate(resolve));
-        assert.equal(harness.data.pendingSongsRaw[0].songKey, "fresh-archive::1");
-
-        assert.equal(loader.commitPendingSnapshot(), true);
-
-        assert.equal(harness.data.allSongsRaw[0].songKey, "fresh-archive::1");
-        assert.equal(harness.data.pendingSongsRaw, null);
-        assert.equal(loader.commitPendingSnapshot(), false);
-    } finally {
-        restoreDom();
-    }
-});
-
-test("data loader: applying pending songs reconciles the existing recommendation cache", async () => {
-    const restoreDom = installFakeDom();
-    try {
-        const cachedSong = createSong("cached-archive::1");
-        const freshSong = {
-            ...cachedSong,
-            url: "https://www.youtube.com/watch?v=abc123&t=20s",
-            endSeconds: 600
-        };
-        const harness = createDataLoaderHarness();
-        let resolveRefresh;
-        const loader = createLoaderWithDataSource({
-            initialSnapshot: { songs: [cachedSong], source: "cache", artifact: {} },
-            onRefresh() {
-                return new Promise((resolve) => {
-                    resolveRefresh = resolve;
-                });
-            }
-        }, harness);
-
-        await loader.loadInitialData();
-        harness.ui.search.recommendedCache = {
-            songs: [cachedSong],
-            requestedCount: 4
-        };
-        resolveRefresh({ songs: [freshSong], source: "network", artifact: {} });
-        await new Promise((resolve) => setImmediate(resolve));
-
-        assert.equal(loader.commitPendingSnapshot(), true);
-
-        assert.deepEqual(harness.ui.search.recommendedCache, {
-            songs: [freshSong],
-            requestedCount: 1
-        });
-        assert.equal(harness.ui.search.recommendedCache.songs[0], freshSong);
+        const loading = loader.loadInitialData();
+        assert.equal(harness.ui.el.searchBox.disabled, true);
+        assert.equal(harness.ui.el.resultCount.innerText, "データを読み込み中...");
+        assert.deepEqual(harness.data.allSongsRaw, []);
+        const song = createSong("public-archive::1");
+        resolveSnapshot({ songs: [song], source: "network" });
+        await loading;
+        assert.deepEqual(harness.data.allSongsRaw, [song]);
+        assert.equal(harness.ui.el.searchBox.disabled, false);
+        assert.equal(loadCount, 1);
     } finally {
         restoreDom();
     }
