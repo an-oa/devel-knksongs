@@ -245,16 +245,17 @@ export function createSongsDataSource(input: SongsDataSourceInput) {
         };
     }
 
-    /** 公開metaとの整合性を確認し、検証済みJSONを保存して初期表示へ渡す。 */
-    async function acceptNetworkSongsJson(
+    /** 公開metaとの整合性を確認し、保存を開始して完了を待たず初期表示へ渡す。 */
+    function acceptNetworkSongsJson(
         candidate: NetworkSongsJsonCandidate,
         meta: SongsJsonArtifactMetadata | null
-    ): Promise<SongsSnapshot> {
+    ): SongsSnapshot {
         const { jsonText, payload } = candidate;
         if (meta && !isCurrentJsonCandidate(payload, meta)) {
             throw new Error("songs json is older than or inconsistent with the public meta");
         }
-        await setCachedSongsJsonText(jsonText);
+        // 保存失敗はhelper内で処理する。表示データは検証済みのメモリ上の値を使う。
+        void setCachedSongsJsonText(jsonText);
         return { songs: payload.songs, source: "network" };
     }
 
@@ -308,13 +309,13 @@ export function createSongsDataSource(input: SongsDataSourceInput) {
                         return { songs: cachedPayload.songs, source: "cache" };
                     }
                     const candidate = await loadNetworkSongsJsonCandidate(deadline);
-                    return await acceptNetworkSongsJson(candidate, meta);
+                    return acceptNetworkSongsJson(candidate, meta);
                 }
                 const [meta, candidate] = await Promise.all([
                     loadSongsJsonMeta(deadline),
                     loadNetworkSongsJsonCandidate(deadline)
                 ]);
-                return await acceptNetworkSongsJson(candidate, meta);
+                return acceptNetworkSongsJson(candidate, meta);
             } catch {
                 // 公開JSONを利用できなければ、有効なキャッシュへ退避する。
             }

@@ -38,6 +38,7 @@ test("a ready UI waits for public meta and reuses matching cached JSON", async (
     await installNetworkMocks(page);
     await page.goto("/");
     await waitForInitialLoad(page);
+    await expect.poll(() => readSongsJsonCacheText(page)).not.toBeNull();
     const requests = [];
     page.on("request", (request) => {
         if (/\/data\/songs(?:-meta)?\.json/.test(request.url())) requests.push(new URL(request.url()).pathname);
@@ -59,4 +60,38 @@ test("a ready UI waits for public meta and reuses matching cached JSON", async (
     }
     await waitForInitialLoad(page);
     expect(requests).toEqual(["/data/songs-meta.json"]);
+});
+
+test("initial cards and search are ready before the cache write completion is delivered", async ({ page }) => {
+    await installNetworkMocks(page);
+    await page.addInitScript(() => {
+        const put = IDBObjectStore.prototype.put;
+        const completion = Object.getOwnPropertyDescriptor(IDBTransaction.prototype, "oncomplete");
+        IDBObjectStore.prototype.put = function (record, ...args) {
+            if (typeof record?.value === "string" && this.name === "songsJsonCache") {
+                Object.defineProperty(this.transaction, "oncomplete", {
+                    set(handler) {
+                        completion.set.call(this, (event) => {
+                            window.releaseCacheCompletion = () => handler.call(this, event);
+                        });
+                    }
+                });
+            }
+            return put.call(this, record, ...args);
+        };
+    });
+    const errors = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page.goto("/");
+    await page.waitForFunction(() => typeof window.releaseCacheCompletion === "function");
+    try {
+        await waitForInitialLoad(page);
+        await openSidebar(page);
+        await filterBySongTitle(page, "Manual Song");
+        await expect(getSongCard(page, "Manual Song")).toBeVisible();
+    } finally {
+        await page.evaluate(() => window.releaseCacheCompletion());
+    }
+    await expect.poll(() => readSongsJsonCacheText(page)).not.toBeNull();
+    expect(errors).toEqual([]);
 });

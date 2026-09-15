@@ -51,7 +51,7 @@ export function buildSongKey(input: SongIdentityRow): string {
     const orderPart = Number.isSafeInteger(input.archiveOrder)
         ? String(input.archiveOrder)
         : "";
-    return [archiveId, orderPart].join("::");
+    return `${archiveId}::${orderPart}`;
 }
 
 /**
@@ -63,16 +63,12 @@ export function buildBookmarkSongKey(input: SongIdentityRow): string {
     const orderPart = Number.isSafeInteger(input.archiveOrder)
         ? String(input.archiveOrder)
         : "";
-    return [keyHead, orderPart].join("::");
+    return `${keyHead}::${orderPart}`;
 }
 
 /** 旧仕様互換の曲キー（archiveId + archiveOrder + url）を生成する。 */
 export function buildLegacySongKey(input: SongIdentityRow): string {
-    return [
-        String(input.archiveId ?? "").trim(),
-        Number.isSafeInteger(input.archiveOrder) ? String(input.archiveOrder) : "",
-        String(input.url ?? "").trim()
-    ].join("::");
+    return `${buildSongKey(input)}::${String(input.url ?? "").trim()}`;
 }
 
 /** 曲行からブックマーク保存に使う参照キーを返す。 */
@@ -170,24 +166,26 @@ export function validateSongIdentities(songRows: readonly unknown[]): SongIdenti
             issues.push({ kind: "invalid-archive-order", index });
             return;
         }
-        const expectedKeys = {
-            songKey: buildSongKey(row),
-            bookmarkSongKey: buildBookmarkSongKey(row),
-            legacySongKey: buildLegacySongKey(row)
-        } as const;
-        for (const fieldName of Object.keys(expectedKeys) as (keyof typeof expectedKeys)[]) {
-            if (row[fieldName] !== expectedKeys[fieldName]) {
-                issues.push({
-                    kind: "mismatched-key",
-                    index,
-                    fieldName,
-                    expected: expectedKeys[fieldName]
-                });
-            }
-        }
+        const songKey = buildSongKey(row);
+        collectMismatchedKeyIssue(row, index, "songKey", songKey, issues);
+        collectMismatchedKeyIssue(row, index, "bookmarkSongKey", buildBookmarkSongKey(row), issues);
+        collectMismatchedKeyIssue(row, index, "legacySongKey", `${songKey}::${String(row.url ?? "").trim()}`, issues);
     });
 
     collectDuplicateKeyIssues(rows, "songKey", issues);
     collectDuplicateKeyIssues(rows, "bookmarkSongKey", issues);
     return issues;
+}
+
+/** 生成規則と異なるキーだけ診断へ追加し、正常な曲ごとの一時オブジェクトを省く。 */
+function collectMismatchedKeyIssue(
+    row: SongIdentityRow,
+    index: number,
+    fieldName: "songKey" | "bookmarkSongKey" | "legacySongKey",
+    expected: string,
+    issues: SongIdentityIssue[]
+): void {
+    if (row[fieldName] !== expected) {
+        issues.push({ kind: "mismatched-key", index, fieldName, expected });
+    }
 }

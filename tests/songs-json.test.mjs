@@ -117,6 +117,40 @@ test("songs json: rejects duplicate song and bookmark keys", () => {
     );
 });
 
+test("songs json: rejects unknown keys even when the field count matches", () => {
+    for (const unknownField of ["sourceIndex", "constructor", "__proto__"]) {
+        const song = createSongFixture();
+        delete song.title;
+        Object.defineProperty(song, unknownField, { value: "unexpected", enumerable: true });
+        assert.throws(
+            () => buildSongsJsonPayload([song], "sha256:test", GENERATED_AT),
+            new RegExp(`songs\\[0\\]\\.${unknownField} is not allowed`)
+        );
+    }
+});
+
+test("songs json: required fields must be own properties regardless of their prototype", () => {
+    const song = createSongFixture();
+    delete song.title;
+    Object.setPrototypeOf(song, { title: "Inherited title" });
+    assert.throws(
+        () => buildSongsJsonPayload([song], "sha256:test", GENERATED_AT),
+        /songs\[0\]\.title is required/
+    );
+});
+
+test("songs json: validates each field type regardless of property order", () => {
+    const song = createSongFixture();
+    const reversedSong = Object.fromEntries(Object.entries(song).reverse());
+    assert.deepEqual(buildSongsJsonPayload([reversedSong], "sha256:test", GENERATED_AT).songs, [song]);
+    for (const field of Object.keys(song)) {
+        assert.throws(
+            () => buildSongsJsonPayload([{ ...reversedSong, [field]: {} }], "sha256:test", GENERATED_AT),
+            new RegExp(`songs\\[0\\]\\.${field} must be`)
+        );
+    }
+});
+
 test("songs json: builder rejects structurally incomplete songs", () => {
     assert.throws(
         () => buildSongsJsonPayload(

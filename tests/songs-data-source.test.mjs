@@ -242,6 +242,43 @@ test("songs data source: network json success stores json and skips csv", async 
     }
 });
 
+for (const saveResult of ["success", "false", "reject"]) {
+    test(`songs data source: initial snapshot does not wait for cache save (${saveResult})`, async (t) => {
+        const jsonText = createSongsJson("public::1", "sha256:public");
+        const cache = createFakeTextCacheStore();
+        let finishSave;
+        let savedText;
+        const save = new Promise((resolve, reject) => {
+            finishSave = () => saveResult === "reject"
+                ? reject(new Error("storage failed")) : resolve(saveResult === "success");
+        });
+        t.mock.method(cache, "setText", (text) => {
+            savedText = text;
+            return save;
+        });
+        const warnings = t.mock.method(console, "warn", () => {});
+        const fetchMock = t.mock.method(globalThis, "fetch", async () => createResponse(jsonText));
+        let snapshot;
+        const loading = createSongsDataSource({
+            publicSongsJsonUrl: "data/songs.json",
+            publicCsvUrl: "https://example.test/songs.csv",
+            songsJsonCache: cache
+        }).loadInitialSnapshot().then((value) => { snapshot = value; });
+        try {
+            await new Promise((resolve) => setImmediate(resolve));
+            assert.equal(savedText, jsonText, "saves the received text without serializing songs again");
+            assert.equal(snapshot?.source, "network", "storage may still be pending when data is ready");
+            assert.equal(snapshot.songs[0].songKey, "public::1");
+        } finally {
+            finishSave();
+            await loading;
+            await new Promise((resolve) => setImmediate(resolve));
+        }
+        assert.equal(fetchMock.mock.callCount(), 1, "a failed save does not trigger CSV fallback");
+        assert.equal(warnings.mock.callCount(), saveResult === "reject" ? 1 : 0);
+    });
+}
+
 test("songs data source: structurally invalid network json is not cached and falls back to csv", async () => {
     const previousFetch = globalThis.fetch;
     try {
