@@ -136,7 +136,7 @@ export function createSearchController({
             const results = pickRecommended(recommendedDisplayCount);
             return {
                 results,
-                displayLimit: Math.min(results.length, recommendedDisplayCount),
+                displayLimit: Math.min(results.length, getInitialDisplayLimit(recommendedDisplayCount)),
                 label: "おすすめを表示中"
             };
         }
@@ -159,9 +159,17 @@ export function createSearchController({
     function buildIncrementalSearchOutcome(results: Song[], label: string): SearchOutcome {
         return {
             results,
-            displayLimit: Math.min(results.length, RESULT_DISPLAY_BATCH_SIZE),
+            displayLimit: Math.min(results.length, getInitialDisplayLimit(RESULT_DISPLAY_BATCH_SIZE)),
             label
         };
+    }
+
+    /** 初期描画件数を画面サイズに合わせ、未指定・不正値の場合は従来の件数を使う。 */
+    function getInitialDisplayLimit(defaultCount: number): number {
+        const count = callbacks.getInitialDisplayCount?.(defaultCount);
+        return Number.isFinite(count) && count >= 1
+            ? Math.min(defaultCount, Math.floor(count))
+            : defaultCount;
     }
 
     /**
@@ -197,9 +205,12 @@ export function createSearchController({
     function refreshRecommendedDisplay(): boolean {
         const searchInput = collectSearchInput();
         if (!isRecommendedMode(searchInput.searchState, searchInput.parsedQuery)) return false;
+        const outcome = resolveSearchResults(searchInput.searchState, searchInput.parsedQuery);
+        // 追加表示済みのカードは縮小時にも残し、スクロール位置と再生対象を維持する。
+        outcome.displayLimit = Math.min(outcome.results.length, Math.max(data.displayLimit, outcome.displayLimit));
         applySearchOutcome(
             searchInput,
-            resolveSearchResults(searchInput.searchState, searchInput.parsedQuery),
+            outcome,
             {
                 scrollToTop: false
             }

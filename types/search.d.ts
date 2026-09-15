@@ -25,6 +25,7 @@ type SearchControllerCallbacks = {
   updateDisplay: () => void;
   scrollResultsPaneToTop: () => void;
   getRecommendedDisplayCount?: () => number;
+  getInitialDisplayCount?: (defaultCount: number) => number;
 };
 
 type SearchDataState = import("../app/state.types").AppDataState;

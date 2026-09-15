@@ -7,6 +7,56 @@ import { createDateFilterController } from "../_build/app/ui/date/filter.mjs";
 
 let autoSongId = 0;
 
+test("createSearchController: limits initial DOM work without reducing recommendation or search results", () => {
+    const rows = Array.from({ length: 60 }, (_, index) => makeRow({
+        archiveId: `initial-${index}`,
+        title: `Candidate ${index}`,
+        artist: "A",
+        format: "オリ曲"
+    }));
+    const data = { allSongsRaw: rows, bookmarks: {}, activeBookmark: null, currentResults: [], displayLimit: 0 };
+    const ui = createSearchUiState({
+        el: { searchBox: { value: "" }, resultCount: { innerText: "" } },
+        selectedFormats: new Set(["配信", "歌みた"])
+    });
+    let initialCount = 12;
+    const controller = createSearchControllerForTest({
+        data,
+        ui,
+        constants: {
+            RANDOM_DISPLAY_COUNT: 48,
+            RESULT_DISPLAY_BATCH_SIZE: 48,
+            MIN_PERFORMANCE_FOR_RANDOM: 1,
+            DEFAULT_FORMATS: ["配信", "歌みた"]
+        },
+        callbacks: createSearchCallbacks({ getInitialDisplayCount: () => initialCount })
+    });
+    controller.search();
+    const recommendations = data.currentResults.slice();
+    assert.equal(recommendations.length, 48);
+    assert.equal(data.displayLimit, 12);
+
+    data.displayLimit = 48;
+    controller.refreshRecommendedDisplay();
+    assert.deepEqual(data.currentResults, recommendations);
+    assert.equal(data.displayLimit, 48, "resize keeps already appended cards");
+
+    ui.el.searchBox.value = "Candidate";
+    controller.search();
+    assert.equal(data.currentResults.length, 60);
+    assert.equal(data.displayLimit, 12);
+    data.bookmarks = { saved: { name: "Saved", songs: rows.map((row) => row.songKey) } };
+    data.activeBookmark = "saved";
+    controller.search();
+    assert.equal(data.currentResults.length, 60);
+    assert.equal(data.displayLimit, 12);
+    for (const invalid of [NaN, Infinity, 0, -1]) {
+        initialCount = invalid;
+        controller.search();
+        assert.equal(data.displayLimit, 48);
+    }
+});
+
 /**
  * 検索コントローラー検証用の UI 状態を作る。
  * @param {*} input
@@ -82,7 +132,8 @@ function createSearchCallbacks(input) {
     return {
         updateDisplay: callbacks.updateDisplay || (() => {}),
         scrollResultsPaneToTop: callbacks.scrollResultsPaneToTop || (() => {}),
-        getRecommendedDisplayCount: callbacks.getRecommendedDisplayCount
+        getRecommendedDisplayCount: callbacks.getRecommendedDisplayCount,
+        getInitialDisplayCount: callbacks.getInitialDisplayCount
     };
 }
 

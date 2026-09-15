@@ -28,7 +28,7 @@ import { createBookmarkPersistenceController } from "./controllers/bookmark-pers
 import { createStorageController } from "./controllers/storage.mjs";
 import { createBookmarkUiController } from "./ui/bookmark/ui.mjs";
 import { scrollResultListToTop } from "./lib/results-scroll.mjs";
-import { estimateMasonryVisibleCardCount } from "./lib/render/masonry-layout.mjs";
+import { estimateInitialResultDisplayCount, estimateMasonryVisibleCardCount } from "./lib/render/masonry-layout.mjs";
 import { setupResultsViewportRefresh } from "./lib/render/results-viewport-refresh.mjs";
 import {
     collectUiElements,
@@ -105,6 +105,10 @@ function createSearchCallbacks({
     return {
         updateDisplay: () => getRenderController().updateDisplay(),
         scrollResultsPaneToTop: () => scrollResultListToTop(ui.el.resultList),
+        getInitialDisplayCount: (defaultCount) => estimateInitialResultDisplayCount(ui.el.resultList, {
+            defaultCount,
+            showThumbnails: ui.playback.showThumbnails
+        }),
         getRecommendedDisplayCount: () => estimateMasonryVisibleCardCount(ui.el.resultList, {
             minItemCount: RANDOM_DISPLAY_COUNT
         })
