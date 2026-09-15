@@ -128,6 +128,8 @@ flowchart TD
 - 公開スプレッドシートのCSVを唯一のマスターデータとし、`songs.json` / `songs-meta.json` は
   現在表示・再生可能な行だけを収録する派生成果物として扱います。JSONを直接修正したり、
   JSONからCSVへデータを戻したりする更新経路は設けません。
+- 起動時は小さい `startup` module からデータ取得を開始し、UI module の取得・初期化と並行して進めます。
+  取得結果は1つのPromiseを共有するため、UI到着時の二重取得や、キャッシュがある場合の不要なJSON本体取得は行いません。
 - 通常の起動時は事前生成された `data/songs-meta.json` を確認してから曲データを表示します。
   有効なJSONキャッシュの `contentHash` が公開metaと一致すれば再利用し、異なる場合は `data/songs.json` を
   取得・検証して初回表示に使います。キャッシュがない場合はmetaとJSON本体を並行取得します。
@@ -172,10 +174,11 @@ flowchart TD
 - `.github/workflows/deploy-pages.yml` は workflow 全体を `queue: max` の concurrency で直列化し、成功した CI の対象を build 前、artifact 生成後、environment 待機後の deploy action 直前に `main` と照合します。待機前に古くなった run は deploy job ごと skip し、待機中に古くなった run は古い artifact を公開せず失敗として記録します。deploy 後は公開 `deployment.json` の SHA が対象 commit と一致するまで最長10分間確認し、最後に対象 commit が引き続き `main` であることを再確認してから workflow を成功扱いにします。
 - `Deploy Pages` のいずれかの job が失敗または cancel されると、`deploy-pages-failure` label と機械判定用markerを持つ公開 Issue を作成して repository owner へ assign します。同じ障害の未解決 Issue があれば新規作成せず、対象 commit、run URL、各 job の結果、検知時刻をコメントとして追記します。その後に Pages deploy が成功した場合だけ復旧コメントを付けて Issue を閉じ、古い対象の skip では閉じません。Issue 更新前に、failureまたはrecoveryの通知を完了した新しい workflow run の有無と現在の `main` SHA を再確認し、queued、notify未完了のcancelled、failure/recoveryを生じないskip構成の run だけでは古い通知を抑止しません。Issue API は一時失敗時を含めて最大3回試行し、復旧処理を完了できない場合は notify job を失敗させます。メールアドレス、secret、workflow log 本文は Issue に記録しません。
 - `main` の SHA 照合と Pages deploy API の実行は原子的ではないため、両者の間に `main` が進んだ場合は古い artifact が一時的に公開される可能性があります。この場合も公開後の再照合で workflow を失敗させますが、公開自体を原子的に防ぐ保証はありません。
-- Pages artifact 生成時は CSS と配布用 JavaScript module の内容から cache buster を算出し、`index.html` の `styles.css` / `app/bootstrap.mjs` と、配布用 `app/**/*.mjs` 内の相対 `.mjs` 参照へ `?v=...` を付与します。明示的な上書きには `DEPLOY_CACHE_BUSTER` を使えます。deploy SHA は `deployment.json` に分離して記録するため、曲 JSON だけの更新では CSS / JavaScript の URL は変わりません。ソースの `index.html` や import には通常 `?v=...` を書きません。
+- Pages artifact 生成時は CSS と配布用 JavaScript module の内容から cache buster を算出し、`index.html` の `styles.css` / `browser/startup.mjs` / modulepreload と、配布用 `app/**/*.mjs`・`browser/**/*.mjs` 内の相対 `.mjs` 参照へ同じ `?v=...` を付与します。明示的な上書きには `DEPLOY_CACHE_BUSTER` を使えます。deploy SHA は `deployment.json` に分離して記録するため、曲 JSON だけの更新では CSS / JavaScript の URL は変わりません。ソースの `index.html` や import には通常 `?v=...` を書きません。
 - フロントエンドのみで動作します(静的ホスティング想定)。
 - 配布物はHTML/CSS/JavaScriptのみで、実行時にnpm等の同梱依存はありません。
-- `app/**/*.mts` は source として扱い、ブラウザ・テスト・Node scripts は `npm run build:ts` で `_build/app/**/*.mjs` に生成された module を読みます。生成 `.mjs` は Git 管理対象外です。fresh checkout 後や `.mts` 変更後は、ローカル確認前に `npm run build:ts` を実行してください。`npm run check:ts-emit` は `_build/app` の生成 `.mjs` が存在し、`app` source tree に `.mjs` が残っていないことを確認します。`npm run build` は静的 asset と TypeScript 生成 module を `_build` へ作成し、`npm run build:pages-artifact` は `_build` を元に `_site` を作成します。`npm run typecheck` / `npm run lint` / `npm run test:unit` / `npm run build:songs-json` / `npm run validate:songs-json` は事前に `build:ts` を実行します。`npm run test:e2e` / `npm run build:pages-artifact` は事前に `npm run build` を実行します。
+- `app/**/*.mts` は source として扱い、テスト・Node scripts は `npm run build:ts` で `_build/app/**/*.mjs` に生成された module を読みます。ブラウザ用には `npm run build` がこのemit結果をesbuildで `_build/browser` のES module bundleへまとめます。生成 `.mjs` は Git 管理対象外です。fresh checkout 後や `.mts` 変更後にブラウザで確認する場合は、`npm run build` を実行し `_build` を配信してください。`build:ts` 単体ではブラウザ用bundleを更新しません。`npm run check:ts-emit` は `_build/app` の生成 `.mjs` が存在し、`app` source tree に `.mjs` が残っていないことを確認します。`npm run build` は静的 asset と TypeScript 生成 module を `_build` へ作成し、`npm run build:pages-artifact` は `_build` を元に `_site` を作成します。`npm run typecheck` / `npm run lint` / `npm run test:unit` / `npm run build:songs-json` / `npm run validate:songs-json` は事前に `build:ts` を実行します。`npm run test:e2e` / `npm run build:pages-artifact` は事前に `npm run build` を実行します。
+- ブラウザ用bundleは小さい起動処理、UI、共有処理へ分割し、UIと共有処理の `modulepreload` をbuild時にHTMLへ生成します。HTML解析時に必要なファイルを並行取得できるため、module依存先を順に発見する通信待ちを減らします。esbuildは開発依存のみで、実行時の外部ライブラリは追加しません。
 - サムネイル表示/埋め込み再生まわりでは YouTube Iframe API を動的に利用します。
 - 開発時の静的解析は TypeScript noEmit typecheck と ESLint を利用します。
 - 開発時テストは Node.js 標準の `node:test` を利用します。

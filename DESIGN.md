@@ -9,14 +9,16 @@
 
 ## 全体構成
 - 静的フロントエンドのみ（HTML/CSS/JavaScript, ES Modules）。
-  `app/**/*.mts` を source とし、`npm run build:ts` で `_build/app/**/*.mjs` へ生成した JavaScript をブラウザ・テスト・Node scripts が読む
+  `app/**/*.mts` を source とし、`npm run build:ts` で `_build/app/**/*.mjs` へ生成した JavaScript をテスト・Node scripts が読む。
+  ブラウザ用は `npm run build` がemit結果をesbuildで `_build/browser` へbundleし、UIと共有chunkのmodulepreloadをHTMLへ生成する。
+  起動moduleはデータ取得を開始してからUIをdynamic importし、同じ初期データPromiseを共有する。
 - データ取得：事前生成JSON（`data/songs.json` / `data/songs-meta.json`）を優先し、唯一のマスターである公開スプレッドシートのCSVを生成元とフォールバックに使う
 - データ生成/公開：GitHub Actions でCSVから派生JSONを生成・検証し、差分を `main` へコミットして CI を起動する。CI 成功後、検証済み commit を deploy 前後に現在の `main` と照合し、公開された `deployment.json` の commit SHA を確認する
 - CI：GitHub Actions で TypeScript emit、曲データ検証、typecheck、lint、unit test、静的 site build を実行する
 - 実行時の同梱外部ライブラリ依存：なし
 - 埋め込み再生まわりでは YouTube Iframe API を動的に利用し、標準では `youtube.com`、プライバシー強化設定ON時は `youtube-nocookie.com` の埋め込みURLを使う
 - 開発時確認：TypeScript emit 同期、曲データJSON検証、TypeScript noEmit typecheck、ESLint、Node.js 標準 `node:test`、Playwright Chromium smoke を利用
-- 型安全性は `app/**/*.mts` の TypeScript source を中心に高め、生成 JavaScript は `_build/app` に限定する。
+- 型安全性は `app/**/*.mts` の TypeScript source を中心に高め、生成 JavaScript は `_build/app`（emit）と `_build/browser`（ブラウザbundle）に置く。
   実行時に npm 等の同梱依存は持たず、配布物は HTML/CSS/JavaScript の静的 asset とする。
 
 ## テスト方針（現状）
@@ -414,7 +416,7 @@ IndexedDB保存：
 - Safari等でCSS/JSキャッシュが残ることがあるため、公開 artifact 生成時に cache buster を付与する
 - source の `index.html` や `app/**/*.mts` 内の `.mjs` import specifier には通常 `?v=...` を書かない
 - `scripts/build-pages-artifact.mjs` が `_build` から `_site` へコピーした配布用 `index.html` の
-  `styles.css` / `app/bootstrap.mjs` と、生成済み `app/**/*.mjs` の相対 import/export/dynamic import に
+  `styles.css` / `browser/startup.mjs` / modulepreload と、生成済み `app/**/*.mjs`・`browser/**/*.mjs` の相対 import/export/dynamic import に
   CSS / JavaScript module の内容から算出した `?v=<sha256>` を付与する
 - `DEPLOY_CACHE_BUSTER` を指定した場合は、内容から算出した値の代わりに明示値を使う
 - deploy commit SHA は cache buster と兼用せず、artifact 直下の `deployment.json` に記録する

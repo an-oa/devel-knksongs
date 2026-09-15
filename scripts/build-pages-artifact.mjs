@@ -16,9 +16,10 @@ const DEFAULT_SITE_DIR = ".";
 const DEPLOYMENT_MARKER_FILE = "deployment.json";
 const HTML_CACHE_BUSTER_TARGETS = [
     { attribute: "href", path: "styles.css" },
-    { attribute: "src", path: "app/bootstrap.mjs" }
+    { attribute: "src", path: "app/bootstrap.mjs" },
+    { attribute: "src", path: "app/startup.mjs" }
 ];
-const STATIC_MODULE_SPECIFIER_PATTERN = /((?:import|export)\s+(?:[^'"]*?\s+from\s*)?)(["'])(\.{1,2}\/[^"']+?\.mjs)(?:\?[^"']*)?\2/g;
+const STATIC_MODULE_SPECIFIER_PATTERN = /(\b(?:import|export)\s*(?:[^'"]*?\bfrom\s*)?)(["'])(\.{1,2}\/[^"']+?\.mjs)(?:\?[^"']*)?\2/g;
 const DYNAMIC_MODULE_SPECIFIER_PATTERN = /(\bimport\s*\(\s*)(["'])(\.{1,2}\/[^"']+?\.mjs)(?:\?[^"']*)?\2/g;
 
 /**
@@ -48,7 +49,7 @@ function appendCacheBuster(assetPath, cacheBuster) {
  * @returns {string}
  */
 export function appendCacheBusterToHtml(html, cacheBuster) {
-    return HTML_CACHE_BUSTER_TARGETS.reduce((nextHtml, target) => {
+    const nextHtml = HTML_CACHE_BUSTER_TARGETS.reduce((nextHtml, target) => {
         const attributePattern = new RegExp(
             `(${target.attribute}\\s*=\\s*)(["'])${escapeRegExp(target.path)}(?:\\?[^"']*)?\\2`,
             "g"
@@ -58,6 +59,13 @@ export function appendCacheBusterToHtml(html, cacheBuster) {
             `$1$2${appendCacheBuster(target.path, cacheBuster)}$2`
         );
     }, html);
+    // bundle の entry と modulepreload は、import と同じ URL で再利用できるよう揃える。
+    return nextHtml.replace(
+        /((?:src|href)\s*=\s*)(["'])(browser\/[^"'?]+\.mjs)(?:\?[^"']*)?\2/g,
+        (_match, prefix, quote, path) => (
+            `${prefix}${quote}${appendCacheBuster(path, cacheBuster)}${quote}`
+        )
+    );
 }
 
 /**
@@ -205,6 +213,7 @@ async function copySiteAssets(outputDir, siteDir) {
         recursive: true,
         filter: shouldCopyAppAsset
     });
+    await cp(join(siteDir, "browser"), join(outputDir, "browser"), { recursive: true });
     await Promise.all(DATA_ASSET_FILES.map((fileName) => (
         copyFile(join(siteDir, "data", fileName), join(outputDir, "data", fileName))
     )));
@@ -264,7 +273,10 @@ export async function buildPagesArtifact(options) {
     const outputDir = resolvePagesArtifactOutputDir(options.outputDir);
     const siteDir = resolvePagesArtifactSiteDir(options.siteDir || DEFAULT_SITE_DIR);
     await copySiteAssets(outputDir, siteDir);
-    const moduleFiles = await listModuleFiles(join(outputDir, "app"));
+    const moduleFiles = [
+        ...await listModuleFiles(join(outputDir, "app")),
+        ...await listModuleFiles(join(outputDir, "browser"))
+    ];
     const cacheBuster = options.cacheBuster || await calculateArtifactCacheBuster(
         outputDir,
         moduleFiles

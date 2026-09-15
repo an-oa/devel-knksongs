@@ -37,6 +37,17 @@ test("pages artifact: replaces existing html cache busters", () => {
     );
 });
 
+test("pages artifact: versions bundle scripts and preloads with the same URL", () => {
+    const html = [
+        '<link rel="modulepreload" href="browser/chunk-ABC.mjs?v=old">',
+        '<script type="module" src="browser/startup.mjs"></script>'
+    ].join("\n");
+    assert.equal(appendCacheBusterToHtml(html, "new/version"), [
+        '<link rel="modulepreload" href="browser/chunk-ABC.mjs?v=new%2Fversion">',
+        '<script type="module" src="browser/startup.mjs?v=new%2Fversion"></script>'
+    ].join("\n"));
+});
+
 test("pages artifact: adds cache busters to relative JavaScript module specifiers", () => {
     const source = [
         'import { createThing } from "./thing.mjs";',
@@ -67,6 +78,13 @@ test("pages artifact: reads cache buster from deploy environment", () => {
             cacheBuster: "abc123",
             deploymentSha: ""
         }
+    );
+});
+
+test("pages artifact: versions minified bundle imports and re-exports", () => {
+    assert.equal(
+        appendCacheBusterToJavaScriptImports('import{a}from"./shared.mjs";import"./side.mjs";export{a}from"./shared.mjs";', "v2"),
+        'import{a}from"./shared.mjs?v=v2";import"./side.mjs?v=v2";export{a}from"./shared.mjs?v=v2";'
     );
 });
 

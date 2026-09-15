@@ -4,6 +4,7 @@ import { copyFile, mkdir, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { buildTypeScriptModules } from "./build-ts.mjs";
+import { buildBrowserModules } from "./build-browser.mjs";
 import { resolveProjectPath } from "./lib/paths.mjs";
 import { DATA_ASSET_FILES, ROOT_ASSET_FILES } from "./lib/site-assets.mjs";
 
@@ -63,6 +64,7 @@ export async function buildSite(options) {
         copyFile(resolve("data", fileName), join(outputDir, "data", fileName))
     )));
     await buildTypeScriptModules({ outputDir });
+    await buildBrowserModules(outputDir);
     return outputDir;
 }
 
