@@ -532,8 +532,9 @@ test("thumbnail images keep masonry layout stable after refresh", async ({ page 
     await expect(before.every((entry) => entry.imageDisplay === "block")).toBe(true);
 
     await page.evaluate(async () => {
-        const { applyMasonryLayout } = await import("/app/lib/render/masonry-layout.mjs");
-        applyMasonryLayout(document.querySelector("#resultList"));
+        // 実際のviewport更新経路で配置を再計算し、公開外moduleへ依存しない。
+        window.dispatchEvent(new Event("resize"));
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     });
 
     const after = await page.locator(".song-card").evaluateAll((nodes) => nodes.map((card) => ({

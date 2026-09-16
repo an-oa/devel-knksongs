@@ -148,11 +148,11 @@ flowchart TD
 - 採用した公開JSONはIndexedDBへの保存を開始し、保存完了を待たずに検証済みデータを初回表示へ反映します。
   保存が遅い場合や失敗した場合も検索・表示を利用できます。表示後の自動再取得・次回検索での差し替えは行わず、
   キャッシュへ退避した場合も公開側の再確認はページの再読み込み時に行います。
-- 現在より古いschemaのJSONキャッシュは削除し、キャッシュがない場合と同じく公開JSON、
-  ネットワークCSVの順に再取得します。
+- 旧localStorageキャッシュの読み取りでは移行保存を待ちません。最終的に採用したJSONだけを保存し、成功後に旧キャッシュを削除します。
+- 不正・旧schemaのキャッシュは未キャッシュとして公開JSON、ネットワークCSVの順に再取得します。公開JSONを採用できれば上書きし、採用できなければ削除を非同期で開始します。
 - 公開スプレッドシートのCSVは、事前生成JSONの元データかつJSON取得失敗時のフォールバックとして参照します(`app/config.mts` の `PUBLIC_CSV_URL` で指定し、実行時は `_build/app/config.mjs` に生成された module を読みます)。
   公開JSONも有効なJSONキャッシュも利用できない場合にCSVを取得します。CSVはキャッシュしません。
-  旧バージョンが保存したCSVキャッシュは起動時に削除します。
+  旧バージョンが保存したCSVキャッシュは初期データ決定後に非同期で削除します。
 - CSVの `配信上の立場` は曲データの `streamRole` としてJSONへ保持します。
 - CSVから公開対象曲を変換した直後に、必須文字列、YouTube URL・動画ID、再生範囲を全件検証します。
   `archiveOrder`と曲参照キーの生成規則・一意性も検証します。問題がある場合はCSV行番号を報告し、
@@ -175,10 +175,10 @@ flowchart TD
 - `.github/workflows/deploy-pages.yml` は workflow 全体を `queue: max` の concurrency で直列化し、成功した CI の対象を build 前、artifact 生成後、environment 待機後の deploy action 直前に `main` と照合します。待機前に古くなった run は deploy job ごと skip し、待機中に古くなった run は古い artifact を公開せず失敗として記録します。deploy 後は公開 `deployment.json` の SHA が対象 commit と一致するまで最長10分間確認し、最後に対象 commit が引き続き `main` であることを再確認してから workflow を成功扱いにします。
 - `Deploy Pages` のいずれかの job が失敗または cancel されると、`deploy-pages-failure` label と機械判定用markerを持つ公開 Issue を作成して repository owner へ assign します。同じ障害の未解決 Issue があれば新規作成せず、対象 commit、run URL、各 job の結果、検知時刻をコメントとして追記します。その後に Pages deploy が成功した場合だけ復旧コメントを付けて Issue を閉じ、古い対象の skip では閉じません。Issue 更新前に、failureまたはrecoveryの通知を完了した新しい workflow run の有無と現在の `main` SHA を再確認し、queued、notify未完了のcancelled、failure/recoveryを生じないskip構成の run だけでは古い通知を抑止しません。Issue API は一時失敗時を含めて最大3回試行し、復旧処理を完了できない場合は notify job を失敗させます。メールアドレス、secret、workflow log 本文は Issue に記録しません。
 - `main` の SHA 照合と Pages deploy API の実行は原子的ではないため、両者の間に `main` が進んだ場合は古い artifact が一時的に公開される可能性があります。この場合も公開後の再照合で workflow を失敗させますが、公開自体を原子的に防ぐ保証はありません。
-- Pages artifact 生成時は CSS と配布用 JavaScript module の内容から cache buster を算出し、`index.html` の `styles.css` / `browser/startup.mjs` / modulepreload と、配布用 `app/**/*.mjs`・`browser/**/*.mjs` 内の相対 `.mjs` 参照へ同じ `?v=...` を付与します。明示的な上書きには `DEPLOY_CACHE_BUSTER` を使えます。deploy SHA は `deployment.json` に分離して記録するため、曲 JSON だけの更新では CSS / JavaScript の URL は変わりません。ソースの `index.html` や import には通常 `?v=...` を書きません。
+- `npm run build` がJavaScriptの内容ハッシュ付きファイル名とCSSの `?v=<sha256>` を決定し、HTML・preload・importのURLを揃えます。Pages artifactはURLや生成JavaScriptを書き換えず、`browser`・静的asset・曲JSONだけを `_site` へコピーします。`_build/app` はNode tests・scripts用で配布しません。明示バージョンはビルド時の `DEPLOY_CACHE_BUSTER` または `npm run build -- --cache-buster <version>` で指定します（artifactコマンドの `--cache-buster` は廃止）。deploy SHAは `deployment.json` に記録するため、曲JSONやemit側コメントだけの変更でCSS/JavaScriptのURLは変わりません。
 - フロントエンドのみで動作します(静的ホスティング想定)。
 - 配布物はHTML/CSS/JavaScriptのみで、実行時にnpm等の同梱依存はありません。
-- `app/**/*.mts` は source として扱い、テスト・Node scripts は `npm run build:ts` で `_build/app/**/*.mjs` に生成された module を読みます。ブラウザ用には `npm run build` がこのemit結果をesbuildで `_build/browser` のES module bundleへまとめます。生成 `.mjs` は Git 管理対象外です。fresh checkout 後や `.mts` 変更後にブラウザで確認する場合は、`npm run build` を実行し `_build` を配信してください。`build:ts` 単体ではブラウザ用bundleを更新しません。`npm run check:ts-emit` は `_build/app` の生成 `.mjs` が存在し、`app` source tree に `.mjs` が残っていないことを確認します。`npm run build` は静的 asset と TypeScript 生成 module を `_build` へ作成し、`npm run build:pages-artifact` は `_build` を元に `_site` を作成します。`npm run typecheck` / `npm run lint` / `npm run test:unit` / `npm run build:songs-json` / `npm run validate:songs-json` は事前に `build:ts` を実行します。`npm run test:e2e` / `npm run build:pages-artifact` は事前に `npm run build` を実行します。
+- `app/**/*.mts` は source として扱い、テスト・Node scripts は `npm run build:ts` で `_build/app/**/*.mjs` に生成された module を読みます。ブラウザ用には `npm run build` がこのemit結果をesbuildで `_build/browser` のES module bundleへまとめます。生成 `.mjs` は Git 管理対象外です。fresh checkout 後や `.mts` 変更後にブラウザで確認する場合は、`npm run build` を実行し `_build` を配信してください。`build:ts` 単体ではブラウザ用bundleを更新しません。`npm run check:ts-emit` は `_build/app` の生成 `.mjs` が存在し、`app` source tree に `.mjs` が残っていないことを確認します。`npm run build` は静的 asset と TypeScript 生成 module を `_build` へ作成し、`npm run build:pages-artifact` は `_build` を元に `_site` を作成します。`npm run typecheck` / `npm run lint` / `npm run test:unit` / `npm run build:songs-json` / `npm run validate:songs-json` は事前に `build:ts` を実行します。`npm run build:pages-artifact` は事前に `npm run build` を実行し、`npm run test:e2e` はそのPages artifactを検証します。
 - ブラウザ用bundleは小さい起動処理、UI、共有処理へ分割し、UIと共有処理の `modulepreload` をbuild時にHTMLへ生成します。HTML解析時に必要なファイルを並行取得できるため、module依存先を順に発見する通信待ちを減らします。esbuildは開発依存のみで、実行時の外部ライブラリは追加しません。
 - サムネイル表示/埋め込み再生まわりでは YouTube Iframe API を動的に利用します。
 - 開発時の静的解析は TypeScript noEmit typecheck と ESLint を利用します。
@@ -205,7 +205,7 @@ flowchart TD
   - 楽曲形式の分類/選択判定テスト (`tests/song-format.test.mjs`)
   - 検索booleanフィルター共有helperのテスト (`tests/search-boolean-filters.test.mjs`)
   - フォーマット表示ラベルのテスト (`tests/format-filter.test.mjs`)
-  - Pages artifact生成とcache buster付与のテスト (`tests/pages-artifact.test.mjs`)
+  - Pages artifact生成とブラウザ成果物URLのテスト (`tests/pages-artifact.test.mjs` / `tests/browser-build.test.mjs`)
   - 再生継続候補の選択ロジック (`tests/playback-sequence.test.mjs`)
   - 再生セッション制御のテスト (`tests/playback-session-controller.test.mjs`)
   - 再生設定値reducerのテスト (`tests/playback-settings-value-reducer.test.mjs`)
@@ -252,7 +252,7 @@ flowchart TD
   - `npx playwright install chromium`
   - `python3` が PATH 上で利用できること
 - Playwright のスモークテストでは、静的サイトはローカル配信し、CSV と YouTube Iframe API は mock / fixture に差し替えて回帰確認します。
-- `npm run test:e2e` は事前に `npm run build` で `_build` を作り、Playwright 側で `python3 -m http.server 4173 --bind 127.0.0.1 --directory _build` を起動して静的サイトを配信します。
+- `npm run test:e2e` は事前に `npm run build:pages-artifact` で `_site` を作り、Playwright 側で `python3 -m http.server 4173 --bind 127.0.0.1 --directory _site` を起動して静的サイトを配信します。
 - 現時点の Playwright 対象は Chromium です。iOS Safari は別途、実機または手動スモーク確認を想定します。
 
 ---

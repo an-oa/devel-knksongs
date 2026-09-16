@@ -132,7 +132,7 @@
   - YouTubeリンク
 
 ## データフロー
-1. IndexedDB の曲データJSONキャッシュを読み込み、構造を検証する。
+1. IndexedDB、なければ旧localStorageの曲データJSONを読み込み、構造を検証する。読み取り中は移行保存・削除を行わない。
 2. 有効なキャッシュがあれば公開 `songs-meta.json` を確認する。
    - hash が一致すればキャッシュを初回表示に使い、JSON本体の取得を省く。
    - hash が異なる場合は、キャッシュの生成日時に関係なく公開 `songs.json` を取得する。
@@ -142,7 +142,7 @@
 4. 公開JSONはschemaを検証し、metaがある場合はhash一致またはJSON本体の生成日時が新しい場合だけ採用する。
    metaより古いJSONや、同じ生成日時でhashが異なるJSONは採用しない。metaがなければJSON本体だけで検証する。
    採用したJSONは受信した文字列のままIndexedDBへ保存を開始し、完了を待たず検証済みの曲配列を初回表示に使う。
-   保存失敗は表示データの採用やCSVへの退避条件に影響しない。
+   保存失敗は表示データの採用やCSVへの退避条件に影響しない。旧キャッシュを採用した場合も非同期で移行保存し、保存成功後だけ旧localStorageを削除する。
 5. 有効なキャッシュがない場合はmetaとJSON本体を並行取得する。
    JSONを採用できなかった場合だけ公開CSVを取得し、曲データへ正規化する。CSVは実行時キャッシュへ保存しない。
 6. metaはresponse受信と本文読込に各2秒、JSON本体はresponse受信に2秒・本文読込に30秒、CSVは
@@ -182,7 +182,7 @@ flowchart TD
 - `songs.json` / `songs-meta.json` は、現在表示・再生可能な曲を配信する派生成果物とする
 - 両JSONはschema Version 3として、同じ `contentHash` とUTC ISO 8601形式の `generatedAt` を持つ。
   `generatedAt` はcontentHashが変わった場合だけ更新し、同じ内容の定期生成では引き継ぐ
-- 実行時は現行schemaだけを受け付け、旧schemaのJSONキャッシュは削除して未キャッシュと同じ取得経路へ進む
+- 実行時は現行schemaだけを受け付け、不正・旧schemaのキャッシュは未キャッシュと同じ取得経路へ進む。公開JSON採用時は上書きし、採用失敗時だけ非同期で削除する
 - 公開対象でもURLが空の行は、現在再生できない曲の履歴としてCSVへ残し、エラーにせず派生JSONから除外する。
   URLが非空で不正な場合は品質エラーとして生成を停止する
 - CSVから公開対象曲へ変換した直後に、必須文字列、YouTube URL・動画ID、再生範囲、
@@ -412,6 +412,7 @@ IndexedDB保存：
   - 受信・キャッシュ読込ごとに `JSON.parse` は1回行い、同じ曲配列を検証と初回表示で使う
   - 構造検証の正常系は既知の全項目と値の型を1回の走査で確認し、不正時だけ詳細な診断を組み立てる
   - 曲キーは一時配列や曲ごとの検証用オブジェクトを作らず生成し、キーの整合性・一意性の検証を保つ
+  - 識別子の検証規則はiteratorで共有し、実行時は最初の問題で停止、CSV品質診断は全件収集する。診断順は行ごとの整合性、songKey重複、bookmarkSongKey重複を維持する
   - IndexedDBへは受信したJSON文字列をそのまま渡し、保存完了を初期表示の待ち条件に含めない
 - 段階表示（追加読み込み）
   - 通常検索・ブックマーク検索ともに `RESULT_DISPLAY_BATCH_SIZE` 単位で追加表示
@@ -419,13 +420,12 @@ IndexedDB保存：
 
 ## 制約・注意点
 - iOSでは埋め込み再生に制約あり
-- Safari等でCSS/JSキャッシュが残ることがあるため、公開 artifact 生成時に cache buster を付与する
-- source の `index.html` や `app/**/*.mts` 内の `.mjs` import specifier には通常 `?v=...` を書かない
-- `scripts/build-pages-artifact.mjs` が `_build` から `_site` へコピーした配布用 `index.html` の
-  `styles.css` / `browser/startup.mjs` / modulepreload と、生成済み `app/**/*.mjs`・`browser/**/*.mjs` の相対 import/export/dynamic import に
-  CSS / JavaScript module の内容から算出した `?v=<sha256>` を付与する
-- `DEPLOY_CACHE_BUSTER` を指定した場合は、内容から算出した値の代わりに明示値を使う
-- deploy commit SHA は cache buster と兼用せず、artifact 直下の `deployment.json` に記録する
-- cache buster の仕様を変える場合は `scripts/build-pages-artifact.mjs` と `tests/pages-artifact.test.mjs` を合わせて更新する
+- `scripts/build-browser.mjs` がesbuildの内容ハッシュ付きファイル名を使い、entry・chunk・HTMLのmodulepreloadのURLを決定する
+- CSSは同じビルド工程で内容のSHA-256を `styles.css?v=...` としてHTMLへ反映する
+- `scripts/build-pages-artifact.mjs` は `_build` の静的asset・`browser`・曲JSONを `_site` へコピーし、URLや生成JSを書き換えない。`app` のemit結果は公開しない
+- ソースのHTMLやimportには通常バージョンを記述しない。emit側コメントだけの変更はブラウザ成果物へ影響しない
+- `DEPLOY_CACHE_BUSTER` またはbuild-siteの `--cache-buster` はビルド時に適用する。JSではbannerを通じて内容ハッシュへ、CSSではURLのバージョンへ反映する
+- deploy commit SHAはassetのバージョンと兼用せず、artifact直下の `deployment.json` に記録する
+- URL決定の仕様変更は `scripts/build-browser.mjs` と `tests/browser-build.test.mjs` を合わせて更新する
 - `songs.json` / `songs-meta.json` の内容更新だけでは cache buster を上げず、`contentHash` による鮮度確認で反映する
 - 日付入力はセレクト方式（ブラウザ互換性優先）

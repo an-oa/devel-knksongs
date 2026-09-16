@@ -267,11 +267,26 @@ export async function routeDeferredSongsJsonFixture(page, songs, generatedAt = "
  */
 export async function readSongsJsonCacheText(page) {
     return page.evaluate(async (cacheKey) => {
-        const { createIndexedDbSongsJsonCacheStore } = await import(
-            "/app/lib/storage/songs-json-cache.mjs"
-        );
-        const cache = createIndexedDbSongsJsonCacheStore({ cacheKey });
-        return cache.getText();
+        return new Promise((resolve, reject) => {
+            const opening = indexedDB.open("knksongs", 1);
+            // 読み取り補助が空のDBを作り、アプリのschema初期化を妨げないようにする。
+            opening.onupgradeneeded = () => opening.transaction.abort();
+            opening.onerror = () => opening.error?.name === "AbortError" ? resolve(null) : reject(opening.error);
+            opening.onsuccess = () => {
+                const db = opening.result;
+                if (!db.objectStoreNames.contains("songsJsonCache")) {
+                    db.close();
+                    resolve(null);
+                    return;
+                }
+                const request = db.transaction("songsJsonCache", "readonly").objectStore("songsJsonCache").get(cacheKey);
+                request.onsuccess = () => {
+                    db.close();
+                    resolve(typeof request.result?.value === "string" ? request.result.value : null);
+                };
+                request.onerror = () => { db.close(); reject(request.error); };
+            };
+        });
     }, SONGS_JSON_CACHE_KEY);
 }
 

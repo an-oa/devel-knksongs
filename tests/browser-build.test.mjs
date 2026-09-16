@@ -5,7 +5,9 @@ import { join, relative } from "node:path";
 import { buildBrowserModules } from "../scripts/build-browser.mjs";
 import { buildPagesArtifact } from "../scripts/build-pages-artifact.mjs";
 
-test("browser build: bundles shared startup data and preserves preload URLs in Pages", async (t) => {
+const htmlTemplate = '<head>\n<link rel="stylesheet" href="styles.css">\n  <script type="module" src="app/startup.mjs"></script>\n</head>';
+
+test("browser build: owns content-hashed URLs and publishes only browser artifacts", async (t) => {
     const root = await mkdtemp(join(process.cwd(), "_build/browser-test-"));
     const outputDir = `_site/${relative(join(process.cwd(), "_build"), root)}`;
     t.after(async () => {
@@ -14,34 +16,55 @@ test("browser build: bundles shared startup data and preserves preload URLs in P
     });
     await mkdir(join(root, "app"));
     await mkdir(join(root, "data"));
+    const bootstrap = 'import { snapshot } from "./data.mjs"; snapshot.then(() => console.log("ready"));';
     await Promise.all([
-        writeFile(join(root, "index.html"), '<head>\n  <script type="module" src="app/startup.mjs"></script>\n</head>'),
         writeFile(join(root, "styles.css"), "body {}"),
         writeFile(join(root, "ogp.png"), "fixture"),
         writeFile(join(root, "data/songs.json"), "{}"),
         writeFile(join(root, "data/songs-meta.json"), "{}"),
         writeFile(join(root, "app/startup.mjs"), 'import "./data.mjs"; void import("./bootstrap.mjs");'),
         writeFile(join(root, "app/data.mjs"), 'export const snapshot = fetch("data/songs.json");'),
-        writeFile(join(root, "app/bootstrap.mjs"), 'import { snapshot } from "./data.mjs"; snapshot.then(() => console.log("ready"));')
+        writeFile(join(root, "app/bootstrap.mjs"), bootstrap)
     ]);
-    await buildBrowserModules(root);
-    const files = await readdir(join(root, "browser"));
-    assert.equal(files.length, 3, "startup, UI, and one shared module");
-    assert.ok(files.every((file) => file.endsWith(".mjs")), "no TypeScript or source maps in bundles");
-    const sources = await Promise.all(files.map((file) => readFile(join(root, "browser", file), "utf8")));
-    assert.equal(sources.join("").match(/fetch\(/g)?.length, 1, "data request code is shared, not duplicated");
-    const startup = await readFile(join(root, "browser/startup.mjs"), "utf8");
-    assert.match(startup, /import\("\.\/bootstrap-/);
-
-    await buildPagesArtifact({ outputDir, siteDir: root, cacheBuster: "fixture/version" });
-    const html = await readFile(join(outputDir, "index.html"), "utf8");
-    assert.ok(!html.includes("app/startup.mjs"));
-    for (const file of files) {
-        assert.ok(html.includes(`browser/${file}?v=fixture%2Fversion`), "each bundle is discoverable from HTML");
-        const source = await readFile(join(outputDir, "browser", file), "utf8");
-        for (const match of source.matchAll(/["']\.\/([^"']+\.mjs\?v=[^"']+)["']/g)) {
-            assert.ok(html.includes(`browser/${match[1]}`), "preload and import use the same versioned URL");
-        }
-        assert.doesNotMatch(source, /["']\.\/[^"'?]+\.mjs["']/, "no unversioned chunk import");
+    /** source HTMLから毎回ビルドし、ブラウザ成果物の内容を比較する。 */
+    async function compile(options) {
+        await rm(join(root, "browser"), { recursive: true, force: true });
+        await writeFile(join(root, "index.html"), htmlTemplate);
+        await buildBrowserModules(root, options);
+        const files = (await readdir(join(root, "browser"))).sort();
+        const sources = await Promise.all(files.map((file) => readFile(join(root, "browser", file), "utf8")));
+        const html = await readFile(join(root, "index.html"), "utf8");
+        return { files, sources, html };
     }
+    const first = await compile();
+    assert.equal(first.files.length, 3, "startup, UI, and one shared module");
+    assert.ok(first.files.every((file) => /-[A-Z0-9]+\.mjs$/.test(file)));
+    assert.equal(first.sources.join("").match(/fetch\(/g)?.length, 1);
+    assert.match(first.html, /styles\.css\?v=[0-9a-f]{64}/);
+    for (const file of first.files) assert.ok(first.html.includes(`browser/${file}`));
+    for (const source of first.sources) {
+        for (const match of source.matchAll(/["']\.\/([^"']+\.mjs)["']/g)) {
+            assert.ok(first.html.includes(`browser/${match[1]}`), "preload and import have identical URLs");
+        }
+    }
+    await buildPagesArtifact({ outputDir, siteDir: root, deploymentSha: "abcdef0" });
+    assert.equal(await readFile(join(outputDir, "index.html"), "utf8"), first.html);
+    assert.deepEqual((await readdir(outputDir)).sort(), ["browser", "data", "deployment.json", "index.html", "ogp.png", "styles.css"]);
+    for (let i = 0; i < first.files.length; i++) {
+        assert.equal(await readFile(join(outputDir, "browser", first.files[i]), "utf8"), first.sources[i]);
+    }
+    await writeFile(join(root, "app/bootstrap.mjs"), `// emit comment only\n${bootstrap}`);
+    await writeFile(join(root, "data/songs.json"), '{"updated":true}');
+    assert.deepEqual(await compile(), first, "emit comments and JSON updates do not invalidate JS/CSS URLs");
+    await writeFile(join(root, "app/bootstrap.mjs"), bootstrap.replace('"ready"', '"changed"'));
+    const changed = await compile();
+    assert.notEqual(changed.files.find((file) => file.startsWith("startup-")), first.files.find((file) => file.startsWith("startup-")), "entry hash includes imported code changes");
+    assert.notEqual(changed.html, first.html);
+    await writeFile(join(root, "styles.css"), "body { color: red; }");
+    const cssChanged = await compile();
+    assert.deepEqual(cssChanged.files, changed.files, "CSS updates leave JS hashes unchanged");
+    assert.notEqual(cssChanged.html, changed.html);
+    const versioned = await compile({ cacheBuster: "release/v2" });
+    assert.match(versioned.html, /styles\.css\?v=release%2Fv2/);
+    assert.notDeepEqual(versioned.files, cssChanged.files, "explicit versions change JS hashes at build time");
 });

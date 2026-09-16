@@ -15,6 +15,7 @@ export const DEFAULT_SONGS_CSV_BODY_TIMEOUT_MS = 30000;
 
 type SongsJsonCache = {
     getText: () => Promise<string | null>;
+    getLegacyText?: () => string | null;
     setText: (value: string) => Promise<boolean>;
     removeText: () => Promise<void>;
 };
@@ -40,6 +41,12 @@ export type SongsSnapshot = {
 type NetworkSongsJsonCandidate = {
     jsonText: string;
     payload: SongsJsonPayload;
+};
+
+type CachedSongsJsonCandidate = {
+    jsonText: string;
+    needsMigration: boolean;
+    payload: SongsJsonPayload | null;
 };
 
 /**
@@ -115,15 +122,22 @@ export function createSongsDataSource(input: SongsDataSourceInput) {
     }
 
     /**
-     * 非同期ストアから曲データJSONキャッシュを読み込む。
-     * @returns キャッシュ文字列
+     * 現行ストア、なければ旧localStorageから曲データJSONを読み取る。
+     * @returns キャッシュ文字列と移行の要否
      */
-    async function getCachedSongsJsonText(): Promise<string | null> {
+    async function getCachedSongsJsonText(): Promise<{ jsonText: string; needsMigration: boolean } | null> {
         if (!songsJsonCache) return null;
         try {
-            return await songsJsonCache.getText();
+            const jsonText = await songsJsonCache.getText();
+            if (jsonText) return { jsonText, needsMigration: false };
         } catch (error) {
             console.warn("曲データJSONキャッシュを読み込めませんでした", error);
+        }
+        try {
+            const jsonText = songsJsonCache.getLegacyText?.();
+            return jsonText ? { jsonText, needsMigration: true } : null;
+        } catch (error) {
+            console.warn("旧曲データJSONキャッシュを読み込めませんでした", error);
             return null;
         }
     }
@@ -260,19 +274,24 @@ export function createSongsDataSource(input: SongsDataSourceInput) {
     }
 
     /**
-     * JSONキャッシュを検証し、不正なら削除する。
-     * @returns 検証済みキャッシュ
+     * JSONキャッシュを読み取り・検証する。保存・削除は採用データの決定後に行う。
+     * @returns 読込元と検証結果。不正な内容も後片付け判断のため候補として返す。
      */
-    async function loadValidatedSongsJsonCache(): Promise<SongsJsonPayload | null> {
-        const cachedJson = await getCachedSongsJsonText();
-        if (!cachedJson) return null;
+    async function loadValidatedSongsJsonCache(): Promise<CachedSongsJsonCandidate | null> {
+        const candidate = await getCachedSongsJsonText();
+        if (!candidate) return null;
         try {
-            return parseSongsJsonPayload(cachedJson);
+            return { ...candidate, payload: parseSongsJsonPayload(candidate.jsonText) };
         } catch (error) {
             console.warn("曲データJSONキャッシュを読み込めませんでした", error);
-            await removeCachedSongsJsonText();
-            return null;
+            return { ...candidate, payload: null };
         }
+    }
+
+    /** 有効な旧キャッシュを採用した場合だけ移行保存を開始し、表示は完了を待たない。 */
+    function acceptCachedSongsJson(candidate: CachedSongsJsonCandidate, payload: SongsJsonPayload): SongsSnapshot {
+        if (candidate.needsMigration) void setCachedSongsJsonText(candidate.jsonText);
+        return { songs: payload.songs, source: "cache" };
     }
 
     /**
@@ -297,7 +316,8 @@ export function createSongsDataSource(input: SongsDataSourceInput) {
      * キャッシュがない場合はmetaと本体を並行取得し、失敗時はCSVへ進む。
      */
     async function loadInitialSnapshot(): Promise<SongsSnapshot | null> {
-        const cachedPayload = await loadValidatedSongsJsonCache();
+        const cachedCandidate = await loadValidatedSongsJsonCache();
+        const cachedPayload = cachedCandidate?.payload;
         if (publicSongsJsonUrl) {
             const deadline = cachedPayload
                 ? performance.now() + cachedSongsNetworkTimeoutMs
@@ -305,8 +325,8 @@ export function createSongsDataSource(input: SongsDataSourceInput) {
             try {
                 if (cachedPayload) {
                     const meta = await loadSongsJsonMeta(deadline);
-                    if (meta?.contentHash === cachedPayload.contentHash) {
-                        return { songs: cachedPayload.songs, source: "cache" };
+                    if (meta?.contentHash === cachedPayload.contentHash && cachedCandidate) {
+                        return acceptCachedSongsJson(cachedCandidate, cachedPayload);
                     }
                     const candidate = await loadNetworkSongsJsonCandidate(deadline);
                     return acceptNetworkSongsJson(candidate, meta);
@@ -320,9 +340,11 @@ export function createSongsDataSource(input: SongsDataSourceInput) {
                 // 公開JSONを利用できなければ、有効なキャッシュへ退避する。
             }
         }
-        if (cachedPayload) {
-            return { songs: cachedPayload.songs, source: "cache" };
+        if (cachedPayload && cachedCandidate) {
+            return acceptCachedSongsJson(cachedCandidate, cachedPayload);
         }
+        // 公開JSONを保存した場合は上書きで置き換える。削除を同時に走らせない。
+        if (cachedCandidate) void removeCachedSongsJsonText();
         return loadCsvFallback();
     }
 

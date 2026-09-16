@@ -30,7 +30,7 @@ function getBrowserLocalStorage(): Storage | null {
 
 /**
  * ブラウザ保存領域を使う曲データ取得元を作成する。
- * JSONはIndexedDBを主キャッシュとして使い、廃止済みCSVキャッシュは初期化時に削除する。
+ * JSONはIndexedDBを主キャッシュとして使い、廃止済みCSVの削除は初期データの決定後に行う。
  */
 export function createBrowserSongsDataSource(input: BrowserSongsDataSourceInput) {
     const {
@@ -59,12 +59,18 @@ export function createBrowserSongsDataSource(input: BrowserSongsDataSourceInput)
         storage: browserStorage,
         label: "CSVキャッシュ"
     });
-    void obsoleteCsvCache.removeText();
-
-    return createSongsDataSource({
+    const dataSource = createSongsDataSource({
         publicSongsJsonUrl,
         publicSongsMetaUrl,
         publicCsvUrl,
         songsJsonCache
     });
+    return {
+        /** 旧CSVの書込トランザクションがJSON読込を待たせないよう、後片付けを後に回す。 */
+        async loadInitialSnapshot() {
+            const snapshot = await dataSource.loadInitialSnapshot();
+            void obsoleteCsvCache.removeText();
+            return snapshot;
+        }
+    };
 }

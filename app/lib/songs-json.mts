@@ -1,4 +1,4 @@
-import { validateSongIdentities, type SongIdentityIssue } from "./song-identity.mjs";
+import { findFirstSongIdentityIssue, type SongIdentityIssue } from "./song-identity.mjs";
 
 export const SONGS_JSON_SCHEMA_VERSION = 3;
 
@@ -191,7 +191,7 @@ function parseSongsArray(songs: unknown): Song[] {
         throw new Error("songs json payload requires a songs array");
     }
     songs.forEach((song, index) => assertSongStructure(song, index));
-    const identityIssue = validateSongIdentities(songs)[0];
+    const identityIssue = findFirstSongIdentityIssue(songs);
     if (identityIssue) {
         throw new Error(formatSongIdentityIssue(identityIssue));
     }

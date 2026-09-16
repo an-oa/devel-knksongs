@@ -5,6 +5,7 @@ import {
     buildLegacySongKey,
     buildSongKey,
     buildSongReferenceIndex,
+    findFirstSongIdentityIssue,
     normalizeLegacySongRefToCurrent,
     parseArchiveOrder,
     validateSongIdentities
@@ -58,4 +59,29 @@ test("song identity: detects mismatched and duplicate generated keys", () => {
     assert.ok(issues.some((issue) => issue.kind === "duplicate-key" && issue.fieldName === "songKey"));
     assert.ok(issues.some((issue) => issue.kind === "duplicate-key" && issue.fieldName === "bookmarkSongKey"));
     assert.ok(issues.some((issue) => issue.kind === "mismatched-key" && issue.fieldName === "songKey"));
+});
+
+test("song identity: first-issue validation preserves diagnostic priority over earlier duplicates", () => {
+    const first = createSongFixture();
+    const invalidOrder = createSongFixture({ archiveOrder: null });
+    const rows = [first, { ...first }, invalidOrder];
+    const issues = validateSongIdentities(rows);
+    assert.deepEqual(issues.map(({ kind, index, fieldName }) => ({ kind, index, fieldName })), [
+        { kind: "invalid-archive-order", index: 2, fieldName: undefined },
+        { kind: "duplicate-key", index: 1, fieldName: "songKey" },
+        { kind: "duplicate-key", index: 2, fieldName: "songKey" },
+        { kind: "duplicate-key", index: 1, fieldName: "bookmarkSongKey" },
+        { kind: "duplicate-key", index: 2, fieldName: "bookmarkSongKey" }
+    ]);
+    for (const input of [[], [null, 42, []], [first], [first, { ...first }], rows,
+        [createSongFixture({ songKey: "bad", bookmarkSongKey: "bad", legacySongKey: "bad" })]]) {
+        assert.deepEqual(findFirstSongIdentityIssue(input), validateSongIdentities(input)[0] ?? null);
+    }
+});
+
+test("song identity: runtime validation stops before inspecting later rows after a mismatch", () => {
+    const later = Object.defineProperty({}, "archiveOrder", { get() { throw new Error("later row was inspected"); } });
+    assert.deepEqual(findFirstSongIdentityIssue([createSongFixture({ songKey: "bad" }), later]), {
+        kind: "mismatched-key", index: 0, fieldName: "songKey", expected: "archive-1::1"
+    });
 });

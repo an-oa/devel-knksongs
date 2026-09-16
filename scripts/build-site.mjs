@@ -13,15 +13,23 @@ const DEFAULT_BUILD_DIR = "_build";
 /**
  * CLI 引数から build option を作る。
  * @param {string[]} args
- * @returns {{ outputDir: string }}
+ * @param {Record<string, string | undefined>} [env]
+ * @returns {{ outputDir: string, cacheBuster: string }}
  */
-export function parseArgs(args) {
+export function parseArgs(args, env = process.env) {
     const options = {
-        outputDir: DEFAULT_BUILD_DIR
+        outputDir: DEFAULT_BUILD_DIR,
+        cacheBuster: (env.DEPLOY_CACHE_BUSTER || "").trim()
     };
     for (let i = 0; i < args.length; i++) {
         const arg = args[i];
         const next = args[i + 1];
+        if (arg === "--cache-buster") {
+            if (!next) throw new Error("--cache-buster requires a version value");
+            options.cacheBuster = next.trim();
+            i++;
+            continue;
+        }
         if (arg === "--output-dir") {
             if (!next) throw new Error("--output-dir requires a directory path");
             options.outputDir = next;
@@ -50,7 +58,7 @@ export function resolveSiteBuildOutputDir(outputDir, rootDir = process.cwd()) {
 
 /**
  * 静的 asset と TypeScript 生成 JavaScript を含む site build を作る。
- * @param {{ outputDir: string }} options
+ * @param {{ outputDir: string, cacheBuster?: string }} options
  * @returns {Promise<string>}
  */
 export async function buildSite(options) {
@@ -64,7 +72,7 @@ export async function buildSite(options) {
         copyFile(resolve("data", fileName), join(outputDir, "data", fileName))
     )));
     await buildTypeScriptModules({ outputDir });
-    await buildBrowserModules(outputDir);
+    await buildBrowserModules(outputDir, { cacheBuster: options.cacheBuster });
     return outputDir;
 }
 

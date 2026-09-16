@@ -664,7 +664,7 @@ test("songs data source: equal timestamps with mismatched hashes are rejected", 
     }
 });
 
-test("songs data source: older schema cache is removed and handled as a cache miss", async () => {
+test("songs data source: older schema cache is replaced without a competing delete", async () => {
     const previousFetch = globalThis.fetch;
     const previousConsoleWarn = console.warn;
     try {
@@ -695,7 +695,7 @@ test("songs data source: older schema cache is removed and handled as a cache mi
             ["data/songs.json", { cache: "no-cache" }]
         ]);
         assert.equal(songsJsonCache.peek(), freshJson);
-        assert.equal(songsJsonCache.getRemoveCount(), 1);
+        assert.equal(songsJsonCache.getRemoveCount(), 0);
         assert.equal(snapshot.source, "network");
         assert.equal(snapshot.songs[0].songKey, "fresh-archive::1");
     } finally {
@@ -729,7 +729,7 @@ test("songs data source: older schema network json is not cached and falls back 
     }
 });
 
-test("songs data source: invalid cached json is removed before network fallback", async () => {
+test("songs data source: invalid cached json is removed after public JSON fails", async () => {
     const previousFetch = globalThis.fetch;
     const previousConsoleWarn = console.warn;
     try {
@@ -1147,3 +1147,75 @@ test("songs data source: no cache keeps parallel requests and allows a body beyo
     assert.equal(snapshot.source, "network");
     assert.equal(snapshot.songs[0].songKey, "public::1");
 });
+
+for (const updated of [false, true]) {
+    test(`songs data source: legacy read starts meta before saving and only persists the accepted JSON (updated=${updated})`, async (t) => {
+        const legacy = createSongsJson("legacy::1", "sha256:legacy");
+        const current = createSongsJson("current::1", "sha256:current");
+        const storage = createFakeLocalStorage();
+        storage.setItem("legacy", legacy);
+        const primary = createFakeTextCacheStore();
+        const writes = [];
+        let finishSave;
+        t.mock.method(primary, "setText", (text) => {
+            writes.push(text);
+            return new Promise((resolve) => { finishSave = resolve; });
+        });
+        const cache = createLegacyLocalStorageSongsJsonCacheAdapter({ cache: primary, storage, legacyKey: "legacy" });
+        let releaseMeta;
+        t.mock.method(globalThis, "fetch", async (url) => {
+            if (url === "meta") return new Promise((resolve) => {
+                releaseMeta = () => resolve(createResponse(createSongsMetaJson(updated ? "sha256:current" : "sha256:legacy")));
+            });
+            assert.equal(url, "json");
+            return createResponse(current);
+        });
+        const loading = createSongsDataSource({ publicSongsJsonUrl: "json", publicSongsMetaUrl: "meta", publicCsvUrl: "csv", songsJsonCache: cache }).loadInitialSnapshot();
+        await new Promise((resolve) => setImmediate(resolve));
+        assert.equal(typeof releaseMeta, "function");
+        assert.deepEqual(writes, [], "reading legacy data must not queue a migration write");
+        releaseMeta();
+        let snapshot;
+        const settled = loading.then((value) => { snapshot = value; });
+        await new Promise((resolve) => setImmediate(resolve));
+        try {
+            assert.equal(snapshot?.source, updated ? "network" : "cache");
+            assert.deepEqual(writes, [updated ? current : legacy]);
+            assert.equal(storage.getItem("legacy"), legacy, "keep legacy until save succeeds");
+        } finally {
+            finishSave(true);
+            await settled;
+            await new Promise((resolve) => setImmediate(resolve));
+        }
+        assert.equal(storage.getItem("legacy"), null);
+        assert.equal(primary.getRemoveCount(), 0);
+    });
+}
+
+for (const networkSucceeds of [false, true]) {
+    test(`songs data source: invalid cache cleanup never blocks loading or races a replacement (network=${networkSucceeds})`, async (t) => {
+        t.mock.method(console, "warn", () => {});
+        const cache = createFakeTextCacheStore("invalid JSON");
+        let releaseDelete;
+        const deletion = t.mock.method(cache, "removeText", () => new Promise((resolve) => { releaseDelete = resolve; }));
+        const current = createSongsJson("current::1");
+        t.mock.method(globalThis, "fetch", async (url) => {
+            if (url === "json") assert.equal(deletion.mock.callCount(), 0, "public fetch begins before cleanup");
+            return url === "json"
+                ? (networkSucceeds ? createResponse(current) : createFailedResponse())
+                : createResponse(createValidCsv());
+        });
+        let snapshot;
+        const loading = createSongsDataSource({ publicSongsJsonUrl: "json", publicCsvUrl: "csv", songsJsonCache: cache })
+            .loadInitialSnapshot().then((value) => { snapshot = value; });
+        await new Promise((resolve) => setImmediate(resolve));
+        try {
+            assert.ok(snapshot, "a pending delete must not delay initial data");
+            assert.equal(deletion.mock.callCount(), networkSucceeds ? 0 : 1);
+            if (networkSucceeds) assert.equal(cache.peek(), current);
+        } finally {
+            releaseDelete?.();
+            await loading;
+        }
+    });
+}

@@ -27,7 +27,6 @@ type LegacyLocalStorageTextCacheAdapterOptions = {
         removeItem: (key: string) => void;
     } | null;
     label?: string;
-    retrySetAfterRemovingLegacy?: boolean;
 };
 
 /**
@@ -225,51 +224,21 @@ function removeLegacyCachedTexts(storage, legacyKeys) {
 }
 
 /**
- * 旧 localStorage キャッシュを非同期 cache へ移行する汎用 adapter を作成する。
- * @param {{
- *   cache: TextCacheStore,
- *   legacyKey?: string,
- *   legacyKeys?: string[],
- *   storage?: {
- *     getItem: (key: string) => string | null,
- *     removeItem: (key: string) => void
- *   } | null,
- *   label?: string,
- *   retrySetAfterRemovingLegacy?: boolean
- * }} options
- * @returns {TextCacheStore}
+ * 現行・旧キャッシュの読み取りと採用後の保存を分離するadapter。
+ * getText/getLegacyTextは読み取り専用で、setText成功後だけ旧キャッシュを削除する。
  */
 export function createLegacyLocalStorageTextCacheAdapter(
     options: LegacyLocalStorageTextCacheAdapterOptions
-): TextCacheStore {
+): TextCacheStore & { getLegacyText: () => string | null } {
     // localStorage に残る大きな旧キャッシュを IndexedDB などの非同期 cache へ移す。
     const {
         cache,
         legacyKey,
         legacyKeys: rawLegacyKeys,
         storage = null,
-        label = "テキストキャッシュ",
-        retrySetAfterRemovingLegacy = false
+        label = "テキストキャッシュ"
     } = options;
     const legacyKeys = getLegacyCacheKeys(legacyKey, rawLegacyKeys);
-
-    /**
-     * 旧localStorageキャッシュがあれば読み込み、非同期キャッシュへ移す。
-     * @returns {Promise<string | null>}
-     */
-    async function getMigratedLegacyText() {
-        // 旧 localStorage キャッシュを互換読み込みして、保存成功時だけ削除する。
-        const legacyCachedText = getFirstLegacyCachedText(storage, legacyKeys);
-        if (!legacyCachedText) return null;
-        try {
-            if (await cache.setText(legacyCachedText)) {
-                removeLegacyCachedTexts(storage, legacyKeys);
-            }
-        } catch (error) {
-            console.warn(`${label}を保存できませんでした`, error);
-        }
-        return legacyCachedText;
-    }
 
     /**
      * 非同期 cache へテキストを保存する。
@@ -284,30 +253,23 @@ export function createLegacyLocalStorageTextCacheAdapter(
             return saved;
         } catch (error) {
             console.warn(`${label}を保存できませんでした`, error);
-            if (!retrySetAfterRemovingLegacy || !getFirstLegacyCachedText(storage, legacyKeys)) {
-                return false;
-            }
-            removeLegacyCachedTexts(storage, legacyKeys);
-            try {
-                return await cache.setText(value);
-            } catch (retryError) {
-                console.warn(`${label}の再保存に失敗しました`, retryError);
-                return false;
-            }
+            return false;
         }
     }
 
     return {
         async getText() {
-            // 現行 cache を優先し、なければ旧 localStorage から移行読み込みする。
+            // 読み取り中は保存・削除をせず、移行元の選択は呼び出し元へ渡す。
             try {
                 const cachedText = await cache.getText();
                 if (cachedText) return cachedText;
             } catch (error) {
                 console.warn(`${label}を読み込めませんでした`, error);
             }
-            return getMigratedLegacyText();
+            return null;
         },
+        /** 旧キャッシュを読み取るだけにし、採用後のsetText成功時に削除する。 */
+        getLegacyText: () => getFirstLegacyCachedText(storage, legacyKeys),
         setText,
         async removeText() {
             // 現行 cache と旧 localStorage キャッシュをまとめて削除する。
@@ -321,27 +283,11 @@ export function createLegacyLocalStorageTextCacheAdapter(
     };
 }
 
-/**
- * 旧localStorageキャッシュを非同期キャッシュへ移行する adapter を作成する。
- * @param {{
- *   cache: {
- *     getText: () => Promise<string | null>,
- *     setText: (value: string) => Promise<boolean>,
- *     removeText: () => Promise<void>
- *   },
- *   legacyKey?: string,
- *   storage?: {
- *     getItem: (key: string) => string | null,
- *     removeItem: (key: string) => void
- *   } | null
- * }} options
- * @returns {{ getText: () => Promise<string | null>, setText: (value: string) => Promise<boolean>, removeText: () => Promise<void> }}
- */
-export function createLegacyLocalStorageSongsJsonCacheAdapter(options) {
+/** 曲データJSONの旧キャッシュを、呼び出し元の検証・採用後に移行するadapter。 */
+export function createLegacyLocalStorageSongsJsonCacheAdapter(options: LegacyLocalStorageTextCacheAdapterOptions) {
     // 旧localStorageキャッシュを非同期キャッシュへ移行する adapter を作成する。
     return createLegacyLocalStorageTextCacheAdapter({
         ...options,
-        label: "曲データJSONキャッシュ",
-        retrySetAfterRemovingLegacy: true
+        label: "曲データJSONキャッシュ"
     });
 }
