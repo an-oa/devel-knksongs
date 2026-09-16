@@ -95,7 +95,9 @@ feat: move settings into dedicated sidebar panel
 - `tsconfig.build.json` は `app/**/*.mts` だけを emit 対象にし、`allowJs: false` のまま保つ。
   既存 `.mjs` を TypeScript emit 対象へ巻き込むと、入力ファイル上書き防止で失敗しやすい。
 - `npm run build` は静的 asset と TypeScript 生成 module を `_build` へ作り、`.ts` / `.mts` source を含めない。
-- Pages artifact は `_build` を入力元にして `_site` を作り、cache buster を付与する。
+- ブラウザ用URLはbuild時にesbuildの内容ハッシュとCSSのcache busterで決定する。
+- Pages artifact は `_build` の静的asset・browser bundle・曲JSONを `_site` へコピーする。
+  `_build/app` はNode tests・scripts用に保ち、配布やURL書き換えの対象にしない。
 
 ## Naming
 

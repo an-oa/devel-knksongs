@@ -20,14 +20,15 @@
     "typecheck:scripts:raw": "tsc --project tsconfig.scripts.json",
     "test:unit": "npm run build:ts && npm run test:unit:raw",
     "test:unit:raw": "node --test tests/*.mjs",
-    "test:e2e": "npm run build && playwright test",
-    "test:e2e:headed": "npm run build && playwright test --headed",
-    "test:e2e:debug": "npm run build && playwright test --debug"
+    "test:e2e": "npm run build:pages-artifact && playwright test",
+    "test:e2e:headed": "npm run build:pages-artifact && playwright test --headed",
+    "test:e2e:debug": "npm run build:pages-artifact && playwright test --debug"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
     "@playwright/test": "^1.53.0",
     "@types/node": "^24.13.3",
+    "esbuild": "^0.28.2",
     "eslint": "^9.39.4",
     "globals": "^17.6.0",
     "typescript": "^6.0.3"

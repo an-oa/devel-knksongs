@@ -1,4 +1,4 @@
-import { validateSongIdentities, type SongIdentityIssue } from "./song-identity.mjs";
+import { findFirstSongIdentityIssue, type SongIdentityIssue } from "./song-identity.mjs";
 
 export const SONGS_JSON_SCHEMA_VERSION = 3;
 
@@ -47,6 +47,8 @@ const SONG_FIELD_KINDS = {
 } as const satisfies Record<keyof Song, SongFieldKind>;
 
 const VIDEO_ORIENTATIONS = new Set<VideoOrientation>(["", "vertical", "landscape"]);
+const SONG_FIELDS = Object.keys(SONG_FIELD_KINDS) as (keyof Song)[];
+const SONG_FIELD_KIND_BY_NAME = new Map<string, SongFieldKind>(Object.entries(SONG_FIELD_KINDS));
 
 /**
  * 曲データJSONのcontentHashを検証する。
@@ -137,17 +139,25 @@ function describeSongFieldKind(fieldKind: SongFieldKind): string {
  * @param index songs配列上の位置
  */
 function assertSongStructure(song: unknown, index: number): asserts song is Song {
-    const location = `songs json payload songs[${index}]`;
     if (!song || typeof song !== "object" || Array.isArray(song)) {
-        throw new Error(`${location} must be an object`);
+        throw new Error(`songs json payload songs[${index}] must be an object`);
     }
     const songRecord = song as Record<string, unknown>;
-    for (const fieldName of Object.keys(songRecord)) {
+    const fieldNames = Object.keys(songRecord);
+    // own keyが既知の全項目と一致する正常系は、値の型も同じ走査で確認する。
+    // 不正時だけ従来の診断を組み立て、欠落・余剰・型不一致の区別を保つ。
+    if (fieldNames.length === SONG_FIELDS.length && fieldNames.every((fieldName) => {
+        const fieldKind = SONG_FIELD_KIND_BY_NAME.get(fieldName);
+        return fieldKind !== undefined && matchesSongFieldKind(fieldKind, songRecord[fieldName]);
+    })) return;
+
+    const location = `songs json payload songs[${index}]`;
+    for (const fieldName of fieldNames) {
         if (!Object.hasOwn(SONG_FIELD_KINDS, fieldName)) {
             throw new Error(`${location}.${fieldName} is not allowed`);
         }
     }
-    for (const fieldName of Object.keys(SONG_FIELD_KINDS) as (keyof Song)[]) {
+    for (const fieldName of SONG_FIELDS) {
         if (!Object.hasOwn(songRecord, fieldName)) {
             throw new Error(`${location}.${fieldName} is required`);
         }
@@ -181,7 +191,7 @@ function parseSongsArray(songs: unknown): Song[] {
         throw new Error("songs json payload requires a songs array");
     }
     songs.forEach((song, index) => assertSongStructure(song, index));
-    const identityIssue = validateSongIdentities(songs)[0];
+    const identityIssue = findFirstSongIdentityIssue(songs);
     if (identityIssue) {
         throw new Error(formatSongIdentityIssue(identityIssue));
     }

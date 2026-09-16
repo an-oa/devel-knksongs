@@ -24,7 +24,7 @@ function createFakeLocalStorage() {
     };
 }
 
-test("songs json cache adapter: migrates legacy localStorage text into primary cache", async () => {
+test("songs json cache adapter: reads legacy text without writing until explicitly accepted", async () => {
     const storage = createFakeLocalStorage();
     let primaryValue = null;
     const cache = {
@@ -47,12 +47,16 @@ test("songs json cache adapter: migrates legacy localStorage text into primary c
 
     storage.setItem("cachedSongsJson", "{\"songs\":[]}");
 
-    assert.equal(await adapter.getText(), "{\"songs\":[]}");
+    assert.equal(await adapter.getText(), null);
+    assert.equal(adapter.getLegacyText(), "{\"songs\":[]}");
+    assert.equal(primaryValue, null);
+    assert.equal(storage.getItem("cachedSongsJson"), "{\"songs\":[]}");
+    await adapter.setText(adapter.getLegacyText());
     assert.equal(primaryValue, "{\"songs\":[]}");
     assert.equal(storage.getItem("cachedSongsJson"), null);
 });
 
-test("songs json cache adapter: removes legacy localStorage text before retrying failed save", async () => {
+test("songs json cache adapter: retains legacy localStorage text when primary save fails", async () => {
     const previousConsoleWarn = console.warn;
     try {
         const storage = createFakeLocalStorage();
@@ -86,10 +90,10 @@ test("songs json cache adapter: removes legacy localStorage text before retrying
 
         storage.setItem("cachedSongsJson", "{\"songs\":[\"old\"]}");
 
-        assert.equal(await adapter.setText("{\"songs\":[\"fresh\"]}"), true);
-        assert.equal(setCalls, 2);
-        assert.equal(primaryValue, "{\"songs\":[\"fresh\"]}");
-        assert.equal(storage.getItem("cachedSongsJson"), null);
+        assert.equal(await adapter.setText("{\"songs\":[\"fresh\"]}"), false);
+        assert.equal(setCalls, 1);
+        assert.equal(primaryValue, null);
+        assert.equal(storage.getItem("cachedSongsJson"), "{\"songs\":[\"old\"]}");
         assert.match(String(warnings[0]?.[0]), /曲データJSONキャッシュを保存できませんでした/);
     } finally {
         console.warn = previousConsoleWarn;
@@ -121,7 +125,9 @@ test("songs json cache adapter: keeps legacy localStorage text when migration sa
 
         storage.setItem("cachedSongsJson", "{\"songs\":[\"legacy\"]}");
 
-        assert.equal(await adapter.getText(), "{\"songs\":[\"legacy\"]}");
+        assert.equal(await adapter.getText(), null);
+        assert.equal(adapter.getLegacyText(), "{\"songs\":[\"legacy\"]}");
+        assert.equal(await adapter.setText(adapter.getLegacyText()), false);
         assert.equal(storage.getItem("cachedSongsJson"), "{\"songs\":[\"legacy\"]}");
         assert.match(String(warnings[0]?.[0]), /曲データJSONキャッシュを読み込めませんでした/);
         assert.match(String(warnings[1]?.[0]), /曲データJSONキャッシュを保存できませんでした/);
@@ -154,7 +160,10 @@ test("text cache adapter: migrates multiple legacy localStorage keys into primar
 
     storage.setItem("cachedCsv", "legacy,csv");
 
-    assert.equal(await adapter.getText(), "legacy,csv");
+    assert.equal(await adapter.getText(), null);
+    assert.equal(adapter.getLegacyText(), "legacy,csv");
+    assert.equal(primaryValue, null);
+    await adapter.setText(adapter.getLegacyText());
     assert.equal(primaryValue, "legacy,csv");
     assert.equal(storage.getItem("cachedCsvV2"), null);
     assert.equal(storage.getItem("cachedCsv"), null);

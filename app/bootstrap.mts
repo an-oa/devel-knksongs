@@ -17,14 +17,7 @@ import {
     STOP_PLAYBACK_ON_SCROLL_OUT,
     appState
 } from "./state.mjs";
-import {
-    PUBLIC_SONGS_JSON_URL,
-    PUBLIC_SONGS_META_URL,
-    PUBLIC_CSV_URL,
-    SONGS_JSON_CACHE_KEY,
-    LEGACY_CSV_CACHE_KEY,
-    CSV_CACHE_KEY
-} from "./config.mjs";
+import { initialSongsSnapshot } from "./startup-data.mjs";
 import { createSearchController } from "./controllers/search.mjs";
 import { createSearchCoordinator } from "./controllers/search-coordinator.mjs";
 import { createRenderController } from "./controllers/render.mjs";
@@ -50,7 +43,6 @@ import { createSidebarController } from "./ui/sidebar/ui.mjs";
 import { createAutoHideHeaderController } from "./ui/header/auto-hide.mjs";
 import { createSearchFiltersController } from "./ui/search-filters/controller.mjs";
 import { debugPlayback } from "./lib/playback-debug.mjs";
-import { createBrowserSongsDataSource } from "./ui/core/data-source.mjs";
 import type {
     AppDataState,
     AppUiState,
@@ -352,19 +344,6 @@ function createAppControllers() {
     });
 
     /**
-     * 曲データの取得元を束ねる data source。
-     * 公開 JSON とmetaによる鮮度確認を優先し、失敗時は保存済みJSON、公開CSVへfallbackする。
-     */
-    const songsDataSource = createBrowserSongsDataSource({
-        publicSongsJsonUrl: PUBLIC_SONGS_JSON_URL,
-        publicSongsMetaUrl: PUBLIC_SONGS_META_URL,
-        publicCsvUrl: PUBLIC_CSV_URL,
-        songsJsonCacheKey: SONGS_JSON_CACHE_KEY,
-        obsoleteCsvCacheKey: CSV_CACHE_KEY,
-        obsoleteLegacyCsvCacheKey: LEGACY_CSV_CACHE_KEY
-    });
-
-    /**
      * ブックマーク本体の永続化と、曲データ反映後の旧参照移行を扱う controller。
      * DataLoader より先に生成し、曲データの取得・反映と保存処理の生成順を分離する。
      */
@@ -382,7 +361,7 @@ function createAppControllers() {
     const dataLoader = createDataLoader({
         data: appDataState,
         ui: appUiState,
-        dataSource: songsDataSource,
+        dataSource: { loadInitialSnapshot: () => initialSongsSnapshot },
         callbacks: {
             applyDateInputRange: (songs) => dateFilterController.applyDateInputRange(songs),
             clampDateInputsToBounds: (minKey, maxKey) => dateFilterController.clampDateInputsToBounds(minKey, maxKey)
@@ -571,7 +550,12 @@ function reportInitError(error: unknown): void {
     console.error("initUI failed", error);
 }
 
-document.addEventListener("DOMContentLoaded", boot);
+// startup からの dynamic import が DOMContentLoaded 後に完了した場合も起動する。
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot, { once: true });
+} else {
+    boot();
+}
 
 /**
  * Inspect の console から隠し再生設定をページ内だけで操作できる API を公開する。

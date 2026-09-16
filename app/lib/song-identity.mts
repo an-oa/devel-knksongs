@@ -51,7 +51,7 @@ export function buildSongKey(input: SongIdentityRow): string {
     const orderPart = Number.isSafeInteger(input.archiveOrder)
         ? String(input.archiveOrder)
         : "";
-    return [archiveId, orderPart].join("::");
+    return `${archiveId}::${orderPart}`;
 }
 
 /**
@@ -63,16 +63,12 @@ export function buildBookmarkSongKey(input: SongIdentityRow): string {
     const orderPart = Number.isSafeInteger(input.archiveOrder)
         ? String(input.archiveOrder)
         : "";
-    return [keyHead, orderPart].join("::");
+    return `${keyHead}::${orderPart}`;
 }
 
 /** 旧仕様互換の曲キー（archiveId + archiveOrder + url）を生成する。 */
 export function buildLegacySongKey(input: SongIdentityRow): string {
-    return [
-        String(input.archiveId ?? "").trim(),
-        Number.isSafeInteger(input.archiveOrder) ? String(input.archiveOrder) : "",
-        String(input.url ?? "").trim()
-    ].join("::");
+    return `${buildSongKey(input)}::${String(input.url ?? "").trim()}`;
 }
 
 /** 曲行からブックマーク保存に使う参照キーを返す。 */
@@ -132,62 +128,71 @@ export function buildSongReferenceIndex<Row extends SongIdentityRow>(
     };
 }
 
-/** 指定キーについて、重複した曲行を識別子問題へ追加する。 */
-function collectDuplicateKeyIssues(
-    songRows: readonly (SongIdentityRow | null)[],
-    fieldName: "songKey" | "bookmarkSongKey",
-    issues: SongIdentityIssue[]
-): void {
+/** 指定キーの重複を入力順に返す。呼び出し元が停止すれば残りの走査も行わない。 */
+function* iterateDuplicateKeyIssues(
+    songRows: readonly unknown[],
+    fieldName: "songKey" | "bookmarkSongKey"
+): Generator<SongIdentityIssue> {
     const firstIndexByKey = new Map<string, number>();
-    songRows.forEach((row, index) => {
-        if (!row) return;
+    for (let index = 0; index < songRows.length; index++) {
+        const row = songRows[index];
+        if (!isSongIdentityRow(row)) continue;
         const value = row[fieldName];
-        if (typeof value !== "string" || !value) return;
+        if (typeof value !== "string" || !value) continue;
         const firstIndex = firstIndexByKey.get(value);
         if (firstIndex !== undefined) {
-            issues.push({ kind: "duplicate-key", index, firstIndex, fieldName, value });
-            return;
+            yield { kind: "duplicate-key", index, firstIndex, fieldName, value };
+        } else {
+            firstIndexByKey.set(value, index);
         }
-        firstIndexByKey.set(value, index);
-    });
+    }
+}
+
+/** 識別子を検証できる行かを判定し、配列の作り直しを避ける。 */
+function isSongIdentityRow(row: unknown): row is SongIdentityRow {
+    return Boolean(row) && typeof row === "object" && !Array.isArray(row);
 }
 
 /**
- * 曲行のarchiveOrder、生成済みキー、一意性を検証する。
- * 呼び出し側はindexをCSV行番号またはJSON配列位置へ対応付けて表示する。
+ * 共通の検証規則を診断順（行ごとの整合性、songKey重複、bookmarkSongKey重複）で返す。
+ * 全件診断と実行時の早期終了で、検証条件と最初の問題の意味を共有する。
  */
-export function validateSongIdentities(songRows: readonly unknown[]): SongIdentityIssue[] {
-    const rows: Array<SongIdentityRow | null> = songRows.map((row) => {
-        return row && typeof row === "object" && !Array.isArray(row)
-            ? row as SongIdentityRow
-            : null;
-    });
-    const issues: SongIdentityIssue[] = [];
-
-    rows.forEach((row, index) => {
-        if (!row) return;
+function* iterateSongIdentityIssues(songRows: readonly unknown[]): Generator<SongIdentityIssue> {
+    for (let index = 0; index < songRows.length; index++) {
+        const row = songRows[index];
+        if (!isSongIdentityRow(row)) continue;
         if (typeof row.archiveOrder !== "number" || !Number.isSafeInteger(row.archiveOrder)) {
-            issues.push({ kind: "invalid-archive-order", index });
-            return;
+            yield { kind: "invalid-archive-order", index };
+            continue;
         }
-        const expectedKeys = {
-            songKey: buildSongKey(row),
-            bookmarkSongKey: buildBookmarkSongKey(row),
-            legacySongKey: buildLegacySongKey(row)
-        } as const;
-        for (const fieldName of Object.keys(expectedKeys) as (keyof typeof expectedKeys)[]) {
-            if (row[fieldName] !== expectedKeys[fieldName]) {
-                issues.push({
-                    kind: "mismatched-key",
-                    index,
-                    fieldName,
-                    expected: expectedKeys[fieldName]
-                });
-            }
-        }
-    });
+        const songKey = buildSongKey(row);
+        const songKeyIssue = getMismatchedKeyIssue(row, index, "songKey", songKey);
+        if (songKeyIssue) yield songKeyIssue;
+        const bookmarkIssue = getMismatchedKeyIssue(row, index, "bookmarkSongKey", buildBookmarkSongKey(row));
+        if (bookmarkIssue) yield bookmarkIssue;
+        const legacyIssue = getMismatchedKeyIssue(row, index, "legacySongKey", `${songKey}::${String(row.url ?? "").trim()}`);
+        if (legacyIssue) yield legacyIssue;
+    }
+    yield* iterateDuplicateKeyIssues(songRows, "songKey");
+    yield* iterateDuplicateKeyIssues(songRows, "bookmarkSongKey");
+}
 
-    collectDuplicateKeyIssues(rows, "songKey", issues);
-    collectDuplicateKeyIssues(rows, "bookmarkSongKey", issues);
-    return issues;
+/** CSV品質診断向けに、曲キーの整合性と一意性の問題を従来と同じ順序で全件返す。 */
+export function validateSongIdentities(songRows: readonly unknown[]): SongIdentityIssue[] {
+    return Array.from(iterateSongIdentityIssues(songRows));
+}
+
+/** 実行時JSON検証向けに最初の問題で停止し、全件分の診断配列を作らない。 */
+export function findFirstSongIdentityIssue(songRows: readonly unknown[]): SongIdentityIssue | null {
+    return iterateSongIdentityIssues(songRows).next().value ?? null;
+}
+
+/** 生成規則と異なるキーだけ診断にし、正常な曲ごとの一時オブジェクトを省く。 */
+function getMismatchedKeyIssue(
+    row: SongIdentityRow,
+    index: number,
+    fieldName: "songKey" | "bookmarkSongKey" | "legacySongKey",
+    expected: string
+): SongIdentityIssue | null {
+    return row[fieldName] !== expected ? { kind: "mismatched-key", index, fieldName, expected } : null;
 }

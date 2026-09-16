@@ -95,8 +95,9 @@ flowchart TD
 - 置換後は、壊れやすいファイルを優先して目視確認する。
   例:
   `index.html`
-  source entrypoint の `app/bootstrap.mts`
-  生成後 entrypoint の `_build/app/bootstrap.mjs`
+  source entrypoint の `app/startup.mts` と UI 初期化の `app/bootstrap.mts`
+  TypeScript emit の `_build/app/startup.mjs`
+  ブラウザ用 entrypoint の `_build/browser/startup-<hash>.mjs`（`npm run build` で更新）
   import を多く持つコントローラー
   テストの先頭 import 群
 
