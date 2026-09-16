@@ -10,7 +10,7 @@ import {
 export type RecommendedSearchCache = {
     /** 抽出済みのおすすめ曲。 */
     songs: Song[];
-    /** この cache で抽出済みとして扱える要求件数。欠損時は実際の曲数まで下げる。 */
+    /** この cache で抽出済みとして扱える要求件数。 */
     requestedCount: number;
 };
 
@@ -34,12 +34,7 @@ type RecommendedSongGroupEntry = {
 };
 
 type RecommendedSongGroup = {
-    key: string;
     latestRows: Song[];
-};
-
-type RecommendedCacheReconcileOptions = {
-    minPerformanceCount: number;
 };
 
 /**
@@ -84,60 +79,6 @@ export function pickRecommendedSongsWithCache(
         songs: nextSongs,
         cache: createRecommendedCacheState(nextSongs, count)
     };
-}
-
-/**
- * 最新の曲データへ切り替える際、既存おすすめの曲順を保ちながら無効な行だけ補修する。
- * N回条件は新規抽選時の入場条件とし、一度選ばれた曲は有効な行が残る限り維持する。
- * @param songs 最新の曲配列
- * @param currentCache 現在表示に使っているおすすめcache
- * @param options おすすめ候補の入場条件
- * @returns 最新データへ参照を更新したおすすめcache
- */
-export function reconcileRecommendedSearchCache(
-    songs: Song[],
-    currentCache: RecommendedSearchCache | null | undefined,
-    { minPerformanceCount }: RecommendedCacheReconcileOptions
-): RecommendedSearchCache | null {
-    const cachedSongs = getRecommendedCacheSongs(currentCache);
-    if (!cachedSongs || !currentCache) return null;
-
-    const dedupedRows = collapseRecommendedRowsByArchive(songs);
-    const groups = groupRecommendedRowsBySong(dedupedRows);
-    const rowsBySongKey = new Map(dedupedRows.map((row) => [row.songKey, row]));
-    const usedGroupKeys = new Set<string>();
-    const nextSlots: Array<Song | null> = cachedSongs.map((cachedRow) => {
-        const exactRow = rowsBySongKey.get(cachedRow.songKey) || null;
-        const groupKey = exactRow
-            ? getRecommendedSongKey(exactRow)
-            : getRecommendedSongKey(cachedRow);
-        const entry = groups.get(groupKey);
-        if (!entry || usedGroupKeys.has(groupKey)) return null;
-
-        const retainedRow = exactRow || pickReplacementRowFromSameGroup(entry, cachedRow, minPerformanceCount);
-        if (!retainedRow) return null;
-        usedGroupKeys.add(groupKey);
-        return retainedRow;
-    });
-
-    const replacementGroups = collectEligibleRecommendedGroups(groups, minPerformanceCount)
-        .filter((group) => !usedGroupKeys.has(group.key));
-    shuffleInPlace(replacementGroups);
-    for (let index = 0; index < nextSlots.length; index++) {
-        if (nextSlots[index]) continue;
-        const replacementGroup = replacementGroups.pop();
-        if (!replacementGroup) continue;
-        const replacementRow = pickRandomEntry(replacementGroup.latestRows);
-        if (!replacementRow) continue;
-        nextSlots[index] = replacementRow;
-        usedGroupKeys.add(replacementGroup.key);
-    }
-
-    const nextSongs = nextSlots.filter((row): row is Song => row !== null);
-    return createRecommendedCacheState(
-        nextSongs,
-        Math.min(getRecommendedCacheRequestedCount(currentCache), nextSongs.length)
-    );
 }
 
 /**
@@ -228,11 +169,11 @@ function collectEligibleRecommendedGroups(
     minPerformanceCount: number
 ): RecommendedSongGroup[] {
     const result: RecommendedSongGroup[] = [];
-    for (const [key, entry] of groups.entries()) {
+    for (const entry of groups.values()) {
         if (!isRecommendedGroupEligible(entry, minPerformanceCount)) continue;
         const latestRows = pickRecommendedLatestRows(entry, minPerformanceCount);
         if (latestRows.length === 0) continue;
-        result.push({ key, latestRows });
+        result.push({ latestRows });
     }
     return result;
 }
@@ -313,24 +254,6 @@ function pickRecommendedLatestRows(
         return entry.shortRows.slice(0, minPerformanceCount);
     }
     return [];
-}
-
-/**
- * 表示していた行がなくなった場合に、同じ曲の有効な別行を選ぶ。
- * 同じアーカイブの代表行が残っていれば優先し、それ以外は既存の形式優先規則を使う。
- * @param entry 最新データ上の同一曲グループ
- * @param cachedRow 以前表示していた行
- * @param minPerformanceCount 通常曲に必要な歌唱回数
- * @returns 同じ曲の代替行
- */
-function pickReplacementRowFromSameGroup(
-    entry: RecommendedSongGroupEntry,
-    cachedRow: Song,
-    minPerformanceCount: number
-): Song | null {
-    const sameArchiveRow = entry.rows.find((row) => row.archiveId === cachedRow.archiveId);
-    if (sameArchiveRow) return sameArchiveRow;
-    return pickRandomEntry(pickRecommendedLatestRows(entry, minPerformanceCount));
 }
 
 /**

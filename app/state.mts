@@ -41,7 +41,6 @@ export function createInitialPlaybackUiRuntimeState(): PlaybackUiRuntimeState {
 export const appState: AppState = {
     data: {
         allSongsRaw: [],
-        pendingSongsRaw: null,
         currentResults: [],
         displayLimit: RANDOM_DISPLAY_COUNT,
         bookmarks: {},

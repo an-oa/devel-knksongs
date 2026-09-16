@@ -377,15 +377,12 @@ function createAppControllers() {
     });
 
     /**
-     * 初期曲データと保留中の更新データを appDataState へ反映する loader。
+     * 初期曲データを appDataState へ反映する loader。
      */
     const dataLoader = createDataLoader({
         data: appDataState,
         ui: appUiState,
         dataSource: songsDataSource,
-        constants: {
-            minPerformanceCount: MIN_PERFORMANCE_FOR_RANDOM
-        },
         callbacks: {
             applyDateInputRange: (songs) => dateFilterController.applyDateInputRange(songs),
             clampDateInputsToBounds: (minKey, maxKey) => dateFilterController.clampDateInputsToBounds(minKey, maxKey)
@@ -393,18 +390,12 @@ function createAppControllers() {
     });
 
     /**
-     * 最新曲データの反映と検索実行を一つの操作として調整する coordinator。
+     * 検索の即時実行とデバウンスを調整する coordinator。
      */
     const searchCoordinator = createSearchCoordinator({
         search: searchUiState,
         debounceMs: SEARCH_DEBOUNCE_MS,
-        searchController,
-        dataLoader,
-        callbacks: {
-            reconcileBookmarksAfterSongsCommitted: () => {
-                bookmarkPersistenceController.migrateLegacyBookmarkSongRefs();
-            }
-        }
+        searchController
     });
 
     /**

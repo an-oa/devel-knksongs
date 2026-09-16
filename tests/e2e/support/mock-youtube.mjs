@@ -218,13 +218,14 @@ export async function routeSongsJsonFixture(page, songs) {
 }
 
 /**
- * より新しいsongs.jsonの応答を、テスト側が明示的に解放するまで保留する。
+ * songs.jsonの応答を、テスト側が明示的に解放するまで保留する。
  * @param {import("@playwright/test").Page} page
  * @param {unknown[]} songs
+ * @param {string} [generatedAt]
  * @returns {Promise<{ requestStarted: Promise<void>, releaseResponse: () => void }>}
  */
-export async function routeDeferredSongsJsonFixture(page, songs) {
-    const songsJsonFixture = buildSongsJsonFixture(songs, "2026-08-15T00:00:00.000Z");
+export async function routeDeferredSongsJsonFixture(page, songs, generatedAt = "2026-08-15T00:00:00.000Z") {
+    const songsJsonFixture = buildSongsJsonFixture(songs, generatedAt);
     let markRequestStarted = () => {};
     let releaseResponse = () => {};
     const requestStarted = new Promise((resolve) => {

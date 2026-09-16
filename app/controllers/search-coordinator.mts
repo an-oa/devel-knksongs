@@ -6,23 +6,15 @@ type SearchCoordinatorInput = {
     searchController: {
         search: () => void;
     };
-    dataLoader: {
-        commitPendingSnapshot: () => boolean;
-    };
-    callbacks: {
-        reconcileBookmarksAfterSongsCommitted: () => void;
-    };
 };
 
 /**
- * 保留中の曲データ反映と検索実行を順序付け、検索デバウンスを管理する。
+ * 検索の即時実行とデバウンスを管理する。
  */
 export function createSearchCoordinator({
     search,
     debounceMs,
-    searchController,
-    dataLoader,
-    callbacks
+    searchController
 }: SearchCoordinatorInput) {
     /**
      * 保留中の検索タイマーを解除し、未予約状態へ戻す。
@@ -34,12 +26,9 @@ export function createSearchCoordinator({
     }
 
     /**
-     * 最新スナップショットを反映してから検索を実行する。
+     * 現在の曲データで検索を実行する。
      */
     function runSearch(): void {
-        if (dataLoader.commitPendingSnapshot()) {
-            callbacks.reconcileBookmarksAfterSongsCommitted();
-        }
         searchController.search();
     }
 
