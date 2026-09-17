@@ -3,9 +3,92 @@ import assert from "node:assert/strict";
 import { createSearchFiltersController } from "../_build/app/ui/search-filters/controller.mjs";
 import { normalizeForSearch } from "../_build/app/lib/search-normalization.mjs";
 import { createSearchController } from "../_build/app/controllers/search.mjs";
+import { createSearchCoordinator } from "../_build/app/controllers/search-coordinator.mjs";
 import { createDateFilterController } from "../_build/app/ui/date/filter.mjs";
 
 let autoSongId = 0;
+
+for (const mode of ["search", "bookmark"]) {
+    test(`createSearchController: resize does not inherit ${mode} results before recommendation search commits`, (t) => {
+        t.mock.timers.enable({ apis: ["setTimeout"] });
+        const rows = Array.from({ length: 160 }, (_, index) => makeRow({
+            archiveId: `pending-${index}`,
+            title: `Candidate ${index}`,
+            format: "オリ曲"
+        }));
+        const data = {
+            allSongsRaw: rows,
+            bookmarks: { saved: { name: "Saved", songs: rows.map((row) => row.songKey) } },
+            activeBookmark: null,
+            currentResults: [],
+            displayLimit: 0
+        };
+        const ui = createSearchUiState({
+            el: { searchBox: { value: "" }, resultCount: { innerText: "" } },
+            selectedFormats: new Set(["配信", "歌みた"])
+        });
+        const renders = [];
+        let recommendedCount = 48;
+        let initialCount = 12;
+        const controller = createSearchControllerForTest({
+            data,
+            ui,
+            constants: {
+                RANDOM_DISPLAY_COUNT: 48,
+                RESULT_DISPLAY_BATCH_SIZE: 48,
+                MIN_PERFORMANCE_FOR_RANDOM: 1,
+                DEFAULT_FORMATS: ["配信", "歌みた"]
+            },
+            callbacks: createSearchCallbacks({
+                getRecommendedDisplayCount: () => recommendedCount,
+                getInitialDisplayCount: () => initialCount,
+                updateDisplay: () => renders.push([data.currentResults.length, data.displayLimit])
+            })
+        });
+        const coordinator = createSearchCoordinator({ search: ui.search, debounceMs: 200, searchController: controller });
+        coordinator.search();
+        // 一度おすすめを表示してから通常検索へ移り、確定済みモードが更新されることも確認する。
+        ui.el.searchBox.value = mode === "search" ? "Candidate" : "";
+        data.activeBookmark = mode === "bookmark" ? "saved" : null;
+        coordinator.search();
+        data.displayLimit = 108;
+        const previousResults = data.currentResults;
+        const previousLabel = ui.el.resultCount.innerText;
+        const previousCache = ui.search.recommendedCache;
+        assert.equal(previousResults.length, 160);
+
+        ui.el.searchBox.value = "";
+        data.activeBookmark = null;
+        assert.equal(controller.refreshRecommendedDisplay(), false, "uncommitted inputs cannot change the result mode");
+        coordinator.scheduleSearch();
+        t.mock.timers.tick(199);
+        assert.equal(controller.refreshRecommendedDisplay(), false);
+        assert.equal(data.currentResults, previousResults);
+        assert.equal(data.displayLimit, 108);
+        assert.equal(ui.el.resultCount.innerText, previousLabel);
+        assert.equal(ui.search.recommendedCache, previousCache);
+        assert.equal(renders.length, 2, "resize does not render interim recommendations");
+
+        t.mock.timers.tick(1);
+        assert.deepEqual(renders, [[48, 12], [160, 12], [48, 12]]);
+        assert.equal(ui.el.resultCount.innerText, "おすすめを表示中");
+
+        // 確定済みのおすすめがあっても、次の検索待機中は再選曲・再描画しない。
+        coordinator.scheduleSearch();
+        recommendedCount = 108;
+        initialCount = 108;
+        assert.equal(controller.refreshRecommendedDisplay(), false);
+        assert.equal(renders.length, 3);
+        t.mock.timers.tick(200);
+        assert.deepEqual(renders[3], [108, 108]);
+        const expandedResults = data.currentResults.slice();
+        recommendedCount = 48;
+        initialCount = 12;
+        assert.equal(controller.refreshRecommendedDisplay(), true);
+        assert.deepEqual(data.currentResults, expandedResults);
+        assert.equal(data.displayLimit, 108);
+    });
+}
 
 test("createSearchController: limits initial DOM work without reducing recommendation or search results", () => {
     const rows = Array.from({ length: 60 }, (_, index) => makeRow({

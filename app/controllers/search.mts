@@ -35,6 +35,8 @@ export function createSearchController({
     const updateDisplay = callbacks.updateDisplay;
     const scrollResultsPaneToTop = callbacks.scrollResultsPaneToTop;
     const getRecommendedDisplayCount = callbacks.getRecommendedDisplayCount || (() => RANDOM_DISPLAY_COUNT);
+    // 入力欄の状態とは別に、currentResults へ確定済みの検索モードを保持する。
+    let hasRecommendedResults = false;
 
     /**
      * 検索入力の収集から結果反映までの処理を行う。
@@ -72,6 +74,7 @@ export function createSearchController({
     ): void {
         data.currentResults = outcome.results;
         data.displayLimit = outcome.displayLimit;
+        hasRecommendedResults = isRecommendedMode(searchInput.searchState, searchInput.parsedQuery);
         if (searchInput.resultCountEl) searchInput.resultCountEl.innerText = outcome.label;
         updateDisplay();
         if (options.scrollToTop !== false) scrollResultsPaneToTop();
@@ -206,11 +209,12 @@ export function createSearchController({
     }
 
     /**
-     * おすすめ表示中だけ、現在の画面サイズに合わせて表示件数を再適用する。
+     * 確定済みのおすすめ表示中だけ、検索待機中を除いて表示件数を再適用する。
      * リサイズ追随用のため、検索結果ペインのスクロール位置は維持する。
      * @returns {boolean}
      */
     function refreshRecommendedDisplay(): boolean {
+        if (!hasRecommendedResults || searchUiState.debounceId) return false;
         const searchInput = collectSearchInput();
         if (!isRecommendedMode(searchInput.searchState, searchInput.parsedQuery)) return false;
         const outcome = buildRecommendedOutcome(data.currentResults.length, data.displayLimit);
