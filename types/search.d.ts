@@ -40,13 +40,6 @@ type SearchConstants = {
 type SearchInput = {
   searchState: SearchState;
   parsedQuery: import("../app/lib/search-query.mjs").ParsedSearchQuery;
-  resultCountEl?: HTMLElement | null;
-};
-
-type SearchOutcome = {
-  results: Song[];
-  displayLimit: number;
-  label: string;
 };
 
 type SearchControllerInput = {

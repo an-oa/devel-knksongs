@@ -59,10 +59,10 @@ for (const mode of ["search", "bookmark"]) {
 
         ui.el.searchBox.value = "";
         data.activeBookmark = null;
-        assert.equal(controller.refreshRecommendedDisplay(), false, "uncommitted inputs cannot change the result mode");
+        assert.equal(coordinator.refreshRecommendedDisplay(), false, "uncommitted inputs cannot change the result mode");
         coordinator.scheduleSearch();
         t.mock.timers.tick(199);
-        assert.equal(controller.refreshRecommendedDisplay(), false);
+        assert.equal(coordinator.refreshRecommendedDisplay(), false);
         assert.equal(data.currentResults, previousResults);
         assert.equal(data.displayLimit, 108);
         assert.equal(ui.el.resultCount.innerText, previousLabel);
@@ -77,14 +77,14 @@ for (const mode of ["search", "bookmark"]) {
         coordinator.scheduleSearch();
         recommendedCount = 108;
         initialCount = 108;
-        assert.equal(controller.refreshRecommendedDisplay(), false);
+        assert.equal(coordinator.refreshRecommendedDisplay(), false);
         assert.equal(renders.length, 3);
         t.mock.timers.tick(200);
         assert.deepEqual(renders[3], [108, 108]);
         const expandedResults = data.currentResults.slice();
         recommendedCount = 48;
         initialCount = 12;
-        assert.equal(controller.refreshRecommendedDisplay(), true);
+        assert.equal(coordinator.refreshRecommendedDisplay(), false);
         assert.deepEqual(data.currentResults, expandedResults);
         assert.equal(data.displayLimit, 108);
     });
@@ -608,9 +608,21 @@ test("createSearchController: recommendation selection and rendering retain thei
     assert.equal(scrollCount, 1);
     assert.equal(updateCount, 1);
 
+    assert.equal(controller.refreshRecommendedDisplay(), false, "unchanged viewport does not render again");
+    assert.equal(updateCount, 1);
+
+    initialDisplayCount = 24;
+    assert.equal(controller.refreshRecommendedDisplay(), true, "display limit can grow without selecting more songs");
+    assert.deepEqual(data.currentResults, firstRecommendedSongs);
+    assert.equal(data.displayLimit, 24);
+    assert.equal(updateCount, 2);
+
     data.displayLimit = 40; // Simulate incremental rendering before shrinking.
     recommendedDisplayCount = 10;
-    assert.equal(controller.refreshRecommendedDisplay(), true);
+    const retainedResults = data.currentResults;
+    assert.equal(controller.refreshRecommendedDisplay(), false);
+    assert.equal(data.currentResults, retainedResults);
+    assert.equal(updateCount, 2);
     assert.deepEqual(data.currentResults, firstRecommendedSongs);
     assert.equal(data.displayLimit, 40);
 
@@ -626,16 +638,19 @@ test("createSearchController: recommendation selection and rendering retain thei
     recommendedDisplayCount = 48;
     initialDisplayCount = 12;
     const expandedSongs = data.currentResults.slice();
-    assert.equal(controller.refreshRecommendedDisplay(), true);
+    assert.equal(controller.refreshRecommendedDisplay(), false);
     assert.deepEqual(data.currentResults, expandedSongs);
     assert.equal(data.currentResults.length, 108);
     assert.equal(data.displayLimit, 108);
     assert.deepEqual(data.currentResults.slice(0, 48), firstRecommendedSongs);
     assert.equal(scrollCount, 1);
-    assert.equal(updateCount, 4);
+    assert.equal(updateCount, 3);
 
     ui.el.searchBox.value = "おすすめ1";
-    assert.equal(controller.refreshRecommendedDisplay(), false);
+    recommendedDisplayCount = 120;
+    initialDisplayCount = 120;
+    assert.equal(controller.refreshRecommendedDisplay(), true, "resize uses the committed mode without collecting inputs");
+    assert.equal(data.currentResults.length, 120);
     assert.equal(updateCount, 4);
     assert.equal(ui.el.resultCount.innerText, "おすすめを表示中");
 });
@@ -769,12 +784,15 @@ test("createSearchController: recommendation count is capped by available recomm
         RESULT_DISPLAY_BATCH_SIZE: 10,
         DEFAULT_FORMATS: ["配信", "歌みた", "ショート"]
     };
+    let recommendedDisplayCount = 20;
+    let updateCount = 0;
     const controller = createSearchControllerForTest({
         data,
         ui,
         constants,
         callbacks: createSearchCallbacks({
-            getRecommendedDisplayCount: () => 20
+            getRecommendedDisplayCount: () => recommendedDisplayCount,
+            updateDisplay: () => { updateCount += 1; }
         })
     });
 
@@ -783,4 +801,16 @@ test("createSearchController: recommendation count is capped by available recomm
     assert.equal(data.currentResults.length, 7);
     assert.equal(data.displayLimit, 7);
     assert.equal(ui.el.resultCount.innerText, "おすすめを表示中");
+    const previousResults = data.currentResults;
+    recommendedDisplayCount = 30;
+    assert.equal(controller.refreshRecommendedDisplay(), false, "exhausted candidates do not trigger a render");
+    assert.equal(data.currentResults, previousResults);
+    assert.equal(updateCount, 1);
+
+    data.allSongsRaw = [];
+    ui.search.recommendedCache = null;
+    controller.search();
+    assert.equal(data.currentResults.length, 0);
+    assert.equal(controller.refreshRecommendedDisplay(), false, "empty recommendations do not trigger a render");
+    assert.equal(updateCount, 2);
 });

@@ -490,7 +490,6 @@ function createAppControllers() {
 
 const {
     searchFiltersController,
-    searchController,
     searchCoordinator,
     renderController,
     playbackSettingsController,
@@ -527,7 +526,7 @@ async function initUI(): Promise<void> {
     if (resultsViewportRefreshCleanup) resultsViewportRefreshCleanup();
     resultsViewportRefreshCleanup = setupResultsViewportRefresh({
         resultList: appUiState.el.resultList,
-        refreshRecommendedDisplay: () => searchController.refreshRecommendedDisplay(),
+        refreshRecommendedDisplay: () => searchCoordinator.refreshRecommendedDisplay(),
         refreshLayout: () => renderController.refreshLayout(),
         setupScrollObserver: () => youtubeController.setupScrollObserver()
     });

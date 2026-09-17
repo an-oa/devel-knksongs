@@ -4,12 +4,12 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join, relative, resolve, sep } from "node:path";
 
 /**
- * 起動 entry と UI の静的依存だけを辿り、後から使う dynamic import は preload しない。
+ * 起動出力と UI の静的依存を一度に解決し、後から使う dynamic import は preload しない。
  * @param {import("esbuild").Metafile} metafile
  * @param {string} outputDir
- * @returns {string[]}
+ * @returns {{ startupPath: string, preloadPaths: string[] }}
  */
-function collectStartupPreloads(metafile, outputDir) {
+function resolveStartupOutputs(metafile, outputDir) {
     const outputs = new Map(Object.entries(metafile.outputs).map(([path, output]) => [resolve(path), output]));
     const roots = ["app/startup.mjs", "app/bootstrap.mjs"].map((entry) => {
         const sourcePath = resolve(outputDir, entry);
@@ -30,7 +30,10 @@ function collectStartupPreloads(metafile, outputDir) {
     }
     roots.forEach(visit);
     visited.delete(roots[0]);
-    return [...visited].map((path) => relative(outputDir, path).split(sep).join("/")).sort();
+    return {
+        startupPath: relative(outputDir, roots[0]).split(sep).join("/"),
+        preloadPaths: [...visited].map((path) => relative(outputDir, path).split(sep).join("/")).sort()
+    };
 }
 
 /**
@@ -57,13 +60,10 @@ export async function buildBrowserModules(outputDir, { cacheBuster = "" } = {}) 
         banner: { js: "// Generated browser bundle. Do not edit; run npm run build." +
             (cacheBuster ? `\n// Build version: ${JSON.stringify(cacheBuster)}` : "") }
     });
-    const startupOutput = Object.entries(result.metafile.outputs)
-        .find(([, output]) => output.entryPoint?.endsWith("/app/startup.mjs"))?.[0];
-    if (!startupOutput) throw new Error("Missing startup entry in browser build outputs");
-    const startupPath = relative(outputDir, startupOutput).split(sep).join("/");
+    const { startupPath, preloadPaths } = resolveStartupOutputs(result.metafile, outputDir);
     // 起動時に dynamic import する UI と静的な共有依存を HTML から発見できるようにする。
     // modulepreload は実行しないため、データ取得の開始は小さい startup module が担う。
-    const preloads = collectStartupPreloads(result.metafile, outputDir)
+    const preloads = preloadPaths
         .map((filePath) => `  <link rel="modulepreload" href="${filePath}">`)
         .join("\n");
     const htmlPath = join(outputDir, "index.html");
