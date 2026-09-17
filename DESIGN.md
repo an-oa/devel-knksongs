@@ -10,7 +10,8 @@
 ## 全体構成
 - 静的フロントエンドのみ（HTML/CSS/JavaScript, ES Modules）。
   `app/**/*.mts` を source とし、`npm run build:ts` で `_build/app/**/*.mjs` へ生成した JavaScript をテスト・Node scripts が読む。
-  ブラウザ用は `npm run build` がemit結果をesbuildで `_build/browser` へbundleし、UIと共有chunkのmodulepreloadをHTMLへ生成する。
+  ブラウザ用は `npm run build` がemit結果をesbuildで `_build/browser` へbundleし、起動用UIと静的依存chunkのmodulepreloadをHTMLへ生成する。
+  起動用UI以外のdynamic import先はpreload対象に含めない。
   起動moduleはデータ取得を開始してからUIをdynamic importし、同じ初期データPromiseを共有する。
 - データ取得：事前生成JSON（`data/songs.json` / `data/songs-meta.json`）を優先し、唯一のマスターである公開スプレッドシートのCSVを生成元とフォールバックに使う
 - データ生成/公開：GitHub Actions でCSVから派生JSONを生成・検証し、差分を `main` へコミットして CI を起動する。CI 成功後、検証済み commit を deploy 前後に現在の `main` と照合し、公開された `deployment.json` の commit SHA を確認する
@@ -417,7 +418,7 @@ IndexedDB保存：
 - 段階表示（追加読み込み）
   - 通常検索・ブックマーク検索・おすすめで、一覧の末尾へ近づくと `RESULT_DISPLAY_BATCH_SIZE` 単位で追加表示
   - 1列では画面高さとサムネイル設定から約2画面分を見積もり、最低12件、従来の初期件数を上限として初期描画を抑える
-  - おすすめの選曲件数と描画件数を分け、初期描画上限が縮小しても選曲件数の範囲内で追加表示済みのカードを維持する
+  - おすすめの選曲件数と描画件数を分け、リサイズで画面が縮小しても選曲済みの内容・順序と追加表示済みのカードを維持する
 - カード配置
   - 1列ではCSSの通常フローを使い、JavaScriptによる各カードの高さ測定と座標指定を省く
   - 複数列では全カードの幅設定、高さ測定、座標設定をそれぞれまとめ、読み書きの交互実行によるレイアウト計算を抑える

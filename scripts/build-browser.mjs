@@ -1,7 +1,37 @@
 import { build } from "esbuild";
 import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
-import { join, relative, sep } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
+
+/**
+ * 起動 entry と UI の静的依存だけを辿り、後から使う dynamic import は preload しない。
+ * @param {import("esbuild").Metafile} metafile
+ * @param {string} outputDir
+ * @returns {string[]}
+ */
+function collectStartupPreloads(metafile, outputDir) {
+    const outputs = new Map(Object.entries(metafile.outputs).map(([path, output]) => [resolve(path), output]));
+    const roots = ["app/startup.mjs", "app/bootstrap.mjs"].map((entry) => {
+        const sourcePath = resolve(outputDir, entry);
+        const match = [...outputs].find(([, output]) => output.entryPoint && resolve(output.entryPoint) === sourcePath);
+        if (!match) throw new Error(`Missing browser startup output for ${entry}`);
+        return match[0];
+    });
+    const visited = new Set();
+    /** @param {string} path */
+    function visit(path) {
+        if (visited.has(path)) return;
+        visited.add(path);
+        for (const dependency of outputs.get(path)?.imports || []) {
+            if (!dependency.external && dependency.kind === "import-statement") {
+                visit(resolve(dependency.path));
+            }
+        }
+    }
+    roots.forEach(visit);
+    visited.delete(roots[0]);
+    return [...visited].map((path) => relative(outputDir, path).split(sep).join("/")).sort();
+}
 
 /**
  * TypeScript emit 済みの起動 module を、データ取得・UI・共有処理の browser bundle にまとめる。
@@ -31,13 +61,9 @@ export async function buildBrowserModules(outputDir, { cacheBuster = "" } = {}) 
         .find(([, output]) => output.entryPoint?.endsWith("/app/startup.mjs"))?.[0];
     if (!startupOutput) throw new Error("Missing startup entry in browser build outputs");
     const startupPath = relative(outputDir, startupOutput).split(sep).join("/");
-    const modulePaths = Object.keys(result.metafile.outputs)
-        .map((filePath) => relative(outputDir, filePath).split(sep).join("/"))
-        .sort();
-    // dynamic import する UI と共有 chunk も HTML から発見できるようにする。
+    // 起動時に dynamic import する UI と静的な共有依存を HTML から発見できるようにする。
     // modulepreload は実行しないため、データ取得の開始は小さい startup module が担う。
-    const preloads = modulePaths
-        .filter((filePath) => filePath !== startupPath)
+    const preloads = collectStartupPreloads(result.metafile, outputDir)
         .map((filePath) => `  <link rel="modulepreload" href="${filePath}">`)
         .join("\n");
     const htmlPath = join(outputDir, "index.html");

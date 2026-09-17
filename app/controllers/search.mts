@@ -132,13 +132,7 @@ export function createSearchController({
         }
 
         if (isRecommendedMode(searchState, parsedQuery)) {
-            const recommendedDisplayCount = getRecommendedResultCount();
-            const results = pickRecommended(recommendedDisplayCount);
-            return {
-                results,
-                displayLimit: Math.min(results.length, getInitialDisplayLimit(recommendedDisplayCount)),
-                label: "おすすめを表示中"
-            };
+            return buildRecommendedOutcome();
         }
 
         const results = filterSongsByCriteria(
@@ -182,6 +176,20 @@ export function createSearchController({
         return Math.max(RANDOM_DISPLAY_COUNT, count);
     }
 
+    /** 選曲件数と描画上限を個別に決め、リサイズ時は既存の選曲・追加表示を保持する。 */
+    function buildRecommendedOutcome(retainedResultCount = 0, retainedDisplayLimit = 0): SearchOutcome {
+        const recommendedCount = getRecommendedResultCount();
+        const results = pickRecommended(Math.max(recommendedCount, retainedResultCount));
+        return {
+            results,
+            displayLimit: Math.min(results.length, Math.max(
+                retainedDisplayLimit,
+                getInitialDisplayLimit(recommendedCount)
+            )),
+            label: "おすすめを表示中"
+        };
+    }
+
     /**
      * おすすめ曲をキャッシュ付きで選定して返す。
      * @param {number} count
@@ -205,9 +213,7 @@ export function createSearchController({
     function refreshRecommendedDisplay(): boolean {
         const searchInput = collectSearchInput();
         if (!isRecommendedMode(searchInput.searchState, searchInput.parsedQuery)) return false;
-        const outcome = resolveSearchResults(searchInput.searchState, searchInput.parsedQuery);
-        // 追加表示済みのカードは縮小時にも残し、スクロール位置と再生対象を維持する。
-        outcome.displayLimit = Math.min(outcome.results.length, Math.max(data.displayLimit, outcome.displayLimit));
+        const outcome = buildRecommendedOutcome(data.currentResults.length, data.displayLimit);
         applySearchOutcome(
             searchInput,
             outcome,

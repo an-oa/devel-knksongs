@@ -58,6 +58,30 @@ test("mobile recommendations append the same selection and retain it across colu
     await expectCardsInsideLayout(page);
 });
 
+test("wide recommendations retain more than 48 cards when shrinking to mobile", async ({ page }) => {
+    await page.setViewportSize({ width: 3840, height: 2160 });
+    await installNetworkMocks(page);
+    const songs = createScrollableResultSongs(160).map((song) => ({ ...song, format: "オリ曲" }));
+    await routeSongsJsonFixture(page, songs);
+    await page.goto("/");
+    await waitForInitialLoad(page);
+    const cards = page.locator(".song-card");
+    await expect.poll(() => cards.count()).toBeGreaterThan(48);
+    const wideKeys = await cards.evaluateAll((nodes) => nodes.map((node) => node.dataset.songKey));
+
+    await page.setViewportSize({ width: 393, height: 851 });
+    await expect(page.locator("#resultList")).toHaveAttribute("data-layout-columns", "1");
+    await expect(cards).toHaveCount(wideKeys.length);
+    expect(await cards.evaluateAll((nodes) => nodes.map((node) => node.dataset.songKey))).toEqual(wideKeys);
+    await expectCardsInsideLayout(page);
+
+    await page.setViewportSize({ width: 3840, height: 2160 });
+    await expect(page.locator("#resultList")).not.toHaveAttribute("data-layout-columns", "1");
+    await expect(cards).toHaveCount(wideKeys.length);
+    expect(await cards.evaluateAll((nodes) => nodes.map((node) => node.dataset.songKey))).toEqual(wideKeys);
+    await expectCardsInsideLayout(page);
+});
+
 test("single-column playback and thumbnail toggles keep natural card and list heights", async ({ page }) => {
     await page.setViewportSize({ width: 393, height: 851 });
     await installNetworkMocks(page);

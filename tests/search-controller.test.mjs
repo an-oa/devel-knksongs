@@ -460,8 +460,8 @@ test("createSearchController: single オリ曲 performance is eligible for recom
     assert.equal(ui.el.resultCount.innerText, "おすすめを表示中");
 });
 
-test("createSearchController: recommendation count expands to the responsive display count", () => {
-    const rows = Array.from({ length: 30 }, (_, index) =>
+test("createSearchController: recommendation selection and rendering retain their limits on resize", () => {
+    const rows = Array.from({ length: 160 }, (_, index) =>
         makeRow({
             archiveId: `a${index + 1}`,
             title: `おすすめ${index + 1}`,
@@ -498,7 +498,8 @@ test("createSearchController: recommendation count expands to the responsive dis
         RESULT_DISPLAY_BATCH_SIZE: 10,
         DEFAULT_FORMATS: ["配信", "歌みた", "ショート"]
     };
-    let recommendedDisplayCount = 12;
+    let recommendedDisplayCount = 48;
+    let initialDisplayCount = 12;
     let scrollCount = 0;
     let updateCount = 0;
     const controller = createSearchControllerForTest({
@@ -507,6 +508,7 @@ test("createSearchController: recommendation count expands to the responsive dis
         constants,
         callbacks: createSearchCallbacks({
             getRecommendedDisplayCount: () => recommendedDisplayCount,
+            getInitialDisplayCount: () => initialDisplayCount,
             updateDisplay: () => {
                 updateCount += 1;
             },
@@ -518,30 +520,40 @@ test("createSearchController: recommendation count expands to the responsive dis
 
     controller.search();
     const firstRecommendedSongs = data.currentResults.slice();
-    assert.equal(data.currentResults.length, 12);
+    assert.equal(data.currentResults.length, 48);
     assert.equal(data.displayLimit, 12);
     assert.equal(scrollCount, 1);
     assert.equal(updateCount, 1);
 
-    recommendedDisplayCount = 20;
-    assert.equal(controller.refreshRecommendedDisplay(), true);
-    assert.equal(data.currentResults.length, 20);
-    assert.equal(data.displayLimit, 20);
-    assert.deepEqual(data.currentResults.slice(0, 12), firstRecommendedSongs);
-    assert.equal(scrollCount, 1);
-    assert.equal(updateCount, 2);
-
+    data.displayLimit = 40; // Simulate incremental rendering before shrinking.
     recommendedDisplayCount = 10;
     assert.equal(controller.refreshRecommendedDisplay(), true);
-    assert.equal(data.currentResults.length, 10);
-    assert.equal(data.displayLimit, 10);
-    assert.deepEqual(data.currentResults, firstRecommendedSongs.slice(0, 10));
+    assert.deepEqual(data.currentResults, firstRecommendedSongs);
+    assert.equal(data.displayLimit, 40);
+
+    recommendedDisplayCount = 108;
+    initialDisplayCount = 108;
+    assert.equal(controller.refreshRecommendedDisplay(), true);
+    assert.equal(data.currentResults.length, 108);
+    assert.equal(data.displayLimit, 108);
+    assert.deepEqual(data.currentResults.slice(0, 48), firstRecommendedSongs);
     assert.equal(scrollCount, 1);
     assert.equal(updateCount, 3);
+
+    recommendedDisplayCount = 48;
+    initialDisplayCount = 12;
+    const expandedSongs = data.currentResults.slice();
+    assert.equal(controller.refreshRecommendedDisplay(), true);
+    assert.deepEqual(data.currentResults, expandedSongs);
+    assert.equal(data.currentResults.length, 108);
+    assert.equal(data.displayLimit, 108);
+    assert.deepEqual(data.currentResults.slice(0, 48), firstRecommendedSongs);
+    assert.equal(scrollCount, 1);
+    assert.equal(updateCount, 4);
 
     ui.el.searchBox.value = "おすすめ1";
     assert.equal(controller.refreshRecommendedDisplay(), false);
-    assert.equal(updateCount, 3);
+    assert.equal(updateCount, 4);
     assert.equal(ui.el.resultCount.innerText, "おすすめを表示中");
 });
 
