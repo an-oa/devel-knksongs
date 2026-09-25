@@ -9,8 +9,8 @@ import {
     normalizeLegacySongRefToCurrent,
     parseArchiveOrder,
     validateSongIdentities
-} from "../_build/app/lib/song-identity.mjs";
-import { createSongFixture } from "./fixtures/song.mjs";
+} from "../app/lib/song-identity.mts";
+import { createSongFixture } from "./fixtures/song.mts";
 
 test("song identity: builds all keys from one canonical rule", () => {
     const row = {
@@ -63,10 +63,14 @@ test("song identity: detects mismatched and duplicate generated keys", () => {
 
 test("song identity: first-issue validation preserves diagnostic priority over earlier duplicates", () => {
     const first = createSongFixture();
-    const invalidOrder = createSongFixture({ archiveOrder: null });
+    const invalidOrder = { ...createSongFixture(), archiveOrder: null };
     const rows = [first, { ...first }, invalidOrder];
     const issues = validateSongIdentities(rows);
-    assert.deepEqual(issues.map(({ kind, index, fieldName }) => ({ kind, index, fieldName })), [
+    assert.deepEqual(issues.map((issue) => ({
+        kind: issue.kind,
+        index: issue.index,
+        fieldName: "fieldName" in issue ? issue.fieldName : undefined
+    })), [
         { kind: "invalid-archive-order", index: 2, fieldName: undefined },
         { kind: "duplicate-key", index: 1, fieldName: "songKey" },
         { kind: "duplicate-key", index: 2, fieldName: "songKey" },

@@ -1,9 +1,8 @@
 /**
  * 現在のJSONスキーマを満たす曲テストデータを作る。
- * @param {Partial<Song>} [overrides] 上書きするフィールド
- * @returns {Song}
+ * @param overrides 上書きするフィールド
  */
-export function createSongFixture(overrides = {}) {
+export function createSongFixture(overrides: Partial<Song> = {}): Song {
     return {
         date: "2026/03/11",
         dateKey: 20260311,

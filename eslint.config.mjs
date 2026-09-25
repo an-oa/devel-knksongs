@@ -1,7 +1,9 @@
 import js from "@eslint/js";
 import globals from "globals";
+import { defineConfig } from "eslint/config";
+import tseslint from "typescript-eslint";
 
-export default [
+export default defineConfig([
     {
         ignores: [
             "node_modules/**",
@@ -50,7 +52,7 @@ export default [
         }
     },
     {
-        files: ["tests/**/*.mjs"],
+        files: ["tests/**/*.mjs", "tests/**/*.mts"],
         languageOptions: {
             ecmaVersion: "latest",
             sourceType: "module",
@@ -60,5 +62,9 @@ export default [
                 ...globals.es2024
             }
         }
+    },
+    {
+        files: ["tests/**/*.mts"],
+        extends: [tseslint.configs.recommended]
     }
-];
+]);

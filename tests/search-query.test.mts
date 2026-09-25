@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { normalizeForSearch } from "../_build/app/lib/search-normalization.mjs";
-import { isValidEmptySearchQuery, parseSearchQuery } from "../_build/app/lib/search-query.mjs";
+import { normalizeForSearch } from "../app/lib/search-normalization.mts";
+import { isValidEmptySearchQuery, parseSearchQuery } from "../app/lib/search-query.mts";
 
 test("normalizeForSearch: normalizes compatible characters and repeated whitespace", () => {
     assert.equal(normalizeForSearch("  Ｆｏｏ　 \t BAR  "), "foo bar");
@@ -87,7 +87,7 @@ test("parseSearchQuery: invalid date-like operators are reported and non-date su
 });
 
 test("parseSearchQuery: expands partial date operators to inclusive boundaries", () => {
-    const cases = [
+    const cases: [query: string, sinceKey: number | null, untilKey: number | null][] = [
         ["since:2024", 20240101, null],
         ["since:2024-", 20240101, null],
         ["since:2024-7", 20240701, null],

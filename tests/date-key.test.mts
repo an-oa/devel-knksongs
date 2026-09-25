@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { dateKeyToParts, isWithinDateRange, parseDateKey } from "../_build/app/lib/date-key.mjs";
+import { dateKeyToParts, isWithinDateRange, parseDateKey } from "../app/lib/date-key.mts";
 
 test("parseDateKey: valid and invalid dates", () => {
     assert.equal(parseDateKey("2024-02-29"), 20240229);

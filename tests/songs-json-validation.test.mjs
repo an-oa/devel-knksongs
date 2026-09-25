@@ -7,7 +7,7 @@ import {
 } from "../_build/app/lib/songs-json.mjs";
 import { createSongsContentHash } from "../scripts/songs-content-hash.mjs";
 import { validateSongsJsonArtifacts } from "../scripts/songs-json-artifact.mjs";
-import { createSongFixture } from "./fixtures/song.mjs";
+import { createSongFixture } from "./fixtures/song.mts";
 
 const GENERATED_AT = "2026-08-14T00:00:00.000Z";
 

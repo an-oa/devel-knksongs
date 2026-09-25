@@ -6,7 +6,7 @@ import {
     isStreamFormat,
     isUtamitaEquivalentFormat,
     matchesSelectedFormat
-} from "../_build/app/lib/song-format.mjs";
+} from "../app/lib/song-format.mts";
 
 test("song format helpers: classify recommendation formats", () => {
     assert.equal(isStreamFormat("配信"), true);

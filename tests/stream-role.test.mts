@@ -5,7 +5,7 @@ import {
     hasStreamRole,
     isGuestStreamRole,
     normalizeStreamRole
-} from "../_build/app/lib/stream-role.mjs";
+} from "../app/lib/stream-role.mts";
 
 test("stream role: normalizes raw values for comparison", () => {
     assert.equal(normalizeStreamRole(" ゲスト "), STREAM_ROLE_GUEST);

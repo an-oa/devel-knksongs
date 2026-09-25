@@ -9,7 +9,7 @@ import {
     buildLegacySongKey,
     buildSongKey
 } from "../_build/app/lib/song-identity.mjs";
-import { createSongFixture } from "./fixtures/song.mjs";
+import { createSongFixture } from "./fixtures/song.mts";
 
 /**
  * 検証用の曲データを作成する。

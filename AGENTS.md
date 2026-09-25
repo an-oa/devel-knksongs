@@ -84,7 +84,10 @@ feat: move settings into dedicated sidebar panel
 
 ## TypeScript Emit During Migration
 
-- `.mts` は TypeScript source として扱い、ブラウザ・テスト・Node scripts は `npm run build:ts` が `_build/app/**/*.mjs` に生成した module を読む。
+- `app/**/*.mts` は TypeScript source として扱い、ブラウザ・未移行の `.mjs` テスト・Node scripts は `npm run build:ts` が `_build/app/**/*.mjs` に生成した module を読む。
+- 移行済みの `tests/**/*.mts` は `tsx` 経由で `app/**/*.mts` を直接 import する。
+  `npm run test:unit:ts` と `npm run typecheck:tests:raw` は事前 build なしで実行できる。
+  テスト用の型宣言は生成せず、tsconfig.tests.json で source を型チェックする。
 - `app` 配下は source tree とし、`app/**/*.mjs` を残さない。手編集は `.mts` 側へ行い、必要な `.mjs` は `npm run build:ts` で `_build/app` に作り直す。
 - `.mts` source では TS の `type` / `interface` / `import type` を主に使い、同じ構造を JSDoc `@typedef` と二重管理しない。
   生成 `.mjs` 側で JSDoc 型を残す必要がある場合だけ、その理由を近接コメントで明示する。
@@ -118,7 +121,7 @@ feat: move settings into dedicated sidebar panel
   `tests/*.mjs` のファイル単位になり、47 件前後として報告されることがある。
   ユーザーの実ターミナルで見える個別 `test()` 単位の件数に近づけるため、
   UnitTest の件数を共有するときは必要に応じて
-  `node --test --test-isolation=process tests/*.mjs` も実行し、
+  `node --import tsx --test --test-isolation=process "tests/*.test.mjs" "tests/*.test.mts"` も実行し、
   305 件前後の pass/fail として併記する。
 - 曲データや生成/検証スクリプトに関わる変更では、`npm run validate:songs-json` も実行する。
 - YouTube 再生やサイドバー操作などブラウザ上の回帰に関わる変更では、

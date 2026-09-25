@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
     getPartialDateKeyRange,
     normalizePartialDateParts
-} from "../_build/app/lib/partial-date.mjs";
+} from "../app/lib/partial-date.mts";
 
 test("partial date helpers: normalize precision and calculate leap-aware ranges", () => {
     const year = normalizePartialDateParts({ year: "2024" });
