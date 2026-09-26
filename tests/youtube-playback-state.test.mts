@@ -1,10 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import type { YoutubePlaybackState } from "../app/lib/youtube/playback-state.mts";
 import {
     createYoutubePlaybackState,
     isYoutubePlaybackSessionActive,
     reduceYoutubePlaybackState
-} from "../_build/app/lib/youtube/playback-state.mjs";
+} from "../app/lib/youtube/playback-state.mts";
 
 test("youtube playback state: request playback creates next session and enters starting", () => {
     const initialState = createYoutubePlaybackState();
@@ -22,7 +23,7 @@ test("youtube playback state: request playback creates next session and enters s
 });
 
 test("youtube playback state: playback started only affects the active session", () => {
-    const startingState = {
+    const startingState: YoutubePlaybackState = {
         sessionSequence: 2,
         transitionGeneration: 3,
         activeSessionId: 2,
@@ -48,7 +49,7 @@ test("youtube playback state: playback started only affects the active session",
 });
 
 test("youtube playback state: restoring a stale session does not clear the current one", () => {
-    const activeState = {
+    const activeState: YoutubePlaybackState = {
         sessionSequence: 4,
         transitionGeneration: 8,
         activeSessionId: 4,
@@ -66,7 +67,7 @@ test("youtube playback state: restoring a stale session does not clear the curre
 });
 
 test("youtube playback state: ended playback clears the active session and bumps generation", () => {
-    const activeState = {
+    const activeState: YoutubePlaybackState = {
         sessionSequence: 5,
         transitionGeneration: 9,
         activeSessionId: 5,
@@ -84,4 +85,49 @@ test("youtube playback state: ended playback clears the active session and bumps
         activeSessionId: 0,
         phase: "idle"
     });
+});
+
+test("youtube playback state: restore and clear without a finite positive session id affect the current session", () => {
+    const activeState: YoutubePlaybackState = {
+        sessionSequence: 5,
+        transitionGeneration: 9,
+        activeSessionId: 5,
+        phase: "playing"
+    };
+
+    for (const type of ["RESTORE_PLAYBACK", "CLEAR_PLAYBACK"] as const) {
+        for (const sessionId of [undefined, 0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+            const event = sessionId === undefined ? { type } : { type, sessionId };
+            const nextState = reduceYoutubePlaybackState(activeState, event);
+            assert.deepEqual(nextState, {
+                sessionSequence: 5,
+                transitionGeneration: type === "RESTORE_PLAYBACK" ? 10 : 9,
+                activeSessionId: 0,
+                phase: "idle"
+            });
+        }
+        assert.equal(reduceYoutubePlaybackState(activeState, { type, sessionId: 4 }), activeState);
+    }
+});
+
+test("youtube playback state: restoring the active session preserves generation only when requested", () => {
+    const activeState: YoutubePlaybackState = {
+        sessionSequence: 5,
+        transitionGeneration: 9,
+        activeSessionId: 5,
+        phase: "playing"
+    };
+
+    for (const preserveTransitionGeneration of [false, true]) {
+        assert.deepEqual(reduceYoutubePlaybackState(activeState, {
+            type: "RESTORE_PLAYBACK",
+            sessionId: 5,
+            preserveTransitionGeneration
+        }), {
+            sessionSequence: 5,
+            transitionGeneration: preserveTransitionGeneration ? 9 : 10,
+            activeSessionId: 0,
+            phase: "idle"
+        });
+    }
 });

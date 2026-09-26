@@ -1,28 +1,37 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseSearchQuery } from "../_build/app/lib/search-query.mjs";
+import { parseSearchQuery } from "../app/lib/search-query.mts";
 import {
     clearSearchQueryValidation,
     clearSearchQueryValidationIfValid,
     getSearchQueryValidationMessage,
     validateSearchQueryInput
-} from "../_build/app/ui/search-query-validation.mjs";
+} from "../app/ui/search-query-validation.mts";
 
-test("search query validation: exposes errors on completion and clears them during correction", () => {
-    const attributes = new Map();
+/** 検索入力の初期値と、検証メッセージ・属性の記録を持つモックを作る。 */
+function createSearchInputMock(value: string, validationMessage = "") {
+    const attributes = new Map<string, string>();
     const searchBox = {
-        value: "since:2024-02-30",
-        validationMessage: "",
-        setCustomValidity(message) {
+        value,
+        validationMessage,
+        /** 検証メッセージを記録する。 */
+        setCustomValidity(message: string) {
             this.validationMessage = message;
         },
-        setAttribute(name, value) {
+        /** ARIA 属性の設定を記録する。 */
+        setAttribute(name: string, value: string) {
             attributes.set(name, value);
         },
-        removeAttribute(name) {
+        /** 指定された属性を取り除く。 */
+        removeAttribute(name: string) {
             attributes.delete(name);
         }
     };
+    return { searchBox, attributes };
+}
+
+test("search query validation: exposes errors on completion and clears them during correction", () => {
+    const { searchBox, attributes } = createSearchInputMock("since:2024-02-30");
     const errorElement = { hidden: true, textContent: "" };
 
     assert.equal(validateSearchQueryInput(searchBox, errorElement), false);
@@ -39,20 +48,8 @@ test("search query validation: exposes errors on completion and clears them duri
 });
 
 test("search query validation: keeps an existing error until input becomes valid", () => {
-    const attributes = new Map([["aria-invalid", "true"]]);
-    const searchBox = {
-        value: "until:2026-13",
-        validationMessage: "existing error",
-        setCustomValidity(message) {
-            this.validationMessage = message;
-        },
-        setAttribute(name, value) {
-            attributes.set(name, value);
-        },
-        removeAttribute(name) {
-            attributes.delete(name);
-        }
-    };
+    const { searchBox, attributes } = createSearchInputMock("until:2026-13", "existing error");
+    attributes.set("aria-invalid", "true");
     const errorElement = { hidden: false, textContent: "existing error" };
 
     assert.equal(clearSearchQueryValidationIfValid(searchBox, errorElement), false);

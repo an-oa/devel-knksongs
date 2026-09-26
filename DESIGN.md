@@ -33,7 +33,7 @@
   - `tests/bookmark-import-export-ui.test.mjs`
   - `tests/bookmark-transfer.test.mts`
   - `tests/bookmark-ui.test.mjs`
-  - `tests/app-state.test.mjs`
+  - `tests/app-state.test.mts`
   - `tests/stream-role.test.mts`
   - `tests/csv-parser.test.mts`
   - `tests/data-loader.test.mjs`
@@ -41,11 +41,11 @@
   - `tests/date-filter-controller.test.mjs`
   - `tests/date-key.test.mts`
   - `tests/partial-date.test.mts`
-  - `tests/search-boolean-filters.test.mjs`
+  - `tests/search-boolean-filters.test.mts`
   - `tests/search-controller.test.mjs`
   - `tests/search-filters.test.mts`
   - `tests/search-query.test.mts`
-  - `tests/search-query-validation.test.mjs`
+  - `tests/search-query-validation.test.mts`
   - `tests/search-recommendation.test.mts`
   - `tests/song-format.test.mts`
   - `tests/song-identity.test.mts`
@@ -53,7 +53,7 @@
   - `tests/pages-artifact.test.mjs`
   - `tests/playback-sequence.test.mts`
   - `tests/playback-session-controller.test.mjs`
-  - `tests/playback-settings-value-reducer.test.mjs`
+  - `tests/playback-settings-value-reducer.test.mts`
   - `tests/render-drag-reorder.test.mjs`
   - `tests/render-layout.test.mjs`
   - `tests/render-masonry-layout.test.mjs`
@@ -67,7 +67,7 @@
   - `tests/youtube-controller.test.mjs`
   - `tests/youtube-embed.test.mjs`
   - `tests/youtube-playback-start-attempt.test.mjs`
-  - `tests/youtube-playback-state.test.mjs`
+  - `tests/youtube-playback-state.test.mts`
   - `tests/youtube-player-adapter.test.mjs`
   - `tests/youtube-shared-playback.test.mjs`
   - `tests/youtube-thumbnail.test.mjs`

@@ -5,7 +5,7 @@ import {
     readYoutubePlayerDuration,
     readYoutubePlayerState,
     YOUTUBE_PLAYER_STATE
-} from "../_build/app/lib/youtube/player-state.mjs";
+} from "../app/lib/youtube/player-state.mts";
 
 test("youtube player state: exposes YouTube iframe API state constants", () => {
     assert.deepEqual(YOUTUBE_PLAYER_STATE, {

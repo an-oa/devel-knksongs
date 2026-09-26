@@ -1,16 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import type { PlaybackSettingDefinition } from "../app/lib/playback-settings/definitions.mts";
 import {
     PLAYBACK_SETTING_KINDS,
     PLAYBACK_SETTING_SCOPES,
     createPlaybackSettingDefinitions
-} from "../_build/app/lib/playback-settings/definitions.mjs";
+} from "../app/lib/playback-settings/definitions.mts";
 import {
     createInitialPlaybackBehaviorPageValues,
     getPlaybackBehaviorEffectiveValue,
     isPagePlaybackBehaviorDefinition,
     reducePlaybackSettingChange
-} from "../_build/app/lib/playback-settings/value-reducer.mjs";
+} from "../app/lib/playback-settings/value-reducer.mts";
 
 test("playback settings reducer: initializes page behavior values from definitions", () => {
     const { pagePlaybackBehaviorDefinitions } = createPlaybackSettingDefinitions();
@@ -48,7 +49,7 @@ test("playback settings definitions: expose youtube-nocookie metadata in the ful
 });
 
 test("playback settings reducer: hidden values override inactive experimental settings", () => {
-    const definition = {
+    const definition: PlaybackSettingDefinition = {
         scope: PLAYBACK_SETTING_SCOPES.PAGE,
         kind: PLAYBACK_SETTING_KINDS.BEHAVIOR,
         stateKey: "continuousPlayback",
@@ -62,7 +63,7 @@ test("playback settings reducer: hidden values override inactive experimental se
 });
 
 test("playback settings reducer: effectiveWhenHidden keeps page values active while hidden", () => {
-    const definition = {
+    const definition: PlaybackSettingDefinition = {
         scope: PLAYBACK_SETTING_SCOPES.PAGE,
         kind: PLAYBACK_SETTING_KINDS.BEHAVIOR,
         stateKey: "playArchiveToEnd",
@@ -85,7 +86,7 @@ test("playback settings reducer: effectiveWhenHidden keeps page values active wh
 });
 
 test("playback settings reducer: inactive hidden behavior does not overwrite page preference", () => {
-    const definition = {
+    const definition: PlaybackSettingDefinition = {
         scope: PLAYBACK_SETTING_SCOPES.PAGE,
         kind: PLAYBACK_SETTING_KINDS.BEHAVIOR,
         stateKey: "continuousPlayback",

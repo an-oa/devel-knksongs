@@ -8,8 +8,9 @@ import {
     hasSelectedSearchBooleanFilterState,
     resetSearchBooleanFilters,
     SEARCH_BOOLEAN_FILTER_KEYS
-} from "../_build/app/lib/search-boolean-filters.mjs";
+} from "../app/lib/search-boolean-filters.mts";
 
+/** 検索の真偽値フィルターに必要な checked 状態を持つモックを作る。 */
 function createBooleanFilterUi() {
     return {
         el: {

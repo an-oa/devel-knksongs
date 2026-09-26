@@ -1,11 +1,3 @@
-/** 検索や日付 UI で扱う日付キーの範囲。 */
-type SearchDateRange = {
-  /** 範囲に含める最小日付キー。 */
-  minKey: DateKey;
-  /** 範囲に含める最大日付キー。 */
-  maxKey: DateKey;
-};
-
 type SaveFilePickerFileHandle = {
   createWritable: () => Promise<{
     write: (contents: Blob | string) => Promise<void>;

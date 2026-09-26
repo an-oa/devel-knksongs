@@ -3,17 +3,15 @@ import assert from "node:assert/strict";
 import {
     appState,
     createInitialPlaybackUiRuntimeState
-} from "../_build/app/state.mjs";
-import { INITIAL_PLAYBACK_SETTING_VALUES } from "../_build/app/lib/playback-settings/definitions.mjs";
+} from "../app/state.mts";
+import { INITIAL_PLAYBACK_SETTING_VALUES } from "../app/lib/playback-settings/definitions.mts";
 
-/** @typedef {import("../app/state.types").PlaybackUiRuntimeState} PlaybackUiRuntimeState */
+import type { PlaybackUiRuntimeState, PlaybackSettingsUiSlice } from "../app/state.types";
 
 /**
  * 再生設定値だけを playback runtime state から抜き出す。
- * @param {PlaybackUiRuntimeState} playback
- * @returns {Record<string, boolean>}
  */
-function pickPlaybackSettingValues(playback) {
+function pickPlaybackSettingValues(playback: PlaybackUiRuntimeState): PlaybackSettingsUiSlice {
     return {
         showThumbnails: playback.showThumbnails,
         showExperimentalPlaybackSettings: playback.showExperimentalPlaybackSettings,

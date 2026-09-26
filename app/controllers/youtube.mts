@@ -31,6 +31,7 @@ import {
     isYoutubePlaybackSessionActive,
     reduceYoutubePlaybackState
 } from "../lib/youtube/playback-state.mjs";
+import type { YoutubePlaybackStateEvent } from "../lib/youtube/playback-state.mjs";
 import {
     createYoutubePlaybackStartAttemptManager,
     createYoutubePlaybackStartResult,
@@ -64,12 +65,6 @@ type YoutubeConstants = {
 type YoutubePlayerStateEvent = {
     data?: number;
     target?: YoutubePlayerLike;
-};
-
-type YoutubePlaybackStateEvent = {
-    type: string;
-    sessionId?: number;
-    preserveTransitionGeneration?: boolean;
 };
 
 type YoutubePlaybackError = Error & {

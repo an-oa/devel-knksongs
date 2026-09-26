@@ -1,16 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createSongFixture } from "./fixtures/song.mts";
+import type { LookupUiRuntimeState } from "../app/state.types";
 import {
     ensureSongLookupMaps,
     resolveSongRef,
     resolveSongRefs
-} from "../_build/app/lib/song-lookup.mjs";
+} from "../app/lib/song-lookup.mts";
 
 /**
  * 曲 lookup テスト用の UI slice を作る。
- * @returns {object}
  */
-function createLookupUiState() {
+function createLookupUiState(): LookupUiRuntimeState {
     return {
         songMapByBookmarkKey: new Map(),
         songMapByKey: new Map(),
@@ -21,16 +22,16 @@ function createLookupUiState() {
 test("song lookup: resolves bookmark and song keys", () => {
     const lookupUi = createLookupUiState();
     const rows = [
-        {
+        createSongFixture({
             songKey: "arch1::1",
             bookmarkSongKey: "videoA::1",
             title: "青い月"
-        },
-        {
+        }),
+        createSongFixture({
             songKey: "arch2::2",
             bookmarkSongKey: "videoB::2",
             title: "赤い星"
-        }
+        })
     ];
 
     assert.equal(resolveSongRef(lookupUi, rows, "videoA::1"), rows[0]);
@@ -41,16 +42,16 @@ test("song lookup: resolves bookmark and song keys", () => {
 test("song lookup: resolves bookmark song refs in saved order", () => {
     const lookupUi = createLookupUiState();
     const rows = [
-        {
+        createSongFixture({
             songKey: "arch1::1",
             bookmarkSongKey: "videoA::1",
             title: "青い月"
-        },
-        {
+        }),
+        createSongFixture({
             songKey: "arch2::2",
             bookmarkSongKey: "videoB::2",
             title: "赤い星"
-        }
+        })
     ];
 
     assert.deepEqual(
@@ -62,18 +63,18 @@ test("song lookup: resolves bookmark song refs in saved order", () => {
 test("song lookup: rebuilds maps when the source rows reference changes", () => {
     const lookupUi = createLookupUiState();
     const firstRows = [
-        {
+        createSongFixture({
             songKey: "arch1::1",
             bookmarkSongKey: "videoA::1",
             title: "青い月"
-        }
+        })
     ];
     const nextRows = [
-        {
+        createSongFixture({
             songKey: "arch2::2",
             bookmarkSongKey: "videoB::2",
             title: "赤い星"
-        }
+        })
     ];
 
     ensureSongLookupMaps(lookupUi, firstRows);
