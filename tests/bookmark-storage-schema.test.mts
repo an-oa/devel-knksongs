@@ -5,8 +5,8 @@ import {
     migrateLegacyBookmarkSongRefsToCurrent,
     parseStoredBookmarksPayload,
     sanitizeBookmarks
-} from "../_build/app/lib/storage/bookmark-schema.mjs";
-import { normalizeLegacySongRefToCurrent } from "../_build/app/lib/song-identity.mjs";
+} from "../app/lib/storage/bookmark-schema.mts";
+import { normalizeLegacySongRefToCurrent } from "../app/lib/song-identity.mts";
 
 test("bookmark storage schema: parses legacy and versioned payloads with sanitization", () => {
     assert.deepEqual(

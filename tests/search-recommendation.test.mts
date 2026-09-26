@@ -3,33 +3,11 @@ import assert from "node:assert/strict";
 import {
     pickRecommendedSongs,
     pickRecommendedSongsWithCache
-} from "../_build/app/lib/search-recommendation.mjs";
-import { normalizeForSearch } from "../_build/app/lib/search-normalization.mjs";
+} from "../app/lib/search-recommendation.mts";
+import { normalizeForSearch } from "../app/lib/search-normalization.mts";
+import { createSearchSongFixtureFactory } from "./fixtures/search-song.mts";
 
-let autoSongId = 0;
-
-function makeRow(input) {
-    const title = input.title ?? "";
-    const artist = input.artist ?? "";
-    const titleYomi = input.titleYomi ?? "";
-    const artistYomi = input.artistYomi ?? "";
-    const songKey = input.songKey ?? `song-${++autoSongId}`;
-    return {
-        archiveId: input.archiveId ?? "",
-        archiveOrder: input.archiveOrder ?? 1,
-        songKey,
-        bookmarkSongKey: input.bookmarkSongKey ?? songKey,
-        dateKey: input.dateKey ?? null,
-        format: input.format ?? "配信",
-        streamRole: input.streamRole ?? "",
-        isRelay: !!input.isRelay,
-        isHarmony: !!input.isHarmony,
-        titleNorm: normalizeForSearch(title),
-        artistNorm: normalizeForSearch(artist),
-        titleYomiNorm: normalizeForSearch(titleYomi),
-        artistYomiNorm: normalizeForSearch(artistYomi)
-    };
-}
+const makeRow = createSearchSongFixtureFactory();
 
 test("pickRecommendedSongs: prefers 歌みた rows over 配信 and ショート for the same song", () => {
     const rows = [

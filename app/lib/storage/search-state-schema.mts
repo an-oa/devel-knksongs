@@ -101,7 +101,10 @@ export function parseStoredSearchStatePayload(
  * @param {number} searchStateVersion
  * @returns {{ host: boolean, guest: boolean }}
  */
-export function normalizeStoredCollabRoleFilters(payload, searchStateVersion) {
+export function normalizeStoredCollabRoleFilters(
+    payload: Record<string, unknown> | null | undefined,
+    searchStateVersion: number
+) {
     const source = payload && typeof payload === "object" ? payload : {};
     if (searchStateVersion > SEARCH_STATE_V4) {
         return {
@@ -141,7 +144,7 @@ export function normalizeStoredCollabRoleFilters(payload, searchStateVersion) {
  * @param {Record<string, unknown> | null | undefined} payload
  * @returns {number}
  */
-export function getStoredSearchStateVersion(payload) {
+export function getStoredSearchStateVersion(payload: Record<string, unknown> | null | undefined): number {
     const version = payload && payload.version;
     if (typeof version === "number" && Number.isInteger(version) && version >= SEARCH_STATE_V1) return version;
     return SEARCH_STATE_V1;
@@ -156,7 +159,7 @@ export function getStoredSearchStateVersion(payload) {
  * @param {string[]} defaultFormats
  * @returns {boolean}
  */
-export function isSearchStateV1DefaultFormats(formats, defaultFormats) {
+export function isSearchStateV1DefaultFormats(formats: unknown[], defaultFormats: string[]): boolean {
     if (!defaultFormats.includes("収録")) return false;
     if (formats.length !== SEARCH_STATE_V1_DEFAULT_FORMATS.length) return false;
     const formatSet = new Set(formats);
@@ -170,7 +173,10 @@ export function isSearchStateV1DefaultFormats(formats, defaultFormats) {
  * @param {{ defaultFormats: string[], searchStateVersion?: number }} options
  * @returns {string[]}
  */
-export function normalizeStoredSearchFormats(rawFormats, options) {
+export function normalizeStoredSearchFormats(
+    rawFormats: unknown,
+    options: { defaultFormats: string[]; searchStateVersion?: number }
+): string[] {
     const defaultFormats = Array.isArray(options.defaultFormats) ? options.defaultFormats : [];
     const formats = Array.isArray(rawFormats) ? rawFormats : [];
     const searchStateVersion = Number.isInteger(options.searchStateVersion)
@@ -180,7 +186,7 @@ export function normalizeStoredSearchFormats(rawFormats, options) {
         return defaultFormats.slice();
     }
     const allowed = new Set(defaultFormats);
-    const selectedFormats = [];
+    const selectedFormats: string[] = [];
     const seen = new Set();
     formats.forEach((format) => {
         if (!allowed.has(format) || seen.has(format)) return;

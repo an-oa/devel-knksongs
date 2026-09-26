@@ -29,13 +29,13 @@
 - TS移行: 純粋関数の単体テストと曲fixtureから段階的に移行し、`tsconfig.tests.json` でstrictな型チェックを行う。
   `test:unit:ts` は事前buildなしで実行できる。全体の `test:unit` は未移行テストのため事前buildを続ける。
 - テストファイル:
-  - `tests/bookmark-storage-schema.test.mjs`
+  - `tests/bookmark-storage-schema.test.mts`
   - `tests/bookmark-import-export-ui.test.mjs`
-  - `tests/bookmark-transfer.test.mjs`
+  - `tests/bookmark-transfer.test.mts`
   - `tests/bookmark-ui.test.mjs`
   - `tests/app-state.test.mjs`
   - `tests/stream-role.test.mts`
-  - `tests/csv-parser.test.mjs`
+  - `tests/csv-parser.test.mts`
   - `tests/data-loader.test.mjs`
   - `tests/dom-utils.test.mjs`
   - `tests/date-filter-controller.test.mjs`
@@ -43,22 +43,22 @@
   - `tests/partial-date.test.mts`
   - `tests/search-boolean-filters.test.mjs`
   - `tests/search-controller.test.mjs`
-  - `tests/search-filters.test.mjs`
+  - `tests/search-filters.test.mts`
   - `tests/search-query.test.mts`
   - `tests/search-query-validation.test.mjs`
-  - `tests/search-recommendation.test.mjs`
+  - `tests/search-recommendation.test.mts`
   - `tests/song-format.test.mts`
   - `tests/song-identity.test.mts`
   - `tests/format-filter.test.mts`
   - `tests/pages-artifact.test.mjs`
-  - `tests/playback-sequence.test.mjs`
+  - `tests/playback-sequence.test.mts`
   - `tests/playback-session-controller.test.mjs`
   - `tests/playback-settings-value-reducer.test.mjs`
   - `tests/render-drag-reorder.test.mjs`
   - `tests/render-layout.test.mjs`
   - `tests/render-masonry-layout.test.mjs`
   - `tests/search-filters-controller.test.mjs`
-  - `tests/search-state-schema.test.mjs`
+  - `tests/search-state-schema.test.mts`
   - `tests/sidebar-ui.test.mjs`
   - `tests/storage-bookmark-limit.test.mjs`
   - `tests/storage-search-state.test.mjs`
@@ -77,13 +77,14 @@
   - `tests/e2e/youtube-smoke.spec.mjs`
   - `tests/songs-content-hash.test.mjs`
   - `tests/songs-data-source.test.mjs`
-  - `tests/songs-data-quality.test.mjs`
+  - `tests/songs-data-quality.test.mts`
   - `tests/build-songs-json.test.mjs`
   - `tests/songs-json-cache.test.mjs`
-  - `tests/songs-json.test.mjs`
+  - `tests/songs-json.test.mts`
   - `tests/songs-json-validation.test.mjs`
 - 補助モジュール:
   - `tests/fixtures/song.mts`
+  - `tests/fixtures/search-song.mts`
   - `tests/test-helpers.mjs`
   - `tests/youtube-harness.mjs`
   - `tests/support/playback-settings-fixture.mjs`

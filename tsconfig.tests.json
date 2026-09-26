@@ -16,6 +16,7 @@
   },
   "include": [
     "tests/**/*.mts",
-    "types/song.d.ts"
+    "types/song.d.ts",
+    "types/search-state.d.ts"
   ]
 }

@@ -7,7 +7,7 @@ import {
     parseSongsJsonMetaPayload,
     parseSongsJsonPayload,
     SONGS_JSON_SCHEMA_VERSION
-} from "../_build/app/lib/songs-json.mjs";
+} from "../app/lib/songs-json.mts";
 import { createSongFixture } from "./fixtures/song.mts";
 
 const GENERATED_AT = "2026-08-14T00:00:00.000Z";
@@ -42,7 +42,7 @@ test("songs json: accepts nullable date and end fields with empty orientation", 
 test("songs json: rejects songs missing any required field", () => {
     const validSong = createSongFixture();
     for (const fieldName of Object.keys(validSong)) {
-        const incompleteSong = { ...validSong };
+        const incompleteSong: Record<string, unknown> = { ...validSong };
         delete incompleteSong[fieldName];
         const payload = {
             schemaVersion: SONGS_JSON_SCHEMA_VERSION,
@@ -60,13 +60,13 @@ test("songs json: rejects songs missing any required field", () => {
 });
 
 test("songs json: rejects non-object songs and invalid field types", () => {
-    const cases = [
+    const cases: [song: unknown, expected: RegExp][] = [
         [null, /songs\[0\] must be an object/],
-        [createSongFixture({ title: 42 }), /songs\[0\]\.title must be a string/],
-        [createSongFixture({ dateKey: "20260311" }), /songs\[0\]\.dateKey must be a finite number or null/],
-        [createSongFixture({ archiveOrder: null }), /songs\[0\]\.archiveOrder must be an integer/],
-        [createSongFixture({ isRelay: 0 }), /songs\[0\]\.isRelay must be a boolean/],
-        [createSongFixture({ videoOrientation: "square" }), /songs\[0\]\.videoOrientation must be one of/]
+        [{ ...createSongFixture(), title: 42 }, /songs\[0\]\.title must be a string/],
+        [{ ...createSongFixture(), dateKey: "20260311" }, /songs\[0\]\.dateKey must be a finite number or null/],
+        [{ ...createSongFixture(), archiveOrder: null }, /songs\[0\]\.archiveOrder must be an integer/],
+        [{ ...createSongFixture(), isRelay: 0 }, /songs\[0\]\.isRelay must be a boolean/],
+        [{ ...createSongFixture(), videoOrientation: "square" }, /songs\[0\]\.videoOrientation must be one of/]
     ];
 
     for (const [song, expected] of cases) {
@@ -119,7 +119,7 @@ test("songs json: rejects duplicate song and bookmark keys", () => {
 
 test("songs json: rejects unknown keys even when the field count matches", () => {
     for (const unknownField of ["sourceIndex", "constructor", "__proto__"]) {
-        const song = createSongFixture();
+        const song: Partial<Song> = createSongFixture();
         delete song.title;
         Object.defineProperty(song, unknownField, { value: "unexpected", enumerable: true });
         assert.throws(
@@ -130,7 +130,7 @@ test("songs json: rejects unknown keys even when the field count matches", () =>
 });
 
 test("songs json: required fields must be own properties regardless of their prototype", () => {
-    const song = createSongFixture();
+    const song: Partial<Song> = createSongFixture();
     delete song.title;
     Object.setPrototypeOf(song, { title: "Inherited title" });
     assert.throws(
@@ -194,12 +194,12 @@ test("songs json: rejects payload and meta from older schema versions", () => {
 });
 
 test("songs json: compares hashes before generated timestamps", () => {
-    const older = {
+    const older: import("../app/lib/songs-json.mts").SongsJsonArtifactMetadata = {
         schemaVersion: SONGS_JSON_SCHEMA_VERSION,
         contentHash: "sha256:same",
         generatedAt: "2026-08-13T00:00:00.000Z"
     };
-    const newer = {
+    const newer: import("../app/lib/songs-json.mts").SongsJsonArtifactMetadata = {
         schemaVersion: SONGS_JSON_SCHEMA_VERSION,
         contentHash: "sha256:same",
         generatedAt: "2026-08-15T00:00:00.000Z"
@@ -209,7 +209,7 @@ test("songs json: compares hashes before generated timestamps", () => {
 });
 
 test("songs json: compares generated timestamps only for mismatched hashes", () => {
-    const reference = {
+    const reference: import("../app/lib/songs-json.mts").SongsJsonArtifactMetadata = {
         schemaVersion: SONGS_JSON_SCHEMA_VERSION,
         contentHash: "sha256:reference",
         generatedAt: GENERATED_AT

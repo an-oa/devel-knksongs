@@ -3,34 +3,12 @@ import assert from "node:assert/strict";
 import {
     filterSongsByCriteria,
     matchesCollabRoleFilters
-} from "../_build/app/lib/search-filters.mjs";
-import { normalizeForSearch } from "../_build/app/lib/search-normalization.mjs";
-import { parseSearchQuery } from "../_build/app/lib/search-query.mjs";
+} from "../app/lib/search-filters.mts";
+import { normalizeForSearch } from "../app/lib/search-normalization.mts";
+import { parseSearchQuery } from "../app/lib/search-query.mts";
+import { createSearchSongFixtureFactory } from "./fixtures/search-song.mts";
 
-let autoSongId = 0;
-
-function makeRow(input) {
-    const title = input.title ?? "";
-    const artist = input.artist ?? "";
-    const titleYomi = input.titleYomi ?? "";
-    const artistYomi = input.artistYomi ?? "";
-    const songKey = input.songKey ?? `song-${++autoSongId}`;
-    return {
-        archiveId: input.archiveId ?? "",
-        archiveOrder: input.archiveOrder ?? 1,
-        songKey,
-        bookmarkSongKey: input.bookmarkSongKey ?? songKey,
-        dateKey: input.dateKey ?? null,
-        format: input.format ?? "配信",
-        streamRole: input.streamRole ?? "",
-        isRelay: !!input.isRelay,
-        isHarmony: !!input.isHarmony,
-        titleNorm: normalizeForSearch(title),
-        artistNorm: normalizeForSearch(artist),
-        titleYomiNorm: normalizeForSearch(titleYomi),
-        artistYomiNorm: normalizeForSearch(artistYomi)
-    };
-}
+const makeRow = createSearchSongFixtureFactory();
 
 const BASE_SEARCH_STATE = {
     dateFromKey: null,
@@ -41,12 +19,12 @@ const BASE_SEARCH_STATE = {
 
 /**
  * 本番と同じく検索語を一度解析してから曲一覧を絞り込む。
- * @param {Song[]} rows
- * @param {SearchState} searchState
- * @param {Set<string>} selectedFormats
- * @returns {Song[]}
  */
-function filterSongsForTest(rows, searchState, selectedFormats) {
+function filterSongsForTest(
+    rows: Song[],
+    searchState: Parameters<typeof filterSongsByCriteria>[1] & { queryRaw: string },
+    selectedFormats: Set<string>
+) {
     return filterSongsByCriteria(rows, searchState, selectedFormats, parseSearchQuery(searchState.queryRaw));
 }
 
@@ -251,14 +229,20 @@ test("filterSongsByCriteria: matches normalized phrase whitespace and escaped qu
 test("filterSongsByCriteria: consumes the supplied parse result without parsing queryRaw again", () => {
     const parsedQuery = parseSearchQuery("target");
     const rows = [makeRow({ title: "Target" })];
+    const searchState = { ...BASE_SEARCH_STATE, queryRaw: "until:2026-13" };
     const hit = filterSongsByCriteria(
         rows,
-        { ...BASE_SEARCH_STATE, queryRaw: "until:2026-13" },
+        searchState,
         new Set(["配信"]),
         parsedQuery
     );
 
     assert.equal(hit.length, 1);
+    assert.deepEqual(
+        filterSongsByCriteria(rows, BASE_SEARCH_STATE, new Set(["配信"]), parsedQuery),
+        hit,
+        "queryRaw and hasDateFilter are not required when the parsed query is supplied"
+    );
 });
 
 test("collab role helpers: match selected host and guest rows", () => {

@@ -3,21 +3,20 @@ import assert from "node:assert/strict";
 import {
     validateSongsDataQuality,
     validateSongYoutubeFields
-} from "../_build/app/lib/songs-data-quality.mjs";
+} from "../app/lib/songs-data-quality.mts";
 import {
     buildBookmarkSongKey,
     buildLegacySongKey,
     buildSongKey
-} from "../_build/app/lib/song-identity.mjs";
+} from "../app/lib/song-identity.mts";
 import { createSongFixture } from "./fixtures/song.mts";
 
 /**
- * 検証用の曲データを作成する。
- * @param {Record<string, unknown>} overrides
- * @returns {Record<string, unknown>}
+ * 正常な曲を基に、検証したい項目へ不正値も指定できる入力候補を作成する。
  */
-function makeSong(overrides = {}) {
-    const song = createSongFixture({
+function makeSong(overrides: Partial<Record<keyof Song, unknown>> = {}) {
+    const song = {
+        ...createSongFixture(),
         archiveId: "archive-1",
         archiveOrder: 1,
         videoId: "7fOw-4QeB7M",
@@ -26,7 +25,7 @@ function makeSong(overrides = {}) {
         url: "https://www.youtube.com/watch?v=7fOw-4QeB7M&t=349s",
         endSeconds: 649,
         ...overrides
-    });
+    };
     return {
         ...song,
         songKey: buildSongKey(song),
@@ -37,10 +36,11 @@ function makeSong(overrides = {}) {
 
 /**
  * 検証用の曲とCSV行番号を対にした候補を作成する。
- * @param {Record<string, unknown>} overrides
- * @param {number} csvRowNumber
  */
-function makeCandidate(overrides = {}, csvRowNumber = 2) {
+function makeCandidate(
+    overrides: Partial<Record<keyof Song, unknown>> = {},
+    csvRowNumber = 2
+): import("../app/lib/songs-data-quality.mts").SongDataQualityCandidate {
     return { song: makeSong(overrides), csvRowNumber };
 }
 
@@ -65,7 +65,7 @@ test("songs data quality: uses transient source row numbers after excluded CSV r
 });
 
 test("songs data quality: rejects invalid extracted video IDs", () => {
-    const issues = [];
+    const issues: string[] = [];
     validateSongYoutubeFields(
         makeCandidate({ url: "https://www.youtube.com/watch?v=short&t=349s" }),
         0,

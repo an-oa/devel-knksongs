@@ -8,7 +8,7 @@ import {
     normalizeStoredCollabRoleFilters,
     normalizeStoredSearchFormats,
     parseStoredSearchStatePayload
-} from "../_build/app/lib/storage/search-state-schema.mjs";
+} from "../app/lib/storage/search-state-schema.mts";
 
 test("search state schema: builds current version payload", () => {
     const payload = buildStoredSearchStatePayload({

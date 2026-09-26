@@ -17,11 +17,11 @@ type CsvSongCandidate = {
 
 /**
  * 画面の向き列を正規化し、既知の値のみ返す。
- * @param {*} raw
+ * @param raw
  * @param {number} rowNumber
  * @returns {VideoOrientation}
  */
-function parseVideoOrientation(raw, rowNumber) {
+function parseVideoOrientation(raw: unknown, rowNumber: number): VideoOrientation {
     const value = String(raw || "").trim();
     if (value === "縦") return "vertical";
     if (value === "横") return "landscape";
@@ -33,10 +33,10 @@ function parseVideoOrientation(raw, rowNumber) {
 
 /**
  * 終了時刻列の値を秒数へ変換し、空欄や不正値は `null` を返す。
- * @param {*} raw
+ * @param raw
  * @param {number} rowNumber
  */
-function parseEndTimeSeconds(raw, rowNumber) {
+function parseEndTimeSeconds(raw: unknown, rowNumber: number): number | null {
     const value = String(raw || "").trim();
     if (value === "") return null;
     if (/^\d+$/.test(value)) {
@@ -64,9 +64,9 @@ function parseEndTimeSeconds(raw, rowNumber) {
 
 /**
  * RFC4180ベースでCSV文字列を2次元配列へ解析する。
- * @param {*} t
+ * @param t
  */
-function parseCsvRFC4180(t) {
+function parseCsvRFC4180(t: string): string[][] {
     let res = [];
     let row = [];
     let field = "";
@@ -109,10 +109,10 @@ function parseCsvRFC4180(t) {
 
 /**
  * CSVを検証・整形して、検索用正規化済みの曲データ配列へ変換する。
- * @param {*} csvText
+ * @param csvText
  * @returns {Song[]}
  */
-export function parseCsvToSongs(csvText) {
+export function parseCsvToSongs(csvText: string): Song[] {
     const rows = parseCsvRFC4180(csvText);
     const header = rows[0];
     const required = ["公開範囲", "#", "##", "曲名", "アーティスト名", "キョクメイ", "アーティストメイ", "配信日", "形態", "歌枠リレー？", "ハモリあり？", "URL", "メモ"];
@@ -122,7 +122,7 @@ export function parseCsvToSongs(csvText) {
     }
     const body = rows.slice(1);
     const idxMap = Object.fromEntries(header.map((name, index) => [name, index]));
-    const idx = (n) => idxMap[n];
+    const idx = (n: string) => idxMap[n];
     const endTimeIndex = header.includes("終了時刻") ? idx("終了時刻") : -1;
     const streamRoleIndex = header.includes("配信上の立場") ? idx("配信上の立場") : -1;
     const candidates: CsvSongCandidate[] = [];

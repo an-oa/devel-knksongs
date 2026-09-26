@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
     exportBookmarksAsJsonText,
     parseBookmarkImportText
-} from "../_build/app/lib/storage/bookmark-transfer.mjs";
+} from "../app/lib/storage/bookmark-transfer.mts";
 
 test("bookmark transfer: exports a versioned bookmark JSON payload", () => {
     const result = exportBookmarksAsJsonText({
@@ -118,12 +118,17 @@ test("bookmark transfer: rejects invalid JSON and import files over limits", () 
         reason: "max_bookmark_count",
         limit: 1
     });
-    assert.deepEqual(parseBookmarkImportText(JSON.stringify({
+    const songLimitResult = parseBookmarkImportText(JSON.stringify({
         version: 2,
         bookmarks: {
             b1: { name: "A", songs: ["s1", "s2"], createdAt: 1 }
         }
-    }), options), {
+    }), options);
+    assert.equal(songLimitResult.ok, false);
+    assert.equal(songLimitResult.reason, "max_songs_per_bookmark");
+    assert.equal(songLimitResult.limit satisfies number, 1);
+    assert.equal(songLimitResult.bookmarkName satisfies string, "A");
+    assert.deepEqual(songLimitResult, {
         ok: false,
         reason: "max_songs_per_bookmark",
         limit: 1,
@@ -151,6 +156,9 @@ test("bookmark transfer: rejects payloads from a future storage version", () => 
         storageVersion: 3
     });
 
+    assert.equal(result.ok, false);
+    assert.equal(result.reason, "unsupported_version");
+    assert.equal(result.version satisfies number, 4);
     assert.deepEqual(result, {
         ok: false,
         reason: "unsupported_version",

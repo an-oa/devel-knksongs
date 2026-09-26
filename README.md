@@ -188,9 +188,10 @@ flowchart TD
   `app/**/*.mts` を直接 import し、ビルド済みのアプリや生成型宣言には依存しません。
   アプリ内部の `.mjs` import は `tsx` が対応する `.mts` source へ解決します。
   `tests/fixtures/song.mts` は既存の `.mjs` テストからも共有します。
+  検索用の曲は `tests/fixtures/search-song.mts` で正規化し、factoryごとに独立した連番を持たせます。
 - 移行済みテストの型チェックは `tsconfig.tests.json` で `strict: true` にしています。
-  型はアプリのsourceと共有ドメイン型の `types/song.d.ts` を参照します。
-  現段階ではUI用ambient宣言を含めず、移行対象の依存先に応じて追加します。
+  型はアプリのsourceと共有ドメイン型の `types/song.d.ts`・`types/search-state.d.ts` を参照します。
+  検索条件と日付キーの型はUI用ambient宣言から分離し、テストではUI・controller用の型定義を取り込みません。
   ESLintのTypeScriptルールは `tests/**/*.mts` に適用します。
 - `npm run test:unit:ts` と `npm run typecheck:tests:raw` は事前buildなしで実行できます。
   `tsx` 自体は型チェックしないため、両方を実行してください。
@@ -202,17 +203,17 @@ flowchart TD
 
 - 現在は以下のテストを用意しています。
   - ブックマークのインポート/エクスポートUIのテスト (`tests/bookmark-import-export-ui.test.mjs`)
-  - ブックマーク保存スキーマ/移行のテスト (`tests/bookmark-storage-schema.test.mjs`)
-  - ブックマークJSON転送のテスト (`tests/bookmark-transfer.test.mjs`)
+  - ブックマーク保存スキーマ/移行のテスト (`tests/bookmark-storage-schema.test.mts`)
+  - ブックマークJSON転送のテスト (`tests/bookmark-transfer.test.mts`)
   - ブックマークUIのテスト (`tests/bookmark-ui.test.mjs`)
   - アプリ初期状態のテスト (`tests/app-state.test.mjs`)
   - 配信上の立場の正規化/判定テスト (`tests/stream-role.test.mts`)
-  - CSVパースのテスト (`tests/csv-parser.test.mjs`)
+  - CSVパースのテスト (`tests/csv-parser.test.mts`)
   - 初期データ読み込み後の状態反映テスト (`tests/data-loader.test.mjs`)
   - DOM補助関数のテスト (`tests/dom-utils.test.mjs`)
   - 日付キーと部分日付の正規化/範囲判定テスト (`tests/date-key.test.mts`, `tests/partial-date.test.mts`)
   - 検索クエリの解析/入力エラー表示テスト (`tests/search-query.test.mts`, `tests/search-query-validation.test.mjs`)
-  - 楽曲の絞り込み/おすすめ選曲テスト (`tests/search-filters.test.mjs`, `tests/search-recommendation.test.mjs`)
+  - 楽曲の絞り込み/おすすめ選曲テスト (`tests/search-filters.test.mts`, `tests/search-recommendation.test.mts`)
   - 日付フィルターUI controllerのテスト (`tests/date-filter-controller.test.mjs`)
   - 検索/ブックマーク/おすすめ表示controllerのテスト (`tests/search-controller.test.mjs`)
   - 楽曲形式の分類/選択判定テスト (`tests/song-format.test.mts`)
@@ -220,7 +221,7 @@ flowchart TD
   - 検索booleanフィルター共有helperのテスト (`tests/search-boolean-filters.test.mjs`)
   - フォーマット表示ラベルのテスト (`tests/format-filter.test.mts`)
   - Pages artifact生成とブラウザ成果物URLのテスト (`tests/pages-artifact.test.mjs` / `tests/browser-build.test.mjs`)
-  - 再生継続候補の選択ロジック (`tests/playback-sequence.test.mjs`)
+  - 再生継続候補の選択ロジック (`tests/playback-sequence.test.mts`)
   - 再生セッション制御のテスト (`tests/playback-session-controller.test.mjs`)
   - 再生設定値reducerのテスト (`tests/playback-settings-value-reducer.test.mjs`)
   - 描画/レイアウトまわりの回帰テスト (`tests/render-layout.test.mjs`)
@@ -229,13 +230,13 @@ flowchart TD
   - レイアウト補正待機のテスト (`tests/layout-anchor.test.mjs`)
   - 結果一覧スクロール制御のテスト (`tests/results-scroll.test.mjs`)
   - 検索フィルターUI controllerのテスト (`tests/search-filters-controller.test.mjs`)
-  - 検索状態保存schemaのテスト (`tests/search-state-schema.test.mjs`)
+  - 検索状態保存schemaのテスト (`tests/search-state-schema.test.mts`)
   - サイドバーUIのテスト (`tests/sidebar-ui.test.mjs`)
   - 曲データJSONのcontent hash算出テスト (`tests/songs-content-hash.test.mjs`)
   - 曲データソースのJSON優先読み込み/CSVフォールバック/キャッシュ更新テスト (`tests/songs-data-source.test.mjs`)
   - 曲データJSONキャッシュのIndexedDB/旧localStorage移行テスト (`tests/songs-json-cache.test.mjs`)
-  - 曲データJSONスキーマのテスト (`tests/songs-json.test.mjs`)
-  - CSV由来の曲データ品質検証テスト (`tests/songs-data-quality.test.mjs`)
+  - 曲データJSONスキーマのテスト (`tests/songs-json.test.mts`)
+  - CSV由来の曲データ品質検証テスト (`tests/songs-data-quality.test.mts`)
   - 曲データJSON生成の書き出し前検証テスト (`tests/build-songs-json.test.mjs`)
   - 派生JSONのスキーマ・hash整合性検証テスト (`tests/songs-json-validation.test.mjs`)
   - ストレージ(ブックマーク上限/リネーム)の単体テスト (`tests/storage-bookmark-limit.test.mjs`)

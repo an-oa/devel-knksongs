@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseCsvToSongs } from "../_build/app/lib/csv-parser.mjs";
+import { parseCsvToSongs } from "../app/lib/csv-parser.mts";
 
 test("csv: explicit video orientation is parsed from 画面の向き", () => {
     const csv = [
@@ -46,7 +46,7 @@ test("csv: invalid 画面の向き value warns and falls back to auto detection"
         "#,配信日,配信上の立場,画面の向き,公開範囲,形態,歌枠リレー？,ハモリあり？,##,曲名,アーティスト名,キョクメイ,アーティストメイ,URL,終了時刻,メモ",
         "1,2026/03/11,,縦型,全体,配信,,,1,KING,Kanaria feat. GUMI,キング,カナリアフィーチャリンググミ,https://www.youtube.com/watch?v=abc123def45&t=10s,0:09:41,"
     ].join("\n");
-    const warnings = [];
+    const warnings: string[] = [];
     const originalWarn = console.warn;
     console.warn = (message) => {
         warnings.push(String(message));
@@ -66,7 +66,7 @@ test("csv: invalid 終了時刻 value warns and falls back to null", () => {
         "#,配信日,配信上の立場,画面の向き,公開範囲,形態,歌枠リレー？,ハモリあり？,##,曲名,アーティスト名,キョクメイ,アーティストメイ,URL,終了時刻,メモ",
         "1,2026/03/11,,縦,全体,配信,,,1,KING,Kanaria feat. GUMI,キング,カナリアフィーチャリンググミ,https://www.youtube.com/watch?v=abc123def45&t=10s,0:99:41,"
     ].join("\n");
-    const warnings = [];
+    const warnings: string[] = [];
     const originalWarn = console.warn;
     console.warn = (message) => {
         warnings.push(String(message));

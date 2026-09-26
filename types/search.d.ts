@@ -1,14 +1,3 @@
-type SearchState = {
-  queryRaw: string;
-  dateFromKey: DateKey | null;
-  dateToKey: DateKey | null;
-  hasDateFilter: boolean;
-  collabHostOnly?: boolean;
-  collabGuestOnly?: boolean;
-  relayOnly?: boolean;
-  harmonyOnly?: boolean;
-};
-
 type SearchUiState = {
   el: import("../app/state.types").AppUiElements;
   search: import("../app/state.types").SearchUiRuntimeState;
