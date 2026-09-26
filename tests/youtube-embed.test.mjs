@@ -9,7 +9,7 @@ import {
     resolveYoutubeEmbedHost,
     resolveYoutubeEmbedHostFromUrl
 } from "../_build/app/lib/youtube/embed.mjs";
-import { installFakeDom } from "./test-helpers.mjs";
+import { installFakeDom } from "./test-helpers.mts";
 
 test("youtube embed: buildYoutubeEmbedUrl includes playback params and optional end", () => {
     const cleanup = installFakeDom();

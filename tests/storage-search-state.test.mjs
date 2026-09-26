@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createBookmarkPersistenceController } from "../_build/app/controllers/bookmark-persistence.mjs";
 import { createStorageController } from "../_build/app/controllers/storage.mjs";
 import { createSearchFiltersController } from "../_build/app/ui/search-filters/controller.mjs";
-import { installFakeDom } from "./test-helpers.mjs";
+import { installFakeDom } from "./test-helpers.mts";
 
 function createFakeLocalStorage() {
     const store = new Map();

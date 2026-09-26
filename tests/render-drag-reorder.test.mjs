@@ -5,7 +5,7 @@ import {
     createDataTransferMock,
     installFakeDom,
     makeRenderRow
-} from "./test-helpers.mjs";
+} from "./test-helpers.mts";
 
 function createDragHarness(options = {}) {
     const data = {

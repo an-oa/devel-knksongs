@@ -210,7 +210,7 @@ flowchart TD
   - 配信上の立場の正規化/判定テスト (`tests/stream-role.test.mts`)
   - CSVパースのテスト (`tests/csv-parser.test.mts`)
   - 初期データ読み込み後の状態反映テスト (`tests/data-loader.test.mjs`)
-  - DOM補助関数のテスト (`tests/dom-utils.test.mjs`)
+  - DOM補助関数のテスト (`tests/dom-utils.test.mts`)
   - 日付キーと部分日付の正規化/範囲判定テスト (`tests/date-key.test.mts`, `tests/partial-date.test.mts`)
   - 検索クエリの解析/入力エラー表示テスト (`tests/search-query.test.mts`, `tests/search-query-validation.test.mjs`)
   - 楽曲の絞り込み/おすすめ選曲テスト (`tests/search-filters.test.mts`, `tests/search-recommendation.test.mts`)
@@ -248,7 +248,7 @@ flowchart TD
   - YouTube playback state / start attempt / player adapter の単体テスト (`tests/youtube-playback-state.test.mjs`, `tests/youtube-playback-start-attempt.test.mjs`, `tests/youtube-player-adapter.test.mjs`)
   - YouTube shared playback / thumbnail helper / unconfirmed playback start の単体テスト (`tests/youtube-shared-playback.test.mjs`, `tests/youtube-thumbnail.test.mjs`, `tests/youtube-unconfirmed-playback-start.test.mjs`)
   - Chromium 上での YouTube 再生スモークテスト (`tests/e2e/youtube-smoke.spec.mjs`)
-- `tests/test-helpers.mjs`、`tests/youtube-harness.mjs`、`tests/support/playback-settings-fixture.mjs`、`tests/e2e/support/mock-youtube.mjs`、`tests/e2e/support/ui-helpers.mjs` は複数テストで共有する補助モジュールです。
+- `tests/test-helpers.mts`、`tests/youtube-harness.mjs`、`tests/support/playback-settings-fixture.mjs`、`tests/e2e/support/mock-youtube.mjs`、`tests/e2e/support/ui-helpers.mjs` は複数テストで共有する補助モジュールです。
 - 実行コマンド:
   - `npm run validate:songs-json`
   - `npm run build:ts`

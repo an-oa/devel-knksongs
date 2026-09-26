@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { afterAnimationFrames, afterLayoutSettled } from "../_build/app/lib/layout-anchor.mjs";
-import { installFakeDom, setGlobalValue } from "./test-helpers.mjs";
+import { installFakeDom, setGlobalValue } from "./test-helpers.mts";
 
 test("layout anchor: afterAnimationFrames waits for the requested frame count", async () => {
     const cleanup = installFakeDom();

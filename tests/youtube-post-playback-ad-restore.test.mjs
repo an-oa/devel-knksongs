@@ -11,7 +11,7 @@ import { YOUTUBE_PLAYER_STATE } from "../_build/app/lib/youtube/player-state.mjs
 import {
     installFakeDom,
     installFakeTimeouts
-} from "./test-helpers.mjs";
+} from "./test-helpers.mts";
 
 /**
  * 動画後広告復元 manager テスト用の Player mock を作る。

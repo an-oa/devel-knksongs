@@ -10,7 +10,7 @@ import {
     installFakeDom,
     invokeListener,
     setGlobalValue
-} from "./test-helpers.mjs";
+} from "./test-helpers.mts";
 import {
     attachMockPlayerIframe,
     createFakeLocalStorage,

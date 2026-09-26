@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createDateFilterController } from "../_build/app/ui/date/filter.mjs";
 import { normalizeForSearch } from "../_build/app/lib/search-normalization.mjs";
-import { installFakeDom } from "./test-helpers.mjs";
+import { installFakeDom } from "./test-helpers.mts";
 
 let autoSongId = 0;
 

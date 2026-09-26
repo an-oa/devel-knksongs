@@ -14,7 +14,7 @@ import {
     makeRenderRow,
     createDataTransferMock,
     invokeListener
-} from "./test-helpers.mjs";
+} from "./test-helpers.mts";
 
 /**
  * 再生開始結果の期待値を返す。

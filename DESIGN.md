@@ -37,7 +37,7 @@
   - `tests/stream-role.test.mts`
   - `tests/csv-parser.test.mts`
   - `tests/data-loader.test.mjs`
-  - `tests/dom-utils.test.mjs`
+  - `tests/dom-utils.test.mts`
   - `tests/date-filter-controller.test.mjs`
   - `tests/date-key.test.mts`
   - `tests/partial-date.test.mts`
@@ -85,7 +85,7 @@
 - 補助モジュール:
   - `tests/fixtures/song.mts`
   - `tests/fixtures/search-song.mts`
-  - `tests/test-helpers.mjs`
+  - `tests/test-helpers.mts`
   - `tests/youtube-harness.mjs`
   - `tests/support/playback-settings-fixture.mjs`
   - `tests/e2e/support/mock-youtube.mjs`

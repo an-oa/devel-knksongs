@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { scheduleScrollElementIntoView, scrollResultListToTop } from "../_build/app/lib/results-scroll.mjs";
-import { installFakeDom } from "./test-helpers.mjs";
+import { installFakeDom } from "./test-helpers.mts";
 
 test("scroll: falls back to window scroll when result list has no scrollable ancestor", () => {
     const cleanup = installFakeDom();

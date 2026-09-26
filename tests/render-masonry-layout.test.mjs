@@ -6,7 +6,7 @@ import {
     estimateMasonryVisibleCardCount,
     getMasonryColumnCount
 } from "../_build/app/lib/render/masonry-layout.mjs";
-import { installFakeDom, setGlobalValue } from "./test-helpers.mjs";
+import { installFakeDom, setGlobalValue } from "./test-helpers.mts";
 
 test("render masonry: column count follows available width and minimum card width", () => {
     assert.equal(getMasonryColumnCount(1920), 6);

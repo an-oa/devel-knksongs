@@ -11,7 +11,7 @@ import {
     shouldLoadYoutubeThumbnailNow,
     suppressYoutubeThumbnailContextMenu
 } from "../_build/app/lib/youtube/thumbnail.mjs";
-import { installFakeDom } from "./test-helpers.mjs";
+import { installFakeDom } from "./test-helpers.mts";
 
 test("youtube thumbnail: create/apply image keeps mqdefault source and eager load", () => {
     const cleanup = installFakeDom();

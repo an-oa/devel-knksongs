@@ -7,7 +7,7 @@ import {
     createYoutubePlaybackStartAttemptManager
 } from "../_build/app/lib/youtube/playback-start-attempt.mjs";
 import { createYoutubeUnconfirmedPlaybackStartManager } from "../_build/app/lib/youtube/unconfirmed-playback-start.mjs";
-import { installFakeDom, setGlobalValue } from "./test-helpers.mjs";
+import { installFakeDom, setGlobalValue } from "./test-helpers.mts";
 
 /**
  * 再生開始待ち manager のテスト用状態を作る。

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createBookmarkNotificationController } from "../_build/app/ui/bookmark/notifications.mjs";
-import { installFakeDom, invokeListener, setGlobalValue } from "./test-helpers.mjs";
+import { installFakeDom, invokeListener, setGlobalValue } from "./test-helpers.mts";
 
 /**
  * 通知テスト用の UI 状態を作る。

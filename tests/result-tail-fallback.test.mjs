@@ -4,7 +4,7 @@ import {
     getResultTailFallbackScrollTarget,
     isResultTailNearScrollBoundary
 } from "../_build/app/lib/render/result-tail-fallback.mjs";
-import { installFakeDom } from "./test-helpers.mjs";
+import { installFakeDom } from "./test-helpers.mts";
 
 test("result tail fallback: scroll target uses window for document scroll and container otherwise", () => {
     const cleanup = installFakeDom();

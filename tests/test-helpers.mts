@@ -1,25 +1,47 @@
 import assert from "node:assert/strict";
+import { createSongFixture } from "./fixtures/song.mts";
+
+// 実際にテストで渡すイベントの部分形。ブラウザの Event 全体は実装しない。
+type FakeEvent = {
+    target?: FakeElement;
+    currentTarget?: FakeElement;
+    relatedTarget?: FakeElement | null;
+    key?: string;
+    shiftKey?: boolean;
+    preventDefault?: () => void;
+    stopPropagation?: () => void;
+    dataTransfer?: ReturnType<typeof createDataTransferMock>;
+};
+
+type FakeTimeout = {
+    cb: () => void;
+    delay: number | undefined;
+    cleared: boolean;
+    unref: () => void;
+};
 
 class FakeClassList {
-    constructor() {
-        this.values = new Set();
-    }
+    values = new Set<string>();
 
-    add(...tokens) {
+    /** 指定されたクラス名を追加する。 */
+    add(...tokens: string[]) {
         tokens.forEach((token) => {
             if (token) this.values.add(token);
         });
     }
 
-    remove(...tokens) {
+    /** 指定されたクラス名を取り除く。 */
+    remove(...tokens: string[]) {
         tokens.forEach((token) => this.values.delete(token));
     }
 
-    contains(token) {
+    /** クラス名の有無を返す。 */
+    contains(token: string) {
         return this.values.has(token);
     }
 
-    toggle(token, force) {
+    /** クラス名の有無を切り替え、変更後の状態を返す。 */
+    toggle(token: string, force?: boolean) {
         if (force === true) {
             this.values.add(token);
             return true;
@@ -36,33 +58,41 @@ class FakeClassList {
         return true;
     }
 
+    /** クラス名を空白区切りで返す。 */
     toString() {
         return Array.from(this.values).join(" ");
     }
 }
 
+// 必要な DOM 操作だけを持つモック。HTMLElement としての完全な実装ではない。
 class FakeElement {
+    tagName: string;
+    dataset: Record<string, string | undefined> = {};
+    children: FakeElement[] = [];
+    parentElement: FakeElement | null = null;
+    classList = new FakeClassList();
+    style: Partial<CSSStyleDeclaration> = {};
+    attributes = new Map<string, string>();
+    onclick: ((event: FakeEvent) => void) | null = null;
+    textContent = "";
+    _innerHTML = "";
+    hidden = false;
+    type = "";
+    _events = new Map<string, (event: FakeEvent) => void>();
+    _scrollHeight?: number;
+    _clientHeight?: number;
+    _clientWidth?: number;
+    _rect?: Pick<DOMRectReadOnly, "top" | "bottom" | "left" | "right" | "width" | "height">;
+
     constructor(tagName = "div") {
         this.tagName = String(tagName).toUpperCase();
-        this.dataset = {};
-        this.children = [];
-        this.parentElement = null;
-        this.classList = new FakeClassList();
-        this.style = {};
-        this.attributes = new Map();
-        this.onclick = null;
-        this.textContent = "";
-        this._innerHTML = "";
-        this.hidden = false;
-        this.type = "";
-        this._events = new Map();
     }
 
     get className() {
         return this.classList.toString();
     }
 
-    set className(value) {
+    set className(value: string) {
         this.classList = new FakeClassList();
         String(value || "")
             .split(/\s+/)
@@ -74,7 +104,7 @@ class FakeElement {
         return this._innerHTML;
     }
 
-    set innerHTML(value) {
+    set innerHTML(value: string) {
         this._innerHTML = String(value || "");
         this.children.forEach((child) => {
             child.parentElement = null;
@@ -96,7 +126,7 @@ class FakeElement {
         return this.children[this.children.length - 1] || null;
     }
 
-    get nextSibling() {
+    get nextSibling(): FakeElement | null {
         if (!this.parentElement) return null;
         const siblings = this.parentElement.children;
         const index = siblings.indexOf(this);
@@ -104,10 +134,11 @@ class FakeElement {
         return siblings[index + 1] || null;
     }
 
-    get isConnected() {
-        const body = globalThis.document && globalThis.document.body;
+    get isConnected(): boolean {
+        const body = getInstalledFakeDocument()?.body;
         if (!body) return false;
-        let node = this;
+        // eslint-disable-next-line @typescript-eslint/no-this-alias -- 自身から祖先をたどるための走査位置。
+        let node: FakeElement | null = this;
         while (node) {
             if (node === body) return true;
             node = node.parentElement;
@@ -130,7 +161,8 @@ class FakeElement {
         return 100;
     }
 
-    appendChild(child) {
+    /** 親を付け替えて子要素を追加し、fragment はその子を展開する。 */
+    appendChild<T extends FakeElement>(child: T): T {
         if (child instanceof FakeDocumentFragment) {
             child.children.slice().forEach((fragmentChild) => {
                 this.appendChild(fragmentChild);
@@ -145,7 +177,8 @@ class FakeElement {
         return child;
     }
 
-    append(...nodes) {
+    /** モック要素だけを末尾へ追加する。 */
+    append(...nodes: (FakeElement | string)[]) {
         nodes.forEach((node) => {
             if (node instanceof FakeElement) {
                 this.appendChild(node);
@@ -153,7 +186,8 @@ class FakeElement {
         });
     }
 
-    replaceChildren(...nodes) {
+    /** 既存の子要素を外して指定された要素へ置き換える。 */
+    replaceChildren(...nodes: (FakeElement | string)[]) {
         this.children.forEach((child) => {
             child.parentElement = null;
         });
@@ -161,7 +195,8 @@ class FakeElement {
         this.append(...nodes);
     }
 
-    removeChild(child) {
+    /** 子要素を取り除き、その親参照を解除する。 */
+    removeChild<T extends FakeElement>(child: T): T {
         const index = this.children.indexOf(child);
         if (index >= 0) {
             this.children.splice(index, 1);
@@ -170,7 +205,8 @@ class FakeElement {
         return child;
     }
 
-    insertBefore(node, referenceNode) {
+    /** 指定した子の直前、または末尾に要素を移動する。 */
+    insertBefore<T extends FakeElement>(node: T, referenceNode: FakeElement | null): T {
         if (node.parentElement) {
             node.parentElement.removeChild(node);
         }
@@ -186,7 +222,8 @@ class FakeElement {
         return node;
     }
 
-    contains(node) {
+    /** 自身または子孫に指定された要素があるか返す。 */
+    contains(node: unknown): boolean {
         if (node === this) return true;
         for (const child of this.children) {
             if (child.contains(node)) return true;
@@ -194,10 +231,12 @@ class FakeElement {
         return false;
     }
 
-    closest(selector) {
+    /** クラス名が一致する自身または祖先を返す。 */
+    closest(selector: string): FakeElement | null {
         if (!selector || !selector.startsWith(".")) return null;
         const targetClass = selector.slice(1);
-        let current = this;
+        // eslint-disable-next-line @typescript-eslint/no-this-alias -- 自身から祖先をたどるための走査位置。
+        let current: FakeElement | null = this;
         while (current) {
             if (current.classList.contains(targetClass)) return current;
             current = current.parentElement;
@@ -205,7 +244,8 @@ class FakeElement {
         return null;
     }
 
-    querySelector(selector) {
+    /** セレクターが一致する最初の子孫を返す。 */
+    querySelector(selector: string): FakeElement | null {
         const matcher = createMatcher(selector);
         for (const child of this.children) {
             if (matcher(child)) return child;
@@ -215,9 +255,10 @@ class FakeElement {
         return null;
     }
 
-    querySelectorAll(selector) {
+    /** セレクターが一致する子孫を配列で返す。 */
+    querySelectorAll(selector: string): FakeElement[] {
         const matcher = createMatcher(selector);
-        const matches = [];
+        const matches: FakeElement[] = [];
         for (const child of this.children) {
             if (matcher(child)) matches.push(child);
             matches.push(...child.querySelectorAll(selector));
@@ -225,26 +266,32 @@ class FakeElement {
         return matches;
     }
 
-    setAttribute(name, value) {
+    /** 属性値を文字列として記録する。 */
+    setAttribute(name: string, value: unknown) {
         this.attributes.set(name, String(value));
     }
 
-    getAttribute(name) {
+    /** 記録済みの属性値を返す。 */
+    getAttribute(name: string) {
         return this.attributes.has(name) ? this.attributes.get(name) : null;
     }
 
-    hasAttribute(name) {
+    /** 属性が記録されているか返す。 */
+    hasAttribute(name: string) {
         return this.attributes.has(name);
     }
 
-    removeAttribute(name) {
+    /** 記録済みの属性を削除する。 */
+    removeAttribute(name: string) {
         this.attributes.delete(name);
     }
 
-    addEventListener(type, listener) {
+    /** イベント種別ごとに最後に登録された listener を記録する。 */
+    addEventListener(type: string, listener: (event: FakeEvent) => void) {
         this._events.set(type, listener);
     }
 
+    /** 記録されたクリック listener と onclick を呼ぶ。 */
     click() {
         const event = {
             target: this,
@@ -261,18 +308,23 @@ class FakeElement {
         }
     }
 
-    focus() {
-        if (globalThis.document) {
-            globalThis.document.activeElement = this;
+    /** グローバルに設置したモック document のフォーカスを更新する。 */
+    focus(): void {
+        const document = getInstalledFakeDocument();
+        if (document) {
+            document.activeElement = this;
         }
     }
 
-    blur() {
-        if (globalThis.document && globalThis.document.activeElement === this) {
-            globalThis.document.activeElement = null;
+    /** 自身がフォーカスされている場合だけ解除する。 */
+    blur(): void {
+        const document = getInstalledFakeDocument();
+        if (document && document.activeElement === this) {
+            document.activeElement = null;
         }
     }
 
+    /** テスト指定の矩形、または既定の矩形を返す。 */
     getBoundingClientRect() {
         if (this._rect) return this._rect;
         return { top: 0, bottom: 100, left: 0, right: 100, width: 100, height: 100 };
@@ -285,7 +337,17 @@ class FakeDocumentFragment extends FakeElement {
     }
 }
 
-function findElementById(root, id) {
+/**
+ * installFakeDom が設置した document を取得し、モック内部の型境界をここに集める。
+ * body がモック要素である場合だけ返し、cleanup 後の実 DOM は操作しない。
+ */
+function getInstalledFakeDocument() {
+    const document = globalThis.document as unknown as ReturnType<typeof installFakeDom>["document"] | undefined;
+    return document?.body instanceof FakeElement ? document : undefined;
+}
+
+/** 属性の id が一致する要素を部分木から探す。 */
+function findElementById(root: FakeElement | null, id: string): FakeElement | null {
     if (!root) return null;
     if (root.getAttribute && root.getAttribute("id") === id) return root;
     for (const child of root.children || []) {
@@ -295,7 +357,8 @@ function findElementById(root, id) {
     return null;
 }
 
-function createMatcher(selector) {
+/** テストで使うクラス・タグ・属性セレクターの判定を作る。 */
+function createMatcher(selector: string): (element: FakeElement) => boolean {
     if (selector.startsWith(".")) {
         const targetClass = selector.slice(1);
         return (el) => el.classList.contains(targetClass);
@@ -304,13 +367,14 @@ function createMatcher(selector) {
     if (attrSelector) {
         const [, tagName, attrName, attrValue] = attrSelector;
         const tag = tagName.toUpperCase();
-        return (el) => el.tagName === tag && (el[attrName] === attrValue || el.getAttribute(attrName) === attrValue);
+        return (el) => el.tagName === tag && (Reflect.get(el, attrName) === attrValue || el.getAttribute(attrName) === attrValue);
     }
     const tag = selector.toUpperCase();
     return (el) => el.tagName === tag;
 }
 
-function parseSimpleInnerHtml(root, html) {
+/** テスト用の単純な HTML をモック要素の木へ変換する。 */
+function parseSimpleInnerHtml(root: FakeElement, html: string) {
     const source = String(html || "");
     if (!source.trim()) return;
     const tokenPattern = /<\/?([a-zA-Z0-9-]+)([^>]*)>|([^<]+)/g;
@@ -353,6 +417,10 @@ function parseSimpleInnerHtml(root, html) {
     }
 }
 
+/**
+ * DOM の部分実装をグローバルに設置する。
+ * 戻り値は従来どおり cleanup として呼べ、document/window でモック固有の値も操作できる。
+ */
 export function installFakeDom() {
     const previous = {
         document: globalThis.document,
@@ -375,33 +443,39 @@ export function installFakeDom() {
         head,
         scrollingElement: body,
         documentElement,
-        activeElement: null,
-        _events: new Map(),
-        createElement(tagName) {
+        activeElement: null as FakeElement | null,
+        _events: new Map<string, (event: FakeEvent) => void>(),
+        /** 指定されたタグのモック要素を作る。 */
+        createElement(tagName: string) {
             return new FakeElement(tagName);
         },
+        /** 子要素をまとめて移動する fragment を作る。 */
         createDocumentFragment() {
             return new FakeDocumentFragment();
         },
-        querySelectorAll() {
+        /** document 全体の一覧検索は従来どおり空配列を返す。 */
+        querySelectorAll(): FakeElement[] {
             return [];
         },
-        querySelector(selector) {
+        /** セレクターが一致する最初の子孫を返す。 */
+        querySelector(selector: string): FakeElement | null {
             const fromHead = head.querySelector(selector);
             if (fromHead) return fromHead;
             return body.querySelector(selector);
         },
-        getElementById(id) {
+        /** head と body から id が一致する要素を探す。 */
+        getElementById(id: string) {
             return findElementById(head, id) || findElementById(body, id);
         },
-        addEventListener(type, listener) {
+        /** イベント種別ごとに最後に登録された listener を記録する。 */
+        addEventListener(type: string, listener: (event: FakeEvent) => void) {
             this._events.set(type, listener);
         }
     };
 
     setGlobalValue("document", document);
-    setGlobalValue("window", {
-        innerHeight: 720,
+    const window = {
+        innerHeight: 720 as number | undefined,
         scrollBy() {},
         matchMedia() {
             return { matches: false };
@@ -409,17 +483,19 @@ export function installFakeDom() {
         getComputedStyle() {
             return { overflowY: "visible" };
         },
-        _events: new Map(),
-        addEventListener(type, listener) {
+        _events: new Map<string, (event: FakeEvent) => void>(),
+        /** イベント種別ごとに最後に登録された listener を記録する。 */
+        addEventListener(type: string, listener: (event: FakeEvent) => void) {
             this._events.set(type, listener);
         }
-    });
+    };
+    setGlobalValue("window", window);
     setGlobalValue("Element", FakeElement);
     setGlobalValue("HTMLElement", FakeElement);
     setGlobalValue("navigator", { maxTouchPoints: 0 });
     setGlobalValue("location", { origin: "https://example.test" });
     setGlobalValue("CSS", { supports: () => false });
-    setGlobalValue("requestAnimationFrame", (cb) => {
+    setGlobalValue("requestAnimationFrame", (cb: () => void) => {
         if (typeof cb === "function") cb();
         return 0;
     });
@@ -428,7 +504,8 @@ export function installFakeDom() {
         disconnect() {}
     });
 
-    return () => {
+    /** 設置前のグローバル値へ戻す。 */
+    const cleanup = () => {
         setGlobalValue("document", previous.document);
         setGlobalValue("window", previous.window);
         setGlobalValue("Element", previous.Element);
@@ -439,9 +516,11 @@ export function installFakeDom() {
         setGlobalValue("requestAnimationFrame", previous.requestAnimationFrame);
         setGlobalValue("IntersectionObserver", previous.IntersectionObserver);
     };
+    return Object.assign(cleanup, { document, window });
 }
 
-export function setGlobalValue(name, value) {
+/** 部分実装のモックをグローバルへ設置する境界。DOM 全体の型とは混同しない。 */
+export function setGlobalValue(name: PropertyKey, value: unknown) {
     Object.defineProperty(globalThis, name, {
         value,
         configurable: true,
@@ -449,8 +528,11 @@ export function setGlobalValue(name, value) {
     });
 }
 
-export function makeRenderRow(input) {
-    return {
+/** 描画用の既定値を保ち、共有 fixture で完全な Song を作る。 */
+export function makeRenderRow(input: Pick<Song, "songKey"> & Partial<Pick<Song,
+    "bookmarkSongKey" | "title" | "artist" | "date" | "format" | "streamRole" | "videoOrientation" | "url"
+>>): Song {
+    return createSongFixture({
         songKey: input.songKey,
         bookmarkSongKey: input.bookmarkSongKey ?? input.songKey,
         title: input.title || "title",
@@ -461,41 +543,45 @@ export function makeRenderRow(input) {
         videoOrientation: input.videoOrientation || "",
         isRelay: false,
         isHarmony: false,
-        url: input.url || "https://youtu.be/video1"
-    };
+        url: input.url || "https://youtu.be/video1",
+        // 描画用の曲には従来どおり再生終了時刻を指定しない。
+        endSeconds: null
+    });
 }
 
+/** ドラッグ操作で受け渡す文字列を記録する。 */
 export function createDataTransferMock() {
-    const store = new Map();
+    const store = new Map<string, string>();
     return {
         effectAllowed: "none",
-        setData(type, value) {
+        /** 種別ごとのデータを文字列として記録する。 */
+        setData(type: string, value: string) {
             store.set(String(type), String(value));
         },
-        getData(type) {
+        /** 記録済みデータ、または空文字列を返す。 */
+        getData(type: string) {
             return store.get(String(type)) || "";
         }
     };
 }
 
-export function invokeListener(element, type, event) {
+/** 指定したイベントの listener があることを確認して呼ぶ。 */
+export function invokeListener(
+    element: { _events?: ReadonlyMap<string, (event: FakeEvent) => void> } | null | undefined,
+    type: string,
+    event: FakeEvent
+) {
     const listener = element && element._events ? element._events.get(type) : null;
-    assert.equal(typeof listener, "function", `${type} listener is missing`);
+    assert.ok(typeof listener === "function", `${type} listener is missing`);
     listener(event);
 }
 
-/**
- * setTimeout/clearTimeout を記録型 fake に差し替える。
- * @returns {{
- *   timeoutCalls: Array<{ cb: Function, delay: number | undefined, cleared: boolean, unref: Function }>,
- *   cleanup: Function
- * }}
- */
+/** setTimeout/clearTimeout を記録型 fake に差し替える。 */
 export function installFakeTimeouts() {
     const previousSetTimeout = globalThis.setTimeout;
     const previousClearTimeout = globalThis.clearTimeout;
-    const timeoutCalls = [];
-    setGlobalValue("setTimeout", (cb, delay) => {
+    const timeoutCalls: FakeTimeout[] = [];
+    setGlobalValue("setTimeout", (cb: () => void, delay?: number) => {
         const timeout = {
             cb,
             delay,
@@ -505,11 +591,12 @@ export function installFakeTimeouts() {
         timeoutCalls.push(timeout);
         return timeout;
     });
-    setGlobalValue("clearTimeout", (timeout) => {
+    setGlobalValue("clearTimeout", (timeout: FakeTimeout | null | undefined) => {
         if (timeout) timeout.cleared = true;
     });
     return {
         timeoutCalls,
+        /** 元のタイマー関数に戻す。 */
         cleanup() {
             setGlobalValue("setTimeout", previousSetTimeout);
             setGlobalValue("clearTimeout", previousClearTimeout);

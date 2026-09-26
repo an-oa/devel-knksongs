@@ -5,11 +5,12 @@ import {
     getHeaderHeight,
     getViewportHeight,
     isHtmlElement
-} from "../_build/app/lib/dom-utils.mjs";
-import { installFakeDom } from "./test-helpers.mjs";
+} from "../app/lib/dom-utils.mts";
+import { installFakeDom } from "./test-helpers.mts";
 
 test("dom utils: isHtmlElement and canUseDom reflect fake dom environment", () => {
     const cleanup = installFakeDom();
+    const { document } = cleanup;
     try {
         const div = document.createElement("div");
         assert.equal(isHtmlElement(div), true);
@@ -22,6 +23,7 @@ test("dom utils: isHtmlElement and canUseDom reflect fake dom environment", () =
 
 test("dom utils: getHeaderHeight reads header rect height and falls back to zero", () => {
     const cleanup = installFakeDom();
+    const { document } = cleanup;
     try {
         assert.equal(getHeaderHeight(), 0);
 
@@ -38,6 +40,7 @@ test("dom utils: getHeaderHeight reads header rect height and falls back to zero
 
 test("dom utils: getViewportHeight prefers window height and falls back to document element", () => {
     const cleanup = installFakeDom();
+    const { document, window } = cleanup;
     try {
         assert.equal(getViewportHeight(), 720);
 

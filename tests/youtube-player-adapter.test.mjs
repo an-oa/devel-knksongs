@@ -5,7 +5,7 @@ import {
     YT_NOCOOKIE_EMBED_HOST
 } from "../_build/app/lib/youtube/embed.mjs";
 import { createYoutubePlayerAdapter } from "../_build/app/lib/youtube/player-adapter.mjs";
-import { installFakeDom } from "./test-helpers.mjs";
+import { installFakeDom } from "./test-helpers.mts";
 
 /**
  * Promise を外側から解決・拒否できるテスト補助を作る。

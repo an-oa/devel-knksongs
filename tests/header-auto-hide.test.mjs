@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createAutoHideHeaderController } from "../_build/app/ui/header/auto-hide.mjs";
-import { installFakeDom, invokeListener, setGlobalValue } from "./test-helpers.mjs";
+import { installFakeDom, invokeListener, setGlobalValue } from "./test-helpers.mts";
 
 /**
  * テスト用ヘッダーと controller を初期化する。

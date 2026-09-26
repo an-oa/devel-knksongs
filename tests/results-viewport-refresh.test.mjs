@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { setupResultsViewportRefresh } from "../_build/app/lib/render/results-viewport-refresh.mjs";
-import { installFakeDom, setGlobalValue } from "./test-helpers.mjs";
+import { installFakeDom, setGlobalValue } from "./test-helpers.mts";
 
 test("results viewport refresh: resize refreshes recommendations before masonry layout", () => {
     const restoreDom = installFakeDom();
