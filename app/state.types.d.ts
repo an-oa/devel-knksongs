@@ -94,8 +94,6 @@ export type AppUiElements = Partial<{
 export type SearchUiRuntimeState = {
   /** 選択中の形式フィルタ。 */
   selectedFormats: Set<string>;
-  /** 検索デバウンス用のタイマー ID。 */
-  debounceId: number;
   /** 条件未指定時に表示するおすすめ曲のキャッシュ。 */
   recommendedCache: RecommendedSearchCache | null;
   /** 曲データ読み込みが完了して検索可能かどうか。 */

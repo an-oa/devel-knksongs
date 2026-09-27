@@ -1,15 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createSearchCoordinator } from "../_build/app/controllers/search-coordinator.mjs";
+import { createSearchCoordinator } from "../app/controllers/search-coordinator.mts";
 
 /**
  * 検索実行 coordinator の状態と呼び出し履歴を作る。
  */
 function createHarness() {
-    const search = { debounceId: 0 };
-    const calls = [];
+    const calls: string[] = [];
     const coordinator = createSearchCoordinator({
-        search,
         debounceMs: 60_000,
         searchController: {
             search() {
@@ -21,37 +19,37 @@ function createHarness() {
             }
         }
     });
-    return { search, calls, coordinator };
+    return { calls, coordinator };
 }
 
-test("search coordinator: cancellation and immediate search clear the pending debounce id", () => {
-    const { search, calls, coordinator } = createHarness();
+test("search coordinator: cancellation and immediate search prevent delayed duplicate searches", (t) => {
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    const { calls, coordinator } = createHarness();
 
     coordinator.scheduleSearch();
-    assert.notEqual(search.debounceId, 0);
-
     coordinator.cancelScheduledSearch();
-    assert.equal(search.debounceId, 0);
+    t.mock.timers.tick(60_000);
     assert.deepEqual(calls, []);
 
     coordinator.scheduleSearch();
-    assert.notEqual(search.debounceId, 0);
+    t.mock.timers.tick(59_999);
+    assert.deepEqual(calls, []);
 
     coordinator.scheduleSearch({ immediate: true });
-    assert.equal(search.debounceId, 0);
+    assert.deepEqual(calls, ["search"]);
+    t.mock.timers.tick(60_000);
     assert.deepEqual(calls, ["search"]);
 });
 
 test("search coordinator: viewport expansion waits for a scheduled search to commit", (t) => {
     t.mock.timers.enable({ apis: ["setTimeout"] });
-    const { search, calls, coordinator } = createHarness();
+    const { calls, coordinator } = createHarness();
     assert.equal(coordinator.refreshRecommendedDisplay(), true);
     coordinator.scheduleSearch();
     assert.equal(coordinator.refreshRecommendedDisplay(), false);
     assert.deepEqual(calls, ["refresh"]);
 
     t.mock.timers.tick(60_000);
-    assert.equal(search.debounceId, 0);
     assert.equal(coordinator.refreshRecommendedDisplay(), true);
     assert.deepEqual(calls, ["refresh", "search", "refresh"]);
 
@@ -62,11 +60,30 @@ test("search coordinator: viewport expansion waits for a scheduled search to com
 
 test("search coordinator: direct search consumes a pending reservation", (t) => {
     t.mock.timers.enable({ apis: ["setTimeout"] });
-    const { search, calls, coordinator } = createHarness();
+    const { calls, coordinator } = createHarness();
     coordinator.scheduleSearch();
     coordinator.search();
-    assert.equal(search.debounceId, 0);
     assert.equal(coordinator.refreshRecommendedDisplay(), true);
     t.mock.timers.tick(60_000);
     assert.deepEqual(calls, ["search", "refresh"]);
+});
+
+test("search coordinator: separate instances keep independent search reservations", (t) => {
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    const first = createHarness();
+    const second = createHarness();
+
+    first.coordinator.scheduleSearch();
+    second.coordinator.scheduleSearch();
+    first.coordinator.cancelScheduledSearch();
+    assert.equal(second.coordinator.refreshRecommendedDisplay(), false);
+
+    t.mock.timers.tick(60_000);
+    assert.deepEqual(first.calls, []);
+    assert.deepEqual(second.calls, ["search"]);
+
+    first.coordinator.scheduleSearch();
+    t.mock.timers.tick(60_000);
+    assert.deepEqual(first.calls, ["search"]);
+    assert.deepEqual(second.calls, ["search"]);
 });

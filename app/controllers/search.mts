@@ -6,8 +6,46 @@ import {
     collectSearchBooleanFilterState,
     hasSelectedSearchBooleanFilterState
 } from "../lib/search-boolean-filters.mjs";
+import type { SearchBooleanFilterElements } from "../lib/search-boolean-filters.mjs";
 import { resolveSongRefs } from "../lib/song-lookup.mjs";
 import { validateSearchQueryInput } from "../ui/search-query-validation.mjs";
+
+import type { AppDataState, SearchUiRuntimeState, LookupUiRuntimeState } from "../state.types";
+import type { createDateFilterController } from "../ui/date/filter.mjs";
+
+type SearchControllerInput = {
+    data: AppDataState;
+    ui: {
+        el: {
+            searchBox?: Parameters<typeof validateSearchQueryInput>[0];
+            searchBoxError?: Parameters<typeof validateSearchQueryInput>[1];
+            resultCount?: Pick<HTMLElement, "innerText"> | null;
+        } & SearchBooleanFilterElements & Record<string, unknown>;
+        search: Pick<SearchUiRuntimeState, "selectedFormats" | "recommendedCache">;
+        lookup: LookupUiRuntimeState;
+    };
+    searchFiltersController: {
+        areAllFormatsSelected: () => boolean;
+        areFormatsDefault: () => boolean;
+    };
+    dateFilterController: Pick<ReturnType<typeof createDateFilterController>, "getPartialDateRange">;
+    constants: {
+        RANDOM_DISPLAY_COUNT: number;
+        MIN_PERFORMANCE_FOR_RANDOM: number;
+        RESULT_DISPLAY_BATCH_SIZE: number;
+    };
+    callbacks: {
+        updateDisplay: () => void;
+        scrollResultsPaneToTop: () => void;
+        getRecommendedDisplayCount?: () => number;
+        getInitialDisplayCount?: (defaultCount: number) => number;
+    };
+};
+
+type SearchInput = {
+    searchState: SearchState;
+    parsedQuery: ParsedSearchQuery;
+};
 
 type SearchOutcome = {
     mode: "recommended" | "search" | "bookmark";
@@ -84,7 +122,7 @@ export function createSearchController({
         const fromRange = dateFilterController.getPartialDateRange("from");
         const toRange = dateFilterController.getPartialDateRange("to");
         return {
-            queryRaw: ui.el.searchBox.value.trim(),
+            queryRaw: ui.el.searchBox?.value.trim() ?? "",
             ...collectSearchBooleanFilterState(ui),
             dateFromKey: fromRange ? fromRange.minKey : null,
             dateToKey: toRange ? toRange.maxKey : null,
@@ -167,7 +205,7 @@ export function createSearchController({
     /** 初期描画件数を画面サイズに合わせ、未指定・不正値の場合は従来の件数を使う。 */
     function getInitialDisplayLimit(defaultCount: number): number {
         const count = callbacks.getInitialDisplayCount?.(defaultCount);
-        return Number.isFinite(count) && count >= 1
+        return typeof count === "number" && Number.isFinite(count) && count >= 1
             ? Math.min(defaultCount, Math.floor(count))
             : defaultCount;
     }

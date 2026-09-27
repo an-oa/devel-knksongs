@@ -1,16 +1,17 @@
 import test from "node:test";
+import type { DateUiRuntimeState } from "../app/state.types";
 import assert from "node:assert/strict";
-import { createDateFilterController } from "../_build/app/ui/date/filter.mjs";
-import { normalizeForSearch } from "../_build/app/lib/search-normalization.mjs";
+import { createDateFilterController } from "../app/ui/date/filter.mts";
+import { createSearchSongFixtureFactory } from "./fixtures/search-song.mts";
 import { installFakeDom } from "./test-helpers.mts";
 
-let autoSongId = 0;
+const makeRow = createSearchSongFixtureFactory();
 
 /**
  * 日付コントローラー検証用の UI 状態を作る。
- * @returns {*}
  */
 function createDateUiState() {
+    const date: DateUiRuntimeState = { bounds: null, index: null, pendingValues: null };
     return {
         el: {
             dateFromYear: document.createElement("select"),
@@ -20,43 +21,16 @@ function createDateUiState() {
             dateToMonth: document.createElement("select"),
             dateToDay: document.createElement("select")
         },
-        date: {
-            bounds: null,
-            index: null,
-            pendingValues: null
-        }
+        date
     };
 }
 
-function makeRow(input) {
-    const title = input.title ?? "";
-    const artist = input.artist ?? "";
-    const titleYomi = input.titleYomi ?? "";
-    const artistYomi = input.artistYomi ?? "";
-    const songKey = input.songKey ?? `song-${++autoSongId}`;
-    return {
-        archiveId: input.archiveId ?? "",
-        archiveOrder: input.archiveOrder ?? 1,
-        songKey,
-        bookmarkSongKey: input.bookmarkSongKey ?? songKey,
-        dateKey: input.dateKey ?? null,
-        format: input.format ?? "配信",
-        streamRole: input.streamRole ?? "",
-        isRelay: !!input.isRelay,
-        isHarmony: !!input.isHarmony,
-        titleNorm: normalizeForSearch(title),
-        artistNorm: normalizeForSearch(artist),
-        titleYomiNorm: normalizeForSearch(titleYomi),
-        artistYomiNorm: normalizeForSearch(artistYomi)
-    };
-}
 
 /**
  * セレクト要素の option 値一覧を返す。
- * @param {*} select
  */
-function getSelectValues(select) {
-    return select.children.map((option) => option.value);
+function getSelectValues(select: HTMLSelectElement) {
+    return Array.from(select.querySelectorAll("option"), (option) => option.value);
 }
 
 test("createDateFilterController: syncDateSelectOptions constrains end-side options by start-side selection", () => {

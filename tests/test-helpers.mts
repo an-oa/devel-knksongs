@@ -3,9 +3,9 @@ import { createSongFixture } from "./fixtures/song.mts";
 
 // 実際にテストで渡すイベントの部分形。ブラウザの Event 全体は実装しない。
 type FakeEvent = {
-    target?: FakeElement;
-    currentTarget?: FakeElement;
-    relatedTarget?: FakeElement | null;
+    target?: FakeElement | EventTarget | null;
+    currentTarget?: FakeElement | EventTarget | null;
+    relatedTarget?: FakeElement | EventTarget | null;
     key?: string;
     shiftKey?: boolean;
     preventDefault?: () => void;
@@ -567,11 +567,11 @@ export function createDataTransferMock() {
 
 /** 指定したイベントの listener があることを確認して呼ぶ。 */
 export function invokeListener(
-    element: { _events?: ReadonlyMap<string, (event: FakeEvent) => void> } | null | undefined,
+    element: Element | { _events?: ReadonlyMap<string, (event: FakeEvent) => void> } | null | undefined,
     type: string,
     event: FakeEvent
 ) {
-    const listener = element && element._events ? element._events.get(type) : null;
+    const listener = element && "_events" in element ? element._events?.get(type) : null;
     assert.ok(typeof listener === "function", `${type} listener is missing`);
     listener(event);
 }

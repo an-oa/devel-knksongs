@@ -1,12 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createSearchFiltersController } from "../_build/app/ui/search-filters/controller.mjs";
+import { createSearchFiltersController } from "../app/ui/search-filters/controller.mts";
 import { installFakeDom, invokeListener } from "./test-helpers.mts";
 
-function createFormatCheckbox(value, checked = false) {
+/** 選択状態を持つ形式チェックボックスのモックを作る。 */
+function createFormatCheckbox(value: string, checked = false) {
     return { value, checked };
 }
 
+/** 形式と真偽値フィルターの状態を作る。 */
 function createSearchFiltersUiState() {
     const formatCheckboxes = [
         createFormatCheckbox("配信"),
@@ -14,7 +16,7 @@ function createSearchFiltersUiState() {
         createFormatCheckbox("ショート")
     ];
     const formatsList = {
-        querySelectorAll: (selector) => {
+        querySelectorAll: (selector: string) => {
             assert.equal(selector, 'input[type="checkbox"]');
             return formatCheckboxes;
         }
@@ -127,7 +129,7 @@ test("createSearchFiltersController: sets up format filter options", () => {
                 formatsList
             },
             search: {
-                selectedFormats: new Set(),
+                selectedFormats: new Set<string>(),
                 userTouchedFilters: false
             },
             date: {
@@ -148,12 +150,16 @@ test("createSearchFiltersController: sets up format filter options", () => {
 
         assert.equal(formatsList.childElementCount, 2);
         assert.deepEqual(controller.getSelectedFormatValues(), ["配信", "歌みた"]);
-        assert.equal(formatsList.children[0].htmlFor, "format-filter-0");
-        assert.equal(formatsList.children[0].firstChild.id, "format-filter-0");
-        assert.equal(formatsList.children[1].htmlFor, "format-filter-1");
-        assert.equal(formatsList.children[1].firstChild.id, "format-filter-1");
+        const labels = formatsList.querySelectorAll("label");
+        const firstFormatCheckbox = labels[0].querySelector("input");
+        const secondFormatCheckbox = labels[1].querySelector("input");
+        assert.ok(firstFormatCheckbox);
+        assert.ok(secondFormatCheckbox);
+        assert.equal(labels[0].htmlFor, "format-filter-0");
+        assert.equal(firstFormatCheckbox.id, "format-filter-0");
+        assert.equal(labels[1].htmlFor, "format-filter-1");
+        assert.equal(secondFormatCheckbox.id, "format-filter-1");
 
-        const secondFormatCheckbox = formatsList.children[1].firstChild;
         secondFormatCheckbox.checked = false;
         invokeListener(secondFormatCheckbox, "change", { target: secondFormatCheckbox });
 

@@ -267,8 +267,12 @@ export function createDateFilterController({ ui }: { ui: DateFilterUiState }) {
             if (!row.dateKey) continue;
             const { year, month, day } = dateKeyToParts(row.dateKey);
             const key = `${year}-${String(month).padStart(2, "0")}`;
-            if (!index.has(key)) index.set(key, new Set());
-            index.get(key).add(day);
+            let days = index.get(key);
+            if (!days) {
+                days = new Set<number>();
+                index.set(key, days);
+            }
+            days.add(day);
         }
         const normalized = new Map<string, number[]>();
         for (const [key, set] of index.entries()) {
@@ -326,10 +330,11 @@ export function createDateFilterController({ ui }: { ui: DateFilterUiState }) {
      * @param {string | undefined} kind
      */
     function syncDateSelectOptions(kind?: string): void {
-        if (!dateUi.bounds) return;
+        const dateBounds = dateUi.bounds;
+        if (!dateBounds) return;
         const targets = kind ? [resolveDateSelectKind(kind)] : (["from", "to"] as const);
         targets.forEach((k) => {
-            const bounds = getConstrainedBounds(k) || dateUi.bounds;
+            const bounds = getConstrainedBounds(k) || dateBounds;
             const {
                 year: yearSelect,
                 month: monthSelect,

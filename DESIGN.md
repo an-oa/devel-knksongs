@@ -38,11 +38,11 @@
   - `tests/csv-parser.test.mts`
   - `tests/data-loader.test.mjs`
   - `tests/dom-utils.test.mts`
-  - `tests/date-filter-controller.test.mjs`
+  - `tests/date-filter-controller.test.mts`
   - `tests/date-key.test.mts`
   - `tests/partial-date.test.mts`
   - `tests/search-boolean-filters.test.mts`
-  - `tests/search-controller.test.mjs`
+  - `tests/search-controller.test.mts`
   - `tests/search-filters.test.mts`
   - `tests/search-query.test.mts`
   - `tests/search-query-validation.test.mts`
@@ -57,7 +57,7 @@
   - `tests/render-drag-reorder.test.mjs`
   - `tests/render-layout.test.mjs`
   - `tests/render-masonry-layout.test.mjs`
-  - `tests/search-filters-controller.test.mjs`
+  - `tests/search-filters-controller.test.mts`
   - `tests/search-state-schema.test.mts`
   - `tests/sidebar-ui.test.mjs`
   - `tests/storage-bookmark-limit.test.mjs`

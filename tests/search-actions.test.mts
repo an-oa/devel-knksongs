@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createSearchUiActions } from "../_build/app/ui/core/search-actions.mjs";
+import { createSearchUiActions } from "../app/ui/core/search-actions.mts";
 
 test("search actions: clear resets conditions before delegating active bookmark cleanup", () => {
     const calls = {
@@ -10,7 +10,7 @@ test("search actions: clear resets conditions before delegating active bookmark 
         directSearch: 0,
         directSave: 0,
         activeBookmarkClear: 0,
-        queryAtActiveBookmarkClear: null,
+        queryAtActiveBookmarkClear: null as string | null,
         filterResetAtActiveBookmarkClear: 0
     };
     const ui = {
@@ -20,7 +20,6 @@ test("search actions: clear resets conditions before delegating active bookmark 
         }
     };
     const search = {
-        debounceId: 0,
         dataReady: true,
         userTouchedQuery: true,
         userTouchedFilters: true

@@ -274,8 +274,7 @@ function createAppControllers() {
         constants: {
             RANDOM_DISPLAY_COUNT,
             MIN_PERFORMANCE_FOR_RANDOM,
-            RESULT_DISPLAY_BATCH_SIZE,
-            DEFAULT_FORMATS
+            RESULT_DISPLAY_BATCH_SIZE
         },
         callbacks: createSearchCallbacks({
             getRenderController: () => renderController,
@@ -376,7 +375,6 @@ function createAppControllers() {
      * 検索の即時実行とデバウンスを調整する coordinator。
      */
     const searchCoordinator = createSearchCoordinator({
-        search: searchUiState,
         debounceMs: SEARCH_DEBOUNCE_MS,
         searchController
     });

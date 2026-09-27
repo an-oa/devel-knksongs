@@ -36,7 +36,6 @@ function createRenderUiState(input) {
         search: {
             selectedFormats: input.selectedFormats ?? new Set(["配信"]),
             dataReady: input.dataReady ?? true,
-            debounceId: input.debounceId ?? 0,
             recommendedCache: null,
             userTouchedQuery: false,
             userTouchedFilters: false,
@@ -625,7 +624,6 @@ test("bookmark: observes result tail and increases by RESULT_DISPLAY_BATCH_SIZE 
         const resultTailSentinel = document.createElement("div");
         resultTailSentinel.hidden = true;
         const ui = createRenderUiState({
-            debounceId: 0,
             el: {
                 resultList: document.createElement("div"),
                 resultTailSentinel,
@@ -662,8 +660,7 @@ test("bookmark: observes result tail and increases by RESULT_DISPLAY_BATCH_SIZE 
             constants: {
                 RANDOM_DISPLAY_COUNT: 48,
                 MIN_PERFORMANCE_FOR_RANDOM: 3,
-                RESULT_DISPLAY_BATCH_SIZE: 48,
-                DEFAULT_FORMATS: ["配信", "歌みた", "ショート", "切り抜き"]
+                RESULT_DISPLAY_BATCH_SIZE: 48
             },
             callbacks: {
                 updateDisplay: () => renderController.updateDisplay(),

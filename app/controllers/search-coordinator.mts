@@ -1,7 +1,4 @@
-import type { SearchUiRuntimeState } from "../state.types";
-
 type SearchCoordinatorInput = {
-    search: Pick<SearchUiRuntimeState, "debounceId">;
     debounceMs: number;
     searchController: {
         search: () => void;
@@ -13,17 +10,18 @@ type SearchCoordinatorInput = {
  * 検索の即時実行とデバウンスを管理する。
  */
 export function createSearchCoordinator({
-    search,
     debounceMs,
     searchController
 }: SearchCoordinatorInput) {
+    let debounceId: ReturnType<typeof setTimeout> | null = null;
+
     /**
      * 保留中の検索タイマーを解除し、未予約状態へ戻す。
      */
     function cancelScheduledSearch(): void {
-        if (!search.debounceId) return;
-        clearTimeout(search.debounceId);
-        search.debounceId = 0;
+        if (debounceId === null) return;
+        clearTimeout(debounceId);
+        debounceId = null;
     }
 
     /**
@@ -36,7 +34,7 @@ export function createSearchCoordinator({
 
     /** 検索待機中は確定済み結果を保持し、それ以外はおすすめ表示の拡張を委譲する。 */
     function refreshRecommendedDisplay(): boolean {
-        if (search.debounceId) return false;
+        if (debounceId !== null) return false;
         return searchController.refreshRecommendedDisplay();
     }
 
@@ -50,8 +48,8 @@ export function createSearchCoordinator({
             runSearch();
             return;
         }
-        search.debounceId = setTimeout(() => {
-            search.debounceId = 0;
+        debounceId = setTimeout(() => {
+            debounceId = null;
             runSearch();
         }, debounceMs);
     }

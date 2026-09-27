@@ -3,9 +3,10 @@ import {
     hasEnabledSearchBooleanFilter,
     resetSearchBooleanFilters
 } from "../../lib/search-boolean-filters.mjs";
+import type { SearchBooleanFilterElements } from "../../lib/search-boolean-filters.mjs";
 import { renderSearchFormatOptions, syncSearchFormatCheckboxes } from "./formats.mjs";
+import type { SearchFormatOptionsList } from "./formats.mjs";
 import type {
-    AppUiElements,
     DateUiRuntimeState,
     SearchUiRuntimeState
 } from "../../state.types";
@@ -16,7 +17,7 @@ type SearchFiltersSearchState = Pick<SearchUiRuntimeState, "selectedFormats" | "
 type SearchFiltersDateState = Pick<DateUiRuntimeState, "pendingValues"> & Partial<DateUiRuntimeState>;
 
 type SearchFiltersUiState = {
-    el: Pick<AppUiElements, "formatsList"> & Record<string, unknown>;
+    el: { formatsList?: SearchFormatOptionsList | null } & SearchBooleanFilterElements & Record<string, unknown>;
     search: SearchFiltersSearchState;
     date?: SearchFiltersDateState | null;
 };

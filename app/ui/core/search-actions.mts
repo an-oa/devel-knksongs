@@ -1,4 +1,4 @@
-import type { AppUiState, SearchUiRuntimeState } from "../../state.types";
+import type { SearchUiRuntimeState } from "../../state.types";
 import { clearSearchQueryValidation } from "../search-query-validation.mjs";
 
 type SearchScheduleOptions = {
@@ -30,8 +30,11 @@ type SearchActionsStorageController = {
 };
 
 type SearchUiActionsInput = {
-    ui: AppUiState;
-    search: SearchUiRuntimeState;
+    ui: { el: {
+        searchBox?: Parameters<typeof clearSearchQueryValidation>[0];
+        searchBoxError?: Parameters<typeof clearSearchQueryValidation>[1];
+    } };
+    search: Pick<SearchUiRuntimeState, "dataReady" | "userTouchedQuery" | "userTouchedFilters">;
     searchFiltersController: SearchActionsSearchFiltersController;
     dateFilterController: SearchActionsDateFilterController;
     searchCoordinator: SearchActionsSearchCoordinator;

@@ -1,12 +1,14 @@
 import test from "node:test";
+import type { AppDataState, SearchUiRuntimeState, DateUiRuntimeState, LookupUiRuntimeState } from "../app/state.types";
 import assert from "node:assert/strict";
-import { createSearchFiltersController } from "../_build/app/ui/search-filters/controller.mjs";
-import { normalizeForSearch } from "../_build/app/lib/search-normalization.mjs";
-import { createSearchController } from "../_build/app/controllers/search.mjs";
-import { createSearchCoordinator } from "../_build/app/controllers/search-coordinator.mjs";
-import { createDateFilterController } from "../_build/app/ui/date/filter.mjs";
+import { createSearchFiltersController } from "../app/ui/search-filters/controller.mts";
+import { createSearchSongFixtureFactory } from "./fixtures/search-song.mts";
+import { normalizeForSearch } from "../app/lib/search-normalization.mts";
+import { createSearchController } from "../app/controllers/search.mts";
+import { createSearchCoordinator } from "../app/controllers/search-coordinator.mts";
+import { createDateFilterController } from "../app/ui/date/filter.mts";
 
-let autoSongId = 0;
+const makeRow = createSearchSongFixtureFactory();
 
 for (const mode of ["search", "bookmark"]) {
     test(`createSearchController: resize does not inherit ${mode} results before recommendation search commits`, (t) => {
@@ -16,7 +18,7 @@ for (const mode of ["search", "bookmark"]) {
             title: `Candidate ${index}`,
             format: "オリ曲"
         }));
-        const data = {
+        const data: AppDataState = {
             allSongsRaw: rows,
             bookmarks: { saved: { name: "Saved", songs: rows.map((row) => row.songKey) } },
             activeBookmark: null,
@@ -27,7 +29,7 @@ for (const mode of ["search", "bookmark"]) {
             el: { searchBox: { value: "" }, resultCount: { innerText: "" } },
             selectedFormats: new Set(["配信", "歌みた"])
         });
-        const renders = [];
+        const renders: number[][] = [];
         let recommendedCount = 48;
         let initialCount = 12;
         const controller = createSearchControllerForTest({
@@ -37,15 +39,15 @@ for (const mode of ["search", "bookmark"]) {
                 RANDOM_DISPLAY_COUNT: 48,
                 RESULT_DISPLAY_BATCH_SIZE: 48,
                 MIN_PERFORMANCE_FOR_RANDOM: 1,
-                DEFAULT_FORMATS: ["配信", "歌みた"]
             },
+            defaultFormats: ["配信", "歌みた"],
             callbacks: createSearchCallbacks({
                 getRecommendedDisplayCount: () => recommendedCount,
                 getInitialDisplayCount: () => initialCount,
                 updateDisplay: () => renders.push([data.currentResults.length, data.displayLimit])
             })
         });
-        const coordinator = createSearchCoordinator({ search: ui.search, debounceMs: 200, searchController: controller });
+        const coordinator = createSearchCoordinator({ debounceMs: 200, searchController: controller });
         coordinator.search();
         // 一度おすすめを表示してから通常検索へ移り、確定済みモードが更新されることも確認する。
         ui.el.searchBox.value = mode === "search" ? "Candidate" : "";
@@ -97,7 +99,7 @@ test("createSearchController: limits initial DOM work without reducing recommend
         artist: "A",
         format: "オリ曲"
     }));
-    const data = { allSongsRaw: rows, bookmarks: {}, activeBookmark: null, currentResults: [], displayLimit: 0 };
+    const data: AppDataState = { allSongsRaw: rows, bookmarks: {}, activeBookmark: null, currentResults: [], displayLimit: 0 };
     const ui = createSearchUiState({
         el: { searchBox: { value: "" }, resultCount: { innerText: "" } },
         selectedFormats: new Set(["配信", "歌みた"])
@@ -110,8 +112,8 @@ test("createSearchController: limits initial DOM work without reducing recommend
             RANDOM_DISPLAY_COUNT: 48,
             RESULT_DISPLAY_BATCH_SIZE: 48,
             MIN_PERFORMANCE_FOR_RANDOM: 1,
-            DEFAULT_FORMATS: ["配信", "歌みた"]
         },
+        defaultFormats: ["配信", "歌みた"],
         callbacks: createSearchCallbacks({ getInitialDisplayCount: () => initialCount })
     });
     controller.search();
@@ -140,78 +142,54 @@ test("createSearchController: limits initial DOM work without reducing recommend
     }
 });
 
-/**
- * 検索コントローラー検証用の UI 状態を作る。
- * @param {*} input
- * @returns {*}
- */
-function createSearchUiState(input) {
-    return {
-        el: input.el,
-        search: {
-            selectedFormats: input.selectedFormats,
-            debounceId: input.debounceId ?? 0,
-            recommendedCache: input.recommendedCache ?? null
-        },
-        date: {
-            bounds: null,
-            index: null,
-            pendingValues: null
-        },
-        lookup: {
-            songMapByBookmarkKey: new Map(),
-            songMapByKey: new Map(),
-            songLookupSourceRef: null
-        }
+type SearchTestUiElements = Parameters<typeof createSearchController>[0]["ui"]["el"] &
+    Parameters<typeof createDateFilterController>[0]["ui"]["el"] &
+    Parameters<typeof createSearchFiltersController>[0]["ui"]["el"];
+
+/** 検索コントローラー検証用の UI 状態を作る。 */
+function createSearchUiState<Elements extends SearchTestUiElements>(input: {
+    el: Elements;
+    selectedFormats: Set<string>;
+    recommendedCache?: SearchUiRuntimeState["recommendedCache"];
+}) {
+    const search: SearchUiRuntimeState = {
+        selectedFormats: input.selectedFormats,
+        recommendedCache: input.recommendedCache ?? null,
+        dataReady: false,
+        userTouchedQuery: false,
+        userTouchedFilters: false,
+        hasRestoredSearchState: false
     };
+    const date: DateUiRuntimeState = { bounds: null, index: null, pendingValues: null };
+    const lookup: LookupUiRuntimeState = {
+        songMapByBookmarkKey: new Map(), songMapByKey: new Map(), songLookupSourceRef: null
+    };
+    return { el: input.el, search, date, lookup };
 }
 
-/**
- * 検索コントローラーへ検索条件 UI controller を注入して作る。
- * @param {{ data: object, ui: object, constants: object, callbacks: object }} input
- * @returns {object}
- */
-function createSearchControllerForTest(input) {
+/** 検索条件 UI controller を注入して検索 controller を作る。 */
+function createSearchControllerForTest(input: {
+    data: AppDataState;
+    ui: ReturnType<typeof createSearchUiState>;
+    constants: Parameters<typeof createSearchController>[0]["constants"];
+    defaultFormats: string[];
+    callbacks: Parameters<typeof createSearchController>[0]["callbacks"];
+}) {
+    const { defaultFormats, ...searchInput } = input;
     return createSearchController({
-        ...input,
+        ...searchInput,
         searchFiltersController: createSearchFiltersController({
             ui: input.ui,
-            defaultFormats: input.constants.DEFAULT_FORMATS
+            defaultFormats
         }),
         dateFilterController: createDateFilterController({ ui: input.ui })
     });
 }
 
-function makeRow(input) {
-    const title = input.title ?? "";
-    const artist = input.artist ?? "";
-    const titleYomi = input.titleYomi ?? "";
-    const artistYomi = input.artistYomi ?? "";
-    const songKey = input.songKey ?? `song-${++autoSongId}`;
-    return {
-        archiveId: input.archiveId ?? "",
-        archiveOrder: input.archiveOrder ?? 1,
-        songKey,
-        bookmarkSongKey: input.bookmarkSongKey ?? songKey,
-        dateKey: input.dateKey ?? null,
-        format: input.format ?? "配信",
-        streamRole: input.streamRole ?? "",
-        isRelay: !!input.isRelay,
-        isHarmony: !!input.isHarmony,
-        titleNorm: normalizeForSearch(title),
-        artistNorm: normalizeForSearch(artist),
-        titleYomiNorm: normalizeForSearch(titleYomi),
-        artistYomiNorm: normalizeForSearch(artistYomi)
-    };
-}
-
 /**
  * 検索コントローラー用の描画コールバックを作る。
- * @param {*} input
- * @returns {*}
  */
-function createSearchCallbacks(input) {
-    const callbacks = input || {};
+function createSearchCallbacks(callbacks: Partial<Parameters<typeof createSearchController>[0]["callbacks"]> = {}) {
     return {
         updateDisplay: callbacks.updateDisplay || (() => {}),
         scrollResultsPaneToTop: callbacks.scrollResultsPaneToTop || (() => {}),
@@ -226,7 +204,7 @@ test("createSearchController: active bookmark also applies search criteria", () 
         makeRow({ songKey: "s2", title: "赤い星", artist: "B", format: "歌みた" }),
         makeRow({ songKey: "s3", title: "赤い空", artist: "C", format: "配信" })
     ];
-    const data = {
+    const data: AppDataState = {
         allSongsRaw: rows,
         bookmarks: {
             bm1: {
@@ -257,13 +235,14 @@ test("createSearchController: active bookmark also applies search criteria", () 
         RANDOM_DISPLAY_COUNT: 10,
         MIN_PERFORMANCE_FOR_RANDOM: 1,
         RESULT_DISPLAY_BATCH_SIZE: 30,
-        DEFAULT_FORMATS: ["配信", "歌みた", "ショート"]
     };
+    const defaultFormats = ["配信", "歌みた", "ショート"];
 
     const controller = createSearchControllerForTest({
         data,
         ui,
         constants,
+        defaultFormats,
         callbacks: createSearchCallbacks()
     });
     controller.search();
@@ -274,22 +253,22 @@ test("createSearchController: active bookmark also applies search criteria", () 
 });
 
 test("createSearchController: direct search synchronizes restored query validation", () => {
-    const attributes = new Map();
+    const attributes = new Map<string, string>();
     const searchBox = {
         value: "until:2026-13",
         validationMessage: "",
-        setCustomValidity(message) {
+        setCustomValidity(message: string) {
             this.validationMessage = message;
         },
-        setAttribute(name, value) {
+        setAttribute(name: string, value: string) {
             attributes.set(name, value);
         },
-        removeAttribute(name) {
+        removeAttribute(name: string) {
             attributes.delete(name);
         }
     };
     const searchBoxError = { hidden: true, textContent: "" };
-    const data = {
+    const data: AppDataState = {
         allSongsRaw: [makeRow({ title: "until:2026-13", dateKey: 20260101 })],
         bookmarks: {},
         activeBookmark: null,
@@ -319,8 +298,8 @@ test("createSearchController: direct search synchronizes restored query validati
             RANDOM_DISPLAY_COUNT: 10,
             MIN_PERFORMANCE_FOR_RANDOM: 1,
             RESULT_DISPLAY_BATCH_SIZE: 30,
-            DEFAULT_FORMATS: ["配信"]
         },
+        defaultFormats: ["配信"],
         callbacks: createSearchCallbacks()
     });
 
@@ -345,7 +324,7 @@ test("createSearchController: active bookmark resolves rows by bookmarkSongKey",
         makeRow({ songKey: "arch2::2", bookmarkSongKey: "videoB::2", title: "赤い星", artist: "B", format: "歌みた" }),
         makeRow({ songKey: "arch3::3", bookmarkSongKey: "videoC::3", title: "白い空", artist: "C", format: "配信" })
     ];
-    const data = {
+    const data: AppDataState = {
         allSongsRaw: rows,
         bookmarks: {
             bm1: {
@@ -376,13 +355,14 @@ test("createSearchController: active bookmark resolves rows by bookmarkSongKey",
         RANDOM_DISPLAY_COUNT: 10,
         MIN_PERFORMANCE_FOR_RANDOM: 1,
         RESULT_DISPLAY_BATCH_SIZE: 30,
-        DEFAULT_FORMATS: ["配信", "歌みた", "ショート"]
     };
+    const defaultFormats = ["配信", "歌みた", "ショート"];
 
     const controller = createSearchControllerForTest({
         data,
         ui,
         constants,
+        defaultFormats,
         callbacks: createSearchCallbacks()
     });
     controller.search();
@@ -400,7 +380,7 @@ test("createSearchController: active bookmark uses incremental display limit", (
             format: "配信"
         })
     );
-    const data = {
+    const data: AppDataState = {
         allSongsRaw: rows,
         bookmarks: {
             bm1: {
@@ -431,13 +411,14 @@ test("createSearchController: active bookmark uses incremental display limit", (
         RANDOM_DISPLAY_COUNT: 10,
         MIN_PERFORMANCE_FOR_RANDOM: 1,
         RESULT_DISPLAY_BATCH_SIZE: 2,
-        DEFAULT_FORMATS: ["配信", "歌みた", "ショート"]
     };
+    const defaultFormats = ["配信", "歌みた", "ショート"];
 
     const controller = createSearchControllerForTest({
         data,
         ui,
         constants,
+        defaultFormats,
         callbacks: createSearchCallbacks()
     });
     controller.search();
@@ -453,7 +434,7 @@ test("createSearchController: an empty quoted query uses recommendation mode for
         makeRow({ archiveId: "a2", title: "覚声", artist: "PSYBELL", format: "オリ曲" }),
         makeRow({ archiveId: "a3", title: "覚声", artist: "PSYBELL", format: "オリ曲" })
     ];
-    const data = {
+    const data: AppDataState = {
         allSongsRaw: rows,
         bookmarks: {},
         activeBookmark: null,
@@ -480,13 +461,14 @@ test("createSearchController: an empty quoted query uses recommendation mode for
         RANDOM_DISPLAY_COUNT: 10,
         MIN_PERFORMANCE_FOR_RANDOM: 3,
         RESULT_DISPLAY_BATCH_SIZE: 30,
-        DEFAULT_FORMATS: ["配信", "歌みた", "ショート", "切り抜き"]
     };
+    const defaultFormats = ["配信", "歌みた", "ショート", "切り抜き"];
 
     const controller = createSearchControllerForTest({
         data,
         ui,
         constants,
+        defaultFormats,
         callbacks: createSearchCallbacks()
     });
     controller.search();
@@ -500,7 +482,7 @@ test("createSearchController: single オリ曲 performance is eligible for recom
     const rows = [
         makeRow({ archiveId: "a1", title: "覚声", artist: "PSYBELL", format: "オリ曲" })
     ];
-    const data = {
+    const data: AppDataState = {
         allSongsRaw: rows,
         bookmarks: {},
         activeBookmark: null,
@@ -527,13 +509,14 @@ test("createSearchController: single オリ曲 performance is eligible for recom
         RANDOM_DISPLAY_COUNT: 10,
         MIN_PERFORMANCE_FOR_RANDOM: 3,
         RESULT_DISPLAY_BATCH_SIZE: 30,
-        DEFAULT_FORMATS: ["配信", "歌みた", "ショート", "切り抜き"]
     };
+    const defaultFormats = ["配信", "歌みた", "ショート", "切り抜き"];
 
     const controller = createSearchControllerForTest({
         data,
         ui,
         constants,
+        defaultFormats,
         callbacks: createSearchCallbacks()
     });
     controller.search();
@@ -552,7 +535,7 @@ test("createSearchController: recommendation selection and rendering retain thei
             format: "配信"
         })
     );
-    const data = {
+    const data: AppDataState = {
         allSongsRaw: rows,
         bookmarks: {},
         activeBookmark: null,
@@ -579,8 +562,8 @@ test("createSearchController: recommendation selection and rendering retain thei
         RANDOM_DISPLAY_COUNT: 10,
         MIN_PERFORMANCE_FOR_RANDOM: 1,
         RESULT_DISPLAY_BATCH_SIZE: 10,
-        DEFAULT_FORMATS: ["配信", "歌みた", "ショート"]
     };
+    const defaultFormats = ["配信", "歌みた", "ショート"];
     let recommendedDisplayCount = 48;
     let initialDisplayCount = 12;
     let scrollCount = 0;
@@ -589,6 +572,7 @@ test("createSearchController: recommendation selection and rendering retain thei
         data,
         ui,
         constants,
+        defaultFormats,
         callbacks: createSearchCallbacks({
             getRecommendedDisplayCount: () => recommendedDisplayCount,
             getInitialDisplayCount: () => initialDisplayCount,
@@ -690,7 +674,7 @@ test("createSearchController: recommendation expansion dedupes by recommendation
                 format: "配信"
             })
         ];
-        const data = {
+        const data: AppDataState = {
             allSongsRaw: rows,
             bookmarks: {},
             activeBookmark: null,
@@ -717,13 +701,14 @@ test("createSearchController: recommendation expansion dedupes by recommendation
             RANDOM_DISPLAY_COUNT: 1,
             MIN_PERFORMANCE_FOR_RANDOM: 2,
             RESULT_DISPLAY_BATCH_SIZE: 10,
-            DEFAULT_FORMATS: ["配信", "歌みた", "ショート"]
         };
+        const defaultFormats = ["配信", "歌みた", "ショート"];
         let recommendedDisplayCount = 1;
         const controller = createSearchControllerForTest({
             data,
             ui,
             constants,
+            defaultFormats,
             callbacks: createSearchCallbacks({
                 getRecommendedDisplayCount: () => recommendedDisplayCount
             })
@@ -755,7 +740,7 @@ test("createSearchController: recommendation count is capped by available recomm
             format: "配信"
         })
     );
-    const data = {
+    const data: AppDataState = {
         allSongsRaw: rows,
         bookmarks: {},
         activeBookmark: null,
@@ -782,14 +767,15 @@ test("createSearchController: recommendation count is capped by available recomm
         RANDOM_DISPLAY_COUNT: 10,
         MIN_PERFORMANCE_FOR_RANDOM: 1,
         RESULT_DISPLAY_BATCH_SIZE: 10,
-        DEFAULT_FORMATS: ["配信", "歌みた", "ショート"]
     };
+    const defaultFormats = ["配信", "歌みた", "ショート"];
     let recommendedDisplayCount = 20;
     let updateCount = 0;
     const controller = createSearchControllerForTest({
         data,
         ui,
         constants,
+        defaultFormats,
         callbacks: createSearchCallbacks({
             getRecommendedDisplayCount: () => recommendedDisplayCount,
             updateDisplay: () => { updateCount += 1; }
