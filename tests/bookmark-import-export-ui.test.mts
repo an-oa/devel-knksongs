@@ -5,7 +5,7 @@ import {
     buildBookmarkImportConfirmMessage,
     getBookmarkImportErrorMessage,
     readFileText
-} from "../_build/app/ui/bookmark/import-export.mjs";
+} from "../app/ui/bookmark/import-export.mts";
 
 test("bookmark import export ui: builds dated export filenames", () => {
     const fileName = buildBookmarkExportFileName(new Date(2026, 3, 9));
@@ -15,28 +15,27 @@ test("bookmark import export ui: builds dated export filenames", () => {
 
 test("bookmark import export ui: maps import results to user-facing messages", () => {
     assert.equal(
-        getBookmarkImportErrorMessage({ ok: false, reason: "invalid_json" }),
+        getBookmarkImportErrorMessage({ reason: "invalid_json" }),
         "JSONとして読み込めないファイルです。"
     );
     assert.equal(
-        getBookmarkImportErrorMessage({ ok: false, reason: "unsupported_version", version: 4 }),
+        getBookmarkImportErrorMessage({ reason: "unsupported_version", version: 4 }),
         "このアプリより新しい形式のブックマークファイルは読み込めません。"
     );
     assert.equal(
-        getBookmarkImportErrorMessage({ ok: false, reason: "storage_write_failed" }),
+        getBookmarkImportErrorMessage({ reason: "storage_write_failed" }),
         "インポートしたブックマークを保存できませんでした。"
     );
     assert.equal(
-        getBookmarkImportErrorMessage({ ok: false, reason: "max_bookmark_count", limit: 20 }),
+        getBookmarkImportErrorMessage({ reason: "max_bookmark_count", limit: 20 }),
         "インポートできるブックマークは最大20件です。"
     );
     assert.equal(
-        getBookmarkImportErrorMessage({ ok: false, reason: "max_bookmark_name_length", limit: 64 }),
+        getBookmarkImportErrorMessage({ reason: "max_bookmark_name_length", limit: 64 }),
         "ブックマーク名は最大64文字までです。"
     );
     assert.equal(
         getBookmarkImportErrorMessage({
-            ok: false,
             reason: "max_songs_per_bookmark",
             limit: 120,
             bookmarkName: "Set List"

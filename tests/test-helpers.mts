@@ -17,6 +17,7 @@ type FakeTimeout = {
     cb: () => void;
     delay: number | undefined;
     cleared: boolean;
+    unrefCalled: boolean;
     unref: () => void;
 };
 
@@ -565,15 +566,15 @@ export function createDataTransferMock() {
     };
 }
 
-/** 指定したイベントの listener があることを確認して呼ぶ。 */
+/** listener の存在を確認して呼び、非同期 handler の完了も待てるよう戻り値を返す。 */
 export function invokeListener(
-    element: Element | { _events?: ReadonlyMap<string, (event: FakeEvent) => void> } | null | undefined,
+    element: Element | { _events?: ReadonlyMap<string, (event: FakeEvent) => void | Promise<void>> } | null | undefined,
     type: string,
     event: FakeEvent
 ) {
     const listener = element && "_events" in element ? element._events?.get(type) : null;
     assert.ok(typeof listener === "function", `${type} listener is missing`);
-    listener(event);
+    return listener(event);
 }
 
 /** setTimeout/clearTimeout を記録型 fake に差し替える。 */
@@ -586,7 +587,9 @@ export function installFakeTimeouts() {
             cb,
             delay,
             cleared: false,
-            unref() {}
+            unrefCalled: false,
+            /** Node 互換の参照解除が呼ばれたことを記録する。 */
+            unref() { this.unrefCalled = true; }
         };
         timeoutCalls.push(timeout);
         return timeout;

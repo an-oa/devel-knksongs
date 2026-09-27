@@ -40,8 +40,10 @@ export function createBookmarkNotificationController({
     ui,
     timeoutMs = BOOKMARK_NOTIFICATION_TIMEOUT_MS
 }: {
-    data: AppDataState;
-    ui: AppUiState;
+    data: Pick<AppDataState, "allSongsRaw">;
+    ui: Pick<AppUiState, "lookup"> & {
+        el: Pick<AppUiState["el"], "bookmarkNotificationRegion">;
+    };
     timeoutMs?: number;
 }) {
     const lookupUi = ui.lookup;

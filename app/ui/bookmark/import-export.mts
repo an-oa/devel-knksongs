@@ -139,8 +139,8 @@ export function getBookmarkImportErrorMessage(result: BookmarkImportMessageResul
  * @returns {string}
  */
 export function buildBookmarkImportConfirmMessage(preview: BookmarkImportMessageResult): string {
-    const bookmarkCount = Number.isFinite(preview && preview.bookmarkCount) ? preview.bookmarkCount : 0;
-    const songCount = Number.isFinite(preview && preview.songCount) ? preview.songCount : 0;
+    const bookmarkCount = preview && Number.isFinite(preview.bookmarkCount) ? preview.bookmarkCount : 0;
+    const songCount = preview && Number.isFinite(preview.songCount) ? preview.songCount : 0;
     return [
         "現在のブックマークを置き換えます。",
         `${bookmarkCount}件のブックマーク、${songCount}曲をインポートします。`,

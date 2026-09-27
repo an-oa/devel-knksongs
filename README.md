@@ -202,10 +202,10 @@ flowchart TD
 ## テスト/静的解析(開発者向け)
 
 - 現在は以下のテストを用意しています。
-  - ブックマークのインポート/エクスポートUIのテスト (`tests/bookmark-import-export-ui.test.mjs`)
+  - ブックマークのインポート/エクスポートUIのテスト (`tests/bookmark-import-export-ui.test.mts`)
   - ブックマーク保存スキーマ/移行のテスト (`tests/bookmark-storage-schema.test.mts`)
   - ブックマークJSON転送のテスト (`tests/bookmark-transfer.test.mts`)
-  - ブックマークUIのテスト (`tests/bookmark-ui.test.mjs`)
+  - ブックマークUIのテスト (`tests/bookmark-ui.test.mts`)
   - アプリ初期状態のテスト (`tests/app-state.test.mts`)
   - 配信上の立場の正規化/判定テスト (`tests/stream-role.test.mts`)
   - CSVパースのテスト (`tests/csv-parser.test.mts`)
@@ -239,8 +239,8 @@ flowchart TD
   - CSV由来の曲データ品質検証テスト (`tests/songs-data-quality.test.mts`)
   - 曲データJSON生成の書き出し前検証テスト (`tests/build-songs-json.test.mjs`)
   - 派生JSONのスキーマ・hash整合性検証テスト (`tests/songs-json-validation.test.mjs`)
-  - ストレージ(ブックマーク上限/リネーム)の単体テスト (`tests/storage-bookmark-limit.test.mjs`)
-  - ストレージ(検索状態保存/復元)の単体テスト (`tests/storage-search-state.test.mjs`)
+  - ストレージ(ブックマーク上限/リネーム)の単体テスト (`tests/storage-bookmark-limit.test.mts`)
+  - ストレージ(検索状態保存/復元)の単体テスト (`tests/storage-search-state.test.mts`)
   - UI設定/ストレージ互換のテスト (`tests/ui-storage-compat.test.mjs`)
   - UI同期のテスト (`tests/ui-sync.test.mjs`)
   - YouTubeサムネイル/埋め込み再生まわりの統合テスト (`tests/youtube-controller.test.mjs`)

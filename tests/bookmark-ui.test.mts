@@ -1,11 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createBookmarkUiController } from "../_build/app/ui/bookmark/ui.mjs";
+import { createBookmarkUiController } from "../app/ui/bookmark/ui.mts";
+import { createSongFixture } from "./fixtures/song.mts";
+import type { BookmarkUiActionCallbackResult, BookmarkUiCallbacks } from "../app/ui/bookmark/ui.mts";
 import { installFakeDom, invokeListener } from "./test-helpers.mts";
 
 /**
  * ブックマーク UI テスト用の最小状態を作る。
- * @returns {*}
  */
 function createBookmarkUiState() {
     const sidebar = document.createElement("aside");
@@ -53,6 +54,11 @@ function createBookmarkUiState() {
     document.body.appendChild(bookmarkNotificationRegion);
     document.body.appendChild(sidebar);
 
+    const bookmarkPanel: Parameters<typeof createBookmarkUiController>[0]["ui"]["bookmarkPanel"] = {
+        pendingAction: null,
+        exitClosesSidebar: false,
+        returnFocusEl: null
+    };
     return {
         el: {
             sidebar,
@@ -72,42 +78,49 @@ function createBookmarkUiState() {
             bookmarkNotificationRegion
         },
         lookup: {
-            songMapByBookmarkKey: new Map(),
-            songMapByKey: new Map(),
+            songMapByBookmarkKey: new Map<string, Song>(),
+            songMapByKey: new Map<string, Song>(),
             songLookupSourceRef: null
         },
-        bookmarkPanel: {
-            pendingAction: null,
-            exitClosesSidebar: false,
-            returnFocusEl: null
-        }
+        bookmarkPanel
     };
 }
 
 /**
  * 指定 ID のブックマーク項目要素を返す。
- * @param {*} ui
  * @param {string} bookmarkId
- * @returns {*}
  */
-function findBookmarkItem(ui, bookmarkId) {
-    return ui.el.bookmarkList.children.find((child) => child.dataset.bookmarkId === bookmarkId) || null;
+function findBookmarkItem(ui: ReturnType<typeof createBookmarkUiState>, bookmarkId: string) {
+    const item = Array.from(ui.el.bookmarkList.querySelectorAll<HTMLElement>(".bookmark-item"))
+        .find((child) => child.dataset.bookmarkId === bookmarkId);
+    assert.ok(item, `bookmark item ${bookmarkId} is missing`);
+    return item;
 }
 
 /**
  * ブックマーク UI テスト用のコントローラーとスパイを作る。
- * @param {*} input
- * @returns {*}
  */
-function createBookmarkHarness(input) {
-    const options = input || {};
-    const data = {
+function createBookmarkHarness(options: {
+    allSongsRaw?: Song[];
+    bookmarks?: Parameters<typeof createBookmarkUiController>[0]["data"]["bookmarks"];
+    activeBookmark?: string | null;
+    onCreateBookmark?: (name: string, data: Parameters<typeof createBookmarkUiController>[0]["data"]) => BookmarkUiActionCallbackResult;
+    onCreateBookmarkAndAdd?: (name: string, songKey: string, data: Parameters<typeof createBookmarkUiController>[0]["data"]) => BookmarkUiActionCallbackResult;
+    onAddSongToBookmarkResult?: BookmarkUiActionCallbackResult;
+    onDeleteBookmarkResult?: BookmarkUiActionCallbackResult;
+    onRenameBookmarkResult?: BookmarkUiActionCallbackResult;
+    onRemoveSongFromBookmarkResult?: BookmarkUiActionCallbackResult;
+    onExportBookmarksResult?: ReturnType<BookmarkUiCallbacks["onExportBookmarks"]>;
+    onPreviewBookmarkImportResult?: ReturnType<BookmarkUiCallbacks["onPreviewBookmarkImport"]>;
+    onImportBookmarksTextResult?: ReturnType<BookmarkUiCallbacks["onImportBookmarksText"]>;
+} = {}) {
+    const data: Parameters<typeof createBookmarkUiController>[0]["data"] = {
         allSongsRaw: options.allSongsRaw || [
-            {
+            createSongFixture({
                 songKey: "song-z",
                 bookmarkSongKey: "song-z",
                 title: "透明な朝"
-            }
+            })
         ],
         bookmarks: options.bookmarks || {
             "bookmark-1": { name: "First", createdAt: 10, songs: ["song-a"] },
@@ -116,7 +129,21 @@ function createBookmarkHarness(input) {
         activeBookmark: options.activeBookmark ?? null
     };
     const ui = createBookmarkUiState();
-    const calls = {
+    const calls: {
+        selectActiveBookmarkArgs: string[];
+        clearActiveBookmark: number;
+        addSongArgs: [string, string][];
+        createBookmarkArgs: string[];
+        createBookmarkAndAddArgs: [string, string][];
+        deleteBookmarkArgs: string[];
+        renameBookmarkArgs: [string, string][];
+        removeSongArgs: [string, string][];
+        requestCloseSidebar: number;
+        exportBookmarkCount: number;
+        previewImportArgs: string[];
+        importTextArgs: string[];
+        savedFiles: { text: string; fileName: string; mimeType: string }[];
+    } = {
         selectActiveBookmarkArgs: [],
         clearActiveBookmark: 0,
         addSongArgs: [],
@@ -131,7 +158,7 @@ function createBookmarkHarness(input) {
         importTextArgs: [],
         savedFiles: []
     };
-    const callbacks = {
+    const callbacks: BookmarkUiCallbacks = {
         onSelectActiveBookmark(bookmarkId) {
             calls.selectActiveBookmarkArgs.push(bookmarkId);
             return { ok: true };
@@ -142,7 +169,7 @@ function createBookmarkHarness(input) {
         },
         onAddSongToBookmark(bookmarkId, songKey) {
             calls.addSongArgs.push([bookmarkId, songKey]);
-            return options.onAddSongToBookmarkResult || { ok: true };
+            return Object.hasOwn(options, "onAddSongToBookmarkResult") ? options.onAddSongToBookmarkResult : { ok: true };
         },
         onCreateBookmark(name) {
             calls.createBookmarkArgs.push(name);
@@ -165,26 +192,26 @@ function createBookmarkHarness(input) {
         },
         onDeleteBookmark(bookmarkId) {
             calls.deleteBookmarkArgs.push(bookmarkId);
-            return options.onDeleteBookmarkResult ?? { ok: true };
+            return Object.hasOwn(options, "onDeleteBookmarkResult") ? options.onDeleteBookmarkResult : { ok: true };
         },
         onRenameBookmark(bookmarkId, name) {
             calls.renameBookmarkArgs.push([bookmarkId, name]);
-            return options.onRenameBookmarkResult || { ok: true };
+            return Object.hasOwn(options, "onRenameBookmarkResult") ? options.onRenameBookmarkResult : { ok: true };
         },
         onRemoveSongFromBookmark(bookmarkId, songKey) {
             calls.removeSongArgs.push([bookmarkId, songKey]);
-            return options.onRemoveSongFromBookmarkResult || { ok: true };
+            return Object.hasOwn(options, "onRemoveSongFromBookmarkResult") ? options.onRemoveSongFromBookmarkResult : { ok: true };
         },
         onExportBookmarks() {
             calls.exportBookmarkCount += 1;
-            return options.onExportBookmarksResult || {
+            return Object.hasOwn(options, "onExportBookmarksResult") ? options.onExportBookmarksResult : {
                 ok: true,
                 text: "{\"version\":3,\"bookmarks\":{}}\n"
             };
         },
         onPreviewBookmarkImport(text) {
             calls.previewImportArgs.push(text);
-            return options.onPreviewBookmarkImportResult || {
+            return Object.hasOwn(options, "onPreviewBookmarkImportResult") ? options.onPreviewBookmarkImportResult : {
                 ok: true,
                 bookmarkCount: 1,
                 songCount: 2
@@ -192,7 +219,7 @@ function createBookmarkHarness(input) {
         },
         onImportBookmarksText(text) {
             calls.importTextArgs.push(text);
-            return options.onImportBookmarksTextResult || {
+            return Object.hasOwn(options, "onImportBookmarksTextResult") ? options.onImportBookmarksTextResult : {
                 ok: true,
                 bookmarkCount: 1,
                 songCount: 2
@@ -287,6 +314,7 @@ test("bookmark ui: add mode success notifies bookmark name and song title", () =
         });
 
         const message = ui.el.bookmarkNotificationRegion.querySelector(".bookmark-toast-message");
+        assert.ok(message);
         assert.equal(message.textContent, "ブックマーク「First」に「透明な朝」を保存しました。");
     } finally {
         restoreDom();
@@ -330,6 +358,7 @@ test("bookmark ui: create-and-add notifies created bookmark and saved song title
         invokeListener(ui.el.bookmarkPanelCreateBtn, "click", {});
 
         const message = ui.el.bookmarkNotificationRegion.querySelector(".bookmark-toast-message");
+        assert.ok(message);
         assert.equal(message.textContent, "ブックマーク「Focus Songs」を作成し、「透明な朝」を保存しました。");
     } finally {
         restoreDom();
@@ -339,7 +368,7 @@ test("bookmark ui: create-and-add notifies created bookmark and saved song title
 test("bookmark ui: duplicate add shows alert and keeps the selection panel open", () => {
     const restoreDom = installFakeDom();
     const previousAlert = globalThis.alert;
-    const alerts = [];
+    const alerts: string[] = [];
     globalThis.alert = (message) => {
         alerts.push(String(message));
     };
@@ -394,7 +423,9 @@ test("bookmark ui: create form shows inline error, clears it on input, and creat
         assert.equal(ui.el.bookmarkPanelNewName.value, "");
         assert.equal(document.activeElement, ui.el.bookmarkPanelNewName);
         assert.ok(data.bookmarks["bookmark-new"]);
-        assert.equal(findBookmarkItem(ui, "bookmark-new").querySelector(".bookmark-item-name").textContent, "Focus Songs");
+        const name = findBookmarkItem(ui, "bookmark-new").querySelector(".bookmark-item-name");
+        assert.ok(name);
+        assert.equal(name.textContent, "Focus Songs");
     } finally {
         restoreDom();
     }
@@ -410,8 +441,11 @@ test("bookmark ui: create form success notifies created bookmark", () => {
         invokeListener(ui.el.bookmarkPanelCreateBtn, "click", {});
 
         const toast = ui.el.bookmarkNotificationRegion.querySelector(".bookmark-toast");
+        assert.ok(toast);
         const message = toast.querySelector(".bookmark-toast-message");
+        assert.ok(message);
         const closeBtn = toast.querySelector(".bookmark-toast-close");
+        assert.ok(closeBtn);
         assert.equal(message.textContent, "ブックマーク「Focus Songs」を作成しました。");
         assert.equal(closeBtn.getAttribute("aria-label"), "通知を閉じる");
         assert.equal(closeBtn.getAttribute("popovertargetaction"), "hide");
@@ -423,7 +457,7 @@ test("bookmark ui: create form success notifies created bookmark", () => {
 test("bookmark ui: unsupported storage version shows an error without a success notification", () => {
     const restoreDom = installFakeDom();
     const previousAlert = globalThis.alert;
-    const alerts = [];
+    const alerts: string[] = [];
     globalThis.alert = (message) => {
         alerts.push(String(message));
     };
@@ -454,7 +488,7 @@ test("bookmark ui: unsupported storage version shows an error without a success 
 test("bookmark ui: stale loaded storage state asks for a reload without a success notification", () => {
     const restoreDom = installFakeDom();
     const previousAlert = globalThis.alert;
-    const alerts = [];
+    const alerts: string[] = [];
     globalThis.alert = (message) => {
         alerts.push(String(message));
     };
@@ -484,7 +518,7 @@ test("bookmark ui: stale loaded storage state asks for a reload without a succes
 test("bookmark ui: public save error notifier asks for a reload", () => {
     const restoreDom = installFakeDom();
     const previousAlert = globalThis.alert;
-    const alerts = [];
+    const alerts: string[] = [];
     globalThis.alert = (message) => {
         alerts.push(String(message));
     };
@@ -519,6 +553,7 @@ test("bookmark ui: removing a song from active bookmark notifies bookmark name a
         controller.removeSongFromActiveBookmark("song-z");
 
         const message = ui.el.bookmarkNotificationRegion.querySelector(".bookmark-toast-message");
+        assert.ok(message);
         assert.deepEqual(calls.removeSongArgs, [["bookmark-1", "song-z"]]);
         assert.equal(message.textContent, "ブックマーク「First」から「透明な朝」を削除しました。");
     } finally {
@@ -556,12 +591,14 @@ test("bookmark ui: deleting a bookmark notifies the deleted bookmark name", () =
 
         const firstItem = findBookmarkItem(ui, "bookmark-1");
         const deleteButton = firstItem.querySelector(".bookmark-delete-btn");
+        assert.ok(deleteButton);
         invokeListener(firstItem, "click", {
             target: deleteButton,
             stopPropagation() {}
         });
 
         const message = ui.el.bookmarkNotificationRegion.querySelector(".bookmark-toast-message");
+        assert.ok(message);
         assert.deepEqual(calls.deleteBookmarkArgs, ["bookmark-1"]);
         assert.equal(message.textContent, "ブックマーク「First」を削除しました。");
     } finally {
@@ -574,7 +611,7 @@ test("bookmark ui: failed bookmark deletion does not show a success notification
     const restoreDom = installFakeDom();
     const previousConfirm = globalThis.confirm;
     const previousAlert = globalThis.alert;
-    const alerts = [];
+    const alerts: string[] = [];
     globalThis.confirm = () => true;
     globalThis.alert = (message) => {
         alerts.push(String(message));
@@ -587,6 +624,7 @@ test("bookmark ui: failed bookmark deletion does not show a success notification
 
         const firstItem = findBookmarkItem(ui, "bookmark-1");
         const deleteButton = firstItem.querySelector(".bookmark-delete-btn");
+        assert.ok(deleteButton);
         invokeListener(firstItem, "click", {
             target: deleteButton,
             stopPropagation() {}
@@ -608,9 +646,7 @@ test("bookmark ui: export button saves the JSON payload with a default filename"
         const { ui, calls, controller } = createBookmarkHarness();
         controller.setupBookmarkHandlers();
 
-        const listener = ui.el.bookmarkPanelExportBtn._events.get("click");
-        assert.equal(typeof listener, "function");
-        await listener({});
+        await invokeListener(ui.el.bookmarkPanelExportBtn, "click", {});
 
         assert.equal(calls.exportBookmarkCount, 1);
         assert.equal(calls.savedFiles.length, 1);
@@ -627,8 +663,8 @@ test("bookmark ui: import button reads JSON and confirms full replacement", asyn
     const restoreDom = installFakeDom();
     const previousConfirm = globalThis.confirm;
     const previousAlert = globalThis.alert;
-    const confirms = [];
-    const alerts = [];
+    const confirms: string[] = [];
+    const alerts: string[] = [];
     globalThis.confirm = (message) => {
         confirms.push(String(message));
         return true;
@@ -648,14 +684,11 @@ test("bookmark ui: import button reads JSON and confirms full replacement", asyn
         assert.equal(filePickerOpened, true);
 
         const importText = "{\"version\":2,\"bookmarks\":{}}";
-        ui.el.bookmarkPanelImportInput.files = [
-            {
-                text: async () => importText
-            }
-        ];
-        const listener = ui.el.bookmarkPanelImportInput._events.get("change");
-        assert.equal(typeof listener, "function");
-        await listener({});
+        Object.defineProperty(ui.el.bookmarkPanelImportInput, "files", {
+            value: [new File([importText], "bookmarks.json", { type: "application/json" })],
+            configurable: true
+        });
+        await invokeListener(ui.el.bookmarkPanelImportInput, "change", {});
 
         assert.deepEqual(calls.previewImportArgs, [importText]);
         assert.deepEqual(calls.importTextArgs, [importText]);
@@ -691,14 +724,11 @@ test("bookmark ui: import error is shown without replacing bookmarks", async () 
         controller.setupBookmarkHandlers();
 
         const importText = "{";
-        ui.el.bookmarkPanelImportInput.files = [
-            {
-                text: async () => importText
-            }
-        ];
-        const listener = ui.el.bookmarkPanelImportInput._events.get("change");
-        assert.equal(typeof listener, "function");
-        await listener({});
+        Object.defineProperty(ui.el.bookmarkPanelImportInput, "files", {
+            value: [new File([importText], "bookmarks.json", { type: "application/json" })],
+            configurable: true
+        });
+        await invokeListener(ui.el.bookmarkPanelImportInput, "change", {});
 
         assert.deepEqual(calls.previewImportArgs, [importText]);
         assert.deepEqual(calls.importTextArgs, []);
@@ -749,7 +779,9 @@ test("bookmark ui: rename cancel and delete cancel are no-ops", () => {
 
         const firstItem = findBookmarkItem(ui, "bookmark-1");
         const renameButton = firstItem.querySelector(".bookmark-rename-btn");
+        assert.ok(renameButton);
         const deleteButton = firstItem.querySelector(".bookmark-delete-btn");
+        assert.ok(deleteButton);
 
         invokeListener(firstItem, "click", {
             target: renameButton,
@@ -768,3 +800,73 @@ test("bookmark ui: rename cancel and delete cancel are no-ops", () => {
         restoreDom();
     }
 });
+
+for (const result of [false, null, undefined] as const) {
+    test(`bookmark ui: explicit ${result} add result keeps the panel open without a success toast`, () => {
+        const restoreDom = installFakeDom();
+        try {
+            const { ui, calls, controller } = createBookmarkHarness({ onAddSongToBookmarkResult: result });
+            controller.openBookmarkModal("song-z", {});
+            const item = findBookmarkItem(ui, "bookmark-1");
+            invokeListener(item, "click", { target: item });
+
+            assert.deepEqual(calls.addSongArgs, [["bookmark-1", "song-z"]]);
+            assert.equal(ui.el.bookmarkSidebarPanel.hidden, false);
+            assert.equal(ui.el.bookmarkNotificationRegion.childElementCount, 0);
+        } finally {
+            restoreDom();
+        }
+    });
+
+    test(`bookmark ui: explicit ${result} export result shows an error without saving a file`, async () => {
+        const restoreDom = installFakeDom();
+        try {
+            const { ui, calls, controller } = createBookmarkHarness({ onExportBookmarksResult: result });
+            controller.setupBookmarkHandlers();
+            await invokeListener(ui.el.bookmarkPanelExportBtn, "click", {});
+
+            assert.equal(calls.exportBookmarkCount, 1);
+            assert.deepEqual(calls.savedFiles, []);
+            assert.equal(ui.el.bookmarkPanelError.hidden, false);
+            assert.equal(ui.el.bookmarkPanelError.textContent, "ブックマークをエクスポートできませんでした。");
+        } finally {
+            restoreDom();
+        }
+    });
+
+    for (const phase of ["preview", "import"] as const) {
+        test(`bookmark ui: explicit ${result} ${phase} result prevents import success`, async () => {
+            const restoreDom = installFakeDom();
+            const previousConfirm = globalThis.confirm;
+            const previousAlert = globalThis.alert;
+            let confirmCount = 0;
+            const alerts: string[] = [];
+            globalThis.confirm = () => { confirmCount += 1; return true; };
+            globalThis.alert = (message) => { alerts.push(String(message)); };
+            try {
+                const { ui, calls, controller } = createBookmarkHarness(phase === "preview"
+                    ? { onPreviewBookmarkImportResult: result }
+                    : { onImportBookmarksTextResult: result });
+                controller.setupBookmarkHandlers();
+                const importText = '{"version":3,"bookmarks":{}}';
+                Object.defineProperty(ui.el.bookmarkPanelImportInput, "files", {
+                    value: [new File([importText], "bookmarks.json", { type: "application/json" })],
+                    configurable: true
+                });
+                await invokeListener(ui.el.bookmarkPanelImportInput, "change", {});
+
+                assert.deepEqual(calls.previewImportArgs, [importText]);
+                assert.deepEqual(calls.importTextArgs, phase === "preview" ? [] : [importText]);
+                assert.equal(confirmCount, phase === "preview" ? 0 : 1);
+                assert.deepEqual(alerts, []);
+                assert.equal(ui.el.bookmarkPanelError.hidden, false);
+                assert.equal(ui.el.bookmarkPanelError.textContent, "ブックマークファイルを読み込めませんでした。");
+                assert.equal(ui.el.bookmarkPanelImportInput.value, "");
+            } finally {
+                globalThis.confirm = previousConfirm;
+                globalThis.alert = previousAlert;
+                restoreDom();
+            }
+        });
+    }
+}

@@ -1,34 +1,23 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createBookmarkPersistenceController } from "../_build/app/controllers/bookmark-persistence.mjs";
-import { createStorageController } from "../_build/app/controllers/storage.mjs";
-import { createSearchFiltersController } from "../_build/app/ui/search-filters/controller.mjs";
+import { createBookmarkPersistenceController } from "../app/controllers/bookmark-persistence.mts";
+import { createStorageController } from "../app/controllers/storage.mts";
+import { createSearchFiltersController } from "../app/ui/search-filters/controller.mts";
+import { createFakeLocalStorage, readStoredText } from "./fixtures/local-storage.mts";
+import type { BookmarkRecord } from "../app/state.types";
 import { installFakeDom } from "./test-helpers.mts";
-
-function createFakeLocalStorage() {
-    const store = new Map();
-    return {
-        getItem(key) {
-            return store.has(key) ? store.get(key) : null;
-        },
-        setItem(key, value) {
-            store.set(key, String(value));
-        },
-        removeItem(key) {
-            store.delete(key);
-        },
-        clear() {
-            store.clear();
-        }
-    };
-}
 
 /**
  * storage コントローラーへ検索条件 UI controller を注入して作る。
- * @param {{ data: object, ui: object, constants: object, callbacks: object }} input
- * @returns {object}
  */
-function createStorageControllerForTest(input) {
+function createStorageControllerForTest(input: {
+    data: Parameters<typeof createStorageController>[0]["data"];
+    ui: Parameters<typeof createStorageController>[0]["ui"] & Parameters<typeof createSearchFiltersController>[0]["ui"];
+    constants: Parameters<typeof createStorageController>[0]["constants"] & { BOOKMARK_STORAGE_KEY?: string };
+    callbacks: Omit<Parameters<typeof createStorageController>[0]["callbacks"], "cancelScheduledSearch"> & {
+        cancelScheduledSearch?: () => void;
+    };
+}) {
     const bookmarkPersistenceController = createBookmarkPersistenceController({
         data: input.data,
         constants: {
@@ -52,15 +41,17 @@ function createStorageControllerForTest(input) {
 
 /**
  * 選択中ブックマークの検索状態復元を検証する最小構成を作る。
- * @param {Record<string, object>} bookmarks
- * @param {{ activeBookmark?: string | null, dataReady?: boolean, pendingValues?: object | null, bookmarkStorageVersion?: number }} [options]
- * @returns {{ controller: object, data: object, getRenderCount: () => number, getScheduleCount: () => number, getCancelCount: () => number }}
  */
-function createActiveBookmarkRestoreHarness(bookmarks, options = {}) {
+function createActiveBookmarkRestoreHarness(bookmarks: Record<string, BookmarkRecord>, options: {
+    activeBookmark?: string | null;
+    dataReady?: boolean;
+    pendingValues?: import("../app/state.types").DateUiPendingValues | null;
+    bookmarkStorageVersion?: number;
+} = {}) {
     let renderCount = 0;
     let scheduleCount = 0;
     let cancelCount = 0;
-    const data = {
+    const data: Parameters<typeof createStorageController>[0]["data"] = {
         allSongsRaw: [],
         bookmarks,
         activeBookmark: options.activeBookmark ?? null
@@ -70,7 +61,7 @@ function createActiveBookmarkRestoreHarness(bookmarks, options = {}) {
             searchBox: { value: "" }
         },
         search: {
-            selectedFormats: new Set(),
+            selectedFormats: new Set<string>(),
             dataReady: options.dataReady ?? true,
             userTouchedQuery: false,
             userTouchedFilters: false,
@@ -113,7 +104,7 @@ test("restorePersistedState: main branch payload restores into sliced ui state",
     globalThis.localStorage = createFakeLocalStorage();
     try {
         let applyPendingCallCount = 0;
-        const data = {
+        const data: Parameters<typeof createStorageController>[0]["data"] = {
             allSongsRaw: [],
             bookmarks: {},
             activeBookmark: null
@@ -127,7 +118,8 @@ test("restorePersistedState: main branch payload restores into sliced ui state",
                 harmonyOnly: { checked: false }
             },
             search: {
-                selectedFormats: new Set(),
+                selectedFormats: new Set<string>(),
+                dataReady: false,
                 userTouchedQuery: false,
                 userTouchedFilters: false,
                 hasRestoredSearchState: false
@@ -200,7 +192,11 @@ test("saveSearchState: writes current schema version", () => {
                 harmonyOnly: { checked: false }
             },
             search: {
-                selectedFormats: new Set(["配信", "収録"])
+                selectedFormats: new Set(["配信", "収録"]),
+                dataReady: false,
+                userTouchedQuery: false,
+                userTouchedFilters: false,
+                hasRestoredSearchState: false
             },
             date: {
                 bounds: null,
@@ -233,7 +229,7 @@ test("saveSearchState: writes current schema version", () => {
 
         controller.saveSearchState();
 
-        const parsed = JSON.parse(globalThis.localStorage.getItem("searchStateTest"));
+        const parsed = JSON.parse(readStoredText(globalThis.localStorage, "searchStateTest"));
         assert.equal(parsed.version, 6);
         assert.equal(parsed.query, "群青");
         assert.equal(parsed.collabHostOnly, true);
@@ -264,7 +260,7 @@ test("active bookmark transitions: state, persistence, rendering, and search sta
         assert.equal(harness.getRenderCount(), 1);
         assert.equal(harness.getScheduleCount(), 1);
         assert.equal(
-            JSON.parse(globalThis.localStorage.getItem("searchStateTest")).activeBookmarkId,
+            JSON.parse(readStoredText(globalThis.localStorage, "searchStateTest")).activeBookmarkId,
             "bookmark-1"
         );
 
@@ -275,7 +271,7 @@ test("active bookmark transitions: state, persistence, rendering, and search sta
         assert.equal(harness.getRenderCount(), 2);
         assert.equal(harness.getScheduleCount(), 2);
         assert.equal(
-            JSON.parse(globalThis.localStorage.getItem("searchStateTest")).activeBookmarkId,
+            JSON.parse(readStoredText(globalThis.localStorage, "searchStateTest")).activeBookmarkId,
             null
         );
     } finally {
@@ -300,7 +296,7 @@ test("active bookmark transitions: pending date conditions survive changes befor
         const result = harness.controller.selectActiveBookmark("bookmark-1");
 
         assert.equal(result.ok, true);
-        const savedSearchState = JSON.parse(globalThis.localStorage.getItem("searchStateTest"));
+        const savedSearchState = JSON.parse(readStoredText(globalThis.localStorage, "searchStateTest"));
         assert.equal(savedSearchState.dateFrom, "2024-02");
         assert.equal(savedSearchState.dateTo, "2024-03");
         assert.equal(savedSearchState.activeBookmarkId, "bookmark-1");
@@ -328,7 +324,7 @@ test("active bookmark transitions: search waits until song data is ready", () =>
         assert.equal(harness.getScheduleCount(), 0);
         assert.equal(harness.getCancelCount(), 1);
         assert.equal(
-            JSON.parse(globalThis.localStorage.getItem("searchStateTest")).activeBookmarkId,
+            JSON.parse(readStoredText(globalThis.localStorage, "searchStateTest")).activeBookmarkId,
             null
         );
     } finally {
@@ -380,7 +376,7 @@ test("restorePersistedState: clears and normalizes an active bookmark id that is
 
         assert.equal(harness.data.activeBookmark, null);
         assert.equal(harness.getRenderCount(), 1);
-        const normalizedSearchState = JSON.parse(globalThis.localStorage.getItem("searchStateTest"));
+        const normalizedSearchState = JSON.parse(readStoredText(globalThis.localStorage, "searchStateTest"));
         assert.equal(normalizedSearchState.activeBookmarkId, null);
         assert.equal(normalizedSearchState.query, "群青");
         assert.equal(normalizedSearchState.dateFrom, "2024-02");
@@ -428,7 +424,7 @@ test("restorePersistedState: preserves an active bookmark id from an unsupported
         harness.controller.saveSearchState();
 
         assert.equal(
-            JSON.parse(globalThis.localStorage.getItem("searchStateTest")).activeBookmarkId,
+            JSON.parse(readStoredText(globalThis.localStorage, "searchStateTest")).activeBookmarkId,
             "future"
         );
 
@@ -436,7 +432,7 @@ test("restorePersistedState: preserves an active bookmark id from an unsupported
 
         assert.deepEqual(clearResult, { ok: true, changed: true });
         assert.equal(
-            JSON.parse(globalThis.localStorage.getItem("searchStateTest")).activeBookmarkId,
+            JSON.parse(readStoredText(globalThis.localStorage, "searchStateTest")).activeBookmarkId,
             null
         );
     } finally {
@@ -452,7 +448,7 @@ test("restorePersistedState: legacy all-format state includes recording in new d
         const defaultFormats = ["配信", "歌みた", "ショート", "切り抜き", "収録"];
         const formatCheckboxes = defaultFormats.map((value) => ({ value, checked: false }));
         const formatsList = {
-            querySelectorAll: (selector) => {
+            querySelectorAll: (selector: string) => {
                 assert.equal(selector, 'input[type="checkbox"]');
                 return formatCheckboxes;
             }
@@ -465,7 +461,8 @@ test("restorePersistedState: legacy all-format state includes recording in new d
                 formatsList
             },
             search: {
-                selectedFormats: new Set(),
+                selectedFormats: new Set<string>(),
+                dataReady: false,
                 userTouchedQuery: false,
                 userTouchedFilters: false,
                 hasRestoredSearchState: false
@@ -525,7 +522,7 @@ test("restorePersistedState: current payload keeps recording unchecked when user
         const defaultFormats = ["配信", "歌みた", "ショート", "切り抜き", "収録"];
         const formatCheckboxes = defaultFormats.map((value) => ({ value, checked: false }));
         const formatsList = {
-            querySelectorAll: (selector) => {
+            querySelectorAll: (selector: string) => {
                 assert.equal(selector, 'input[type="checkbox"]');
                 return formatCheckboxes;
             }
@@ -538,7 +535,8 @@ test("restorePersistedState: current payload keeps recording unchecked when user
                 formatsList
             },
             search: {
-                selectedFormats: new Set(),
+                selectedFormats: new Set<string>(),
+                dataReady: false,
                 userTouchedQuery: false,
                 userTouchedFilters: false,
                 hasRestoredSearchState: false
@@ -601,7 +599,7 @@ test("restorePersistedState: invalid saved formats fall back to defaults and syn
             { value: "歌みた", checked: false }
         ];
         const formatsList = {
-            querySelectorAll: (selector) => {
+            querySelectorAll: (selector: string) => {
                 assert.equal(selector, 'input[type="checkbox"]');
                 return formatCheckboxes;
             }
@@ -615,6 +613,7 @@ test("restorePersistedState: invalid saved formats fall back to defaults and syn
             },
             search: {
                 selectedFormats: new Set(["旧値"]),
+                dataReady: false,
                 userTouchedQuery: false,
                 userTouchedFilters: false,
                 hasRestoredSearchState: false

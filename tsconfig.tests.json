@@ -17,6 +17,7 @@
   "include": [
     "tests/**/*.mts",
     "types/song.d.ts",
+    "types/bookmark-browser.d.ts",
     "types/search-state.d.ts"
   ]
 }

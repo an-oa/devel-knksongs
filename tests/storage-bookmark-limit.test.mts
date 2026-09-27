@@ -1,46 +1,41 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createBookmarkPersistenceController } from "../_build/app/controllers/bookmark-persistence.mjs";
-import { createStorageController } from "../_build/app/controllers/storage.mjs";
-import { createSearchFiltersController } from "../_build/app/ui/search-filters/controller.mjs";
+import { createBookmarkPersistenceController } from "../app/controllers/bookmark-persistence.mts";
+import { createStorageController } from "../app/controllers/storage.mts";
+import { createSearchFiltersController } from "../app/ui/search-filters/controller.mts";
+import { createFakeLocalStorage, readStoredText } from "./fixtures/local-storage.mts";
+import { createSongFixture } from "./fixtures/song.mts";
+import type { BookmarkRecord } from "../app/state.types";
 import { installFakeDom } from "./test-helpers.mts";
 
-function createFakeLocalStorage() {
-    const store = new Map();
-    return {
-        getItem(key) {
-            return store.has(key) ? store.get(key) : null;
-        },
-        setItem(key, value) {
-            store.set(key, String(value));
-        },
-        removeItem(key) {
-            store.delete(key);
-        },
-        clear() {
-            store.clear();
-        }
-    };
-}
-
+/** 保存上限と初期ブックマークを指定し、controller と呼び出し回数を返す。 */
 function setupStorageController({
     bookmarks,
     activeBookmark,
     maxBookmarkCount,
     maxSongsPerBookmark,
     maxBookmarkNameLength
+}: {
+    bookmarks?: Record<string, BookmarkRecord>;
+    activeBookmark?: string | null;
+    maxBookmarkCount?: number;
+    maxSongsPerBookmark?: number;
+    maxBookmarkNameLength?: number;
 }) {
     let renderCount = 0;
     let scheduleCount = 0;
-    const data = {
+    const data: Parameters<typeof createStorageController>[0]["data"] = {
         allSongsRaw: [],
-        bookmarks: JSON.parse(JSON.stringify(bookmarks || {})),
+        bookmarks: structuredClone(bookmarks || {}),
         activeBookmark: activeBookmark || null
     };
     const ui = {
         el: {},
         search: {
-            selectedFormats: new Set(),
+            selectedFormats: new Set<string>(),
+            userTouchedQuery: false,
+            userTouchedFilters: false,
+            hasRestoredSearchState: false,
             dataReady: true
         },
         date: {
@@ -63,7 +58,6 @@ function setupStorageController({
         constants: {
             DEFAULT_FORMATS: [],
             SEARCH_STATE_KEY: "searchStateTest",
-            BOOKMARK_STORAGE_KEY: "bookmarksTest",
             BOOKMARK_STORAGE_VERSION: 3,
             MAX_BOOKMARK_COUNT: maxBookmarkCount,
             MAX_SONGS_PER_BOOKMARK: maxSongsPerBookmark,
@@ -236,14 +230,14 @@ test("importBookmarksFromJsonText: confirmed import replaces a future payload", 
         }));
 
         assert.equal(result.ok, true);
-        assert.deepEqual(data.bookmarks, {
+        assert.deepEqual<Record<string, BookmarkRecord>>(data.bookmarks, {
             imported: {
                 name: "Imported",
                 songs: ["song-1"],
                 createdAt: 2
             }
         });
-        assert.deepEqual(JSON.parse(globalThis.localStorage.getItem("bookmarksTest")), {
+        assert.deepEqual(JSON.parse(readStoredText(globalThis.localStorage, "bookmarksTest")), {
             version: 3,
             bookmarks: data.bookmarks
         });
@@ -257,7 +251,7 @@ test("importBookmarksFromJsonText: confirmed import replaces a future payload", 
             songs: [],
             createdAt: Number(createResult.id.slice(2))
         });
-        assert.deepEqual(JSON.parse(globalThis.localStorage.getItem("bookmarksTest")), {
+        assert.deepEqual(JSON.parse(readStoredText(globalThis.localStorage, "bookmarksTest")), {
             version: 3,
             bookmarks: data.bookmarks
         });
@@ -349,7 +343,7 @@ test("createBookmark: future-loaded state cannot overwrite a current payload unt
             ok: false,
             reason: "storage_reload_required"
         });
-        assert.deepEqual(data.bookmarks, {});
+        assert.deepEqual<Record<string, BookmarkRecord>>(data.bookmarks, {});
         assert.equal(globalThis.localStorage.getItem("bookmarksTest"), currentPayloadText);
         assert.equal(getRenderCount(), 1);
 
@@ -364,7 +358,7 @@ test("createBookmark: future-loaded state cannot overwrite a current payload unt
             songs: [],
             createdAt: Number(recoveredResult.id.slice(2))
         });
-        assert.deepEqual(JSON.parse(globalThis.localStorage.getItem("bookmarksTest")), {
+        assert.deepEqual(JSON.parse(readStoredText(globalThis.localStorage, "bookmarksTest")), {
             version: 3,
             bookmarks: data.bookmarks
         });
@@ -419,7 +413,7 @@ test("createBookmark: blocks a future payload and resumes after storage returns 
             reason: "unsupported_storage_version",
             version: 4
         });
-        assert.deepEqual(data.bookmarks, currentPayload.bookmarks);
+        assert.deepEqual<Record<string, BookmarkRecord>>(data.bookmarks, currentPayload.bookmarks);
         assert.equal(globalThis.localStorage.getItem("bookmarksTest"), futurePayloadText);
         assert.equal(getRenderCount(), 1);
 
@@ -433,7 +427,7 @@ test("createBookmark: blocks a future payload and resumes after storage returns 
             songs: [],
             createdAt: Number(recoveredResult.id.slice(2))
         });
-        assert.deepEqual(JSON.parse(globalThis.localStorage.getItem("bookmarksTest")), {
+        assert.deepEqual(JSON.parse(readStoredText(globalThis.localStorage, "bookmarksTest")), {
             version: 3,
             bookmarks: data.bookmarks
         });
@@ -485,7 +479,7 @@ test("createBookmark: current payload changed by another tab requires reload bef
             ok: false,
             reason: "storage_reload_required"
         });
-        assert.deepEqual(data.bookmarks, loadedPayload.bookmarks);
+        assert.deepEqual<Record<string, BookmarkRecord>>(data.bookmarks, loadedPayload.bookmarks);
         assert.equal(globalThis.localStorage.getItem("bookmarksTest"), externalPayloadText);
         assert.equal(getRenderCount(), 1);
 
@@ -500,7 +494,7 @@ test("createBookmark: current payload changed by another tab requires reload bef
             songs: [],
             createdAt: Number(recoveredResult.id.slice(2))
         });
-        assert.deepEqual(JSON.parse(globalThis.localStorage.getItem("bookmarksTest")), {
+        assert.deepEqual(JSON.parse(readStoredText(globalThis.localStorage, "bookmarksTest")), {
             version: 3,
             bookmarks: data.bookmarks
         });
@@ -591,7 +585,7 @@ test("migrateLegacyBookmarkSongRefs: waits for reload before upgrading an extern
         bookmarkPersistenceController.migrateLegacyBookmarkSongRefs();
 
         assert.deepEqual(data.bookmarks, externalLegacyPayload.bookmarks);
-        assert.deepEqual(JSON.parse(storage.getItem("bookmarksTest")), {
+        assert.deepEqual(JSON.parse(readStoredText(globalThis.localStorage, "bookmarksTest")), {
             version: 3,
             bookmarks: externalLegacyPayload.bookmarks
         });
@@ -632,7 +626,7 @@ test("createBookmark: replaces the same malformed payload observed during restor
             songs: [],
             createdAt: Number(result.id.slice(2))
         });
-        assert.deepEqual(JSON.parse(globalThis.localStorage.getItem("bookmarksTest")), {
+        assert.deepEqual(JSON.parse(readStoredText(globalThis.localStorage, "bookmarksTest")), {
             version: 3,
             bookmarks: data.bookmarks
         });
@@ -677,7 +671,7 @@ test("createBookmark: does not replace a malformed payload first observed after 
             ok: false,
             reason: "storage_write_failed"
         });
-        assert.deepEqual(data.bookmarks, currentPayload.bookmarks);
+        assert.deepEqual<Record<string, BookmarkRecord>>(data.bookmarks, currentPayload.bookmarks);
         assert.equal(globalThis.localStorage.getItem("bookmarksTest"), malformedPayloadText);
         assert.equal(getRenderCount(), 1);
     } finally {
@@ -737,16 +731,16 @@ test("migrateLegacyBookmarkSongRefs: rewrites old songKey refs to bookmarkSongKe
             maxSongsPerBookmark: 120
         });
         data.allSongsRaw = [
-            {
+            createSongFixture({
                 songKey: "arch1::1",
                 bookmarkSongKey: "videoA::1",
                 legacySongKey: "arch1::1::https://youtu.be/videoA"
-            },
-            {
+            }),
+            createSongFixture({
                 songKey: "arch2::2",
                 bookmarkSongKey: "videoB::2",
                 legacySongKey: "arch2::2::https://youtu.be/videoB"
-            }
+            })
         ];
         globalThis.localStorage.setItem("bookmarksTest", JSON.stringify(storedBookmarks));
 
@@ -761,7 +755,7 @@ test("migrateLegacyBookmarkSongRefs: rewrites old songKey refs to bookmarkSongKe
             }
         });
         assert.deepEqual(
-            JSON.parse(globalThis.localStorage.getItem("bookmarksTest")),
+            JSON.parse(readStoredText(globalThis.localStorage, "bookmarksTest")),
             {
                 version: 3,
                 bookmarks: data.bookmarks
@@ -791,11 +785,11 @@ test("migrateLegacyBookmarkSongRefs: preserves current bookmarkSongKey refs and 
             maxSongsPerBookmark: 120
         });
         data.allSongsRaw = [
-            {
+            createSongFixture({
                 songKey: "arch1::1",
                 bookmarkSongKey: "videoA::1",
                 legacySongKey: "arch1::1::https://youtu.be/videoA"
-            }
+            })
         ];
         globalThis.localStorage.setItem("bookmarksTest", JSON.stringify(storedBookmarks));
 
@@ -803,7 +797,7 @@ test("migrateLegacyBookmarkSongRefs: preserves current bookmarkSongKey refs and 
         bookmarkPersistenceController.migrateLegacyBookmarkSongRefs();
 
         assert.deepEqual(
-            JSON.parse(globalThis.localStorage.getItem("bookmarksTest")),
+            JSON.parse(readStoredText(globalThis.localStorage, "bookmarksTest")),
             {
                 version: 3,
                 bookmarks: data.bookmarks
@@ -841,17 +835,17 @@ test("migrateLegacyBookmarkSongRefs: retries unresolved legacy refs after songs 
         controller.restorePersistedState();
         bookmarkPersistenceController.migrateLegacyBookmarkSongRefs();
 
-        assert.deepEqual(JSON.parse(globalThis.localStorage.getItem("bookmarksTest")), {
+        assert.deepEqual(JSON.parse(readStoredText(globalThis.localStorage, "bookmarksTest")), {
             version: 3,
             bookmarks: storedBookmarks
         });
 
         data.allSongsRaw = [
-            {
+            createSongFixture({
                 songKey: "arch1::1",
                 bookmarkSongKey: "videoA::1",
                 legacySongKey
-            }
+            })
         ];
         bookmarkPersistenceController.migrateLegacyBookmarkSongRefs();
 
@@ -862,7 +856,7 @@ test("migrateLegacyBookmarkSongRefs: retries unresolved legacy refs after songs 
                 createdAt: 1710000000000
             }
         });
-        assert.deepEqual(JSON.parse(globalThis.localStorage.getItem("bookmarksTest")), {
+        assert.deepEqual(JSON.parse(readStoredText(globalThis.localStorage, "bookmarksTest")), {
             version: 3,
             bookmarks: data.bookmarks
         });
@@ -885,11 +879,11 @@ test("importBookmarksFromJsonText: replaces current bookmarks and clears missing
             maxSongsPerBookmark: 120
         });
         data.allSongsRaw = [
-            {
+            createSongFixture({
                 songKey: "arch1::1",
                 bookmarkSongKey: "videoA::1",
                 legacySongKey: "arch1::1::https://youtu.be/videoA"
-            }
+            })
         ];
 
         const result = controller.importBookmarksFromJsonText(JSON.stringify({
@@ -916,12 +910,12 @@ test("importBookmarksFromJsonText: replaces current bookmarks and clears missing
         assert.equal(data.activeBookmark, null);
         assert.equal(getRenderCount(), 1);
         assert.equal(getScheduleCount(), 1);
-        assert.deepEqual(JSON.parse(globalThis.localStorage.getItem("bookmarksTest")), {
+        assert.deepEqual(JSON.parse(readStoredText(globalThis.localStorage, "bookmarksTest")), {
             version: 3,
             bookmarks: data.bookmarks
         });
         assert.equal(
-            JSON.parse(globalThis.localStorage.getItem("searchStateTest")).activeBookmarkId,
+            JSON.parse(readStoredText(globalThis.localStorage, "searchStateTest")).activeBookmarkId,
             null
         );
     } finally {
@@ -973,7 +967,7 @@ test("migrateLegacyBookmarkSongRefs: emits opt-in debug logs when migration runs
     const previousConsoleDebug = console.debug;
     globalThis.localStorage = createFakeLocalStorage();
     try {
-        const debugCalls = [];
+        const debugCalls: unknown[][] = [];
         console.debug = (...args) => {
             debugCalls.push(args);
         };
@@ -990,11 +984,11 @@ test("migrateLegacyBookmarkSongRefs: emits opt-in debug logs when migration runs
             maxSongsPerBookmark: 120
         });
         data.allSongsRaw = [
-            {
+            createSongFixture({
                 songKey: "arch1::1",
                 bookmarkSongKey: "videoA::1",
                 legacySongKey: "arch1::1::https://youtu.be/videoA"
-            }
+            })
         ];
         globalThis.localStorage.setItem("debugBookmarkMigration", "true");
         globalThis.localStorage.setItem("bookmarksTest", JSON.stringify(storedBookmarks));
@@ -1242,7 +1236,7 @@ test("deleteBookmark: succeeds and returns action result", () => {
         assert.equal(getRenderCount(), 1);
         assert.equal(getScheduleCount(), 1);
         assert.equal(
-            JSON.parse(globalThis.localStorage.getItem("searchStateTest")).activeBookmarkId,
+            JSON.parse(readStoredText(globalThis.localStorage, "searchStateTest")).activeBookmarkId,
             null
         );
     } finally {

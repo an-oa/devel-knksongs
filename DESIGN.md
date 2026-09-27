@@ -30,9 +30,9 @@
   `test:unit:ts` は事前buildなしで実行できる。全体の `test:unit` は未移行テストのため事前buildを続ける。
 - テストファイル:
   - `tests/bookmark-storage-schema.test.mts`
-  - `tests/bookmark-import-export-ui.test.mjs`
+  - `tests/bookmark-import-export-ui.test.mts`
   - `tests/bookmark-transfer.test.mts`
-  - `tests/bookmark-ui.test.mjs`
+  - `tests/bookmark-ui.test.mts`
   - `tests/app-state.test.mts`
   - `tests/stream-role.test.mts`
   - `tests/csv-parser.test.mts`
@@ -60,8 +60,8 @@
   - `tests/search-filters-controller.test.mts`
   - `tests/search-state-schema.test.mts`
   - `tests/sidebar-ui.test.mjs`
-  - `tests/storage-bookmark-limit.test.mjs`
-  - `tests/storage-search-state.test.mjs`
+  - `tests/storage-bookmark-limit.test.mts`
+  - `tests/storage-search-state.test.mts`
   - `tests/ui-storage-compat.test.mjs`
   - `tests/ui-sync.test.mjs`
   - `tests/youtube-controller.test.mjs`
