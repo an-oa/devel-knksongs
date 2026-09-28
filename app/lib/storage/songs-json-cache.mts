@@ -54,7 +54,7 @@ function waitForRequest<T = unknown>(request: IDBRequest<T>): Promise<T> {
  * @param {IDBTransaction} transaction
  * @returns {Promise<void>}
  */
-function waitForTransaction(transaction) {
+function waitForTransaction(transaction: IDBTransaction) {
     return new Promise<void>((resolve, reject) => {
         transaction.oncomplete = () => resolve();
         transaction.onerror = () => reject(transaction.error || new Error("IndexedDB transaction failed"));
@@ -191,11 +191,11 @@ export function createIndexedDbSongsJsonCacheStore(options: TextCacheStoreOption
  * @param {string[] | undefined} legacyKeys
  * @returns {string[]}
  */
-function getLegacyCacheKeys(legacyKey, legacyKeys) {
+function getLegacyCacheKeys(legacyKey: string | undefined, legacyKeys: string[] | undefined): string[] {
     // 旧単一 key 指定と複数 key 指定を同じ配列へ整える。
     return [legacyKey]
         .concat(Array.isArray(legacyKeys) ? legacyKeys : [])
-        .filter((key, index, keys) => Boolean(key) && keys.indexOf(key) === index);
+        .filter((key, index, keys): key is string => typeof key === "string" && key.length > 0 && keys.indexOf(key) === index);
 }
 
 /**
@@ -204,7 +204,7 @@ function getLegacyCacheKeys(legacyKey, legacyKeys) {
  * @param {string[]} legacyKeys
  * @returns {string | null}
  */
-function getFirstLegacyCachedText(storage, legacyKeys) {
+function getFirstLegacyCachedText(storage: Pick<Storage, "getItem"> | null | undefined, legacyKeys: string[]): string | null {
     // 現行 key、旧 key の順に移行元候補を探す。
     for (const key of legacyKeys) {
         const text = getLocalStorageText(storage, key);
@@ -218,7 +218,7 @@ function getFirstLegacyCachedText(storage, legacyKeys) {
  * @param {{ removeItem: (key: string) => void } | null | undefined} storage
  * @param {string[]} legacyKeys
  */
-function removeLegacyCachedTexts(storage, legacyKeys) {
+function removeLegacyCachedTexts(storage: Pick<Storage, "removeItem"> | null | undefined, legacyKeys: string[]): void {
     // 移行後に localStorage の容量を解放する。
     legacyKeys.forEach((key) => removeLocalStorageText(storage, key));
 }
@@ -245,7 +245,7 @@ export function createLegacyLocalStorageTextCacheAdapter(
      * @param {string} value
      * @returns {Promise<boolean>}
      */
-    async function setText(value) {
+    async function setText(value: string): Promise<boolean> {
         // 現行 cache へ保存し、成功後は旧 localStorage キャッシュを片付ける。
         try {
             const saved = await cache.setText(value);

@@ -7,7 +7,11 @@ export type InitialDataLoadResult =
 
 type DataLoaderInput = {
     data: Pick<AppDataState, "allSongsRaw">;
-    ui: AppUiState;
+    ui: {
+        el: Pick<AppUiState["el"], "resultCount" | "searchBox">;
+        search: Pick<AppUiState["search"], "recommendedCache" | "dataReady" | "hasRestoredSearchState">;
+        date: Pick<AppUiState["date"], "pendingValues">;
+    };
     dataSource: {
         loadInitialSnapshot: () => Promise<SongsSnapshot | null>;
     };

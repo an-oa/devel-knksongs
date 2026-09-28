@@ -36,7 +36,7 @@
   - `tests/app-state.test.mts`
   - `tests/stream-role.test.mts`
   - `tests/csv-parser.test.mts`
-  - `tests/data-loader.test.mjs`
+  - `tests/data-loader.test.mts`
   - `tests/dom-utils.test.mts`
   - `tests/date-filter-controller.test.mts`
   - `tests/date-key.test.mts`
@@ -76,10 +76,10 @@
   - `tests/results-scroll.test.mts`
   - `tests/e2e/youtube-smoke.spec.mjs`
   - `tests/songs-content-hash.test.mjs`
-  - `tests/songs-data-source.test.mjs`
+  - `tests/songs-data-source.test.mts`
   - `tests/songs-data-quality.test.mts`
   - `tests/build-songs-json.test.mjs`
-  - `tests/songs-json-cache.test.mjs`
+  - `tests/songs-json-cache.test.mts`
   - `tests/songs-json.test.mts`
   - `tests/songs-json-validation.test.mjs`
 - 補助モジュール:

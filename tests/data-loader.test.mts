@@ -1,77 +1,67 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createDataLoader } from "../_build/app/ui/core/data.mjs";
+import { createDataLoader } from "../app/ui/core/data.mts";
+import type { SongsSnapshot } from "../app/lib/songs-data-source.mts";
+import type { AppUiState } from "../app/state.types";
+import { createSongFixture } from "./fixtures/song.mts";
 import { installFakeDom } from "./test-helpers.mts";
 
-/**
- * data loader テスト用の曲データを返す。
- * @param {string} songKey
- * @returns {*}
- */
-function createSong(songKey) {
-    const archiveId = songKey.split("::")[0] || "json-archive";
-    return {
-        date: "2026/03/11",
-        dateKey: 20260311,
-        archiveId,
-        archiveOrder: 1,
+/** data loader テスト用の曲識別子を持つ曲データを返す。 */
+function createSong(songKey: string): Song {
+    return createSongFixture({
+        archiveId: songKey.split("::")[0] || "json-archive",
         videoId: "abc123",
         songKey,
         bookmarkSongKey: `abc123::${songKey}`,
         legacySongKey: `${songKey}::https://www.youtube.com/watch?v=abc123&t=10s`,
-        format: "配信",
-        streamRole: "",
-        videoOrientation: "vertical",
-        isRelay: false,
-        isHarmony: false,
-        title: "KING",
-        artist: "Kanaria feat. GUMI",
-        titleYomi: "キング",
-        artistYomi: "カナリアフィーチャリンググミ",
-        url: "https://www.youtube.com/watch?v=abc123&t=10s",
-        endSeconds: 581,
-        titleNorm: "king",
-        artistNorm: "kanaria feat. gumi",
-        titleYomiNorm: "キング",
-        artistYomiNorm: "カナリアフィーチャリンググミ"
-    };
+        url: "https://www.youtube.com/watch?v=abc123&t=10s"
+    });
 }
+
+type DataLoaderHarnessOptions = {
+    searchBoxDisabled?: boolean;
+    recommendedCache?: AppUiState["search"]["recommendedCache"];
+    hasRestoredSearchState?: boolean;
+    pendingValues?: AppUiState["date"]["pendingValues"];
+    dateBounds?: SearchDateRange;
+};
 
 /**
  * data loader テスト用の状態とスパイを作る。
- * @param {*} input
- * @returns {*}
  */
-function createDataLoaderHarness(input) {
-    const options = input || {};
+function createDataLoaderHarness(options: DataLoaderHarnessOptions = {}) {
     const resultCount = document.createElement("div");
     const searchBox = document.createElement("input");
     searchBox.disabled = options.searchBoxDisabled ?? true;
 
-    const data = {
+    const data: Parameters<typeof createDataLoader>[0]["data"] = {
         allSongsRaw: []
+    };
+    const search: Parameters<typeof createDataLoader>[0]["ui"]["search"] = {
+        recommendedCache: options.recommendedCache ?? { songs: [], requestedCount: 1 },
+        dataReady: false,
+        hasRestoredSearchState: options.hasRestoredSearchState ?? false
     };
     const ui = {
         el: {
             resultCount,
             searchBox
         },
-        search: {
-            recommendedCache: options.recommendedCache ?? { stale: true },
-            dataReady: false,
-            hasRestoredSearchState: options.hasRestoredSearchState ?? false
-        },
+        search,
         date: {
             pendingValues: options.pendingValues ?? null
         }
-    };
+    } satisfies Parameters<typeof createDataLoader>[0]["ui"];
 
-    const calls = {
+    const calls: {
+        applyDateInputRangeArgs: Song[][];
+        clampDateInputsToBoundsArgs: [number, number][];
+    } = {
         applyDateInputRangeArgs: [],
         clampDateInputsToBoundsArgs: []
     };
 
-    const callbacks = {
+    const callbacks: Parameters<typeof createDataLoader>[0]["callbacks"] = {
         applyDateInputRange(songs) {
             calls.applyDateInputRangeArgs.push(songs);
             return options.dateBounds ?? { minKey: 20260311, maxKey: 20260311 };
@@ -86,11 +76,11 @@ function createDataLoaderHarness(input) {
 
 /**
  * dataSource から返すスナップショットを指定して data loader を作る。
- * @param {{ initialSnapshot?: object | null }} options
- * @param {*} harness
- * @returns {*}
  */
-function createLoaderWithDataSource(options, harness) {
+function createLoaderWithDataSource(
+    options: { initialSnapshot?: SongsSnapshot | null },
+    harness: ReturnType<typeof createDataLoaderHarness>
+) {
     return createDataLoader({
         data: harness.data,
         ui: harness.ui,
@@ -132,7 +122,7 @@ test("data loader: cache source shows cache status and skips reset when pending 
     const restoreDom = installFakeDom();
     try {
         const harness = createDataLoaderHarness({
-            pendingValues: { fromYear: "2026" }
+            pendingValues: { from: "2026-01-01", to: null }
         });
         const loader = createLoaderWithDataSource({
             initialSnapshot: {
@@ -157,7 +147,7 @@ test("data loader: search stays disabled until the initial public snapshot is re
     const restoreDom = installFakeDom();
     try {
         const harness = createDataLoaderHarness();
-        let resolveSnapshot;
+        const { promise: snapshot, resolve: resolveSnapshot } = Promise.withResolvers<SongsSnapshot | null>();
         let loadCount = 0;
         const loader = createDataLoader({
             data: harness.data,
@@ -166,7 +156,7 @@ test("data loader: search stays disabled until the initial public snapshot is re
             dataSource: {
                 loadInitialSnapshot() {
                     loadCount += 1;
-                    return new Promise((resolve) => { resolveSnapshot = resolve; });
+                    return snapshot;
                 }
             }
         });
