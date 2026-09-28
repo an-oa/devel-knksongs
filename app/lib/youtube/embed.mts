@@ -12,13 +12,17 @@ export type YoutubeTarget = {
 
 /**
  * YouTube Iframe API の読み込み完了を扱うローダーを作成する。
- * @param {{ youtube: *, iframeApiSrc: string, iframeApiSelector: string, readyPollMs: number }} input
  */
 export function createYoutubeIframeApiLoader({
     youtube,
     iframeApiSrc,
     iframeApiSelector,
     readyPollMs
+}: {
+    youtube: Pick<import("../../state.types").AppYoutubeRuntimeState, "apiPromise">;
+    iframeApiSrc: string;
+    iframeApiSelector: string;
+    readyPollMs: number;
 }) {
     /**
      * YouTube Iframe API が利用可能か返す。
@@ -30,9 +34,9 @@ export function createYoutubeIframeApiLoader({
 
     /**
      * Iframe API が利用可能になるまでポーリングで待機する。
-     * @param {Function} resolve
+     * @param {() => void} resolve
      */
-    function waitForReady(resolve) {
+    function waitForReady(resolve: () => void) {
         if (isReady()) {
             resolve();
             return;
@@ -47,7 +51,7 @@ export function createYoutubeIframeApiLoader({
     function ensureReady() {
         if (isReady()) return Promise.resolve();
         if (youtube.apiPromise) return youtube.apiPromise;
-        let script = null;
+        let script: HTMLScriptElement | null = null;
         let resolveReady: (value?: void | PromiseLike<void>) => void = () => {};
         const prevCallback = window.onYouTubeIframeAPIReady;
 
@@ -81,7 +85,7 @@ export function createYoutubeIframeApiLoader({
             const existing = document.querySelector(iframeApiSelector);
             resolveReady = resolve;
             window.onYouTubeIframeAPIReady = readyCallback;
-            const rejectWithCleanup = (error) => {
+            const rejectWithCleanup = (error: Error) => {
                 restoreCallback();
                 removeScript();
                 reject(error);
@@ -116,7 +120,7 @@ export function createYoutubeIframeApiLoader({
  * @param {{ useYoutubeNoCookie?: boolean } | undefined} options
  * @returns {string}
  */
-export function resolveYoutubeEmbedHost(options) {
+export function resolveYoutubeEmbedHost(options?: { useYoutubeNoCookie?: boolean }) {
     return options && options.useYoutubeNoCookie
         ? YT_NOCOOKIE_EMBED_HOST
         : YT_EMBED_HOST;
@@ -127,7 +131,7 @@ export function resolveYoutubeEmbedHost(options) {
  * @param {string | null | undefined} iframeSrc
  * @returns {string}
  */
-export function resolveYoutubeEmbedHostFromUrl(iframeSrc) {
+export function resolveYoutubeEmbedHostFromUrl(iframeSrc: string | null | undefined) {
     const src = String(iframeSrc || "");
     return resolveYoutubeEmbedHost({
         useYoutubeNoCookie: src.startsWith(`${YT_NOCOOKIE_EMBED_HOST}/`)
@@ -140,7 +144,7 @@ export function resolveYoutubeEmbedHostFromUrl(iframeSrc) {
  * @param {{ endSeconds?: number | null, autoplay?: boolean, useYoutubeNoCookie?: boolean } | undefined} options
  * @returns {string}
  */
-export function buildYoutubeEmbedUrl(yt, options) {
+export function buildYoutubeEmbedUrl(yt: YoutubeTarget, options?: { endSeconds?: number | null; autoplay?: boolean; useYoutubeNoCookie?: boolean }) {
     const autoplay = options && options.autoplay === true ? "1" : "0";
     const embedHost = resolveYoutubeEmbedHost(options);
     const params = new URLSearchParams({
@@ -152,8 +156,8 @@ export function buildYoutubeEmbedUrl(yt, options) {
         cc_load_policy: "0",
         iv_load_policy: "3"
     });
-    const endSeconds = Number.isFinite(options && options.endSeconds)
-        ? options.endSeconds
+    const endSeconds = Number.isFinite(options?.endSeconds)
+        ? options?.endSeconds
         : null;
     if (Number.isFinite(endSeconds)) {
         params.set("end", String(endSeconds));
@@ -168,7 +172,7 @@ export function buildYoutubeEmbedUrl(yt, options) {
  * YouTube が生成した iframe へ必要な属性を反映する。
  * @param {Element | null | undefined} iframe
  */
-export function applyYoutubePlayerIframeAttributes(iframe) {
+export function applyYoutubePlayerIframeAttributes(iframe: Element | null | undefined) {
     if (!isHtmlElement(iframe)) return;
     const iframeElement = iframe as HTMLIFrameElement;
     iframeElement.allow = "autoplay; encrypted-media";

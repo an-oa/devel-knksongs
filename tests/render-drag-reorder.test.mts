@@ -1,14 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createBookmarkDragReorderController } from "../_build/app/lib/render/drag-reorder.mjs";
+import { createBookmarkDragReorderController } from "../app/lib/render/drag-reorder.mts";
 import {
     createDataTransferMock,
     installFakeDom,
     makeRenderRow
 } from "./test-helpers.mts";
 
-function createDragHarness(options = {}) {
-    const data = {
+/** ドラッグ対象の状態と永続化呼び出し記録を作る。 */
+function createDragHarness(options: {
+    saveResult?: import("../app/lib/render/drag-reorder.mts").BookmarkDragReorderSaveResult;
+} = {}) {
+    const data: Parameters<typeof createBookmarkDragReorderController>[0]["data"] = {
         activeBookmark: "bookmark-1",
         bookmarks: {
             "bookmark-1": {
@@ -26,8 +29,8 @@ function createDragHarness(options = {}) {
     const calls = {
         save: 0,
         update: 0,
-        savedBookmarks: [],
-        saveFailures: []
+        savedBookmarks: [] as Parameters<typeof createBookmarkDragReorderController>[0]["data"]["bookmarks"][],
+        saveFailures: [] as import("../app/lib/render/drag-reorder.mts").BookmarkDragReorderSaveFailure[]
     };
     const controller = createBookmarkDragReorderController({
         data,
@@ -35,7 +38,7 @@ function createDragHarness(options = {}) {
         saveBookmarks: (bookmarks) => {
             calls.save += 1;
             calls.savedBookmarks.push(bookmarks);
-            return options.saveResult || { ok: true };
+            return options.saveResult ?? { ok: true };
         },
         onSaveFailure: (result) => {
             calls.saveFailures.push(result);
@@ -138,6 +141,35 @@ test("render drag reorder: drag start is ignored outside bookmark mode", () => {
         });
 
         assert.equal(prevented, true);
+    } finally {
+        cleanup();
+    }
+});
+
+test("render drag reorder: missing drag data leaves bookmark order unchanged", () => {
+    const cleanup = installFakeDom();
+    try {
+        const { data, calls, controller } = createDragHarness();
+        const card = document.createElement("div");
+        card.className = "song-card";
+        card.dataset.songKey = "c";
+        let prevented = false;
+        controller.onDragStart({
+            currentTarget: card,
+            dataTransfer: null,
+            preventDefault() { prevented = true; }
+        });
+        controller.onDrop({
+            target: card,
+            dataTransfer: null,
+            preventDefault() {}
+        });
+
+        assert.equal(prevented, true);
+        assert.deepEqual(data.currentResults.map((row) => row.songKey), ["a", "b", "c"]);
+        assert.deepEqual(data.bookmarks["bookmark-1"].songs, ["song-a", "song-b", "song-c"]);
+        assert.equal(calls.save, 0);
+        assert.equal(calls.update, 0);
     } finally {
         cleanup();
     }

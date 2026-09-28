@@ -251,21 +251,6 @@ export type YoutubeSharedPlaybackPendingAttach = {
   playbackSessionId: number;
 };
 
-/** YouTube 再生開始の成否待ちを表す状態。 */
-export type YoutubePlaybackStartAttempt = {
-  /** 再生開始待ち対象のセッション ID。 */
-  sessionId: number;
-  /** 再生開始結果を呼び出し元へ返す Promise resolver。 */
-  resolve: (result: { status: string }) => void;
-  /** セットアップまたは再生開始待ちのタイマー ID。 */
-  timeoutId: ReturnType<typeof setTimeout> | null;
-  /** 失敗時の復元やログに使う再生開始コンテキスト。 */
-  context: {
-    thumbDiv?: Element | null;
-    playbackMode?: string;
-  };
-};
-
 /** 複数カード間で再利用する YouTube 共有 iframe / Player の状態。 */
 export type YoutubeSharedPlaybackState = {
   /** 共有 iframe に紐付いた YouTube Player。 */
@@ -285,7 +270,7 @@ export type YoutubeSharedPlaybackState = {
   /** 現在の共有プレーヤー再生セッション ID。 */
   sessionId: number;
   /** 再生開始待ち中の attempt。 */
-  playbackStartAttempt: YoutubePlaybackStartAttempt | null;
+  playbackStartAttempt: import("./lib/youtube/playback-start-attempt.mjs").YoutubePlaybackStartAttempt | null;
   /** 再生開始が未確定のまま保持されているセッション ID。 */
   unconfirmedPlaybackStartSessionId: number;
 };

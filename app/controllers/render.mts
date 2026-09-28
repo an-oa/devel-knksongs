@@ -34,8 +34,8 @@ type RenderUiElements = {
 
 type RenderUiState = {
     el: RenderUiElements;
-    search: SearchUiRuntimeState;
-    playback: PlaybackUiRuntimeState;
+    search: Pick<SearchUiRuntimeState, "dataReady" | "selectedFormats">;
+    playback: Pick<PlaybackUiRuntimeState, "activeThumb" | "showThumbnails" | "scrollObserver">;
     render: RenderUiRuntimeState;
 };
 
@@ -84,7 +84,7 @@ type RenderCallbacks = {
 };
 
 type RenderControllerInput = {
-    data: AppDataState;
+    data: Pick<AppDataState, "currentResults" | "displayLimit" | "activeBookmark" | "bookmarks">;
     ui: RenderUiState;
     isAllFormatsSelected: () => boolean;
     resultDisplayBatchSize?: number;
@@ -199,7 +199,7 @@ export function createRenderController({
      * @param {Song} row
      * @param {number} resultIndex
      */
-    function updateCardFromRow(entry, row, resultIndex) {
+    function updateCardFromRow(entry: RenderCardEntry, row: Song, resultIndex: number) {
         const bookmarkSongRef = getBookmarkSongRef(row);
         const yt = buildYoutubeTarget(row);
         const titleId = `result-title-${resultIndex + 1}`;
@@ -238,7 +238,7 @@ export function createRenderController({
      * @param {Song} row
      * @returns {YoutubeTarget}
      */
-    function buildYoutubeTarget(row) {
+    function buildYoutubeTarget(row: Song): YoutubeTarget {
         const extracted = extractYoutubeInfo(row.url);
         return {
             ...extracted,
@@ -254,7 +254,7 @@ export function createRenderController({
      * @param {HTMLAnchorElement} titleEl
      * @param {Song} row
      */
-    function updateTitleLink(titleEl, row) {
+    function updateTitleLink(titleEl: HTMLAnchorElement, row: Song) {
         titleEl.textContent = row.title || "無題";
         if (row.url) {
             titleEl.classList.add("title-link");
@@ -274,7 +274,7 @@ export function createRenderController({
      * @param {Element} tags
      * @param {{ format?: string, streamRole?: string, isRelay?: boolean, isHarmony?: boolean }} row
      */
-    function updateFooterTags(tags, row) {
+    function updateFooterTags(tags: Element, row: Song) {
         tags.replaceChildren();
         if (row.format) {
             const fmt = document.createElement("span");
@@ -307,7 +307,7 @@ export function createRenderController({
      * @param {string} message
      * @returns {HTMLLIElement}
      */
-    function createEmptyStateElement(message) {
+    function createEmptyStateElement(message: string) {
         const empty = document.createElement("li");
         empty.className = "result-empty-state";
         empty.textContent = message;
@@ -372,7 +372,7 @@ export function createRenderController({
      * @param {string} songKey
      * @returns {RenderCardEntry | null}
      */
-    function getCardEntryBySongKey(songKey) {
+    function getCardEntryBySongKey(songKey: string) {
         if (!songKey) return null;
         return renderUi.cardEntriesBySongKey.get(songKey) || null;
     }
@@ -381,7 +381,7 @@ export function createRenderController({
      * 指定インデックスの曲が表示範囲外なら、表示上限を広げて描画する。
      * @param {number} index
      */
-    function ensureResultVisible(index) {
+    function ensureResultVisible(index: number) {
         if (!Number.isFinite(index) || index < 0) return;
         if (index < data.displayLimit) return;
         const nextLimit = Math.ceil((index + 1) / displayBatchSize) * displayBatchSize;
@@ -393,7 +393,7 @@ export function createRenderController({
      * @param {string} songKey
      * @returns {Promise<YoutubePlaybackStartResult>}
      */
-    function playSongByKey(songKey) {
+    function playSongByKey(songKey: string) {
         const index = data.currentResults.findIndex((row) => row && row.songKey === songKey);
         if (index === -1) {
             return Promise.resolve(createYoutubePlaybackStartResult(YOUTUBE_PLAYBACK_START_STATUS.FAILED));
@@ -417,7 +417,7 @@ export function createRenderController({
      * 指定曲のカードが見える位置まで、固定ヘッダーを避けてスクロールする。
      * @param {string} songKey
      */
-    function scrollSongIntoView(songKey) {
+    function scrollSongIntoView(songKey: string) {
         const entry = getCardEntryBySongKey(songKey);
         if (!entry) return;
         scheduleScrollElementIntoView(entry.card, {
@@ -431,7 +431,7 @@ export function createRenderController({
      * 空結果UIを描画し、再生状態と末尾監視をリセットする。
      * @param {HTMLElement} container
      */
-    function renderEmptyResults(container) {
+    function renderEmptyResults(container: HTMLElement) {
         restoreActivePlayback();
         const emptyState = getEmptyStateDescriptor();
         container.replaceChildren(createEmptyStateElement(emptyState.message));
@@ -521,7 +521,7 @@ export function createRenderController({
      * @param {HTMLElement[]} nodes
      * @param {HTMLElement | null} pinnedActiveCard
      */
-    function reconcileNodesWithPinnedActive(container, nodes, pinnedActiveCard) {
+    function reconcileNodesWithPinnedActive(container: HTMLElement, nodes: HTMLElement[], pinnedActiveCard: HTMLElement | null) {
         if (!pinnedActiveCard) return;
         const keepSet = new Set(nodes);
         Array.from(container.children).forEach((child) => {
@@ -539,7 +539,7 @@ export function createRenderController({
             }
         }
 
-        let anchor = null;
+        let anchor: HTMLElement | null = null;
         for (let i = nodes.length - 1; i > pinnedIndex; i--) {
             const node = nodes[i];
             if (node === pinnedActiveCard) continue;
@@ -553,7 +553,7 @@ export function createRenderController({
      * @param {HTMLElement} container
      * @param {HTMLElement[]} nodes
      */
-    function reconcileNodesByOrder(container, nodes) {
+    function reconcileNodesByOrder(container: HTMLElement, nodes: HTMLElement[]) {
         const children = container.children;
         for (let i = 0; i < nodes.length; i++) {
             const node = nodes[i];
@@ -574,7 +574,7 @@ export function createRenderController({
      * @param {HTMLElement} container
      * @param {HTMLElement[]} nodes
      */
-    function reconcileResultNodes(container, nodes) {
+    function reconcileResultNodes(container: HTMLElement, nodes: HTMLElement[]) {
         const activeState = collectActiveCardRenderState(container, nodes);
         stopActivePlaybackIfHidden(activeState);
         const pinnedActiveCard = getPinnedActiveCard(activeState);
@@ -597,7 +597,7 @@ export function createRenderController({
      * 表示中カードのサムネイルをIntersectionObserverへ登録する。
      * @param {RenderCardEntry[]} entries
      */
-    function observeVisibleThumbnails(entries) {
+    function observeVisibleThumbnails(entries: RenderCardEntry[]) {
         if (!playbackUi.showThumbnails || !playbackUi.scrollObserver) return;
         for (const entry of entries) {
             playbackUi.scrollObserver.observe(entry.thumbDiv);
@@ -606,11 +606,13 @@ export function createRenderController({
 
     /**
      * 描画に必要なコンテナ・結果・モード情報をまとめる。
-     * @returns {DisplayState}
+     * @returns {DisplayState | null}
      */
-    function collectDisplayState(): DisplayState {
+    function collectDisplayState(): DisplayState | null {
+        const container = ui.el.resultList;
+        if (!container) return null;
         return {
-            container: ui.el.resultList,
+            container,
             results: data.currentResults.slice(0, data.displayLimit)
         };
     }
@@ -655,6 +657,7 @@ export function createRenderController({
     function updateDisplay() {
         tracePlayback("render", "updateDisplay", undefined);
         const displayState = collectDisplayState();
+        if (!displayState) return;
         prepareDisplayObservation();
         const rendered = renderDisplayState(displayState);
         if (!rendered) return;

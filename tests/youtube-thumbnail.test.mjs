@@ -45,14 +45,14 @@ test("youtube thumbnail: save-related default actions are suppressed", () => {
         const thumb = document.createElement("div");
         suppressYoutubeThumbnailContextMenu(thumb);
         const thumbContextMenu = thumb._events.get("contextmenu");
-        assert.equal(typeof thumbContextMenu, "function");
+        assert.equal(thumbContextMenu?.size, 1);
 
         const img = createYoutubeThumbnailImage("video1");
         assert.ok(img);
         assert.equal(img.draggable, false);
         assert.equal(img.getAttribute("draggable"), "false");
-        assert.equal(typeof img._events.get("contextmenu"), "function");
-        assert.equal(typeof img._events.get("dragstart"), "function");
+        assert.equal(img._events.get("contextmenu")?.size, 1);
+        assert.equal(img._events.get("dragstart")?.size, 1);
     } finally {
         cleanup();
     }

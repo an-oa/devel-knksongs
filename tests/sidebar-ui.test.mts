@@ -196,10 +196,8 @@ test("sidebar: escape closes settings panel, removes inert, and restores focus",
         invokeListener(openSidebarBtn, "click", {});
         invokeListener(ui.el.openSettingsPanelBtn, "click", {});
 
-        const keydownListener = restoreDom.document._events.get("keydown");
-        assert.ok(keydownListener);
         let prevented = false;
-        keydownListener({
+        invokeListener(restoreDom.document, "keydown", {
             key: "Escape",
             preventDefault() {
                 prevented = true;
@@ -341,10 +339,8 @@ test("sidebar: escape prioritizes settings panel over bookmark panel", () => {
         ui.el.bookmarkSidebarPanel.hidden = false;
         ui.el.openSettingsPanelBtn.focus();
 
-        const keydownListener = restoreDom.document._events.get("keydown");
-        assert.ok(keydownListener);
         let prevented = false;
-        keydownListener({
+        invokeListener(restoreDom.document, "keydown", {
             key: "Escape",
             preventDefault() {
                 prevented = true;

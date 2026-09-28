@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import {
     getResultTailFallbackScrollTarget,
     isResultTailNearScrollBoundary
-} from "../_build/app/lib/render/result-tail-fallback.mjs";
-import { installFakeDom } from "./test-helpers.mts";
+} from "../app/lib/render/result-tail-fallback.mts";
+import { getFakeElement, installFakeDom } from "./test-helpers.mts";
 
 test("result tail fallback: scroll target uses window for document scroll and container otherwise", () => {
     const cleanup = installFakeDom();
@@ -24,21 +24,21 @@ test("result tail fallback: boundary checks use viewport or scroll container edg
     try {
         const sentinel = document.createElement("div");
         const scrollContainer = document.createElement("section");
-        scrollContainer._rect = { top: 100, bottom: 500, left: 0, right: 500, width: 500, height: 400 };
+        getFakeElement(scrollContainer)._rect = { top: 100, bottom: 500, left: 0, right: 500, width: 500, height: 400 };
 
-        sentinel._rect = { top: 1200, bottom: 1201, left: 0, right: 1, width: 1, height: 1 };
+        getFakeElement(sentinel)._rect = { top: 1200, bottom: 1201, left: 0, right: 1, width: 1, height: 1 };
         assert.equal(isResultTailNearScrollBoundary(sentinel, 480, null), true);
 
-        sentinel._rect = { top: 1201, bottom: 1202, left: 0, right: 1, width: 1, height: 1 };
+        getFakeElement(sentinel)._rect = { top: 1201, bottom: 1202, left: 0, right: 1, width: 1, height: 1 };
         assert.equal(isResultTailNearScrollBoundary(sentinel, 480, null), false);
 
-        sentinel._rect = { top: 900, bottom: 901, left: 0, right: 1, width: 1, height: 1 };
+        getFakeElement(sentinel)._rect = { top: 900, bottom: 901, left: 0, right: 1, width: 1, height: 1 };
         assert.equal(isResultTailNearScrollBoundary(sentinel, 400, scrollContainer), true);
 
-        sentinel._rect = { top: 901, bottom: 902, left: 0, right: 1, width: 1, height: 1 };
+        getFakeElement(sentinel)._rect = { top: 901, bottom: 902, left: 0, right: 1, width: 1, height: 1 };
         assert.equal(isResultTailNearScrollBoundary(sentinel, 400, scrollContainer), false);
 
-        sentinel._rect = { top: 0, bottom: 99, left: 0, right: 1, width: 1, height: 99 };
+        getFakeElement(sentinel)._rect = { top: 0, bottom: 99, left: 0, right: 1, width: 1, height: 99 };
         assert.equal(isResultTailNearScrollBoundary(sentinel, 400, scrollContainer), false);
     } finally {
         cleanup();

@@ -54,9 +54,9 @@
   - `tests/playback-sequence.test.mts`
   - `tests/playback-session-controller.test.mjs`
   - `tests/playback-settings-value-reducer.test.mts`
-  - `tests/render-drag-reorder.test.mjs`
-  - `tests/render-layout.test.mjs`
-  - `tests/render-masonry-layout.test.mjs`
+  - `tests/render-drag-reorder.test.mts`
+  - `tests/render-layout.test.mts`
+  - `tests/render-masonry-layout.test.mts`
   - `tests/search-filters-controller.test.mts`
   - `tests/search-state-schema.test.mts`
   - `tests/sidebar-ui.test.mts`
@@ -72,8 +72,8 @@
   - `tests/youtube-shared-playback.test.mjs`
   - `tests/youtube-thumbnail.test.mjs`
   - `tests/youtube-unconfirmed-playback-start.test.mjs`
-  - `tests/layout-anchor.test.mjs`
-  - `tests/results-scroll.test.mjs`
+  - `tests/layout-anchor.test.mts`
+  - `tests/results-scroll.test.mts`
   - `tests/e2e/youtube-smoke.spec.mjs`
   - `tests/songs-content-hash.test.mjs`
   - `tests/songs-data-source.test.mjs`

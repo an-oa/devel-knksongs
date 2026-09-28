@@ -65,8 +65,47 @@ class FakeClassList {
     }
 }
 
+type FakeListener = (event: FakeEvent) => void | Promise<void>;
+
+/** DOMモックで使う関数リスナーの登録・解除・通知を共通管理する。 */
+class FakeEventTarget {
+    readonly _events = new Map<string, Set<FakeListener>>();
+
+    /** 同じ関数の重複登録を避け、登録順にリスナーを保持する。 */
+    addEventListener(type: string, listener: FakeListener) {
+        let listeners = this._events.get(type);
+        if (!listeners) {
+            listeners = new Set();
+            this._events.set(type, listeners);
+        }
+        listeners.add(listener);
+    }
+
+    /** 指定されたリスナーだけを解除する。 */
+    removeEventListener(type: string, listener: FakeListener) {
+        const listeners = this._events.get(type);
+        if (!listeners) return;
+        listeners.delete(listener);
+        if (listeners.size === 0) this._events.delete(type);
+    }
+
+    /** 登録順に同期呼び出しし、非同期リスナーの完了はまとめて返す。 */
+    dispatchListeners(type: string, event: FakeEvent): void | Promise<void> {
+        const listeners = this._events.get(type);
+        if (!listeners) return;
+        const pending: Promise<void>[] = [];
+        for (const listener of [...listeners]) {
+            // 通知中に解除された関数は呼ばず、追加された関数は次回から呼ぶ。
+            if (!listeners.has(listener)) continue;
+            const result = listener(event);
+            if (result) pending.push(result);
+        }
+        if (pending.length > 0) return Promise.all(pending).then(() => {});
+    }
+}
+
 // 必要な DOM 操作だけを持つモック。HTMLElement としての完全な実装ではない。
-class FakeElement {
+class FakeElement extends FakeEventTarget {
     tagName: string;
     dataset: Record<string, string | undefined> = {};
     children: FakeElement[] = [];
@@ -81,13 +120,13 @@ class FakeElement {
     _innerHTML = "";
     hidden = false;
     type = "";
-    _events = new Map<string, (event: FakeEvent) => void>();
     _scrollHeight?: number;
     _clientHeight?: number;
     _clientWidth?: number;
     _rect?: Pick<DOMRectReadOnly, "top" | "bottom" | "left" | "right" | "width" | "height">;
 
     constructor(tagName = "div") {
+        super();
         this.tagName = String(tagName).toUpperCase();
     }
 
@@ -269,6 +308,9 @@ class FakeElement {
         return matches;
     }
 
+    /** スクロール要求の差し替え先。 */
+    scrollTo(options?: ScrollToOptions) { void options; }
+
     /** 属性値を文字列として記録する。 */
     setAttribute(name: string, value: unknown) {
         this.attributes.set(name, String(value));
@@ -289,11 +331,6 @@ class FakeElement {
         this.attributes.delete(name);
     }
 
-    /** イベント種別ごとに最後に登録された listener を記録する。 */
-    addEventListener(type: string, listener: (event: FakeEvent) => void) {
-        this._events.set(type, listener);
-    }
-
     /** 記録されたクリック listener と onclick を呼ぶ。 */
     click() {
         const event = {
@@ -302,13 +339,11 @@ class FakeElement {
             preventDefault() {},
             stopPropagation() {}
         };
-        const listener = this._events.get("click");
-        if (typeof listener === "function") {
-            listener(event);
-        }
+        const pending = this.dispatchListeners("click", event);
         if (typeof this.onclick === "function") {
             this.onclick(event);
         }
+        return pending;
     }
 
     /** グローバルに設置したモック document のフォーカスを更新する。 */
@@ -458,14 +493,13 @@ export function installFakeDom() {
     const head = new FakeElement("head");
     const documentElement = new FakeElement("html");
     documentElement._clientHeight = 720;
-    const document = {
+    const document = Object.assign(new FakeEventTarget(), {
         body,
         head,
         scrollingElement: body,
         documentElement,
         activeElement: null as FakeElement | null,
         visibilityState: "visible" as DocumentVisibilityState,
-        _events: new Map<string, (event: FakeEvent) => void>(),
         /** 指定されたタグのモック要素を作る。 */
         createElement(tagName: string) {
             return new FakeElement(tagName);
@@ -487,29 +521,22 @@ export function installFakeDom() {
         /** head と body から id が一致する要素を探す。 */
         getElementById(id: string) {
             return findElementById(head, id) || findElementById(body, id);
-        },
-        /** イベント種別ごとに最後に登録された listener を記録する。 */
-        addEventListener(type: string, listener: (event: FakeEvent) => void) {
-            this._events.set(type, listener);
         }
-    };
+    });
 
     setGlobalValue("document", document);
-    const window = {
+    const window = Object.assign(new FakeEventTarget(), {
         innerHeight: 720 as number | undefined,
         scrollBy() {},
+        scrollTo(options?: ScrollToOptions) { void options; },
         matchMedia() {
             return { matches: false };
         },
-        getComputedStyle() {
+        getComputedStyle(element: Element) {
+            void element;
             return { overflowY: "visible" };
-        },
-        _events: new Map<string, (event: FakeEvent) => void>(),
-        /** イベント種別ごとに最後に登録された listener を記録する。 */
-        addEventListener(type: string, listener: (event: FakeEvent) => void) {
-            this._events.set(type, listener);
         }
-    };
+    });
     setGlobalValue("window", window);
     setGlobalValue("Element", FakeElement);
     setGlobalValue("HTMLElement", FakeElement);
@@ -588,13 +615,13 @@ export function createDataTransferMock() {
 
 /** listener の存在を確認して呼び、非同期 handler の完了も待てるよう戻り値を返す。 */
 export function invokeListener(
-    element: Element | { _events?: ReadonlyMap<string, (event: FakeEvent) => void | Promise<void>> } | null | undefined,
+    element: Element | FakeEventTarget | null | undefined,
     type: string,
     event: FakeEvent
 ) {
-    const listener = element && "_events" in element ? element._events?.get(type) : null;
-    assert.ok(typeof listener === "function", `${type} listener is missing`);
-    return listener(event);
+    assert.ok(element instanceof FakeEventTarget, "event target is not a DOM mock");
+    assert.ok(element._events.get(type)?.size, `${type} listener is missing`);
+    return element.dispatchListeners(type, event);
 }
 
 /** setTimeout/clearTimeout を記録型 fake に差し替える。 */

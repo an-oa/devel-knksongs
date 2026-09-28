@@ -5,8 +5,8 @@ import {
     estimateInitialResultDisplayCount,
     estimateMasonryVisibleCardCount,
     getMasonryColumnCount
-} from "../_build/app/lib/render/masonry-layout.mjs";
-import { installFakeDom, setGlobalValue } from "./test-helpers.mts";
+} from "../app/lib/render/masonry-layout.mts";
+import { getFakeElement, installFakeDom, setGlobalValue } from "./test-helpers.mts";
 
 test("render masonry: column count follows available width and minimum card width", () => {
     assert.equal(getMasonryColumnCount(1920), 6);
@@ -21,11 +21,11 @@ test("render masonry: one column uses natural height and clears previous absolut
     const cleanup = installFakeDom();
     try {
         const container = document.createElement("div");
-        container._clientWidth = 700;
+        getFakeElement(container)._clientWidth = 700;
         const cards = [100, 200, 80].map((height) => {
             const card = document.createElement("div");
             card.className = "song-card";
-            card._scrollHeight = height;
+            getFakeElement(card)._scrollHeight = height;
             container.appendChild(card);
             return card;
         });
@@ -33,7 +33,7 @@ test("render masonry: one column uses natural height and clears previous absolut
         assert.equal(container.dataset.layoutColumns, "2");
         assert.equal(container.style.height, "200px");
 
-        container._clientWidth = 350;
+        getFakeElement(container)._clientWidth = 350;
         for (const card of cards) {
             Object.defineProperty(card, "scrollHeight", {
                 configurable: true,
@@ -49,10 +49,10 @@ test("render masonry: one column uses natural height and clears previous absolut
             assert.equal(card.style.left, "");
             assert.equal(card.style.transform, "");
             assert.equal(card.dataset.layoutColumn, "0");
-            delete card.scrollHeight;
+            Reflect.deleteProperty(card, "scrollHeight");
         }
 
-        container._clientWidth = 700;
+        getFakeElement(container)._clientWidth = 700;
         applyMasonryLayout(container);
         assert.equal(container.dataset.layoutColumns, "2");
         assert.equal(container.style.height, "200px");
@@ -66,7 +66,7 @@ test("render masonry: measures all new widths before writing any card positions"
     const cleanup = installFakeDom();
     try {
         const container = document.createElement("div");
-        container._clientWidth = 700;
+        getFakeElement(container)._clientWidth = 700;
         const cards = Array.from({ length: 3 }, () => {
             const card = document.createElement("div");
             card.className = "song-card";
@@ -94,8 +94,8 @@ test("render masonry: initial single-column count follows height and thumbnail v
     const cleanup = installFakeDom();
     try {
         const container = document.createElement("div");
-        container._clientWidth = 350;
-        container._rect = { top: 100, bottom: 100, left: 0, right: 350, width: 350, height: 0 };
+        getFakeElement(container)._clientWidth = 350;
+        getFakeElement(container)._rect = { top: 100, bottom: 100, left: 0, right: 350, width: 350, height: 0 };
         const options = { defaultCount: 48, showThumbnails: false, viewportHeight: 850 };
         assert.equal(estimateInitialResultDisplayCount(container, options), 19);
         assert.equal(estimateInitialResultDisplayCount(container, { ...options, showThumbnails: true }), 12);
@@ -103,7 +103,7 @@ test("render masonry: initial single-column count follows height and thumbnail v
         assert.equal(estimateInitialResultDisplayCount(container, { ...options, viewportHeight: 0 }), 48);
         assert.equal(estimateInitialResultDisplayCount(container, { ...options, defaultCount: 5 }), 5);
         assert.equal(estimateInitialResultDisplayCount(null, options), 48);
-        container._clientWidth = 700;
+        getFakeElement(container)._clientWidth = 700;
         assert.equal(estimateInitialResultDisplayCount(container, options), 48);
     } finally {
         cleanup();
@@ -114,11 +114,11 @@ test("render masonry: applies fixed columns and container height", () => {
     const cleanup = installFakeDom();
     try {
         const container = document.createElement("div");
-        container._clientWidth = 224;
+        getFakeElement(container)._clientWidth = 224;
         const cards = Array.from({ length: 3 }, () => document.createElement("div"));
         cards.forEach((card, index) => {
             card.className = "song-card";
-            card._scrollHeight = [100, 80, 40][index];
+            getFakeElement(card)._scrollHeight = [100, 80, 40][index];
             container.appendChild(card);
         });
 
@@ -142,21 +142,22 @@ test("render masonry: reads layout metrics from CSS custom properties", () => {
     const previousGetComputedStyle = globalThis.getComputedStyle;
     try {
         setGlobalValue("getComputedStyle", () => ({
-            getPropertyValue(name) {
-                return {
+            getPropertyValue(name: string) {
+                const values: Record<string, string> = {
                     "--masonry-gap": "12px",
                     "--masonry-min-card-width": "100px",
                     "--masonry-card-content-estimate": "40px"
-                }[name] || "";
+                };
+                return values[name] || "";
             }
         }));
         const container = document.createElement("div");
-        container._clientWidth = 224;
-        container._rect = { top: 100, bottom: 200, left: 0, right: 224, width: 224, height: 100 };
+        getFakeElement(container)._clientWidth = 224;
+        getFakeElement(container)._rect = { top: 100, bottom: 200, left: 0, right: 224, width: 224, height: 100 };
         const cards = Array.from({ length: 2 }, () => document.createElement("div"));
         cards.forEach((card) => {
             card.className = "song-card";
-            card._scrollHeight = 50;
+            getFakeElement(card)._scrollHeight = 50;
             container.appendChild(card);
         });
 
@@ -178,16 +179,16 @@ test("render masonry: estimated visible count expands beyond the minimum for tal
     const cleanup = installFakeDom();
     try {
         const container = document.createElement("div");
-        container._clientWidth = 3840;
-        container._rect = { top: 100, bottom: 200, left: 0, right: 3840, width: 3840, height: 100 };
+        getFakeElement(container)._clientWidth = 3840;
+        getFakeElement(container)._rect = { top: 100, bottom: 200, left: 0, right: 3840, width: 3840, height: 100 };
 
         assert.equal(estimateMasonryVisibleCardCount(container, {
             minItemCount: 48,
             viewportHeight: 2100
         }), 96);
 
-        container._clientWidth = 1920;
-        container._rect = { top: 100, bottom: 200, left: 0, right: 1920, width: 1920, height: 100 };
+        getFakeElement(container)._clientWidth = 1920;
+        getFakeElement(container)._rect = { top: 100, bottom: 200, left: 0, right: 1920, width: 1920, height: 100 };
 
         assert.equal(estimateMasonryVisibleCardCount(container, {
             minItemCount: 48,

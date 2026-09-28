@@ -1,36 +1,53 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createRenderController } from "../_build/app/controllers/render.mjs";
-import { createSearchController } from "../_build/app/controllers/search.mjs";
-import { extractYoutubeInfo } from "../_build/app/controllers/youtube.mjs";
-import { createSearchFiltersController } from "../_build/app/ui/search-filters/controller.mjs";
-import { createDateFilterController } from "../_build/app/ui/date/filter.mjs";
+import { createSongFixture } from "./fixtures/song.mts";
+import { createRenderController } from "../app/controllers/render.mts";
+import { createSearchController } from "../app/controllers/search.mts";
+import { extractYoutubeInfo } from "../app/lib/youtube-url.mts";
+import { createSearchFiltersController } from "../app/ui/search-filters/controller.mts";
+import { createDateFilterController } from "../app/ui/date/filter.mts";
 import {
     createYoutubePlaybackStartResult,
     YOUTUBE_PLAYBACK_START_STATUS
-} from "../_build/app/lib/youtube/playback-start-attempt.mjs";
+} from "../app/lib/youtube/playback-start-attempt.mts";
 import {
     installFakeDom,
     makeRenderRow,
     createDataTransferMock,
-    invokeListener
+    invokeListener,
+    getFakeElement,
+    setGlobalValue
 } from "./test-helpers.mts";
+
+/** 描画と検索の共有データに、省略した初期値を補う。 */
+function createRenderDataState(input: Partial<import("../app/state.types").AppDataState>): import("../app/state.types").AppDataState {
+    return { allSongsRaw: [], currentResults: [], displayLimit: 48, activeBookmark: null, bookmarks: {}, ...input };
+}
 
 /**
  * 再生開始結果の期待値を返す。
  * @param {string} status
  * @returns {{ status: string }}
  */
-function playbackStartResult(status) {
+function playbackStartResult(status: import("../app/lib/youtube/playback-start-attempt.mts").YoutubePlaybackStartStatus) {
     return createYoutubePlaybackStartResult(status);
 }
 
 /**
  * render 系テスト用の UI 状態を作る。
- * @param {*} input
- * @returns {*}
  */
-function createRenderUiState(input) {
+function createRenderUiState<Elements extends {
+    resultList: HTMLElement;
+    resultTailSentinel: HTMLElement;
+}>(input: {
+    el: Elements;
+    selectedFormats?: Set<string>;
+    dataReady?: boolean;
+    activeThumb?: HTMLElement | null;
+    showThumbnails?: boolean;
+    scrollObserver?: IntersectionObserver | null;
+    cardEntriesBySongKey?: Map<string, import("../app/state.types").RenderCardEntry>;
+}) {
     return {
         el: input.el,
         search: {
@@ -52,7 +69,7 @@ function createRenderUiState(input) {
             scrollObserver: input.scrollObserver ?? null
         },
         render: {
-            cardEntriesBySongKey: input.cardEntriesBySongKey ?? new Map()
+            cardEntriesBySongKey: input.cardEntriesBySongKey ?? new Map<string, import("../app/state.types").RenderCardEntry>()
         },
         lookup: {
             songMapByBookmarkKey: new Map(),
@@ -64,14 +81,12 @@ function createRenderUiState(input) {
 
 /**
  * render コントローラー用の依存関数を作る。
- * @param {*} input
- * @returns {*}
  */
-function createRenderCallbacks(input) {
+function createRenderCallbacks(input: Partial<Parameters<typeof createRenderController>[0]["callbacks"]> = {}): Parameters<typeof createRenderController>[0]["callbacks"] {
     const callbacks = input || {};
     return {
         updateThumbnail: callbacks.updateThumbnail || (() => {}),
-        extractYoutubeInfo: callbacks.extractYoutubeInfo || (() => ({ videoId: "", startSeconds: 0 })),
+        extractYoutubeInfo: callbacks.extractYoutubeInfo || (() => ({ videoId: "", startSeconds: 0, isVertical: false })),
         playThumbnail: callbacks.playThumbnail || (() => playbackStartResult(YOUTUBE_PLAYBACK_START_STATUS.FAILED)),
         restoreActivePlayback: callbacks.restoreActivePlayback || (() => {}),
         openBookmarkModal: callbacks.openBookmarkModal || (() => {}),
@@ -85,11 +100,11 @@ function createRenderCallbacks(input) {
 test("render: empty results stop active playback", () => {
     const cleanup = installFakeDom();
     try {
-        const data = {
+        const data = createRenderDataState({
             currentResults: [],
             displayLimit: 48,
             activeBookmark: null
-        };
+        });
         const ui = createRenderUiState({
             activeThumb: document.createElement("div"),
             el: {
@@ -120,11 +135,11 @@ test("render: active card kept in next nodes does not stop playback", () => {
     const cleanup = installFakeDom();
     try {
         const row = makeRenderRow({ songKey: "a::1"});
-        const data = {
+        const data = createRenderDataState({
             currentResults: [row],
             displayLimit: 10,
             activeBookmark: null
-        };
+        });
         const ui = createRenderUiState({
             el: {
                 resultList: document.createElement("div"),
@@ -162,11 +177,11 @@ test("render: active card hidden from next nodes stops playback", () => {
     try {
         const rowA = makeRenderRow({ songKey: "a::1"});
         const rowB = makeRenderRow({ songKey: "b::2", url: "https://youtu.be/video2" });
-        const data = {
+        const data = createRenderDataState({
             currentResults: [rowA],
             displayLimit: 10,
             activeBookmark: null
-        };
+        });
         const ui = createRenderUiState({
             el: {
                 resultList: document.createElement("div"),
@@ -203,11 +218,11 @@ test("render: active card hidden from next nodes stops playback", () => {
 test("render: result cards and empty state use list semantics", () => {
     const cleanup = installFakeDom();
     try {
-        const data = {
+        const data = createRenderDataState({
             currentResults: [makeRenderRow({ songKey: "song:semantic", title: "Semantic Song" })],
             displayLimit: 48,
             activeBookmark: null
-        };
+        });
         const ui = createRenderUiState({
             el: {
                 resultList: document.createElement("ol"),
@@ -225,11 +240,13 @@ test("render: result cards and empty state use list semantics", () => {
 
         const card = ui.el.resultList.children[0];
         const article = card.querySelector("article");
+        assert.ok(article);
         const heading = article.querySelector("h2");
+        assert.ok(heading);
         assert.equal(card.tagName, "LI");
         assert.equal(article.getAttribute("aria-labelledby"), "result-title-1");
         assert.equal(heading.getAttribute("id"), "result-title-1");
-        assert.equal(heading.querySelector(".title").textContent, "Semantic Song");
+        assert.equal(heading.querySelector(".title")?.textContent, "Semantic Song");
 
         data.currentResults = [];
         controller.updateDisplay();
@@ -246,11 +263,11 @@ test("render: cards keep fixed columns while preserving DOM order", () => {
     try {
         const rowA = makeRenderRow({ songKey: "a::1"});
         const rowB = makeRenderRow({ songKey: "b::2", url: "https://www.youtube.com/shorts/video2" });
-        const data = {
+        const data = createRenderDataState({
             currentResults: [rowA, rowB],
             displayLimit: 10,
             activeBookmark: null
-        };
+        });
         const ui = createRenderUiState({
             el: {
                 resultList: document.createElement("div"),
@@ -263,12 +280,14 @@ test("render: cards keep fixed columns while preserving DOM order", () => {
             isAllFormatsSelected: () => true,
             callbacks: createRenderCallbacks()
         });
-        ui.el.resultList._clientWidth = 700;
-        ui.el.resultList._rect = { top: 0, bottom: 200, left: 0, right: 700, width: 700, height: 200 };
+        getFakeElement(ui.el.resultList)._clientWidth = 700;
+        getFakeElement(ui.el.resultList)._rect = { top: 0, bottom: 200, left: 0, right: 700, width: 700, height: 200 };
 
         controller.updateDisplay();
         const entryA = ui.render.cardEntriesBySongKey.get(rowA.songKey);
+        assert.ok(entryA);
         const entryB = ui.render.cardEntriesBySongKey.get(rowB.songKey);
+        assert.ok(entryB);
         assert.equal(ui.el.resultList.children[0], entryA.card);
         assert.equal(ui.el.resultList.children[1], entryB.card);
         assert.equal(entryA.card.style.width, "344px");
@@ -294,11 +313,11 @@ test("render: card height changes only shift cards in the same column", () => {
             makeRenderRow({ songKey: "c::3"}),
             makeRenderRow({ songKey: "d::4"})
         ];
-        const data = {
+        const data = createRenderDataState({
             currentResults: rows,
             displayLimit: 10,
             activeBookmark: null
-        };
+        });
         const ui = createRenderUiState({
             el: {
                 resultList: document.createElement("div"),
@@ -311,17 +330,17 @@ test("render: card height changes only shift cards in the same column", () => {
             isAllFormatsSelected: () => true,
             callbacks: createRenderCallbacks()
         });
-        ui.el.resultList._clientWidth = 700;
-        ui.el.resultList._rect = { top: 0, bottom: 200, left: 0, right: 700, width: 700, height: 200 };
+        getFakeElement(ui.el.resultList)._clientWidth = 700;
+        getFakeElement(ui.el.resultList)._rect = { top: 0, bottom: 200, left: 0, right: 700, width: 700, height: 200 };
 
         controller.updateDisplay();
         const entryA = ui.render.cardEntriesBySongKey.get("a::1");
-        const entryB = ui.render.cardEntriesBySongKey.get("b::2");
-        const entryC = ui.render.cardEntriesBySongKey.get("c::3");
-        const entryD = ui.render.cardEntriesBySongKey.get("d::4");
         assert.ok(entryA);
+        const entryB = ui.render.cardEntriesBySongKey.get("b::2");
         assert.ok(entryB);
+        const entryC = ui.render.cardEntriesBySongKey.get("c::3");
         assert.ok(entryC);
+        const entryD = ui.render.cardEntriesBySongKey.get("d::4");
         assert.ok(entryD);
 
         assert.equal(entryA.card.style.top, "0px");
@@ -329,7 +348,7 @@ test("render: card height changes only shift cards in the same column", () => {
         assert.equal(entryC.card.style.top, "112px");
         assert.equal(entryD.card.style.top, "112px");
 
-        entryA.card._scrollHeight = 400;
+        getFakeElement(entryA.card)._scrollHeight = 400;
         controller.refreshLayout();
 
         assert.equal(entryA.card.style.top, "0px");
@@ -338,7 +357,7 @@ test("render: card height changes only shift cards in the same column", () => {
         assert.equal(entryD.card.style.top, "112px");
         assert.equal(ui.el.resultList.style.height, "512px");
 
-        entryA.card._scrollHeight = 100;
+        getFakeElement(entryA.card)._scrollHeight = 100;
         controller.refreshLayout();
 
         assert.equal(entryC.card.style.top, "112px");
@@ -353,11 +372,11 @@ test("render: refreshLayout shrinks multi-column container height after card hei
     const cleanup = installFakeDom();
     try {
         const row = makeRenderRow({ songKey: "a::1"});
-        const data = {
+        const data = createRenderDataState({
             currentResults: [row],
             displayLimit: 10,
             activeBookmark: null
-        };
+        });
         const ui = createRenderUiState({
             el: {
                 resultList: document.createElement("div"),
@@ -371,14 +390,15 @@ test("render: refreshLayout shrinks multi-column container height after card hei
             callbacks: createRenderCallbacks()
         });
 
-        ui.el.resultList._clientWidth = 700;
+        getFakeElement(ui.el.resultList)._clientWidth = 700;
         controller.updateDisplay();
         const entry = ui.render.cardEntriesBySongKey.get(row.songKey);
-        entry.card._scrollHeight = 400;
+        assert.ok(entry);
+        getFakeElement(entry.card)._scrollHeight = 400;
         controller.refreshLayout();
         assert.equal(ui.el.resultList.style.height, "400px");
 
-        entry.card._scrollHeight = 100;
+        getFakeElement(entry.card)._scrollHeight = 100;
         controller.refreshLayout();
         assert.equal(ui.el.resultList.style.height, "100px");
     } finally {
@@ -399,11 +419,11 @@ test("render: adds footer tags for collaboration, relay, and harmony", () => {
             songKey: "song:solo",
             streamRole: ""
         });
-        const data = {
+        const data = createRenderDataState({
             currentResults: [collabRow, soloRow],
             displayLimit: 10,
             activeBookmark: null
-        };
+        });
         const ui = createRenderUiState({
             el: {
                 resultList: document.createElement("div"),
@@ -420,15 +440,17 @@ test("render: adds footer tags for collaboration, relay, and harmony", () => {
         controller.updateDisplay();
 
         const collabEntry = ui.render.cardEntriesBySongKey.get("song:collab");
+        assert.ok(collabEntry);
         const soloEntry = ui.render.cardEntriesBySongKey.get("song:solo");
+        assert.ok(soloEntry);
         const collabTags = Array.from(collabEntry.card.querySelectorAll(".tag")).map((tag) => tag.textContent);
         const soloTags = Array.from(soloEntry.card.querySelectorAll(".tag")).map((tag) => tag.textContent);
 
         assert.deepEqual(collabTags, ["配信", "コラボ", "リレー", "ハモリ"]);
         assert.deepEqual(soloTags, ["配信"]);
-        assert.equal(collabEntry.card.querySelector(".tag-collab").textContent, "コラボ");
-        assert.equal(collabEntry.card.querySelector(".tag-relay").textContent, "リレー");
-        assert.equal(collabEntry.card.querySelector(".tag-harmony").textContent, "ハモリ");
+        assert.equal(collabEntry.card.querySelector(".tag-collab")?.textContent, "コラボ");
+        assert.equal(collabEntry.card.querySelector(".tag-relay")?.textContent, "リレー");
+        assert.equal(collabEntry.card.querySelector(".tag-harmony")?.textContent, "ハモリ");
     } finally {
         cleanup();
     }
@@ -442,32 +464,32 @@ test("render: explicit video orientation overrides URL heuristic", () => {
             url: "https://youtu.be/video1",
             videoOrientation: "vertical"
         });
-        const data = {
+        const data = createRenderDataState({
             currentResults: [row],
             displayLimit: 10,
             activeBookmark: null
-        };
+        });
         const ui = createRenderUiState({
             el: {
                 resultList: document.createElement("div"),
                 resultTailSentinel: document.createElement("div")
             }
         });
-        let received = null;
+        const received: import("../app/lib/youtube/embed.mts").YoutubeTarget[] = [];
         const controller = createRenderController({
             data,
             ui,
             isAllFormatsSelected: () => true,
             callbacks: createRenderCallbacks({
                 updateThumbnail: (_, yt) => {
-                    received = yt;
+                    received.push(yt);
                 },
                 extractYoutubeInfo
             })
         });
 
         controller.updateDisplay();
-        assert.equal(received && received.isVertical, true);
+        assert.equal(received[0]?.isVertical, true);
     } finally {
         cleanup();
     }
@@ -481,11 +503,11 @@ test("render: playSongByKey expands display limit and starts playback for hidden
             makeRenderRow({ songKey: "song:2", url: "https://youtu.be/video2" }),
             makeRenderRow({ songKey: "song:3", url: "https://youtu.be/video3" })
         ];
-        const data = {
+        const data = createRenderDataState({
             currentResults: rows,
             displayLimit: 1,
             activeBookmark: null
-        };
+        });
         const ui = createRenderUiState({
             showThumbnails: true,
             el: {
@@ -493,7 +515,7 @@ test("render: playSongByKey expands display limit and starts playback for hidden
                 resultTailSentinel: document.createElement("div")
             }
         });
-        const playCalls = [];
+        const playCalls: { thumbDiv: HTMLElement; yt: import("../app/lib/youtube/embed.mts").YoutubeTarget; options: Parameters<Parameters<typeof createRenderController>[0]["callbacks"]["playThumbnail"]>[2] }[] = [];
         const controller = createRenderController({
             data,
             ui,
@@ -536,11 +558,11 @@ test("render: playSongByKey expands display limit in increment-sized chunks", as
             makeRenderRow({ songKey: "song:4"}),
             makeRenderRow({ songKey: "song:5"})
         ];
-        const data = {
+        const data = createRenderDataState({
             currentResults: rows,
             displayLimit: 1,
             activeBookmark: null
-        };
+        });
         const ui = createRenderUiState({
             showThumbnails: true,
             el: {
@@ -571,31 +593,54 @@ test("render: playSongByKey expands display limit in increment-sized chunks", as
 test("bookmark: observes result tail and increases by RESULT_DISPLAY_BATCH_SIZE (48)", () => {
     const cleanup = installFakeDom();
     const previousIntersectionObserver = globalThis.IntersectionObserver;
-    const observers = [];
-    globalThis.IntersectionObserver = class {
-        constructor(callback, options) {
+    const observers: FakeIntersectionObserver[] = [];
+    class FakeIntersectionObserver implements IntersectionObserver {
+        readonly root = null;
+        readonly rootMargin = "0px";
+        readonly scrollMargin = "0px";
+        readonly thresholds = [0];
+        readonly targets: Element[] = [];
+        readonly callback: IntersectionObserverCallback;
+        readonly options?: IntersectionObserverInit;
+        disconnected = false;
+
+        constructor(callback: IntersectionObserverCallback, options?: IntersectionObserverInit) {
             this.callback = callback;
             this.options = options;
-            this.targets = [];
-            this.disconnected = false;
             observers.push(this);
         }
 
-        observe(target) {
-            this.targets.push(target);
+        /** 監視対象を記録する。 */
+        observe(target: Element) { this.targets.push(target); }
+
+        /** 監視対象を解除する。 */
+        unobserve(target: Element) {
+            const index = this.targets.indexOf(target);
+            if (index >= 0) this.targets.splice(index, 1);
         }
 
-        disconnect() {
-            this.disconnected = true;
-        }
+        /** 監視解除を記録する。 */
+        disconnect() { this.disconnected = true; }
 
+        /** 未配信の観測結果は保持しない。 */
+        takeRecords(): IntersectionObserverEntry[] { return []; }
+
+        /** 記録した対象の交差状態を通知する。 */
         trigger(isIntersecting = true) {
-            this.callback(this.targets.map((target) => ({ target, isIntersecting })));
+            this.callback(this.targets.map((target) => ({
+                target, isIntersecting, time: 0,
+                intersectionRatio: isIntersecting ? 1 : 0,
+                boundingClientRect: target.getBoundingClientRect(),
+                intersectionRect: target.getBoundingClientRect(),
+                rootBounds: null
+            })), this);
         }
-    };
+    }
+    globalThis.IntersectionObserver = FakeIntersectionObserver;
     try {
-        const rows = Array.from({ length: 100 }, (_, index) => ({
+        const rows = Array.from({ length: 100 }, (_, index) => createSongFixture({
             songKey: `song-${index + 1}`,
+            bookmarkSongKey: `song-${index + 1}`,
             title: `曲${index + 1}`,
             artist: "artist",
             date: "2024-01-01",
@@ -609,7 +654,7 @@ test("bookmark: observes result tail and increases by RESULT_DISPLAY_BATCH_SIZE 
             titleYomiNorm: "",
             artistYomiNorm: ""
         }));
-        const data = {
+        const data = createRenderDataState({
             allSongsRaw: rows,
             bookmarks: {
                 bm1: {
@@ -620,7 +665,7 @@ test("bookmark: observes result tail and increases by RESULT_DISPLAY_BATCH_SIZE 
             activeBookmark: "bm1",
             currentResults: [],
             displayLimit: 0
-        };
+        });
         const resultTailSentinel = document.createElement("div");
         resultTailSentinel.hidden = true;
         const ui = createRenderUiState({
@@ -645,7 +690,7 @@ test("bookmark: observes result tail and increases by RESULT_DISPLAY_BATCH_SIZE 
             ui,
             isAllFormatsSelected: () => true,
             callbacks: createRenderCallbacks({
-                extractYoutubeInfo: (url) => ({ videoId: String(url || ""), startSeconds: 0 })
+                extractYoutubeInfo: (url) => ({ videoId: String(url || ""), startSeconds: 0, isVertical: false })
             })
         });
 
@@ -675,12 +720,16 @@ test("bookmark: observes result tail and increases by RESULT_DISPLAY_BATCH_SIZE 
         assert.equal(resultTailSentinel.hidden, false);
         assert.equal(observers.length, 1);
 
-        observers.at(-1).trigger();
+        const observer = observers.at(-1);
+        assert.ok(observer);
+        observer.trigger();
         assert.equal(data.displayLimit, 96);
         assert.equal(ui.el.resultList.children.length, 96);
         assert.equal(resultTailSentinel.hidden, false);
 
-        observers.at(-1).trigger();
+        const nextObserver = observers.at(-1);
+        assert.ok(nextObserver);
+        nextObserver.trigger();
         assert.equal(data.displayLimit, 100);
         assert.equal(ui.el.resultList.children.length, 100);
         assert.equal(resultTailSentinel.hidden, true);
@@ -693,25 +742,23 @@ test("bookmark: observes result tail and increases by RESULT_DISPLAY_BATCH_SIZE 
 test("render: result tail fallback increases display limit without IntersectionObserver", () => {
     const cleanup = installFakeDom();
     const previousIntersectionObserver = globalThis.IntersectionObserver;
-    globalThis.IntersectionObserver = undefined;
-    window.removeEventListener = function removeEventListener(type, listener) {
-        if (this._events.get(type) === listener) this._events.delete(type);
-    };
+    setGlobalValue("IntersectionObserver", undefined);
     try {
         const rows = Array.from({ length: 60 }, (_, index) => makeRenderRow({
             songKey: `song-${index + 1}`,
+            bookmarkSongKey: `song-${index + 1}`,
             url: `https://youtu.be/video${index + 1}`
         }));
         const resultTailSentinel = document.createElement("div");
         resultTailSentinel.hidden = true;
-        resultTailSentinel._rect = { top: 1300, bottom: 1301, left: 0, right: 1, width: 1, height: 1 };
-        const data = {
+        getFakeElement(resultTailSentinel)._rect = { top: 1300, bottom: 1301, left: 0, right: 1, width: 1, height: 1 };
+        const data = createRenderDataState({
             allSongsRaw: rows,
             bookmarks: {},
             activeBookmark: null,
             currentResults: rows,
             displayLimit: 48
-        };
+        });
         const ui = createRenderUiState({
             el: {
                 resultList: document.createElement("div"),
@@ -730,15 +777,15 @@ test("render: result tail fallback increases display limit without IntersectionO
         assert.equal(data.displayLimit, 48);
         assert.equal(ui.el.resultList.children.length, 48);
         assert.equal(resultTailSentinel.hidden, false);
-        assert.equal(typeof window._events.get("scroll"), "function");
+        assert.equal(cleanup.window._events.get("scroll")?.size, 1);
 
-        resultTailSentinel._rect = { top: 800, bottom: 801, left: 0, right: 1, width: 1, height: 1 };
-        window._events.get("scroll")();
+        getFakeElement(resultTailSentinel)._rect = { top: 800, bottom: 801, left: 0, right: 1, width: 1, height: 1 };
+        invokeListener(cleanup.window, "scroll", {});
 
         assert.equal(data.displayLimit, 60);
         assert.equal(ui.el.resultList.children.length, 60);
         assert.equal(resultTailSentinel.hidden, true);
-        assert.equal(window._events.has("scroll"), false);
+        assert.equal(cleanup.window._events.has("scroll"), false);
     } finally {
         globalThis.IntersectionObserver = previousIntersectionObserver;
         cleanup();
@@ -748,41 +795,36 @@ test("render: result tail fallback increases display limit without IntersectionO
 test("render: result tail fallback listens to the nearest scrollable ancestor", () => {
     const cleanup = installFakeDom();
     const previousIntersectionObserver = globalThis.IntersectionObserver;
-    globalThis.IntersectionObserver = undefined;
-    window.removeEventListener = function removeEventListener(type, listener) {
-        if (this._events.get(type) === listener) this._events.delete(type);
-    };
+    setGlobalValue("IntersectionObserver", undefined);
     try {
         const rows = Array.from({ length: 60 }, (_, index) => makeRenderRow({
             songKey: `song-${index + 1}`,
+            bookmarkSongKey: `song-${index + 1}`,
             url: `https://youtu.be/video${index + 1}`
         }));
         const scrollContainer = document.createElement("section");
-        scrollContainer._scrollHeight = 2000;
-        scrollContainer._clientHeight = 400;
-        scrollContainer._rect = { top: 100, bottom: 500, left: 0, right: 500, width: 500, height: 400 };
-        scrollContainer.removeEventListener = function removeEventListener(type, listener) {
-            if (this._events.get(type) === listener) this._events.delete(type);
-        };
-        window.getComputedStyle = (element) => ({
+        getFakeElement(scrollContainer)._scrollHeight = 2000;
+        getFakeElement(scrollContainer)._clientHeight = 400;
+        getFakeElement(scrollContainer)._rect = { top: 100, bottom: 500, left: 0, right: 500, width: 500, height: 400 };
+        cleanup.window.getComputedStyle = (element) => ({
             overflowY: element === scrollContainer ? "auto" : "visible"
         });
 
         const resultList = document.createElement("div");
         const resultTailSentinel = document.createElement("div");
         resultTailSentinel.hidden = true;
-        resultTailSentinel._rect = { top: 1200, bottom: 1201, left: 0, right: 1, width: 1, height: 1 };
+        getFakeElement(resultTailSentinel)._rect = { top: 1200, bottom: 1201, left: 0, right: 1, width: 1, height: 1 };
         scrollContainer.appendChild(resultList);
         scrollContainer.appendChild(resultTailSentinel);
         document.body.appendChild(scrollContainer);
 
-        const data = {
+        const data = createRenderDataState({
             allSongsRaw: rows,
             bookmarks: {},
             activeBookmark: null,
             currentResults: rows,
             displayLimit: 48
-        };
+        });
         const ui = createRenderUiState({
             el: {
                 resultList,
@@ -800,17 +842,17 @@ test("render: result tail fallback listens to the nearest scrollable ancestor", 
 
         assert.equal(data.displayLimit, 48);
         assert.equal(resultTailSentinel.hidden, false);
-        assert.equal(typeof scrollContainer._events.get("scroll"), "function");
-        assert.equal(window._events.has("scroll"), false);
-        assert.equal(typeof window._events.get("resize"), "function");
+        assert.equal(getFakeElement(scrollContainer)._events.get("scroll")?.size, 1);
+        assert.equal(cleanup.window._events.has("scroll"), false);
+        assert.equal(cleanup.window._events.get("resize")?.size, 1);
 
-        resultTailSentinel._rect = { top: 900, bottom: 901, left: 0, right: 1, width: 1, height: 1 };
-        scrollContainer._events.get("scroll")();
+        getFakeElement(resultTailSentinel)._rect = { top: 900, bottom: 901, left: 0, right: 1, width: 1, height: 1 };
+        invokeListener(scrollContainer, "scroll", {});
 
         assert.equal(data.displayLimit, 60);
         assert.equal(ui.el.resultList.children.length, 60);
         assert.equal(resultTailSentinel.hidden, true);
-        assert.equal(scrollContainer._events.has("scroll"), false);
+        assert.equal(getFakeElement(scrollContainer)._events.has("scroll"), false);
     } finally {
         globalThis.IntersectionObserver = previousIntersectionObserver;
         cleanup();
@@ -822,7 +864,7 @@ test("render: drag handle is bookmark-only and reorder works in both directions 
     try {
         const rowA = makeRenderRow({ songKey: "a::1", title: "A" });
         const rowB = makeRenderRow({ songKey: "b::2", title: "B", url: "https://youtu.be/video2" });
-        const data = {
+        const data = createRenderDataState({
             currentResults: [rowA, rowB],
             displayLimit: 10,
             activeBookmark: null,
@@ -832,7 +874,7 @@ test("render: drag handle is bookmark-only and reorder works in both directions 
                     songs: [rowA.songKey, rowB.songKey]
                 }
             }
-        };
+        });
         const ui = createRenderUiState({
             el: {
                 resultList: document.createElement("div"),
@@ -858,13 +900,13 @@ test("render: drag handle is bookmark-only and reorder works in both directions 
         assert.equal(normalEntryA.dragHandle.hidden, true);
         assert.equal(normalEntryA.dragHandle.draggable, false);
         assert.equal(normalEntryA.card.draggable, false);
-        assert.equal(normalEntryA.card._events.has("dragstart"), false);
+        assert.equal(getFakeElement(normalEntryA.card)._events.has("dragstart"), false);
 
         data.activeBookmark = "bm1";
         controller.updateDisplay();
         const entryA = ui.render.cardEntriesBySongKey.get(rowA.songKey);
-        const entryB = ui.render.cardEntriesBySongKey.get(rowB.songKey);
         assert.ok(entryA);
+        const entryB = ui.render.cardEntriesBySongKey.get(rowB.songKey);
         assert.ok(entryB);
         assert.equal(entryA.dragHandle.hidden, false);
         assert.equal(entryA.dragHandle.draggable, true);
@@ -910,7 +952,7 @@ test("render: drag reorder forwards reload-required save failures without changi
     try {
         const rowA = makeRenderRow({ songKey: "a::1", title: "A" });
         const rowB = makeRenderRow({ songKey: "b::2", title: "B" });
-        const data = {
+        const data = createRenderDataState({
             currentResults: [rowA, rowB],
             displayLimit: 10,
             activeBookmark: "bm1",
@@ -920,15 +962,15 @@ test("render: drag reorder forwards reload-required save failures without changi
                     songs: [rowA.songKey, rowB.songKey]
                 }
             }
-        };
+        });
         const ui = createRenderUiState({
             el: {
                 resultList: document.createElement("div"),
                 resultTailSentinel: document.createElement("div")
             }
         });
-        const saveFailure = { ok: false, reason: "storage_reload_required" };
-        const notifiedFailures = [];
+        const saveFailure = { ok: false as const, reason: "storage_reload_required" };
+        const notifiedFailures: import("../app/lib/render/drag-reorder.mts").BookmarkDragReorderSaveFailure[] = [];
         const controller = createRenderController({
             data,
             ui,
@@ -941,8 +983,8 @@ test("render: drag reorder forwards reload-required save failures without changi
 
         controller.updateDisplay();
         const entryA = ui.render.cardEntriesBySongKey.get(rowA.songKey);
-        const entryB = ui.render.cardEntriesBySongKey.get(rowB.songKey);
         assert.ok(entryA);
+        const entryB = ui.render.cardEntriesBySongKey.get(rowB.songKey);
         assert.ok(entryB);
 
         const transfer = createDataTransferMock();
@@ -973,7 +1015,7 @@ test("render: active playback card can move back left without jumping to the end
         const rowB = makeRenderRow({ songKey: "b::2", bookmarkSongKey: "videoB::2", title: "B" });
         const rowC = makeRenderRow({ songKey: "c::3", bookmarkSongKey: "videoC::3", title: "C" });
         const rowD = makeRenderRow({ songKey: "d::4", bookmarkSongKey: "videoD::4", title: "D" });
-        const data = {
+        const data = createRenderDataState({
             currentResults: [rowA, rowB, rowC, rowD],
             displayLimit: 10,
             activeBookmark: "bm1",
@@ -983,7 +1025,7 @@ test("render: active playback card can move back left without jumping to the end
                     songs: [rowA.bookmarkSongKey, rowB.bookmarkSongKey, rowC.bookmarkSongKey, rowD.bookmarkSongKey]
                 }
             }
-        };
+        });
         const ui = createRenderUiState({
             el: {
                 resultList: document.createElement("div"),
@@ -1001,13 +1043,13 @@ test("render: active playback card can move back left without jumping to the end
 
         controller.updateDisplay();
         const entryA = ui.render.cardEntriesBySongKey.get(rowA.songKey);
-        const entryB = ui.render.cardEntriesBySongKey.get(rowB.songKey);
         assert.ok(entryA);
+        const entryB = ui.render.cardEntriesBySongKey.get(rowB.songKey);
         assert.ok(entryB);
 
         ui.playback.activeThumb = entryA.thumbDiv;
         ui.playback.activeThumb.appendChild(document.createElement("iframe"));
-        const movedNodes = [];
+        const movedNodes: Node[] = [];
         const originalInsertBefore = ui.el.resultList.insertBefore.bind(ui.el.resultList);
         ui.el.resultList.insertBefore = (node, referenceNode) => {
             movedNodes.push(node);
@@ -1059,7 +1101,10 @@ test("render: active playback card can move back left without jumping to the end
             rowD.bookmarkSongKey
         ]);
         assert.deepEqual(
-            ui.el.resultList.children.map((card) => card.dataset.songKey),
+            Array.from(ui.el.resultList.children, (card) => {
+                assert.ok(card instanceof HTMLElement);
+                return card.dataset.songKey;
+            }),
             [rowA.songKey, rowB.songKey, rowC.songKey, rowD.songKey]
         );
         assert.equal(

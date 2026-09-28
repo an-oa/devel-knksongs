@@ -16,7 +16,7 @@ type BookmarkDragDataTransfer = {
 type BookmarkDragEvent = {
     currentTarget?: EventTarget | null;
     target?: EventTarget | null;
-    dataTransfer: BookmarkDragDataTransfer;
+    dataTransfer: BookmarkDragDataTransfer | null;
     preventDefault: () => void;
 };
 
@@ -83,7 +83,7 @@ export function createBookmarkDragReorderController(input: BookmarkDragReorderCo
         const queue = orderedKeys.slice();
         const nextSongs = bookmark.songs.map((songKey) => {
             if (!reorderSet.has(songKey)) return songKey;
-            return queue.length > 0 ? queue.shift() : songKey;
+            return queue.shift() ?? songKey;
         });
 
         const changed = nextSongs.some((songKey, idx) => songKey !== bookmark.songs[idx]);
@@ -95,7 +95,7 @@ export function createBookmarkDragReorderController(input: BookmarkDragReorderCo
      * @param {BookmarkDragEvent} event
      */
     function onDragStart(event: BookmarkDragEvent): void {
-        if (!data.activeBookmark) {
+        if (!data.activeBookmark || !event.dataTransfer) {
             event.preventDefault();
             return;
         }
@@ -154,7 +154,7 @@ export function createBookmarkDragReorderController(input: BookmarkDragReorderCo
      */
     function onDrop(event: BookmarkDragEvent): void {
         const bookmarkId = data.activeBookmark;
-        if (!bookmarkId) return;
+        if (!bookmarkId || !event.dataTransfer) return;
         event.preventDefault();
         const draggedKey = event.dataTransfer.getData("text/plain");
         const targetCard = getSongCardFromTarget(event.target);
