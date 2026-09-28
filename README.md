@@ -231,7 +231,7 @@ flowchart TD
   - 結果一覧スクロール制御のテスト (`tests/results-scroll.test.mjs`)
   - 検索フィルターUI controllerのテスト (`tests/search-filters-controller.test.mts`)
   - 検索状態保存schemaのテスト (`tests/search-state-schema.test.mts`)
-  - サイドバーUIのテスト (`tests/sidebar-ui.test.mjs`)
+  - サイドバーUIのテスト (`tests/sidebar-ui.test.mts`)
   - 曲データJSONのcontent hash算出テスト (`tests/songs-content-hash.test.mjs`)
   - 曲データソースのJSON優先読み込み/CSVフォールバック/キャッシュ更新テスト (`tests/songs-data-source.test.mjs`)
   - 曲データJSONキャッシュのIndexedDB/旧localStorage移行テスト (`tests/songs-json-cache.test.mjs`)
@@ -241,14 +241,14 @@ flowchart TD
   - 派生JSONのスキーマ・hash整合性検証テスト (`tests/songs-json-validation.test.mjs`)
   - ストレージ(ブックマーク上限/リネーム)の単体テスト (`tests/storage-bookmark-limit.test.mts`)
   - ストレージ(検索状態保存/復元)の単体テスト (`tests/storage-search-state.test.mts`)
-  - UI設定/ストレージ互換のテスト (`tests/ui-storage-compat.test.mjs`)
-  - UI同期のテスト (`tests/ui-sync.test.mjs`)
+  - UI設定/ストレージ互換のテスト (`tests/ui-storage-compat.test.mts`)
+  - UI同期のテスト (`tests/ui-sync.test.mts`)
   - YouTubeサムネイル/埋め込み再生まわりの統合テスト (`tests/youtube-controller.test.mjs`)
   - YouTube埋め込みURL/API loader のテスト (`tests/youtube-embed.test.mjs`)
   - YouTube playback state / start attempt / player adapter の単体テスト (`tests/youtube-playback-state.test.mts`, `tests/youtube-playback-start-attempt.test.mjs`, `tests/youtube-player-adapter.test.mjs`)
   - YouTube shared playback / thumbnail helper / unconfirmed playback start の単体テスト (`tests/youtube-shared-playback.test.mjs`, `tests/youtube-thumbnail.test.mjs`, `tests/youtube-unconfirmed-playback-start.test.mjs`)
   - Chromium 上での YouTube 再生スモークテスト (`tests/e2e/youtube-smoke.spec.mjs`)
-- `tests/test-helpers.mts`、`tests/youtube-harness.mjs`、`tests/support/playback-settings-fixture.mjs`、`tests/e2e/support/mock-youtube.mjs`、`tests/e2e/support/ui-helpers.mjs` は複数テストで共有する補助モジュールです。
+- `tests/test-helpers.mts`、`tests/youtube-harness.mjs`、`tests/support/playback-settings-fixture.mts`、`tests/e2e/support/mock-youtube.mjs`、`tests/e2e/support/ui-helpers.mjs` は複数テストで共有する補助モジュールです。
 - 実行コマンド:
   - `npm run validate:songs-json`
   - `npm run build:ts`

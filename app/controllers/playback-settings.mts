@@ -32,7 +32,7 @@ type PlaybackSettingsUiElements = Pick<
 type PlaybackSettingsUiState = {
     el: PlaybackSettingsUiElements;
     playback: PlaybackUiRuntimeState;
-    search: SearchUiRuntimeState;
+    search: Pick<SearchUiRuntimeState, "dataReady">;
 };
 
 export type PlaybackSettingsConsoleApi = {
@@ -335,10 +335,9 @@ export function createPlaybackSettingsController({ ui, callbacks }: PlaybackSett
 
     /**
      * 保存領域から全再生設定の値を読み出す。
-     * @param {PlaybackSettingDefinition[]} definitions
      * @returns {Map<string, boolean>}
      */
-    function readPlaybackSettingValues(definitions: PlaybackSettingDefinition[]): Map<string, boolean> {
+    function readPlaybackSettingValues(definitions: Extract<PlaybackSettingDefinition, { scope: "persisted" }>[]): Map<string, boolean> {
         return new Map(definitions.map((definition) => [
             definition.stateKey,
             loadStoredBoolean(definition.storageKey, definition.defaultValue)
@@ -440,8 +439,7 @@ export function createPlaybackSettingsController({ ui, callbacks }: PlaybackSett
      * @returns {PlaybackSettingsConsoleApi}
      */
     function createConsoleApi(): PlaybackSettingsConsoleApi {
-        /** @type {PlaybackSettingsConsoleApi} */
-        const api = {
+        const api: PlaybackSettingsConsoleApi = {
             get showExperimentalPlaybackSettings() {
                 return getPlaybackSettingsSnapshot().showExperimentalPlaybackSettings;
             },

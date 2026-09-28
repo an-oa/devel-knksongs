@@ -1,11 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createSidebarController } from "../_build/app/ui/sidebar/ui.mjs";
-import { installFakeDom, invokeListener } from "./test-helpers.mts";
+import { createSidebarController } from "../app/ui/sidebar/ui.mts";
+import { installFakeDom, invokeListener, installFakeAnimationFrames } from "./test-helpers.mts";
 
 /**
  * サイドバーUIテスト用の最小状態を作る。
- * @returns {*}
  */
 function createSidebarUiState() {
     const sidebar = document.createElement("aside");
@@ -50,42 +49,22 @@ function createSidebarUiState() {
     settingsSidebarPanel.hidden = true;
     bookmarkSidebarPanel.hidden = true;
 
-    sidebar.appendChild(sidebarHeader);
-    sidebar.appendChild(sidebarScrollArea);
-    sidebar.appendChild(settingsSidebarPanel);
-    sidebar.appendChild(bookmarkSidebarPanel);
-    document.body.append(
-        mainContent,
-        sidebar,
-        openSidebarBtn,
-        closeSidebarBtn,
-        overlay,
-        clearBtn
+    sidebarHeader.append(closeSidebarBtn, clearBtn);
+    const fromGroup = document.createElement("div");
+    fromGroup.className = "date-select-group";
+    fromGroup.append(dateFromYear, dateFromMonth, dateFromDay);
+    const toGroup = document.createElement("div");
+    toGroup.className = "date-select-group";
+    toGroup.append(dateToYear, dateToMonth, dateToDay);
+    sidebarScrollArea.append(
+        searchBox, fromGroup, clearDateFromBtn, toGroup, clearDateToBtn,
+        collabHostOnly, collabGuestOnly, relayOnly, harmonyOnly,
+        openBookmarkPanelBtn, openSettingsPanelBtn
     );
-
-    sidebar.querySelectorAll = () => [
-        closeSidebarBtn,
-        clearBtn,
-        openSettingsPanelBtn,
-        openBookmarkPanelBtn,
-        closeSettingsPanelBtn,
-        closeSettingsSidebarBtn,
-        closeBookmarkPanelBtn,
-        closeBookmarkSidebarBtn,
-        searchBox,
-        collabHostOnly,
-        collabGuestOnly,
-        relayOnly,
-        harmonyOnly,
-        dateFromYear,
-        dateFromMonth,
-        dateFromDay,
-        dateToYear,
-        dateToMonth,
-        dateToDay,
-        clearDateFromBtn,
-        clearDateToBtn
-    ].filter((element) => !element.hidden && !element.hasAttribute("inert"));
+    settingsSidebarPanel.append(closeSettingsPanelBtn, closeSettingsSidebarBtn);
+    bookmarkSidebarPanel.append(closeBookmarkPanelBtn, closeBookmarkSidebarBtn);
+    sidebar.append(sidebarHeader, sidebarScrollArea, settingsSidebarPanel, bookmarkSidebarPanel);
+    document.body.append(mainContent, sidebar, openSidebarBtn, overlay);
 
     return {
         ui: {
@@ -129,34 +108,37 @@ function createSidebarUiState() {
         closeSidebarBtn,
         overlay,
         mainContent,
-        clearBtn
+        clearBtn,
+        fromGroup
     };
 }
 
-/**
- * サイドバー controller をテスト用の状態で作る。
- * @param {{ ui: object, callbacks: object }} input
- * @returns {object}
- */
-function createSidebarControllerForTest(input) {
-    return createSidebarController(input);
-}
+type BookmarkUiMockOverrides = Partial<NonNullable<
+    ReturnType<Parameters<typeof createSidebarController>[0]["callbacks"]["getBookmarkUiController"]>
+>>;
 
-/**
- * サイドバーコントローラー用のコールバックを作る。
- * @param {*} input
- * @returns {*}
- */
-function createSidebarCallbacks(input) {
-    const state = input || {};
-    const bookmarkUiController = state.bookmarkUiController || {
+/** ブックマーク操作の既定モックと、モーダルを開く呼び出し記録を作る。 */
+function createBookmarkUiMock(overrides: BookmarkUiMockOverrides = {}) {
+    const openBookmarkCalls: Parameters<NonNullable<BookmarkUiMockOverrides["openBookmarkModal"]>>[] = [];
+    const controller = {
         closeBookmarkModal() {},
         openBookmarkBrowser() {},
         setupBookmarkHandlers() {},
-        openBookmarkModal() {},
+        openBookmarkModal(...args: Parameters<NonNullable<BookmarkUiMockOverrides["openBookmarkModal"]>>) {
+            openBookmarkCalls.push(args);
+        },
         removeSongFromActiveBookmark() {},
-        clearActiveBookmark() {}
+        ...overrides
     };
+    return { controller, openBookmarkCalls };
+}
+
+/** サイドバーコントローラー用のコールバックを作る。 */
+function createSidebarCallbacks(state: {
+    bookmarkUiController?: ReturnType<typeof createBookmarkUiMock>["controller"];
+    onOpenChange?: Parameters<typeof createSidebarController>[0]["callbacks"]["onOpenChange"];
+} = {}): Parameters<typeof createSidebarController>[0]["callbacks"] {
+    const bookmarkUiController = state.bookmarkUiController ?? createBookmarkUiMock().controller;
     return {
         getBookmarkUiController: () => bookmarkUiController,
         isIOSWebKit: () => false,
@@ -175,19 +157,14 @@ test("sidebar: opening settings panel makes background inert and focuses back bu
     try {
         const { ui, openSidebarBtn } = createSidebarUiState();
         let closedBookmarkModal = 0;
-        const controller = createSidebarControllerForTest({
+        const controller = createSidebarController({
             ui,
             callbacks: createSidebarCallbacks({
-                bookmarkUiController: {
+                bookmarkUiController: createBookmarkUiMock({
                     closeBookmarkModal() {
                         closedBookmarkModal += 1;
-                    },
-                    openBookmarkBrowser() {},
-                    setupBookmarkHandlers() {},
-                    openBookmarkModal() {},
-                    removeSongFromActiveBookmark() {},
-                    clearActiveBookmark() {}
-                }
+                    }
+                }).controller
             })
         });
 
@@ -210,7 +187,7 @@ test("sidebar: escape closes settings panel, removes inert, and restores focus",
     const restoreDom = installFakeDom();
     try {
         const { ui, openSidebarBtn } = createSidebarUiState();
-        const controller = createSidebarControllerForTest({
+        const controller = createSidebarController({
             ui,
             callbacks: createSidebarCallbacks()
         });
@@ -219,8 +196,8 @@ test("sidebar: escape closes settings panel, removes inert, and restores focus",
         invokeListener(openSidebarBtn, "click", {});
         invokeListener(ui.el.openSettingsPanelBtn, "click", {});
 
-        const keydownListener = document._events.get("keydown");
-        assert.equal(typeof keydownListener, "function");
+        const keydownListener = restoreDom.document._events.get("keydown");
+        assert.ok(keydownListener);
         let prevented = false;
         keydownListener({
             key: "Escape",
@@ -247,21 +224,10 @@ test("sidebar: openBookmarkModal opens sidebar first when closed and passes clos
         const launcher = document.createElement("button");
         document.body.appendChild(launcher);
         launcher.focus();
-        const openBookmarkCalls = [];
-        const controller = createSidebarControllerForTest({
+        const { controller: bookmarkUiController, openBookmarkCalls } = createBookmarkUiMock();
+        const controller = createSidebarController({
             ui,
-            callbacks: createSidebarCallbacks({
-                bookmarkUiController: {
-                    closeBookmarkModal() {},
-                    openBookmarkBrowser() {},
-                    setupBookmarkHandlers() {},
-                    openBookmarkModal(songKey, options) {
-                        openBookmarkCalls.push({ songKey, options });
-                    },
-                    removeSongFromActiveBookmark() {},
-                    clearActiveBookmark() {}
-                }
-            })
+            callbacks: createSidebarCallbacks({ bookmarkUiController })
         });
 
         controller.setupUIHandlers();
@@ -269,9 +235,11 @@ test("sidebar: openBookmarkModal opens sidebar first when closed and passes clos
 
         assert.equal(ui.el.sidebar.classList.contains("active"), true);
         assert.equal(openBookmarkCalls.length, 1);
-        assert.equal(openBookmarkCalls[0].songKey, "song-42");
-        assert.equal(openBookmarkCalls[0].options.returnFocusEl, launcher);
-        assert.equal(openBookmarkCalls[0].options.closeSidebarOnExit, true);
+        const [songKey, options] = openBookmarkCalls[0];
+        assert.equal(songKey, "song-42");
+        assert.ok(options);
+        assert.equal(options.returnFocusEl, launcher);
+        assert.equal(options.closeSidebarOnExit, true);
         assert.equal(document.activeElement, closeSidebarBtn);
     } finally {
         restoreDom();
@@ -283,8 +251,8 @@ test("sidebar: open button aria-expanded follows sidebar open state", () => {
     try {
         const { ui, openSidebarBtn, overlay, mainContent } = createSidebarUiState();
         openSidebarBtn.setAttribute("aria-expanded", "false");
-        const openChangeCalls = [];
-        const controller = createSidebarControllerForTest({
+        const openChangeCalls: boolean[] = [];
+        const controller = createSidebarController({
             ui,
             callbacks: createSidebarCallbacks({
                 onOpenChange(open) {
@@ -324,7 +292,7 @@ test("sidebar: native popover opens without fallback overlay and backdrop click 
         ui.el.sidebar.hidePopover = () => {
             hidePopoverCount += 1;
         };
-        const controller = createSidebarControllerForTest({
+        const controller = createSidebarController({
             ui,
             callbacks: createSidebarCallbacks()
         });
@@ -356,19 +324,14 @@ test("sidebar: escape prioritizes settings panel over bookmark panel", () => {
     try {
         const { ui, openSidebarBtn } = createSidebarUiState();
         let bookmarkCloseCount = 0;
-        const controller = createSidebarControllerForTest({
+        const controller = createSidebarController({
             ui,
             callbacks: createSidebarCallbacks({
-                bookmarkUiController: {
+                bookmarkUiController: createBookmarkUiMock({
                     closeBookmarkModal() {
                         bookmarkCloseCount += 1;
-                    },
-                    openBookmarkBrowser() {},
-                    setupBookmarkHandlers() {},
-                    openBookmarkModal() {},
-                    removeSongFromActiveBookmark() {},
-                    clearActiveBookmark() {}
-                }
+                    }
+                }).controller
             })
         });
 
@@ -378,7 +341,8 @@ test("sidebar: escape prioritizes settings panel over bookmark panel", () => {
         ui.el.bookmarkSidebarPanel.hidden = false;
         ui.el.openSettingsPanelBtn.focus();
 
-        const keydownListener = document._events.get("keydown");
+        const keydownListener = restoreDom.document._events.get("keydown");
+        assert.ok(keydownListener);
         let prevented = false;
         keydownListener({
             key: "Escape",
@@ -399,25 +363,16 @@ test("sidebar: escape prioritizes settings panel over bookmark panel", () => {
 
 test("sidebar: ios year change clears lower date selects and removes updating class after two frames", () => {
     const restoreDom = installFakeDom();
-    const previousRequestAnimationFrame = globalThis.requestAnimationFrame;
-    const frameQueue = [];
-    globalThis.requestAnimationFrame = (callback) => {
-        frameQueue.push(callback);
-        return frameQueue.length;
-    };
+    const frames = installFakeAnimationFrames();
     try {
-        const { ui } = createSidebarUiState();
-        const fromGroup = document.createElement("div");
-        fromGroup.className = "date-select-group";
-        fromGroup.append(ui.el.dateFromYear, ui.el.dateFromMonth, ui.el.dateFromDay);
-        ui.el.sidebar.appendChild(fromGroup);
+        const { ui, fromGroup } = createSidebarUiState();
         ui.el.dateFromYear.value = "2026";
         ui.el.dateFromMonth.value = "03";
         ui.el.dateFromDay.value = "11";
-        const markFilterTouchedArgs = [];
+        const markFilterTouchedArgs: ({ immediate?: boolean } | undefined)[] = [];
         let clampCount = 0;
         let syncCount = 0;
-        const controller = createSidebarControllerForTest({
+        const controller = createSidebarController({
             ui,
             callbacks: {
                 ...createSidebarCallbacks(),
@@ -444,55 +399,12 @@ test("sidebar: ios year change clears lower date selects and removes updating cl
         assert.equal(clampCount, 1);
         assert.equal(syncCount, 1);
 
-        frameQueue.shift()();
+        frames.advanceFrame();
         assert.equal(fromGroup.classList.contains("is-updating"), true);
-        frameQueue.shift()();
+        frames.advanceFrame();
         assert.equal(fromGroup.classList.contains("is-updating"), false);
     } finally {
-        globalThis.requestAnimationFrame = previousRequestAnimationFrame;
-        restoreDom();
-    }
-});
-
-test("sidebar: tab focus is trapped within the active sidebar in both directions", () => {
-    const restoreDom = installFakeDom();
-    try {
-        const { ui, openSidebarBtn, closeSidebarBtn } = createSidebarUiState();
-        const controller = createSidebarControllerForTest({
-            ui,
-            callbacks: createSidebarCallbacks()
-        });
-
-        controller.setupUIHandlers();
-        invokeListener(openSidebarBtn, "click", {});
-
-        const keydownListener = document._events.get("keydown");
-        let preventedForward = false;
-        ui.el.clearDateToBtn.focus();
-        keydownListener({
-            key: "Tab",
-            shiftKey: false,
-            preventDefault() {
-                preventedForward = true;
-            }
-        });
-
-        assert.equal(preventedForward, true);
-        assert.equal(document.activeElement, closeSidebarBtn);
-
-        let preventedBackward = false;
-        closeSidebarBtn.focus();
-        keydownListener({
-            key: "Tab",
-            shiftKey: true,
-            preventDefault() {
-                preventedBackward = true;
-            }
-        });
-
-        assert.equal(preventedBackward, true);
-        assert.equal(document.activeElement, ui.el.clearDateToBtn);
-    } finally {
+        frames.cleanup();
         restoreDom();
     }
 });

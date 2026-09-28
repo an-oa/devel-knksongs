@@ -47,17 +47,18 @@ export type PlaybackSettingKind = typeof PLAYBACK_SETTING_KINDS[keyof typeof PLA
  * 再生設定 1 件の定義。
  */
 export type PlaybackSettingDefinition = {
-    scope: PlaybackSettingScope;
     kind: PlaybackSettingKind;
     stateKey: keyof PlaybackSettingsUiSlice;
     elementKey?: PlaybackSettingElementKey;
-    storageKey?: string;
     defaultValue: boolean;
     hiddenValue?: boolean;
     effectiveWhenHidden?: boolean;
     interactive?: boolean;
     restoreActivePlaybackOnChange?: boolean;
-};
+} & (
+    | { scope: typeof PLAYBACK_SETTING_SCOPES.PERSISTED; storageKey: string }
+    | { scope: typeof PLAYBACK_SETTING_SCOPES.PAGE; storageKey?: never }
+);
 
 type PlaybackSettingDefinitionSet = {
     pagePlaybackBehaviorDefinitions: PlaybackSettingDefinition[];

@@ -59,11 +59,11 @@
   - `tests/render-masonry-layout.test.mjs`
   - `tests/search-filters-controller.test.mts`
   - `tests/search-state-schema.test.mts`
-  - `tests/sidebar-ui.test.mjs`
+  - `tests/sidebar-ui.test.mts`
   - `tests/storage-bookmark-limit.test.mts`
   - `tests/storage-search-state.test.mts`
-  - `tests/ui-storage-compat.test.mjs`
-  - `tests/ui-sync.test.mjs`
+  - `tests/ui-storage-compat.test.mts`
+  - `tests/ui-sync.test.mts`
   - `tests/youtube-controller.test.mjs`
   - `tests/youtube-embed.test.mjs`
   - `tests/youtube-playback-start-attempt.test.mjs`
@@ -87,7 +87,7 @@
   - `tests/fixtures/search-song.mts`
   - `tests/test-helpers.mts`
   - `tests/youtube-harness.mjs`
-  - `tests/support/playback-settings-fixture.mjs`
+  - `tests/support/playback-settings-fixture.mts`
   - `tests/e2e/support/mock-youtube.mjs`
   - `tests/e2e/support/ui-helpers.mjs`
 - 実行コマンド:

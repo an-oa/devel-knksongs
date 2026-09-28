@@ -190,6 +190,32 @@ test("sidebar native popover backdrop click closes and restores focus", async ({
     await expect(openButton).toBeFocused();
 });
 
+test("sidebar Tab navigation stays in the active panel after switching panels", async ({ page }) => {
+    await openSidebar(page);
+    const states = [
+        { opener: null, first: "#close-sidebar", last: "#open-settings-panel" },
+        { opener: "#open-settings-panel", first: "#close-settings-panel", last: "#theme-toggle" },
+        { opener: "#open-bookmark-panel", first: "#close-bookmark-panel", last: "#bookmark-panel-export-btn" }
+    ];
+    for (const { opener, first, last } of states) {
+        if (opener) await page.locator(opener).click();
+        if (opener === "#open-settings-panel") {
+            await page.locator("#thumbnail-toggle").uncheck();
+            await expect(page.locator("#playback-settings-group")).toBeHidden();
+        }
+        await page.locator(first).focus();
+        await expect(page.locator(first)).toBeFocused();
+        await page.keyboard.press("Shift+Tab");
+        await expect(page.locator(last)).toBeFocused();
+        await page.keyboard.press("Tab");
+        await expect(page.locator(first)).toBeFocused();
+        if (opener) {
+            await page.locator(first).click();
+            await expect(page.locator(opener)).toBeFocused();
+        }
+    }
+});
+
 test("search box date operators validate input and filter songs", async ({ page }) => {
     await openSidebar(page);
 

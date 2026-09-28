@@ -75,6 +75,8 @@ class FakeElement {
     style: Partial<CSSStyleDeclaration> = {};
     attributes = new Map<string, string>();
     onclick: ((event: FakeEvent) => void) | null = null;
+    // 機能判定を変えないよう、matches は必要なテストだけで設定する。
+    matches?: (selector: string) => boolean;
     textContent = "";
     _innerHTML = "";
     hidden = false;
@@ -360,18 +362,35 @@ function findElementById(root: FakeElement | null, id: string): FakeElement | nu
 
 /** テストで使うクラス・タグ・属性セレクターの判定を作る。 */
 function createMatcher(selector: string): (element: FakeElement) => boolean {
+    if (selector.includes(",")) {
+        const matchers = selector.split(",").map((part) => createMatcher(part.trim()));
+        return (el) => matchers.some((matches) => matches(el));
+    }
+    const negation = selector.match(/^(.*):not\(([^()]+)\)$/);
+    if (negation) {
+        const matches = createMatcher(negation[1]);
+        const excludes = createMatcher(negation[2]);
+        return (el) => matches(el) && !excludes(el);
+    }
+    const attribute = selector.match(/^([a-zA-Z0-9-]*)\[([a-zA-Z0-9:-]+)(?:="([^"]*)")?\]$/);
+    if (attribute) {
+        const [, tag, name, value] = attribute;
+        return (el) => (!tag || el.tagName === tag.toUpperCase()) && (value === undefined
+            ? el.hasAttribute(name)
+            : el.getAttribute(name) === value || Reflect.get(el, name) === value);
+    }
     if (selector.startsWith(".")) {
         const targetClass = selector.slice(1);
         return (el) => el.classList.contains(targetClass);
     }
-    const attrSelector = selector.match(/^([a-zA-Z0-9-]+)\[([a-zA-Z0-9:-]+)="([^"]*)"\]$/);
-    if (attrSelector) {
-        const [, tagName, attrName, attrValue] = attrSelector;
-        const tag = tagName.toUpperCase();
-        return (el) => el.tagName === tag && (Reflect.get(el, attrName) === attrValue || el.getAttribute(attrName) === attrValue);
-    }
     const tag = selector.toUpperCase();
     return (el) => el.tagName === tag;
+}
+
+/** 設置した DOM モックであることを確認し、モック固有の設定を操作する。 */
+export function getFakeElement(element: Element): FakeElement {
+    assert.ok(element instanceof FakeElement, "element is not a DOM mock");
+    return element;
 }
 
 /** テスト用の単純な HTML をモック要素の木へ変換する。 */
@@ -445,6 +464,7 @@ export function installFakeDom() {
         scrollingElement: body,
         documentElement,
         activeElement: null as FakeElement | null,
+        visibilityState: "visible" as DocumentVisibilityState,
         _events: new Map<string, (event: FakeEvent) => void>(),
         /** 指定されたタグのモック要素を作る。 */
         createElement(tagName: string) {
@@ -603,6 +623,38 @@ export function installFakeTimeouts() {
         cleanup() {
             setGlobalValue("setTimeout", previousSetTimeout);
             setGlobalValue("clearTimeout", previousClearTimeout);
+        }
+    };
+}
+
+/** アニメーションフレームを保留し、明示的に1フレームずつ進める。 */
+export function installFakeAnimationFrames() {
+    const previousRequest = globalThis.requestAnimationFrame;
+    const previousCancel = globalThis.cancelAnimationFrame;
+    const pending = new Map<number, FrameRequestCallback>();
+    let nextId = 0;
+    globalThis.requestAnimationFrame = (callback) => {
+        const id = ++nextId;
+        pending.set(id, callback);
+        return id;
+    };
+    globalThis.cancelAnimationFrame = (id) => { pending.delete(id); };
+    return {
+        get pendingCount() { return pending.size; },
+        /** 現在のフレームを実行し、追加予約は次のフレームへ残す。 */
+        advanceFrame(timestamp = 0) {
+            assert.ok(pending.size > 0, "no animation frame is pending");
+            for (const id of [...pending.keys()]) {
+                const callback = pending.get(id);
+                pending.delete(id);
+                callback?.(timestamp);
+            }
+        },
+        /** 元のフレーム関数へ戻して残りの予約を破棄する。 */
+        cleanup() {
+            globalThis.requestAnimationFrame = previousRequest;
+            globalThis.cancelAnimationFrame = previousCancel;
+            pending.clear();
         }
     };
 }

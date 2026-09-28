@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { applyThemeFromStorage, setupTheme } from "../_build/app/ui/core/elements.mjs";
+import { applyThemeFromStorage, setupTheme } from "../app/ui/core/elements.mts";
+import { createFakeLocalStorage } from "./fixtures/local-storage.mts";
 import { installFakeDom, invokeListener } from "./test-helpers.mts";
 import {
     assertExperimentalPlaybackSettingsHidden,
@@ -8,10 +9,9 @@ import {
     assertLegacyPlaybackSettingsStorageCleared,
     assertPlaybackSettingsGroupHidden,
     assertPlaybackSettingsGroupVisible,
-    createFakeLocalStorage,
     createPlaybackSettingsFixture,
     seedPlaybackSettingsStorage
-} from "./support/playback-settings-fixture.mjs";
+} from "./support/playback-settings-fixture.mts";
 
 test("applyThemeFromStorage: main branch theme key restores dark mode state", () => {
     const restoreDom = installFakeDom();
