@@ -140,11 +140,11 @@ export function resolveYoutubeEmbedHostFromUrl(iframeSrc: string | null | undefi
 
 /**
  * 埋め込み再生用の標準 YouTube URL を生成する。
- * @param {YoutubeTarget} yt
+ * @param yt 動画IDと再生開始位置
  * @param {{ endSeconds?: number | null, autoplay?: boolean, useYoutubeNoCookie?: boolean } | undefined} options
  * @returns {string}
  */
-export function buildYoutubeEmbedUrl(yt: YoutubeTarget, options?: { endSeconds?: number | null; autoplay?: boolean; useYoutubeNoCookie?: boolean }) {
+export function buildYoutubeEmbedUrl(yt: Pick<YoutubeTarget, "videoId" | "startSeconds">, options?: { endSeconds?: number | null; autoplay?: boolean; useYoutubeNoCookie?: boolean }) {
     const autoplay = options && options.autoplay === true ? "1" : "0";
     const embedHost = resolveYoutubeEmbedHost(options);
     const params = new URLSearchParams({

@@ -14,7 +14,9 @@ type PlaybackSessionCallbacks = {
 
 type PlaybackSessionControllerInput = {
     data: Pick<AppDataState, "currentResults">;
-    ui: Pick<AppUiState, "playback">;
+    ui: {
+        playback: Pick<AppUiState["playback"], "continuousPlayback" | "loopPlayback" | "activeThumb">;
+    };
     callbacks: PlaybackSessionCallbacks;
 };
 

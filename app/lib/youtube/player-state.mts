@@ -1,4 +1,4 @@
-import type { YoutubePlayerLike } from "../../state.types";
+import type { YoutubePlayerLike } from "./iframe-api.types";
 
 export const YOUTUBE_PLAYER_STATE = Object.freeze({
     UNSTARTED: -1,

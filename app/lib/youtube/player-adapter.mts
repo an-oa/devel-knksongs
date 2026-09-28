@@ -1,23 +1,24 @@
 import { isHtmlElement } from "../dom-utils.mjs";
 import { resolveYoutubeEmbedHostFromUrl } from "./embed.mjs";
+import type { YoutubeSharedPlaybackState } from "../../state.types";
+import type { YoutubePlayerEvent, YoutubePlayerLike } from "./iframe-api.types";
 
-/**
- * 共有 iframe に YouTube Iframe API の Player を紐付ける adapter を作成する。
- * @param {{
- *   getSharedPlaybackState: Function,
- *   setPendingAttach: Function,
- *   setSessionId: Function,
- *   ensureReady: Function,
- *   applyIframeAttributes: Function,
- *   syncIframe: Function,
- *   handleStateChange: Function,
- *   handlePlayerError: Function,
- *   handleAttachFailure?: Function,
- *   debug?: Function
- * }} input
- * @returns {{ attach: Function }}
- */
-export function createYoutubePlayerAdapter(input) {
+type YoutubePlayerAdapterInput = {
+    getSharedPlaybackState: () => Pick<YoutubeSharedPlaybackState,
+        "player" | "playerPromise" | "pendingAttach" | "parkingNode">;
+    setPendingAttach: (iframe: HTMLIFrameElement | null, playbackSessionId: number) => void;
+    setSessionId: (playbackSessionId: number) => void;
+    ensureReady: () => Promise<unknown>;
+    applyIframeAttributes: (iframe: Element | null) => void;
+    syncIframe: () => void;
+    handleStateChange: (event: YoutubePlayerEvent, playbackSessionId: number) => void;
+    handlePlayerError: (event: YoutubePlayerEvent, playbackSessionId: number) => void;
+    handleAttachFailure?: (error: unknown, playbackSessionId: number) => YoutubePlayerLike | null | Promise<YoutubePlayerLike | null>;
+    debug?: (message: string, details: unknown) => void;
+};
+
+/** 共有 iframe に YouTube Iframe API の Player を紐付ける adapter を作成する。 */
+export function createYoutubePlayerAdapter(input: YoutubePlayerAdapterInput) {
     const {
         getSharedPlaybackState,
         setPendingAttach,
@@ -33,11 +34,11 @@ export function createYoutubePlayerAdapter(input) {
 
     /**
      * 生成済み iframe へ YouTube プレイヤーを紐付ける。
-     * @param {*} iframe
+     * @param iframe プレーヤーを紐付けるiframe
      * @param {number} playbackSessionId
-     * @returns {Promise<*>}
+     * @returns 作成したプレーヤー、または紐付け不要な場合はnull
      */
-    function attach(iframe, playbackSessionId) {
+    function attach(iframe: HTMLIFrameElement | null, playbackSessionId: number): Promise<YoutubePlayerLike | null> {
         const sharedPlayback = getSharedPlaybackState();
         setPendingAttach(iframe, playbackSessionId);
         if (sharedPlayback.playerPromise) {
@@ -59,14 +60,13 @@ export function createYoutubePlayerAdapter(input) {
             const nextPlaybackSessionId = pendingAttach.playbackSessionId;
             setSessionId(nextPlaybackSessionId);
             if (!isHtmlElement(nextIframe)) return null;
-            const nextIframeElement = nextIframe as HTMLIFrameElement;
             if (!document.body.contains(nextIframe)) return null;
             if (latestSharedPlayback.parkingNode && nextIframe.parentElement === latestSharedPlayback.parkingNode) {
                 return null;
             }
             if (latestSharedPlayback.player) return latestSharedPlayback.player;
             latestSharedPlayback.player = new window.YT.Player(nextIframe, {
-                host: resolveYoutubeEmbedHostFromUrl(nextIframeElement.src),
+                host: resolveYoutubeEmbedHostFromUrl(nextIframe.src),
                 events: {
                     onReady: (event) => {
                         applyIframeAttributes(

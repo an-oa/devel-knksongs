@@ -8,7 +8,8 @@ import {
     createYoutubeIframeApiLoader,
     resolveYoutubeEmbedHost,
     resolveYoutubeEmbedHostFromUrl
-} from "../_build/app/lib/youtube/embed.mjs";
+} from "../app/lib/youtube/embed.mts";
+import { createYoutubeIframeApiFixture } from "./fixtures/youtube-api.mts";
 import { installFakeDom } from "./test-helpers.mts";
 
 test("youtube embed: buildYoutubeEmbedUrl includes playback params and optional end", () => {
@@ -101,7 +102,7 @@ test("youtube embed: applyYoutubePlayerIframeAttributes updates iframe attribute
 test("youtube embed: createYoutubeIframeApiLoader appends iframe api script and resolves on ready", async () => {
     const cleanup = installFakeDom();
     try {
-        const youtube = { apiPromise: null };
+        const youtube: Parameters<typeof createYoutubeIframeApiLoader>[0]["youtube"] = { apiPromise: null };
         const loader = createYoutubeIframeApiLoader({
             youtube,
             iframeApiSrc: "https://www.youtube.com/iframe_api",
@@ -110,14 +111,15 @@ test("youtube embed: createYoutubeIframeApiLoader appends iframe api script and 
         });
 
         const pending = loader.ensureReady();
-        const script = document.head.children[0] || null;
+        const script = document.head.querySelector("script");
 
         assert.ok(script);
         assert.equal(script.tagName, "SCRIPT");
         assert.equal(script.src, "https://www.youtube.com/iframe_api");
         assert.ok(youtube.apiPromise);
 
-        globalThis.window.YT = { Player: class {} };
+        globalThis.window.YT = createYoutubeIframeApiFixture().api;
+        assert.ok(globalThis.window.onYouTubeIframeAPIReady);
         globalThis.window.onYouTubeIframeAPIReady();
 
         await pending;
@@ -130,7 +132,7 @@ test("youtube embed: createYoutubeIframeApiLoader appends iframe api script and 
 test("youtube embed: failed iframe api load clears cache and can retry", async () => {
     const cleanup = installFakeDom();
     try {
-        const youtube = { apiPromise: null };
+        const youtube: Parameters<typeof createYoutubeIframeApiLoader>[0]["youtube"] = { apiPromise: null };
         const loader = createYoutubeIframeApiLoader({
             youtube,
             iframeApiSrc: "https://www.youtube.com/iframe_api",
@@ -141,10 +143,11 @@ test("youtube embed: failed iframe api load clears cache and can retry", async (
         globalThis.window.onYouTubeIframeAPIReady = previousReady;
 
         const failedLoad = loader.ensureReady();
-        const failedScript = document.head.children[0] || null;
+        const failedScript = document.head.querySelector("script");
         assert.ok(failedScript);
 
-        failedScript.onerror();
+        assert.ok(failedScript.onerror);
+        failedScript.onerror(new Event("error"));
 
         await assert.rejects(failedLoad, /iframe_api load failed/);
         assert.equal(youtube.apiPromise, null);
@@ -152,11 +155,12 @@ test("youtube embed: failed iframe api load clears cache and can retry", async (
         assert.equal(globalThis.window.onYouTubeIframeAPIReady, previousReady);
 
         const retryLoad = loader.ensureReady();
-        const retryScript = document.head.children[0] || null;
+        const retryScript = document.head.querySelector("script");
         assert.ok(retryScript);
         assert.notEqual(retryScript, failedScript);
 
-        globalThis.window.YT = { Player: class {} };
+        globalThis.window.YT = createYoutubeIframeApiFixture().api;
+        assert.ok(globalThis.window.onYouTubeIframeAPIReady);
         globalThis.window.onYouTubeIframeAPIReady();
 
         await retryLoad;

@@ -52,7 +52,7 @@
   - `tests/format-filter.test.mts`
   - `tests/pages-artifact.test.mjs`
   - `tests/playback-sequence.test.mts`
-  - `tests/playback-session-controller.test.mjs`
+  - `tests/playback-session-controller.test.mts`
   - `tests/playback-settings-value-reducer.test.mts`
   - `tests/render-drag-reorder.test.mts`
   - `tests/render-layout.test.mts`
@@ -65,12 +65,12 @@
   - `tests/ui-storage-compat.test.mts`
   - `tests/ui-sync.test.mts`
   - `tests/youtube-controller.test.mjs`
-  - `tests/youtube-embed.test.mjs`
+  - `tests/youtube-embed.test.mts`
   - `tests/youtube-playback-start-attempt.test.mjs`
   - `tests/youtube-playback-state.test.mts`
-  - `tests/youtube-player-adapter.test.mjs`
+  - `tests/youtube-player-adapter.test.mts`
   - `tests/youtube-shared-playback.test.mjs`
-  - `tests/youtube-thumbnail.test.mjs`
+  - `tests/youtube-thumbnail.test.mts`
   - `tests/youtube-unconfirmed-playback-start.test.mjs`
   - `tests/layout-anchor.test.mts`
   - `tests/results-scroll.test.mts`

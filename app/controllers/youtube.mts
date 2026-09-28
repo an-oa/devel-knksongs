@@ -49,9 +49,9 @@ import {
 import { createYoutubePostPlaybackAdRestoreManager } from "../lib/youtube/post-playback-ad-restore.mjs";
 import type {
     AppUiState,
-    AppYoutubeRuntimeState,
-    YoutubePlayerLike
+    AppYoutubeRuntimeState
 } from "../state.types";
+import type { YoutubePlayerEvent } from "../lib/youtube/iframe-api.types";
 
 export { extractYoutubeInfo } from "../lib/youtube-url.mjs";
 
@@ -60,11 +60,6 @@ type YoutubeConstants = {
     YT_IFRAME_API_SELECTOR: string;
     YT_IFRAME_READY_POLL_MS: number;
     STOP_PLAYBACK_ON_SCROLL_OUT: boolean;
-};
-
-type YoutubePlayerStateEvent = {
-    data?: number;
-    target?: YoutubePlayerLike;
 };
 
 type YoutubePlaybackError = Error & {
@@ -221,12 +216,12 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
     /**
      * state change event が示す状態と、プレーヤーが現在返す状態の不一致を検出する。
      * 古い再生から遅れて届いたイベントを誤処理しないために使う。
-     * @param {YoutubePlayerStateEvent | null | undefined} event
+     * @param {YoutubePlayerEvent | null | undefined} event
      * @param {number | null} currentPlayerState
      * @returns {boolean}
      */
     function isStalePlayerStateEvent(
-        event: YoutubePlayerStateEvent | null | undefined,
+        event: YoutubePlayerEvent | null | undefined,
         currentPlayerState: number | null
     ): boolean {
         if (!event || currentPlayerState === null) return false;
@@ -351,10 +346,10 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
         },
         /**
          * プレイヤー状態変化に応じて再生状態表示を更新する。
-         * @param {YoutubePlayerStateEvent} event
+         * @param {YoutubePlayerEvent} event
          * @param {number} playbackSessionId
          */
-        handleStateChange(event: YoutubePlayerStateEvent, playbackSessionId: number) {
+        handleStateChange(event: YoutubePlayerEvent, playbackSessionId: number) {
             const thumbDiv = getSharedPlaybackThumb(playbackSessionId);
             debugPlayback("youtube", "player state change", {
                 playbackSessionId,
@@ -413,10 +408,10 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
         },
         /**
          * プレーヤーエラー発生時に再生開始待ちを失敗として処理する。
-         * @param {YoutubePlayerStateEvent} event
+         * @param {YoutubePlayerEvent} event
          * @param {number} playbackSessionId
          */
-        handlePlayerError(event: YoutubePlayerStateEvent, playbackSessionId: number) {
+        handlePlayerError(event: YoutubePlayerEvent, playbackSessionId: number) {
             const thumbDiv = getSharedPlaybackThumb(playbackSessionId);
             if (!isHtmlElement(thumbDiv)) return;
             if (!isCurrentPlaybackSession(thumbDiv, playbackSessionId)) return;
@@ -477,7 +472,7 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
 
     /**
      * Player 接続前に始まった再生状態を取りこぼさないよう、現在状態を反映する。
-     * @param {YoutubePlayerLike | null | undefined} player
+     * @param {import("../lib/youtube/iframe-api.types").YoutubePlayerLike | null | undefined} player
      * @param {number} playbackSessionId
      */
     function syncAttachedPlayerState(player, playbackSessionId) {

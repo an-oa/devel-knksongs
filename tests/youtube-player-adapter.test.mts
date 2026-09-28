@@ -3,38 +3,32 @@ import assert from "node:assert/strict";
 import {
     YT_EMBED_HOST,
     YT_NOCOOKIE_EMBED_HOST
-} from "../_build/app/lib/youtube/embed.mjs";
-import { createYoutubePlayerAdapter } from "../_build/app/lib/youtube/player-adapter.mjs";
+} from "../app/lib/youtube/embed.mts";
+import { createYoutubePlayerAdapter } from "../app/lib/youtube/player-adapter.mts";
+import type { YoutubePlayerEvent } from "../app/lib/youtube/iframe-api.types";
+import type { YoutubeSharedPlaybackState } from "../app/state.types";
+import { createYoutubeIframeApiFixture } from "./fixtures/youtube-api.mts";
 import { installFakeDom } from "./test-helpers.mts";
 
 /**
- * Promise を外側から解決・拒否できるテスト補助を作る。
- * @returns {{ promise: Promise<*>, resolve: Function, reject: Function }}
- */
-function createDeferred() {
-    let resolve;
-    let reject;
-    const promise = new Promise((innerResolve, innerReject) => {
-        resolve = innerResolve;
-        reject = innerReject;
-    });
-    return { promise, resolve, reject };
-}
-
-/**
  * YT.Player adapter のテスト用状態を作る。
- * @param {{ ensureReady?: Function } | undefined} options
- * @returns {*}
  */
-function createAdapterHarness(options = {}) {
-    const sharedPlayback = {
+function createAdapterHarness(options: { ensureReady?: () => Promise<unknown> } = {}) {
+    const sharedPlayback: Pick<YoutubeSharedPlaybackState,
+        "player" | "playerPromise" | "pendingAttach" | "parkingNode"> = {
         player: null,
         playerPromise: null,
         pendingAttach: null,
-        iframe: null,
         parkingNode: null
     };
-    const calls = {
+    const calls: {
+        appliedIframes: (Element | null)[];
+        debug: { message: string; details: unknown }[];
+        errors: { event: YoutubePlayerEvent; playbackSessionId: number }[];
+        sessions: number[];
+        stateChanges: { event: YoutubePlayerEvent; playbackSessionId: number }[];
+        sync: number;
+    } = {
         appliedIframes: [],
         debug: [],
         errors: [],
@@ -56,7 +50,6 @@ function createAdapterHarness(options = {}) {
         },
         syncIframe: () => {
             calls.sync += 1;
-            return sharedPlayback.iframe;
         },
         handleStateChange: (event, playbackSessionId) => {
             calls.stateChanges.push({ event, playbackSessionId });
@@ -77,36 +70,31 @@ test("youtube player adapter: creates a YT.Player for the pending iframe and bri
         const { adapter, calls, sharedPlayback } = createAdapterHarness();
         const iframe = document.createElement("iframe");
         document.body.appendChild(iframe);
-        const playerCalls = [];
-        window.YT = {
-            Player: class {
-                constructor(host, options) {
-                    playerCalls.push({ host, options });
-                    this.iframe = host;
-                    options.events.onReady({ target: this });
-                }
-
-                getIframe() {
-                    return this.iframe;
-                }
-            }
-        };
+        const { api, creations } = createYoutubeIframeApiFixture();
+        window.YT = api;
 
         const player = await adapter.attach(iframe, 7);
 
         assert.equal(player, sharedPlayback.player);
         assert.equal(sharedPlayback.playerPromise, null);
-        assert.equal(playerCalls.length, 1);
-        assert.equal(playerCalls[0].host, iframe);
-        assert.equal(playerCalls[0].options.host, YT_EMBED_HOST);
+        assert.equal(creations.length, 1);
+        assert.equal(creations[0].iframe, iframe);
+        assert.equal(creations[0].options.host, YT_EMBED_HOST);
         assert.deepEqual(calls.sessions, [7, 7]);
-        assert.deepEqual(calls.appliedIframes, [iframe, iframe]);
+        assert.equal(creations[0].player, sharedPlayback.player);
+        assert.deepEqual(calls.appliedIframes, [iframe], "ready has not been emitted yet");
         assert.equal(calls.sync, 1);
+
+        creations[0].emitReady();
+        assert.deepEqual(calls.appliedIframes, [iframe, iframe]);
 
         const stateEvent = { data: 1 };
         const errorEvent = { data: 150 };
-        playerCalls[0].options.events.onStateChange(stateEvent);
-        playerCalls[0].options.events.onError(errorEvent);
+        const events = creations[0].options.events;
+        assert.ok(events?.onStateChange);
+        assert.ok(events.onError);
+        events.onStateChange(stateEvent);
+        events.onError(errorEvent);
 
         assert.deepEqual(calls.stateChanges, [{ event: stateEvent, playbackSessionId: 7 }]);
         assert.deepEqual(calls.errors, [{ event: errorEvent, playbackSessionId: 7 }]);
@@ -122,25 +110,13 @@ test("youtube player adapter: uses nocookie host option for nocookie iframes", a
         const iframe = document.createElement("iframe");
         iframe.src = `${YT_NOCOOKIE_EMBED_HOST}/embed/video1?enablejsapi=1`;
         document.body.appendChild(iframe);
-        const playerCalls = [];
-        window.YT = {
-            Player: class {
-                constructor(host, options) {
-                    playerCalls.push({ host, options });
-                    this.iframe = host;
-                    options.events.onReady({ target: this });
-                }
-
-                getIframe() {
-                    return this.iframe;
-                }
-            }
-        };
+        const { api, creations } = createYoutubeIframeApiFixture();
+        window.YT = api;
 
         await adapter.attach(iframe, 7);
 
-        assert.equal(playerCalls.length, 1);
-        assert.equal(playerCalls[0].options.host, YT_NOCOOKIE_EMBED_HOST);
+        assert.equal(creations.length, 1);
+        assert.equal(creations[0].options.host, YT_NOCOOKIE_EMBED_HOST);
     } finally {
         cleanup();
     }
@@ -149,26 +125,15 @@ test("youtube player adapter: uses nocookie host option for nocookie iframes", a
 test("youtube player adapter: pending attach uses the latest iframe while player init is waiting", async () => {
     const cleanup = installFakeDom();
     try {
-        const ready = createDeferred();
+        const ready = Promise.withResolvers<void>();
         const { adapter, sharedPlayback } = createAdapterHarness({
             ensureReady: () => ready.promise
         });
         const firstIframe = document.createElement("iframe");
         const secondIframe = document.createElement("iframe");
         document.body.append(firstIframe, secondIframe);
-        const playerHosts = [];
-        window.YT = {
-            Player: class {
-                constructor(host) {
-                    playerHosts.push(host);
-                    this.iframe = host;
-                }
-
-                getIframe() {
-                    return this.iframe;
-                }
-            }
-        };
+        const { api, creations } = createYoutubeIframeApiFixture();
+        window.YT = api;
 
         const firstAttach = adapter.attach(firstIframe, 1);
         const secondAttach = adapter.attach(secondIframe, 2);
@@ -177,8 +142,8 @@ test("youtube player adapter: pending attach uses the latest iframe while player
         ready.resolve();
         const player = await firstAttach;
 
-        assert.equal(playerHosts.length, 1);
-        assert.equal(playerHosts[0], secondIframe);
+        assert.equal(creations.length, 1);
+        assert.equal(creations[0].iframe, secondIframe);
         assert.equal(player, sharedPlayback.player);
     } finally {
         cleanup();

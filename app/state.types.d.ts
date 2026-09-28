@@ -1,3 +1,4 @@
+import type { YoutubePlayerLike } from "./lib/youtube/iframe-api.types";
 import type { RecommendedSearchCache } from "./lib/search-recommendation.mjs";
 
 /**
@@ -230,19 +231,6 @@ export type AppUiState = {
   bookmarkPanel: BookmarkPanelUiRuntimeState;
 };
 
-/**
- * YouTube IFrame API の Player として利用する最小限のメソッド。
- * 個別メソッドは外部 API 名をそのまま写すため、型全体の説明に集約する。
- */
-export type YoutubePlayerLike = {
-  getIframe?: () => Element | null;
-  getPlayerState?: () => number;
-  getCurrentTime?: () => number;
-  getDuration?: () => number;
-  stopVideo?: () => void;
-  destroy?: () => void;
-};
-
 /** 共有プレーヤー初期化待ち中の最新 iframe 紐付け要求。 */
 export type YoutubeSharedPlaybackPendingAttach = {
   /** プレーヤー化する iframe。 */
@@ -281,32 +269,6 @@ export type AppYoutubeRuntimeState = {
   apiPromise: Promise<unknown> | null;
   /** カード間で再利用する共有プレーヤー状態。 */
   sharedPlayback: YoutubeSharedPlaybackState | null;
-};
-
-/**
- * YouTube IFrame API が window に公開する namespace。
- * 個別プロパティは外部 API の公開名を写すため、型全体の説明に集約する。
- */
-export type YoutubeIframeApiGlobal = {
-  PlayerState: {
-    UNSTARTED: number;
-    ENDED: number;
-    PLAYING: number;
-    PAUSED: number;
-    BUFFERING: number;
-    CUED: number;
-  };
-  Player: new (
-    iframe: Element,
-    options: {
-      host?: string;
-      events?: {
-        onReady?: (event: { target?: YoutubePlayerLike }) => void;
-        onStateChange?: (event: { data?: number; target?: YoutubePlayerLike }) => void;
-        onError?: (event: { data?: number; target?: YoutubePlayerLike }) => void;
-      };
-    }
-  ) => YoutubePlayerLike;
 };
 
 /** アプリ全体の状態ルート。 */

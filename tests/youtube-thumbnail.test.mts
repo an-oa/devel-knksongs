@@ -10,8 +10,8 @@ import {
     setYoutubeThumbnailPlaybackState,
     shouldLoadYoutubeThumbnailNow,
     suppressYoutubeThumbnailContextMenu
-} from "../_build/app/lib/youtube/thumbnail.mjs";
-import { installFakeDom } from "./test-helpers.mts";
+} from "../app/lib/youtube/thumbnail.mts";
+import { getFakeElement, installFakeDom, invokeListener } from "./test-helpers.mts";
 
 test("youtube thumbnail: create/apply image keeps mqdefault source and eager load", () => {
     const cleanup = installFakeDom();
@@ -44,15 +44,19 @@ test("youtube thumbnail: save-related default actions are suppressed", () => {
 
         const thumb = document.createElement("div");
         suppressYoutubeThumbnailContextMenu(thumb);
-        const thumbContextMenu = thumb._events.get("contextmenu");
-        assert.equal(thumbContextMenu?.size, 1);
+        prevented = false;
+        invokeListener(thumb, "contextmenu", { preventDefault: () => { prevented = true; } });
+        assert.equal(prevented, true);
 
         const img = createYoutubeThumbnailImage("video1");
         assert.ok(img);
         assert.equal(img.draggable, false);
         assert.equal(img.getAttribute("draggable"), "false");
-        assert.equal(img._events.get("contextmenu")?.size, 1);
-        assert.equal(img._events.get("dragstart")?.size, 1);
+        for (const type of ["contextmenu", "dragstart"]) {
+            prevented = false;
+            invokeListener(img, type, { preventDefault: () => { prevented = true; } });
+            assert.equal(prevented, true, `${type} must prevent the default action`);
+        }
     } finally {
         cleanup();
     }
@@ -90,10 +94,10 @@ test("youtube thumbnail: shouldLoadYoutubeThumbnailNow uses viewport intersectio
     const cleanup = installFakeDom();
     try {
         const thumb = document.createElement("div");
-        thumb._rect = { top: 100, bottom: 200, left: 0, right: 100, width: 100, height: 100 };
+        getFakeElement(thumb)._rect = { top: 100, bottom: 200, left: 0, right: 100, width: 100, height: 100 };
         assert.equal(shouldLoadYoutubeThumbnailNow(thumb), true);
 
-        thumb._rect = { top: 900, bottom: 1000, left: 0, right: 100, width: 100, height: 100 };
+        getFakeElement(thumb)._rect = { top: 900, bottom: 1000, left: 0, right: 100, width: 100, height: 100 };
         assert.equal(shouldLoadYoutubeThumbnailNow(thumb), false);
     } finally {
         cleanup();

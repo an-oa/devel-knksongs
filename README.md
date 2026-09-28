@@ -222,7 +222,7 @@ flowchart TD
   - フォーマット表示ラベルのテスト (`tests/format-filter.test.mts`)
   - Pages artifact生成とブラウザ成果物URLのテスト (`tests/pages-artifact.test.mjs` / `tests/browser-build.test.mjs`)
   - 再生継続候補の選択ロジック (`tests/playback-sequence.test.mts`)
-  - 再生セッション制御のテスト (`tests/playback-session-controller.test.mjs`)
+  - 再生セッション制御のテスト (`tests/playback-session-controller.test.mts`)
   - 再生設定値reducerのテスト (`tests/playback-settings-value-reducer.test.mts`)
   - 描画/レイアウトまわりの回帰テスト (`tests/render-layout.test.mts`)
   - ブックマーク時のドラッグ並び替えテスト (`tests/render-drag-reorder.test.mts`)
@@ -244,9 +244,9 @@ flowchart TD
   - UI設定/ストレージ互換のテスト (`tests/ui-storage-compat.test.mts`)
   - UI同期のテスト (`tests/ui-sync.test.mts`)
   - YouTubeサムネイル/埋め込み再生まわりの統合テスト (`tests/youtube-controller.test.mjs`)
-  - YouTube埋め込みURL/API loader のテスト (`tests/youtube-embed.test.mjs`)
-  - YouTube playback state / start attempt / player adapter の単体テスト (`tests/youtube-playback-state.test.mts`, `tests/youtube-playback-start-attempt.test.mjs`, `tests/youtube-player-adapter.test.mjs`)
-  - YouTube shared playback / thumbnail helper / unconfirmed playback start の単体テスト (`tests/youtube-shared-playback.test.mjs`, `tests/youtube-thumbnail.test.mjs`, `tests/youtube-unconfirmed-playback-start.test.mjs`)
+  - YouTube埋め込みURL/API loader のテスト (`tests/youtube-embed.test.mts`)
+  - YouTube playback state / start attempt / player adapter の単体テスト (`tests/youtube-playback-state.test.mts`, `tests/youtube-playback-start-attempt.test.mjs`, `tests/youtube-player-adapter.test.mts`)
+  - YouTube shared playback / thumbnail helper / unconfirmed playback start の単体テスト (`tests/youtube-shared-playback.test.mjs`, `tests/youtube-thumbnail.test.mts`, `tests/youtube-unconfirmed-playback-start.test.mjs`)
   - Chromium 上での YouTube 再生スモークテスト (`tests/e2e/youtube-smoke.spec.mjs`)
 - `tests/test-helpers.mts`、`tests/youtube-harness.mjs`、`tests/support/playback-settings-fixture.mts`、`tests/e2e/support/mock-youtube.mjs`、`tests/e2e/support/ui-helpers.mjs` は複数テストで共有する補助モジュールです。
 - 実行コマンド:
