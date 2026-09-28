@@ -1,11 +1,11 @@
 import { isHtmlElement } from "../dom-utils.mjs";
 import { resolveYoutubeEmbedHostFromUrl } from "./embed.mjs";
-import type { YoutubeSharedPlaybackState } from "../../state.types";
+import type { YoutubeSharedPlaybackState } from "./shared-playback.mjs";
 import type { YoutubePlayerEvent, YoutubePlayerLike } from "./iframe-api.types";
 
 type YoutubePlayerAdapterInput = {
     getSharedPlaybackState: () => Pick<YoutubeSharedPlaybackState,
-        "player" | "playerPromise" | "pendingAttach" | "parkingNode">;
+        "player" | "playerPromise" | "pendingAttach">;
     setPendingAttach: (iframe: HTMLIFrameElement | null, playbackSessionId: number) => void;
     setSessionId: (playbackSessionId: number) => void;
     ensureReady: () => Promise<unknown>;
@@ -61,9 +61,6 @@ export function createYoutubePlayerAdapter(input: YoutubePlayerAdapterInput) {
             setSessionId(nextPlaybackSessionId);
             if (!isHtmlElement(nextIframe)) return null;
             if (!document.body.contains(nextIframe)) return null;
-            if (latestSharedPlayback.parkingNode && nextIframe.parentElement === latestSharedPlayback.parkingNode) {
-                return null;
-            }
             if (latestSharedPlayback.player) return latestSharedPlayback.player;
             latestSharedPlayback.player = new window.YT.Player(nextIframe, {
                 host: resolveYoutubeEmbedHostFromUrl(nextIframe.src),

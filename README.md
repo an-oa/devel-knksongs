@@ -245,8 +245,8 @@ flowchart TD
   - UI同期のテスト (`tests/ui-sync.test.mts`)
   - YouTubeサムネイル/埋め込み再生まわりの統合テスト (`tests/youtube-controller.test.mjs`)
   - YouTube埋め込みURL/API loader のテスト (`tests/youtube-embed.test.mts`)
-  - YouTube playback state / start attempt / player adapter の単体テスト (`tests/youtube-playback-state.test.mts`, `tests/youtube-playback-start-attempt.test.mjs`, `tests/youtube-player-adapter.test.mts`)
-  - YouTube shared playback / thumbnail helper / unconfirmed playback start の単体テスト (`tests/youtube-shared-playback.test.mjs`, `tests/youtube-thumbnail.test.mts`, `tests/youtube-unconfirmed-playback-start.test.mjs`)
+  - YouTube playback state / start attempt / player adapter の単体テスト (`tests/youtube-playback-state.test.mts`, `tests/youtube-playback-start-attempt.test.mts`, `tests/youtube-player-adapter.test.mts`)
+  - YouTube shared playback / thumbnail helper / unconfirmed playback start の単体テスト (`tests/youtube-shared-playback.test.mts`, `tests/youtube-thumbnail.test.mts`, `tests/youtube-unconfirmed-playback-start.test.mts`)
   - Chromium 上での YouTube 再生スモークテスト (`tests/e2e/youtube-smoke.spec.mjs`)
 - `tests/test-helpers.mts`、`tests/youtube-harness.mjs`、`tests/support/playback-settings-fixture.mts`、`tests/e2e/support/mock-youtube.mjs`、`tests/e2e/support/ui-helpers.mjs` は複数テストで共有する補助モジュールです。
 - 実行コマンド:

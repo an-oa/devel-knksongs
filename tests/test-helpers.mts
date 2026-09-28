@@ -156,6 +156,11 @@ class FakeElement extends FakeEventTarget {
         parseSimpleInnerHtml(this, this._innerHTML);
     }
 
+    /** このモックが扱う要素の親を parentElement と同じ参照で返す。 */
+    get parentNode(): FakeElement | null {
+        return this.parentElement;
+    }
+
     get firstChild() {
         return this.children[0] || null;
     }

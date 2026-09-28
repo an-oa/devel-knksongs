@@ -66,12 +66,12 @@
   - `tests/ui-sync.test.mts`
   - `tests/youtube-controller.test.mjs`
   - `tests/youtube-embed.test.mts`
-  - `tests/youtube-playback-start-attempt.test.mjs`
+  - `tests/youtube-playback-start-attempt.test.mts`
   - `tests/youtube-playback-state.test.mts`
   - `tests/youtube-player-adapter.test.mts`
-  - `tests/youtube-shared-playback.test.mjs`
+  - `tests/youtube-shared-playback.test.mts`
   - `tests/youtube-thumbnail.test.mts`
-  - `tests/youtube-unconfirmed-playback-start.test.mjs`
+  - `tests/youtube-unconfirmed-playback-start.test.mts`
   - `tests/layout-anchor.test.mts`
   - `tests/results-scroll.test.mts`
   - `tests/e2e/youtube-smoke.spec.mjs`

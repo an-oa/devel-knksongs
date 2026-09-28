@@ -8,7 +8,7 @@ import {
 } from "../lib/youtube/embed.mjs";
 import type { YoutubeTarget } from "../lib/youtube/embed.mjs";
 import {
-    destroyYoutubeSharedPlayback,
+    destroyYoutubeSharedPlaybackPlayer,
     ensureYoutubeSharedPlaybackElements,
     getYoutubeSharedPlaybackState,
     getYoutubeSharedPlaybackThumb,
@@ -142,7 +142,7 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
 
     /**
      * 共有埋め込みプレーヤーの保持領域を返す。
-     * @returns {import("../state.types").YoutubeSharedPlaybackState}
+     * @returns {import("../lib/youtube/shared-playback.mjs").YoutubeSharedPlaybackState}
      */
     function getSharedPlaybackState() {
         return getYoutubeSharedPlaybackState(youtube);
@@ -633,7 +633,7 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
 
     /**
      * 共有 iframe と閉じるボタンを必要に応じて生成する。
-     * @returns {import("../state.types").YoutubeSharedPlaybackState}
+     * @returns {import("../lib/youtube/shared-playback.mjs").YoutubeSharedPlaybackState}
      */
     function ensureSharedPlaybackElements() {
         return ensureYoutubeSharedPlaybackElements({
@@ -645,11 +645,12 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
     }
 
     /**
-     * 共有プレーヤー実体を破棄し、再生成できる初期状態へ戻す。
+     * 広告終了監視を止め、共有プレーヤー実体とカードへの紐付けを破棄する。
+     * 再生成前に作成した再生開始待ちと未確定セッションは保持する。
      */
-    function destroySharedPlayback() {
+    function destroySharedPlaybackPlayer() {
         postPlaybackAdRestore.clear();
-        destroyYoutubeSharedPlayback({
+        destroyYoutubeSharedPlaybackPlayer({
             youtube,
             syncIframe: () => syncSharedPlaybackIframe(),
             debug: (message, details) => debugPlayback("youtube", message, details)
@@ -703,7 +704,7 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
                 songKey: getSongKeyFromYoutubeThumb(thumbDiv)
             });
         }
-        destroySharedPlayback();
+        destroySharedPlaybackPlayer();
         clearActiveThumb(thumbDiv);
         return true;
     }
@@ -725,7 +726,7 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
                 videoId: yt && yt.videoId,
                 playbackSessionId
             });
-            destroySharedPlayback();
+            destroySharedPlaybackPlayer();
         }
         sharedPlayback = ensureSharedPlaybackElements();
         const iframe = (syncSharedPlaybackIframe() || sharedPlayback.iframe) as HTMLIFrameElement | null;

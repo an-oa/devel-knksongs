@@ -1,4 +1,4 @@
-import type { YoutubePlayerLike } from "./lib/youtube/iframe-api.types";
+import type { YoutubeSharedPlaybackState } from "./lib/youtube/shared-playback.mjs";
 import type { RecommendedSearchCache } from "./lib/search-recommendation.mjs";
 
 /**
@@ -229,38 +229,6 @@ export type AppUiState = {
   settingsPanel: SettingsPanelUiRuntimeState;
   /** ブックマークパネルの状態。 */
   bookmarkPanel: BookmarkPanelUiRuntimeState;
-};
-
-/** 共有プレーヤー初期化待ち中の最新 iframe 紐付け要求。 */
-export type YoutubeSharedPlaybackPendingAttach = {
-  /** プレーヤー化する iframe。 */
-  iframe: HTMLIFrameElement | null;
-  /** iframe を紐付ける再生セッション ID。 */
-  playbackSessionId: number;
-};
-
-/** 複数カード間で再利用する YouTube 共有 iframe / Player の状態。 */
-export type YoutubeSharedPlaybackState = {
-  /** 共有 iframe に紐付いた YouTube Player。 */
-  player: YoutubePlayerLike | null;
-  /** Player 初期化中に共有する Promise。 */
-  playerPromise: Promise<YoutubePlayerLike | null> | null;
-  /** Player 初期化待ち中に処理する最新の iframe 紐付け要求。 */
-  pendingAttach: YoutubeSharedPlaybackPendingAttach | null;
-  /** 共有プレーヤーとして使う iframe。 */
-  iframe: HTMLIFrameElement | null;
-  /** 共有プレーヤーを閉じるボタン。 */
-  closeButton: HTMLButtonElement | null;
-  /** iframe をカード外へ退避するための隠しノード。 */
-  parkingNode: HTMLElement | null;
-  /** 現在共有プレーヤーを表示しているサムネイル。 */
-  hostThumb: HTMLElement | null;
-  /** 現在の共有プレーヤー再生セッション ID。 */
-  sessionId: number;
-  /** 再生開始待ち中の attempt。 */
-  playbackStartAttempt: import("./lib/youtube/playback-start-attempt.mjs").YoutubePlaybackStartAttempt | null;
-  /** 再生開始が未確定のまま保持されているセッション ID。 */
-  unconfirmedPlaybackStartSessionId: number;
 };
 
 /** YouTube API 読み込みと共有プレーヤーのランタイム状態。 */

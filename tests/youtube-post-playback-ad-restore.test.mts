@@ -6,19 +6,16 @@ import {
     isPlaybackContinuingPlayerState,
     isPostPlaybackAdFinishedPlayerState,
     YOUTUBE_POST_PLAYBACK_AD_RESTORE_POLL_MS
-} from "../_build/app/lib/youtube/post-playback-ad-restore.mjs";
-import { YOUTUBE_PLAYER_STATE } from "../_build/app/lib/youtube/player-state.mjs";
+} from "../app/lib/youtube/post-playback-ad-restore.mts";
+import type { YoutubePlayerLike } from "../app/lib/youtube/iframe-api.types";
+import { YOUTUBE_PLAYER_STATE } from "../app/lib/youtube/player-state.mts";
 import {
     installFakeDom,
     installFakeTimeouts
 } from "./test-helpers.mts";
 
-/**
- * 動画後広告復元 manager テスト用の Player mock を作る。
- * @param {{ state?: number, currentTime?: number, duration?: number } | undefined} input
- * @returns {*}
- */
-function createPlayer(input = {}) {
+/** 動画後広告復元 manager テスト用の Player mock を作る。 */
+function createPlayer(input: { state?: number; currentTime?: number; duration?: number } = {}) {
     return {
         state: input.state ?? YOUTUBE_PLAYER_STATE.PLAYING,
         currentTime: input.currentTime ?? 75,
@@ -35,20 +32,21 @@ function createPlayer(input = {}) {
     };
 }
 
-/**
- * 動画後広告復元 manager と周辺状態を作る。
- * @param {{ player?: *, expectedEndSeconds?: number | null, now?: () => number, timeoutMs?: number } | undefined} input
- * @returns {{ manager: *, thumb: HTMLElement, completes: Array<*>, debugCalls: Array<*> }}
- */
-function createManagerHarness(input = {}) {
+/** 動画後広告復元 manager と周辺状態を作る。 */
+function createManagerHarness(input: {
+    player?: YoutubePlayerLike;
+    expectedEndSeconds?: number | null;
+    now?: () => number;
+    timeoutMs?: number;
+} = {}) {
     const thumb = document.createElement("div");
     document.body.appendChild(thumb);
     const player = input.player ?? createPlayer();
     const expectedEndSeconds = input.expectedEndSeconds === undefined
         ? 75
         : input.expectedEndSeconds;
-    const completes = [];
-    const debugCalls = [];
+    const completes: { thumb: HTMLElement; sessionId: number }[] = [];
+    const debugCalls: { message: string; details?: Record<string, unknown> }[] = [];
     const manager = createYoutubePostPlaybackAdRestoreManager({
         getPlayer: () => player,
         getThumbForSession: () => thumb,
