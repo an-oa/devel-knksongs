@@ -16,6 +16,7 @@
     "verbatimModuleSyntax": true,
     "skipLibCheck": false
   },
+  "exclude": ["tests/e2e"],
   "include": [
     "tests/**/*.mts",
     "types/song.d.ts",

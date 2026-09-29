@@ -84,11 +84,14 @@ feat: move settings into dedicated sidebar panel
 
 ## TypeScript Emit During Migration
 
-- `app/**/*.mts` は TypeScript source として扱い、Node scriptsとE2Eのfixture生成helperは `npm run build:ts` が `_build/app/**/*.mjs` に生成した module を読む。
+- `app/**/*.mts` は TypeScript source として扱い、Node scriptsは `npm run build:ts` が `_build/app/**/*.mjs` に生成した module を読む。
 - Node単体テストの `tests/**/*.mts` は `tsx` 経由で `app/**/*.mts` を直接 import する。
   Node scriptsのテストはscripts経由で生成moduleも読むため、`npm run test:unit:ts` は事前に `build:ts` を実行する。
   `npm run typecheck:tests:raw` は事前 build なしで実行でき、Node scriptsのJSDoc型を `allowJs: true` で参照する。
   テスト用の型宣言は生成せず、tsconfig.tests.json で source を型チェックする。
+- E2EのTSテストとhelperは `tests/e2e/tsconfig.json` で型チェックする。テスト専用のWindow拡張はE2E内に置く。
+  曲fixture生成helperはアプリのTSソースを直接読み、ブラウザは `_site` の配布成果物を検証する。
+  ブラウザ用YouTubeモックのTSソースはesbuildでJavaScriptへ変換し、APIの応答として配信する。
 - `app` 配下は source tree とし、`app/**/*.mjs` を残さない。手編集は `.mts` 側へ行い、必要な `.mjs` は `npm run build:ts` で `_build/app` に作り直す。
 - `.mts` source では TS の `type` / `interface` / `import type` を主に使い、同じ構造を JSDoc `@typedef` と二重管理しない。
   生成 `.mjs` 側で JSDoc 型を残す必要がある場合だけ、その理由を近接コメントで明示する。

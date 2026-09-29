@@ -1,16 +1,13 @@
 import { test, expect } from "@playwright/test";
-import {
-    installNetworkMocks,
-    readSongsJsonCacheText,
-    routeDeferredSongsJsonFixture
-} from "./support/mock-youtube.mjs";
-import { createScrollableResultSongs } from "./support/song-fixtures.mjs";
+import { installNetworkMocks } from "./support/network-mocks.mts";
+import { readSongsJsonCacheText, routeDeferredSongsJsonFixture } from "./support/songs-network.mts";
+import { createScrollableResultSongs } from "./support/song-fixtures.mts";
 import {
     filterBySongTitle,
     getSongCard,
     openSidebar,
     waitForInitialLoad
-} from "./support/ui-helpers.mjs";
+} from "./support/ui-helpers.mts";
 
 /**
  * IndexedDBへ保存されている曲タイトルを返す。

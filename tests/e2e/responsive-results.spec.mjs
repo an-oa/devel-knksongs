@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
-import { installNetworkMocks, routeSongsJsonFixture } from "./support/mock-youtube.mjs";
-import { createScrollableResultSongs } from "./support/song-fixtures.mjs";
+import { installNetworkMocks } from "./support/network-mocks.mts";
+import { routeSongsJsonFixture } from "./support/songs-network.mts";
+import { createScrollableResultSongs } from "./support/song-fixtures.mts";
 import {
     clickControlLabel,
     closeSidebar,
@@ -9,7 +10,7 @@ import {
     getSongCard,
     openSettingsPanel,
     waitForInitialLoad
-} from "./support/ui-helpers.mjs";
+} from "./support/ui-helpers.mts";
 
 /** 実際の矩形で、カード同士の重なりやコンテナからのはみ出しを検証する。 */
 async function expectCardsInsideLayout(page) {

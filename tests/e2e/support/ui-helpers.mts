@@ -1,30 +1,24 @@
-import { expect } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 
 /**
  * 初期データ読み込み完了まで待機する。
- * @param {import("@playwright/test").Page} page
  */
-export async function waitForInitialLoad(page) {
+export async function waitForInitialLoad(page: Page) {
     await expect(page.locator("#searchBox")).toBeEnabled();
     await expect(page.locator("#resultCount")).not.toHaveText("接続中...");
 }
 
 /**
  * 指定フォームコントロールを囲む label を返す。
- * @param {import("@playwright/test").Page} page
- * @param {string} selector
- * @returns {import("@playwright/test").Locator}
  */
-export function getControlLabel(page, selector) {
+export function getControlLabel(page: Page, selector: string) {
     return page.locator(selector).locator("xpath=ancestor::label[1]");
 }
 
 /**
  * 指定フォームコントロールの label をクリックする。
- * @param {import("@playwright/test").Page} page
- * @param {string} selector
  */
-export async function clickControlLabel(page, selector) {
+export async function clickControlLabel(page: Page, selector: string) {
     const controlLabel = getControlLabel(page, selector);
     await expect(controlLabel).toBeVisible();
     await controlLabel.click();
@@ -32,9 +26,8 @@ export async function clickControlLabel(page, selector) {
 
 /**
  * 検索サイドバーを開く。
- * @param {import("@playwright/test").Page} page
  */
-export async function openSidebar(page) {
+export async function openSidebar(page: Page) {
     await page.locator("#open-sidebar").click();
     await expect(page.locator("#sidebar")).toHaveAttribute("aria-hidden", "false");
     await expect(page.locator("#open-sidebar")).toHaveAttribute("aria-expanded", "true");
@@ -42,9 +35,8 @@ export async function openSidebar(page) {
 
 /**
  * サイドバーの設定パネルを開く。
- * @param {import("@playwright/test").Page} page
  */
-export async function openSettingsPanel(page) {
+export async function openSettingsPanel(page: Page) {
     await openSidebar(page);
     await page.locator("#open-settings-panel").click();
     await expect(page.locator("#settings-sidebar-panel")).toBeVisible();
@@ -52,9 +44,8 @@ export async function openSettingsPanel(page) {
 
 /**
  * 検索サイドバーを閉じて結果一覧へ戻る。
- * @param {import("@playwright/test").Page} page
  */
-export async function closeSidebar(page) {
+export async function closeSidebar(page: Page) {
     await page.locator("#close-sidebar").click();
     await expect(page.locator("#sidebar")).toHaveAttribute("aria-hidden", "true");
     await expect(page.locator("#open-sidebar")).toHaveAttribute("aria-expanded", "false");
@@ -62,17 +53,15 @@ export async function closeSidebar(page) {
 
 /**
  * サイドバー popover の backdrop 領域をクリックする。
- * @param {import("@playwright/test").Page} page
  */
-export async function clickSidebarBackdrop(page) {
+export async function clickSidebarBackdrop(page: Page) {
     await page.mouse.click(20, 100);
 }
 
 /**
  * サイドバー popover が開き、背面が inert になっていることを確認する。
- * @param {import("@playwright/test").Page} page
  */
-export async function expectSidebarPopoverOpen(page) {
+export async function expectSidebarPopoverOpen(page: Page) {
     const sidebar = page.locator("#sidebar");
     await expect(sidebar).toHaveAttribute("aria-hidden", "false");
     await expect(page.locator("#open-sidebar")).toHaveAttribute("aria-expanded", "true");
@@ -84,9 +73,8 @@ export async function expectSidebarPopoverOpen(page) {
 
 /**
  * サイドバー popover が閉じ、背面の inert が解除されていることを確認する。
- * @param {import("@playwright/test").Page} page
  */
-export async function expectSidebarPopoverClosed(page) {
+export async function expectSidebarPopoverClosed(page: Page) {
     const sidebar = page.locator("#sidebar");
     await expect(sidebar).toHaveAttribute("aria-hidden", "true");
     await expect(page.locator("#open-sidebar")).toHaveAttribute("aria-expanded", "false");
@@ -98,10 +86,8 @@ export async function expectSidebarPopoverClosed(page) {
 
 /**
  * 指定の設定トグルを必要時だけ ON にする。
- * @param {import("@playwright/test").Page} page
- * @param {string} selector
  */
-export async function ensureToggleEnabled(page, selector) {
+export async function ensureToggleEnabled(page: Page, selector: string) {
     const toggle = page.locator(selector);
     const switchLabel = getControlLabel(page, selector);
     await expect(switchLabel).toBeVisible();
@@ -111,16 +97,15 @@ export async function ensureToggleEnabled(page, selector) {
 
 /**
  * 再生設定を有効化する。
- * @param {import("@playwright/test").Page} page
- * @param {{ continuousPlayback?: boolean } | undefined} options
  */
-export async function enablePlaybackSettings(page, options) {
+export async function enablePlaybackSettings(page: Page, options?: { continuousPlayback?: boolean }) {
     const settings = options || {};
     await openSettingsPanel(page);
     await ensureToggleEnabled(page, "#thumbnail-toggle");
     if (settings.continuousPlayback) {
         await page.evaluate(() => {
-            window.knkPlaybackSettings.showExperimentalPlaybackSettings = true;
+            if (!window.knkPlaybackSettings) throw new Error("Playback settings API is unavailable");
+            window.knkPlaybackSettings.setExperimentalPlaybackSettings(true);
         });
         await expect(page.locator("#experimental-playback-settings")).toBeVisible();
         await ensureToggleEnabled(page, "#continuous-playback-toggle");
@@ -131,10 +116,8 @@ export async function enablePlaybackSettings(page, options) {
 
 /**
  * 曲タイトルで結果を絞り込む。
- * @param {import("@playwright/test").Page} page
- * @param {string} query
  */
-export async function filterBySongTitle(page, query) {
+export async function filterBySongTitle(page: Page, query: string) {
     await page.locator("#searchBox").fill(query);
     await expect(page.locator("#searchBox")).toHaveValue(query);
     await closeSidebar(page);
@@ -142,22 +125,15 @@ export async function filterBySongTitle(page, query) {
 
 /**
  * タイトルを含む結果カードを返す。
- * @param {import("@playwright/test").Page} page
- * @param {string} title
  */
-export function getSongCard(page, title) {
+export function getSongCard(page: Page, title: string) {
     return page.locator(".song-card").filter({ hasText: title });
 }
 
 /**
  * 指定した曲カードからブックマークを作成する。
- * @param {import("@playwright/test").Page} page
- * @param {{
- *   bookmarkName: string,
- *   songTitle: string
- * }} options
  */
-export async function createBookmarkFromSong(page, { bookmarkName, songTitle }) {
+export async function createBookmarkFromSong(page: Page, { bookmarkName, songTitle }: { bookmarkName: string; songTitle: string }) {
     await page.locator("#searchBox").fill(songTitle);
     await expect(page.locator("#searchBox")).toHaveValue(songTitle);
 
@@ -172,21 +148,15 @@ export async function createBookmarkFromSong(page, { bookmarkName, songTitle }) 
 
 /**
  * 指定名のブックマーク項目を返す。
- * @param {import("@playwright/test").Page} page
- * @param {string} bookmarkName
- * @returns {import("@playwright/test").Locator}
  */
-export function getBookmarkItem(page, bookmarkName) {
+export function getBookmarkItem(page: Page, bookmarkName: string) {
     return page.locator(".bookmark-item").filter({ hasText: bookmarkName });
 }
 
 /**
  * ブックマーク通知 toast の文言と popover 表示を確認する。
- * @param {import("@playwright/test").Page} page
- * @param {string} message
- * @returns {Promise<import("@playwright/test").Locator>}
  */
-export async function expectBookmarkToast(page, message) {
+export async function expectBookmarkToast(page: Page, message: string) {
     const toast = page.locator(".bookmark-toast");
     await expect(toast.locator(".bookmark-toast-message")).toHaveText(message);
     await expect
@@ -197,9 +167,8 @@ export async function expectBookmarkToast(page, message) {
 
 /**
  * ブックマーク管理パネルを開く。
- * @param {import("@playwright/test").Page} page
  */
-export async function openBookmarkPanel(page) {
+export async function openBookmarkPanel(page: Page) {
     await page.locator("#open-bookmark-panel").click();
     await expect(page.locator("#bookmark-sidebar-panel")).toBeVisible();
 }

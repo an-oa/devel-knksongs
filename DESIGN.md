@@ -9,7 +9,7 @@
 
 ## 全体構成
 - 静的フロントエンドのみ（HTML/CSS/JavaScript, ES Modules）。
-  `app/**/*.mts` を source とし、`npm run build:ts` で `_build/app/**/*.mjs` へ生成した JavaScript を Node scriptsとE2Eのfixture生成helperが読む。
+  `app/**/*.mts` を source とし、`npm run build:ts` で `_build/app/**/*.mjs` へ生成した JavaScript を Node scriptsが読む。
   `.mts` 単体テストは `tsx` 経由でアプリsourceを直接読む。Node scriptsを対象とするテストはscripts経由で生成moduleも読む。型宣言の生成には依存しない。
   ブラウザ用は `npm run build` がemit結果をesbuildで `_build/browser` へbundleし、起動用UIと静的依存chunkのmodulepreloadをHTMLへ生成する。
   起動用UI以外のdynamic import先はpreload対象に含めない。
@@ -26,8 +26,10 @@
 ## テスト方針（現状）
 - 対象: 検索ロジック、日付フィルタ、ブックマーク検索、描画/再生/保存/サイドバーまわりの回帰
 - 重点ケース: ブックマーク表示時のみ有効なドラッグ並び替えと、並び順の永続化、YouTube 継続再生の失敗復旧
-- TS移行: Node単体テストとその共通helperはすべてTSへ移行済み。`tsconfig.tests.json` でstrictな型チェックを行う。E2Eは引き続き `.mjs` を使う。
+- TS移行: Node単体テストとその共通helperはすべてTSへ移行済み。`tsconfig.tests.json` でstrictな型チェックを行う。E2Eは共通helperとヘッダーのテストをTS化し、残り4ファイルは `.mjs` を使う。
   Node scriptsのJSDoc型は `allowJs: true` で参照し、scripts本体の検査範囲は `tsconfig.scripts.json` で管理する。
+  E2Eの型設定は `tests/e2e/tsconfig.json` に置き、`typecheck:e2e:raw` を全体のtypecheckへ組み込む。
+  E2Eのfixture生成はアプリsourceを直接参照し、ブラウザでは `_site` の配布成果物を検証する。
   `typecheck:tests:raw` は事前build不要。`test:unit:ts` と `test:unit` は、Node scriptsが生成moduleを読むため事前に `build:ts` を実行する。
 - テストファイル:
   - `tests/bookmark-storage-schema.test.mts`
@@ -79,6 +81,7 @@
   - `tests/youtube-unconfirmed-playback-start.test.mts`
   - `tests/layout-anchor.test.mts`
   - `tests/results-scroll.test.mts`
+  - `tests/e2e/header-auto-hide.spec.mts`
   - `tests/e2e/youtube-smoke.spec.mjs`
   - `tests/songs-content-hash.test.mts`
   - `tests/songs-data-source.test.mts`
@@ -93,13 +96,18 @@
   - `tests/test-helpers.mts`
   - `tests/youtube-harness.mts`
   - `tests/support/playback-settings-fixture.mts`
-  - `tests/e2e/support/mock-youtube.mjs`
-  - `tests/e2e/support/ui-helpers.mjs`
+  - `tests/e2e/support/network-mocks.mts`（各ネットワークモックを組み合わせる入口）
+  - `tests/e2e/support/songs-network.mts`（曲JSON・CSVの応答とIndexedDB読み取り）
+  - `tests/e2e/support/mock-youtube.mts`（YouTubeの応答とPlayer操作）
+  - `tests/e2e/support/ui-helpers.mts`
+  - `tests/e2e/support/song-fixtures.mts`
+  - `tests/e2e/support/youtube-iframe-api.mts`（ブラウザ内モック。esbuildでJS化して配信）
 - 実行コマンド:
   - `npm run validate:songs-json`
   - `npm run build:ts`
   - `npm run typecheck`
   - `npm run typecheck:tests:raw`
+  - `npm run typecheck:e2e:raw`
   - `npm run check:ts-emit`
   - `npm run build`
   - `npm run lint`

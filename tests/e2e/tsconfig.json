@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.tests.json",
+  "exclude": [],
+  "include": [
+    "**/*.mts",
+    "**/*.d.ts",
+    "../../types/song.d.ts",
+    "../../types/app-state.d.ts",
+    "../../types/bookmark-browser.d.ts",
+    "../../types/search-state.d.ts"
+  ]
+}

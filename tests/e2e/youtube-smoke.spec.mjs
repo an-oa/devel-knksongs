@@ -1,10 +1,7 @@
 import { test, expect } from "@playwright/test";
-import {
-    installNetworkMocks,
-    routeSongsJsonFixture,
-    setMockVideoBehavior,
-    waitForMockYoutube
-} from "./support/mock-youtube.mjs";
+import { installNetworkMocks } from "./support/network-mocks.mts";
+import { routeSongsJsonFixture } from "./support/songs-network.mts";
+import { setMockVideoBehavior, waitForMockYoutube } from "./support/mock-youtube.mts";
 import {
     clickControlLabel,
     clickSidebarBackdrop,
@@ -22,8 +19,8 @@ import {
     openSidebar,
     openSettingsPanel,
     waitForInitialLoad
-} from "./support/ui-helpers.mjs";
-import { createScrollableResultSongs } from "./support/song-fixtures.mjs";
+} from "./support/ui-helpers.mts";
+import { createScrollableResultSongs } from "./support/song-fixtures.mts";
 
 test.beforeEach(async ({ page }) => {
     await installNetworkMocks(page);

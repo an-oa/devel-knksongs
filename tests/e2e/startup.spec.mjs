@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
-import { installNetworkMocks, readSongsJsonCacheText } from "./support/mock-youtube.mjs";
-import { filterBySongTitle, getSongCard, openSidebar, waitForInitialLoad } from "./support/ui-helpers.mjs";
+import { installNetworkMocks } from "./support/network-mocks.mts";
+import { readSongsJsonCacheText } from "./support/songs-network.mts";
+import { filterBySongTitle, getSongCard, openSidebar, waitForInitialLoad } from "./support/ui-helpers.mts";
 
 test("initial JSON loads once while the UI bundle is still downloading", async ({ page }) => {
     await installNetworkMocks(page);

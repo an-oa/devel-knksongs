@@ -1,14 +1,12 @@
-import { test, expect } from "@playwright/test";
-import {
-    installNetworkMocks,
-    routeSongsJsonFixture
-} from "./support/mock-youtube.mjs";
-import { createScrollableResultSongs } from "./support/song-fixtures.mjs";
+import { test, expect, type Page } from "@playwright/test";
+import { installNetworkMocks } from "./support/network-mocks.mts";
+import { routeSongsJsonFixture } from "./support/songs-network.mts";
+import { createScrollableResultSongs } from "./support/song-fixtures.mts";
 import {
     closeSidebar,
     openSidebar,
     waitForInitialLoad
-} from "./support/ui-helpers.mjs";
+} from "./support/ui-helpers.mts";
 
 test.beforeEach(async ({ page }) => {
     await installNetworkMocks(page);
@@ -22,9 +20,8 @@ test.beforeEach(async ({ page }) => {
 
 /**
  * スクロール可能な検索結果を読み込み、サイドバーを閉じた状態にする。
- * @param {import("@playwright/test").Page} page
  */
-async function loadScrollableResults(page) {
+async function loadScrollableResults(page: Page) {
     await routeSongsJsonFixture(page, createScrollableResultSongs(60));
     await page.reload();
     await waitForInitialLoad(page);

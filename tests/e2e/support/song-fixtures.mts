@@ -1,9 +1,7 @@
 /**
  * スクロールを伴う検索結果のE2E検証用に曲fixtureを作る。
- * @param {number} count
- * @returns {Song[]}
  */
-export function createScrollableResultSongs(count) {
+export function createScrollableResultSongs(count: number): Song[] {
     return Array.from({ length: count }, (_, index) => {
         const songNumber = index + 1;
         const paddedIndex = String(songNumber).padStart(2, "0");
