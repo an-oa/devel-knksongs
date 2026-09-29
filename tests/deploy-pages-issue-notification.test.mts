@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import type { ManagedIssue } from "../scripts/deploy-pages-issue-notification.mjs";
 import {
     DEPLOYMENT_FAILURE_LABEL,
     DEPLOYMENT_FAILURE_MARKER,
@@ -15,6 +16,30 @@ import {
     selectManagedIssues,
     updateDeploymentFailureIssue
 } from "../scripts/deploy-pages-issue-notification.mjs";
+
+type RecordedRequest = {
+    method: string;
+    path: string;
+    search: string;
+    body: unknown;
+};
+
+/** fetchの入力をAPI検証用の情報へ変換し、呼び出し順に記録する。 */
+function recordRequest(
+    requests: RecordedRequest[],
+    input: Parameters<typeof fetch>[0],
+    init: Parameters<typeof fetch>[1] = {}
+): RecordedRequest {
+    const url = new URL(input instanceof Request ? input.url : String(input));
+    const request: RecordedRequest = {
+        method: init.method || "GET",
+        path: url.pathname,
+        search: url.search,
+        body: typeof init.body === "string" ? JSON.parse(init.body) : null
+    };
+    requests.push(request);
+    return request;
+}
 
 const BASE_CONTEXT = {
     deploySha: "c2abca650af9fca8ff7a2ab28627ea3c3620d9b9",
@@ -236,8 +261,7 @@ test("deploy issue ordering: only completed notification jobs carry deployment s
 });
 
 test("deploy issue API: retries temporary failures with exponential delays", async () => {
-    /** @type {number[]} */
-    const waitDelays = [];
+    const waitDelays: number[] = [];
     let calls = 0;
 
     const result = await retryOperation(
@@ -262,22 +286,13 @@ test("deploy issue API: retries temporary failures with exponential delays", asy
 });
 
 test("deploy issue API client: skips newer queued, cancelled, and no-op runs", async () => {
-    /** @type {Array<{ method: string, path: string, search: string, body: Record<string, *> | null }>} */
-    const requests = [];
+    const requests: RecordedRequest[] = [];
     let labelExists = false;
-    /** @type {typeof fetch} */
-    const fetchImpl = async (url, init = {}) => {
-        const requestUrl = url instanceof Request ? url.url : String(url);
-        const request = {
-            method: init.method || "GET",
-            path: new URL(requestUrl).pathname,
-            search: new URL(requestUrl).search,
-            body: typeof init.body === "string" ? JSON.parse(init.body) : null
-        };
-        requests.push(request);
+    const fetchImpl: typeof fetch = async (url, init = {}) => {
+        const request = recordRequest(requests, url, init);
 
         if (request.path.endsWith("/actions/workflows/deploy-pages.yml/runs")) {
-            if (new URL(requestUrl).searchParams.get("page") === "2") {
+            if (new URLSearchParams(request.search).get("page") === "2") {
                 return Response.json({
                     workflow_runs: [
                         { id: 105, run_number: 105, run_attempt: 1, status: "queued" },
@@ -385,19 +400,9 @@ test("deploy issue API client: skips newer queued, cancelled, and no-op runs", a
 });
 
 test("deploy issue API client: uses the expected Issue paths, methods, and payloads", async () => {
-    /** @type {Array<{ method: string, path: string, search: string, body: Record<string, *> | null }>} */
-    const requests = [];
-    /** @type {typeof fetch} */
-    const fetchImpl = async (url, init = {}) => {
-        const requestUrl = url instanceof Request ? url.url : String(url);
-        const parsedUrl = new URL(requestUrl);
-        const request = {
-            method: init.method || "GET",
-            path: parsedUrl.pathname,
-            search: parsedUrl.search,
-            body: typeof init.body === "string" ? JSON.parse(init.body) : null
-        };
-        requests.push(request);
+    const requests: RecordedRequest[] = [];
+    const fetchImpl: typeof fetch = async (url, init = {}) => {
+        const request = recordRequest(requests, url, init);
 
         if (request.method === "GET" && request.path.endsWith("/issues")) {
             return Response.json([
@@ -565,23 +570,21 @@ test("deploy issue update: updates every matching issue when duplicates exist", 
         body: DEPLOYMENT_FAILURE_MARKER,
         labels: [{ name: DEPLOYMENT_FAILURE_LABEL }]
     }));
-    /** @type {Array<[number, string]>} */
-    const assigned = [];
-    /** @type {Array<[number, string]>} */
-    const commented = [];
+    const assigned: Array<[number, string]> = [];
+    const commented: Array<[number, string]> = [];
     const client = {
         ...CURRENT_DEPLOYMENT_METHODS,
         async ensureLabel() {},
         async listOpenIssues() { return issues; },
         async createIssue() { throw new Error("must not create"); },
         async addAssignee(
-            /** @type {number} */ issueNumber,
-            /** @type {string} */ assignee
+            issueNumber: number,
+            assignee: string
         ) { assigned.push([issueNumber, assignee]); },
         async listComments() { return []; },
         async commentIssue(
-            /** @type {number} */ issueNumber,
-            /** @type {string} */ body
+            issueNumber: number,
+            body: string
         ) { commented.push([issueNumber, body]); },
         async closeIssue() { throw new Error("must not close"); }
     };
@@ -601,15 +604,14 @@ test("deploy issue update: updates every matching issue when duplicates exist", 
 });
 
 test("deploy issue creation: locates an issue created before a transient response failure", async () => {
-    /** @type {Array<{ number: number, body: string, labels: Array<{ name: string }> }>} */
-    let issues = [];
+    let issues: ManagedIssue[] = [];
     let createCalls = 0;
     let commentCalls = 0;
     const client = {
         ...CURRENT_DEPLOYMENT_METHODS,
         async ensureLabel() {},
         async listOpenIssues() { return issues; },
-        async createIssue(/** @type {string} */ body) {
+        async createIssue(body: string) {
             createCalls++;
             issues = [{
                 number: 10,
@@ -648,8 +650,7 @@ test("deploy issue recovery: retries close and avoids duplicate comments across 
         body: DEPLOYMENT_FAILURE_MARKER,
         labels: [{ name: DEPLOYMENT_FAILURE_LABEL }]
     };
-    /** @type {number[]} */
-    const waitDelays = [];
+    const waitDelays: number[] = [];
     let closeCalls = 0;
     let commentCalls = 0;
     const client = {

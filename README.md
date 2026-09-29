@@ -179,18 +179,19 @@ flowchart TD
 - `npm run build` がJavaScriptの内容ハッシュ付きファイル名とCSSの `?v=<sha256>` を決定し、HTML・preload・importのURLを揃えます。Pages artifactはURLや生成JavaScriptを書き換えず、`browser`・静的asset・曲JSONだけを `_site` へコピーします。`_build/app` はNode tests・scripts用で配布しません。明示バージョンはビルド時の `DEPLOY_CACHE_BUSTER` または `npm run build -- --cache-buster <version>` で指定します（artifactコマンドの `--cache-buster` は廃止）。deploy SHAは `deployment.json` に記録するため、曲JSONやemit側コメントだけの変更でCSS/JavaScriptのURLは変わりません。
 - フロントエンドのみで動作します(静的ホスティング想定)。
 - 配布物はHTML/CSS/JavaScriptのみで、実行時にnpm等の同梱依存はありません。
-- `app/**/*.mts` は source として扱い、未移行の `.mjs` テスト・Node scripts は `npm run build:ts` で `_build/app/**/*.mjs` に生成された module を読みます。ブラウザ用には `npm run build` がこのemit結果をesbuildで `_build/browser` のES module bundleへまとめます。生成 `.mjs` は Git 管理対象外です。fresh checkout 後や `.mts` 変更後にブラウザで確認する場合は、`npm run build` を実行し `_build` を配信してください。`build:ts` 単体ではブラウザ用bundleを更新しません。`npm run check:ts-emit` は `_build/app` の生成 `.mjs` が存在し、`app` source tree に `.mjs` が残っていないことを確認します。`npm run build` は静的 asset と TypeScript 生成 module を `_build` へ作成し、`npm run build:pages-artifact` は `_build` を元に `_site` を作成します。`npm run typecheck` / `npm run lint` / `npm run test:unit` / `npm run build:songs-json` / `npm run validate:songs-json` は事前に `build:ts` を実行します。`npm run build:pages-artifact` は事前に `npm run build` を実行し、`npm run test:e2e` はそのPages artifactを検証します。
+- `app/**/*.mts` は source として扱い、Node scriptsとE2Eのfixture生成helperは `npm run build:ts` で `_build/app/**/*.mjs` に生成された module を読みます。ブラウザ用には `npm run build` がこのemit結果をesbuildで `_build/browser` のES module bundleへまとめます。生成 `.mjs` は Git 管理対象外です。fresh checkout 後や `.mts` 変更後にブラウザで確認する場合は、`npm run build` を実行し `_build` を配信してください。`build:ts` 単体ではブラウザ用bundleを更新しません。`npm run check:ts-emit` は `_build/app` の生成 `.mjs` が存在し、`app` source tree に `.mjs` が残っていないことを確認します。`npm run build` は静的 asset と TypeScript 生成 module を `_build` へ作成し、`npm run build:pages-artifact` は `_build` を元に `_site` を作成します。`npm run typecheck` / `npm run lint` / `npm run test:unit` / `npm run build:songs-json` / `npm run validate:songs-json` は事前に `build:ts` を実行します。`npm run build:pages-artifact` は事前に `npm run build` を実行し、`npm run test:e2e` はそのPages artifactを検証します。
 - ブラウザ用bundleは小さい起動処理、UI、共有処理へ分割し、UIと共有処理の `modulepreload` をbuild時にHTMLへ生成します。HTML解析時に必要なファイルを並行取得できるため、module依存先を順に発見する通信待ちを減らします。esbuildは開発依存のみで、実行時の外部ライブラリは追加しません。
 - サムネイル表示/埋め込み再生まわりでは YouTube Iframe API を動的に利用します。
 - 開発時の静的解析は TypeScript noEmit typecheck と ESLint を利用します。
 - 開発時テストは Node.js 標準の `node:test` を利用します。
-- テストは段階的にTSへ移行しています。移行済みの `tests/**/*.mts` は `tsx` 経由で
+- Node単体テストはすべてTSへ移行済みです。E2Eテストは引き続き `.mjs` を使います。
+  `tests/**/*.mts` は `tsx` 経由で
   `app/**/*.mts` を直接 import します。Node scriptsを対象にするテストは、
   scripts経由で `_build/app/**/*.mjs` も読むため事前buildが必要です。生成型宣言は使いません。
   アプリ内部の `.mjs` import は `tsx` が対応する `.mts` source へ解決します。
-  `tests/fixtures/song.mts` は既存の `.mjs` テストからも共有します。
+  曲fixtureは `tests/fixtures/song.mts` で共有します。
   検索用の曲は `tests/fixtures/search-song.mts` で正規化し、factoryごとに独立した連番を持たせます。
-- 移行済みテストの型チェックは `tsconfig.tests.json` で `strict: true` にしています。
+- Node単体テストの型チェックは `tsconfig.tests.json` で `strict: true` にしています。
   `allowJs: true` で参照先のNode scriptsのJSDoc型を取り込みます。`checkJs: false` とし、
   scripts本体の検査範囲は `tsconfig.scripts.json` で管理し、現在は配布通知と曲データのハッシュ算出を対象にしています。
   曲JSONの生成・検証スクリプトは、型情報が除かれた生成moduleも参照するため、本体の型チェック対象にはまだ含めていません。
@@ -200,7 +201,7 @@ flowchart TD
 - `npm run typecheck:tests:raw` は事前buildなしで実行できます。
   `npm run test:unit:ts` と `npm run test:unit` は、Node scriptsが生成moduleを読むため、
   事前に `build:ts` を実行します。`tsx` 自体は型チェックしないため、型チェックも併せて実行してください。
-  CIも既存テストと移行済みテストの両方を検証します。
+  CIもすべての単体テストを検証します。
 - ブラウザ回帰確認として Playwright による Chromium スモークテストを用意しています。
 
 ## テスト/静的解析(開発者向け)
@@ -224,7 +225,9 @@ flowchart TD
   - 曲キーの生成/整合性/一意性検証テスト (`tests/song-identity.test.mts`)
   - 検索booleanフィルター共有helperのテスト (`tests/search-boolean-filters.test.mts`)
   - フォーマット表示ラベルのテスト (`tests/format-filter.test.mts`)
-  - Pages artifact生成とブラウザ成果物URLのテスト (`tests/pages-artifact.test.mjs` / `tests/browser-build.test.mjs`)
+  - Pages artifact生成とブラウザ成果物URLのテスト (`tests/pages-artifact.test.mts` / `tests/browser-build.test.mts`)
+  - サイトビルドの引数・出力先のテスト (`tests/build-site.test.mts`)
+  - Pages公開確認と配布失敗通知のテスト (`tests/pages-deployment-verification.test.mts` / `tests/deploy-pages-issue-notification.test.mts`)
   - 再生継続候補の選択ロジック (`tests/playback-sequence.test.mts`)
   - 再生セッション制御のテスト (`tests/playback-session-controller.test.mts`)
   - 再生設定値reducerのテスト (`tests/playback-settings-value-reducer.test.mts`)
@@ -257,12 +260,12 @@ flowchart TD
   - `npm run validate:songs-json`
   - `npm run build:ts`
   - `npm run typecheck`
-  - `npm run typecheck:tests:raw`（移行済みテストの型チェックのみ）
+  - `npm run typecheck:tests:raw`（Node単体テストの型チェックのみ）
   - `npm run check:ts-emit`
   - `npm run build`
   - `npm run lint`
-  - `npm run test:unit`（既存 `.mjs` と移行済み `.mts` の単体テストをまとめて実行）
-  - `npm run test:unit:ts`（移行済みテストのみ、事前にbuild:tsを実行）
+  - `npm run test:unit`（すべての `.mts` 単体テストを実行）
+  - `npm run test:unit:ts`（互換用コマンド。test:unitへ委譲）
   - `npm run test:e2e`
 - Node.jsはCIと同じ24.16.0で検証しています。
 - 初回または `node_modules` がない環境では、検証コマンドの前に

@@ -1,4 +1,4 @@
-import test from "node:test";
+import test, { type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
@@ -8,7 +8,7 @@ import { buildPagesArtifact } from "../scripts/build-pages-artifact.mjs";
 const htmlTemplate = '<head>\n<link rel="stylesheet" href="styles.css">\n  <script type="module" src="app/startup.mjs"></script>\n</head>';
 
 /** 独立した emit fixture と再ビルド用 helper を作り、テスト終了時に片付ける。 */
-async function createBrowserFixture(t) {
+async function createBrowserFixture(t: TestContext) {
     const root = await mkdtemp(join(process.cwd(), "_build/browser-test-"));
     const outputDir = `_site/${relative(join(process.cwd(), "_build"), root)}`;
     t.after(async () => {
@@ -28,7 +28,7 @@ async function createBrowserFixture(t) {
         writeFile(join(root, "app/bootstrap.mjs"), bootstrap)
     ]);
     /** source HTMLから毎回ビルドし、ブラウザ成果物の内容を比較する。 */
-    async function compile(options) {
+    async function compile(options?: Parameters<typeof buildBrowserModules>[1]) {
         await rm(join(root, "browser"), { recursive: true, force: true });
         await writeFile(join(root, "index.html"), htmlTemplate);
         await buildBrowserModules(root, options);
@@ -93,7 +93,7 @@ test("browser build: preloads startup UI and static dependencies but excludes la
     const startup = files.find((file) => file.startsWith("startup-"));
     assert.ok(startup);
     assert.ok(!preloads.includes(`browser/${startup}`));
-    const staticDependencies = new Set();
+    const staticDependencies = new Set<string>();
     for (const file of [startup, ui]) {
         const source = await readFile(join(root, "browser", file), "utf8");
         for (const match of source.matchAll(/from"\.\/([^"]+)"/g)) {

@@ -9,8 +9,8 @@
 
 ## 全体構成
 - 静的フロントエンドのみ（HTML/CSS/JavaScript, ES Modules）。
-  `app/**/*.mts` を source とし、`npm run build:ts` で `_build/app/**/*.mjs` へ生成した JavaScript を未移行の `.mjs` テスト・Node scripts が読む。
-  移行済みの `.mts` テストは `tsx` 経由でアプリsourceを直接読み、型宣言の生成には依存しない。
+  `app/**/*.mts` を source とし、`npm run build:ts` で `_build/app/**/*.mjs` へ生成した JavaScript を Node scriptsとE2Eのfixture生成helperが読む。
+  `.mts` 単体テストは `tsx` 経由でアプリsourceを直接読む。Node scriptsを対象とするテストはscripts経由で生成moduleも読む。型宣言の生成には依存しない。
   ブラウザ用は `npm run build` がemit結果をesbuildで `_build/browser` へbundleし、起動用UIと静的依存chunkのmodulepreloadをHTMLへ生成する。
   起動用UI以外のdynamic import先はpreload対象に含めない。
   起動moduleはデータ取得を開始してからUIをdynamic importし、同じ初期データPromiseを共有する。
@@ -26,7 +26,7 @@
 ## テスト方針（現状）
 - 対象: 検索ロジック、日付フィルタ、ブックマーク検索、描画/再生/保存/サイドバーまわりの回帰
 - 重点ケース: ブックマーク表示時のみ有効なドラッグ並び替えと、並び順の永続化、YouTube 継続再生の失敗復旧
-- TS移行: 純粋関数の単体テストと曲fixtureから段階的に移行し、`tsconfig.tests.json` でstrictな型チェックを行う。
+- TS移行: Node単体テストとその共通helperはすべてTSへ移行済み。`tsconfig.tests.json` でstrictな型チェックを行う。E2Eは引き続き `.mjs` を使う。
   Node scriptsのJSDoc型は `allowJs: true` で参照し、scripts本体の検査範囲は `tsconfig.scripts.json` で管理する。
   `typecheck:tests:raw` は事前build不要。`test:unit:ts` と `test:unit` は、Node scriptsが生成moduleを読むため事前に `build:ts` を実行する。
 - テストファイル:
@@ -51,7 +51,11 @@
   - `tests/song-format.test.mts`
   - `tests/song-identity.test.mts`
   - `tests/format-filter.test.mts`
-  - `tests/pages-artifact.test.mjs`
+  - `tests/pages-artifact.test.mts`
+  - `tests/browser-build.test.mts`
+  - `tests/build-site.test.mts`
+  - `tests/pages-deployment-verification.test.mts`
+  - `tests/deploy-pages-issue-notification.test.mts`
   - `tests/playback-sequence.test.mts`
   - `tests/playback-session-controller.test.mts`
   - `tests/playback-settings-value-reducer.test.mts`
@@ -99,8 +103,8 @@
   - `npm run check:ts-emit`
   - `npm run build`
   - `npm run lint`
-  - `npm run test:unit`（既存 `.mjs` と移行済み `.mts` の単体テストをまとめて実行）
-  - `npm run test:unit:ts`（移行済みテストのみ、事前にbuild:tsを実行）
+  - `npm run test:unit`（すべての `.mts` 単体テストを実行）
+  - `npm run test:unit:ts`（互換用コマンド。test:unitへ委譲）
   - `npm run test:e2e`
 
 ## 主要機能
@@ -441,6 +445,6 @@ IndexedDB保存：
 - ソースのHTMLやimportには通常バージョンを記述しない。emit側コメントだけの変更はブラウザ成果物へ影響しない
 - `DEPLOY_CACHE_BUSTER` またはbuild-siteの `--cache-buster` はビルド時に適用する。JSではbannerを通じて内容ハッシュへ、CSSではURLのバージョンへ反映する
 - deploy commit SHAはassetのバージョンと兼用せず、artifact直下の `deployment.json` に記録する
-- URL決定の仕様変更は `scripts/build-browser.mjs` と `tests/browser-build.test.mjs` を合わせて更新する
+- URL決定の仕様変更は `scripts/build-browser.mjs` と `tests/browser-build.test.mts` を合わせて更新する
 - `songs.json` / `songs-meta.json` の内容更新だけでは cache buster を上げず、`contentHash` による鮮度確認で反映する
 - 日付入力はセレクト方式（ブラウザ互換性優先）

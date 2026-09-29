@@ -8,9 +8,6 @@ import {
 } from "../scripts/build-pages-artifact.mjs";
 
 
-
-
-
 test("pages artifact: reads source site directory from arguments", () => {
     assert.deepEqual(
         parseArgs(["--site-dir", "_build"], { DEPLOY_CACHE_BUSTER: "abc123" }),

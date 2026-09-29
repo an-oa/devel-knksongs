@@ -33,9 +33,9 @@ test("pages deployment verification: creates a cache-bypassing URL under the Pag
 });
 
 test("pages deployment verification: retries until the expected SHA is served", async () => {
-    const fetchedUrls = [];
-    const waitDelays = [];
-    const requestTimeouts = [];
+    const fetchCalls: Parameters<typeof fetch>[] = [];
+    const waitDelays: number[] = [];
+    const requestTimeouts: number[] = [];
     let fetchCount = 0;
     let currentTime = 0;
 
@@ -47,8 +47,7 @@ test("pages deployment verification: retries until the expected SHA is served", 
         delayMs: 25,
         requestTimeoutMs: 30,
         fetchImpl: async (url, init) => {
-            fetchedUrls.push(url.href);
-            assert.ok(init.signal instanceof AbortSignal);
+            fetchCalls.push([url, init]);
             fetchCount++;
             const servedSha = fetchCount === 1
                 ? "1111111111111111111111111111111111111111"
@@ -66,6 +65,11 @@ test("pages deployment verification: retries until the expected SHA is served", 
         }
     });
 
+    const fetchedUrls = fetchCalls.map(([url, init]) => {
+        assert.ok(url instanceof URL);
+        assert.ok(init?.signal instanceof AbortSignal);
+        return url.href;
+    });
     assert.deepEqual(fetchedUrls, [
         "https://example.test/knksongs/deployment.json?deployment-check=run-456-1",
         "https://example.test/knksongs/deployment.json?deployment-check=run-456-2"
@@ -76,8 +80,8 @@ test("pages deployment verification: retries until the expected SHA is served", 
 });
 
 test("pages deployment verification: stops at the deadline when the SHA never appears", async () => {
-    const waitDelays = [];
-    const requestTimeouts = [];
+    const waitDelays: number[] = [];
+    const requestTimeouts: number[] = [];
     let currentTime = 0;
 
     await assert.rejects(

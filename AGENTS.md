@@ -84,8 +84,8 @@ feat: move settings into dedicated sidebar panel
 
 ## TypeScript Emit During Migration
 
-- `app/**/*.mts` は TypeScript source として扱い、ブラウザ・未移行の `.mjs` テスト・Node scripts は `npm run build:ts` が `_build/app/**/*.mjs` に生成した module を読む。
-- 移行済みの `tests/**/*.mts` は `tsx` 経由で `app/**/*.mts` を直接 import する。
+- `app/**/*.mts` は TypeScript source として扱い、Node scriptsとE2Eのfixture生成helperは `npm run build:ts` が `_build/app/**/*.mjs` に生成した module を読む。
+- Node単体テストの `tests/**/*.mts` は `tsx` 経由で `app/**/*.mts` を直接 import する。
   Node scriptsのテストはscripts経由で生成moduleも読むため、`npm run test:unit:ts` は事前に `build:ts` を実行する。
   `npm run typecheck:tests:raw` は事前 build なしで実行でき、Node scriptsのJSDoc型を `allowJs: true` で参照する。
   テスト用の型宣言は生成せず、tsconfig.tests.json で source を型チェックする。
