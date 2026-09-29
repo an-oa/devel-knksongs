@@ -1,5 +1,7 @@
 {
   "compilerOptions": {
+    "allowJs": true,
+    "checkJs": false,
     "noEmit": true,
     "target": "ES2024",
     "module": "Preserve",

@@ -4,7 +4,7 @@ import {
     buildSongsJsonMetaPayload,
     buildSongsJsonPayload,
     SONGS_JSON_SCHEMA_VERSION
-} from "../_build/app/lib/songs-json.mjs";
+} from "../app/lib/songs-json.mts";
 import { createSongsContentHash } from "../scripts/songs-content-hash.mjs";
 import { validateSongsJsonArtifacts } from "../scripts/songs-json-artifact.mjs";
 import { createSongFixture } from "./fixtures/song.mts";
@@ -13,10 +13,8 @@ const GENERATED_AT = "2026-08-14T00:00:00.000Z";
 
 /**
  * JSON成果物検証用のsongs.jsonとsongs-meta.jsonを作る。
- * @param {unknown[]} songs 曲配列
- * @returns {{ songsJson: string, metaJson: string, contentHash: string }}
  */
-function makeArtifacts(songs) {
+function makeArtifacts(songs: Song[]) {
     const contentHash = createSongsContentHash(songs);
     return {
         songsJson: JSON.stringify(buildSongsJsonPayload(songs, contentHash, GENERATED_AT)),

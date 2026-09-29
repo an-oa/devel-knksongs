@@ -15,6 +15,7 @@
   },
   "include": [
     "scripts/deploy-pages-issue-notification.mjs",
+    "scripts/songs-content-hash.mjs",
     "tests/deploy-pages-issue-notification.test.mjs"
   ]
 }

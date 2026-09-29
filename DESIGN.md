@@ -27,7 +27,8 @@
 - 対象: 検索ロジック、日付フィルタ、ブックマーク検索、描画/再生/保存/サイドバーまわりの回帰
 - 重点ケース: ブックマーク表示時のみ有効なドラッグ並び替えと、並び順の永続化、YouTube 継続再生の失敗復旧
 - TS移行: 純粋関数の単体テストと曲fixtureから段階的に移行し、`tsconfig.tests.json` でstrictな型チェックを行う。
-  `test:unit:ts` は事前buildなしで実行できる。全体の `test:unit` は未移行テストのため事前buildを続ける。
+  Node scriptsのJSDoc型は `allowJs: true` で参照し、scripts本体の検査範囲は `tsconfig.scripts.json` で管理する。
+  `typecheck:tests:raw` は事前build不要。`test:unit:ts` と `test:unit` は、Node scriptsが生成moduleを読むため事前に `build:ts` を実行する。
 - テストファイル:
   - `tests/bookmark-storage-schema.test.mts`
   - `tests/bookmark-import-export-ui.test.mts`
@@ -75,13 +76,13 @@
   - `tests/layout-anchor.test.mts`
   - `tests/results-scroll.test.mts`
   - `tests/e2e/youtube-smoke.spec.mjs`
-  - `tests/songs-content-hash.test.mjs`
+  - `tests/songs-content-hash.test.mts`
   - `tests/songs-data-source.test.mts`
   - `tests/songs-data-quality.test.mts`
-  - `tests/build-songs-json.test.mjs`
+  - `tests/build-songs-json.test.mts`
   - `tests/songs-json-cache.test.mts`
   - `tests/songs-json.test.mts`
-  - `tests/songs-json-validation.test.mjs`
+  - `tests/songs-json-validation.test.mts`
 - 補助モジュール:
   - `tests/fixtures/song.mts`
   - `tests/fixtures/search-song.mts`
@@ -99,7 +100,7 @@
   - `npm run build`
   - `npm run lint`
   - `npm run test:unit`（既存 `.mjs` と移行済み `.mts` の単体テストをまとめて実行）
-  - `npm run test:unit:ts`（移行済みテストのみ、build不要）
+  - `npm run test:unit:ts`（移行済みテストのみ、事前にbuild:tsを実行）
   - `npm run test:e2e`
 
 ## 主要機能

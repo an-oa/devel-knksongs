@@ -9,14 +9,12 @@ import {
     parseSongsJsonMetaPayload,
     parseSongsJsonPayload,
     SONGS_JSON_SCHEMA_VERSION
-} from "../_build/app/lib/songs-json.mjs";
+} from "../app/lib/songs-json.mts";
 
 /**
  * JSON生成スクリプト用のローカルCSVを作る。
- * @param {string} url 曲URL
- * @returns {string} CSV文字列
  */
-function makeCsv(url) {
+function makeCsv(url: string): string {
     return [
         "#,配信日,配信上の立場,画面の向き,公開範囲,形態,歌枠リレー？,ハモリあり？,##,曲名,アーティスト名,キョクメイ,アーティストメイ,URL,終了時刻,メモ",
         `1,2026/03/11,,横,全体,歌みた,,,1,Song,Artist,ソング,アーティスト,${url},,`

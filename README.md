@@ -185,18 +185,22 @@ flowchart TD
 - 開発時の静的解析は TypeScript noEmit typecheck と ESLint を利用します。
 - 開発時テストは Node.js 標準の `node:test` を利用します。
 - テストは段階的にTSへ移行しています。移行済みの `tests/**/*.mts` は `tsx` 経由で
-  `app/**/*.mts` を直接 import し、ビルド済みのアプリや生成型宣言には依存しません。
+  `app/**/*.mts` を直接 import します。Node scriptsを対象にするテストは、
+  scripts経由で `_build/app/**/*.mjs` も読むため事前buildが必要です。生成型宣言は使いません。
   アプリ内部の `.mjs` import は `tsx` が対応する `.mts` source へ解決します。
   `tests/fixtures/song.mts` は既存の `.mjs` テストからも共有します。
   検索用の曲は `tests/fixtures/search-song.mts` で正規化し、factoryごとに独立した連番を持たせます。
 - 移行済みテストの型チェックは `tsconfig.tests.json` で `strict: true` にしています。
+  `allowJs: true` で参照先のNode scriptsのJSDoc型を取り込みます。`checkJs: false` とし、
+  scripts本体の検査範囲は `tsconfig.scripts.json` で管理し、現在は配布通知と曲データのハッシュ算出を対象にしています。
+  曲JSONの生成・検証スクリプトは、型情報が除かれた生成moduleも参照するため、本体の型チェック対象にはまだ含めていません。
   型はアプリのsourceと共有ドメイン型の `types/song.d.ts`・`types/search-state.d.ts` を参照します。
   検索条件と日付キーの型はUI用ambient宣言から分離し、テストではUI・controller用の型定義を取り込みません。
   ESLintのTypeScriptルールは `tests/**/*.mts` に適用します。
-- `npm run test:unit:ts` と `npm run typecheck:tests:raw` は事前buildなしで実行できます。
-  `tsx` 自体は型チェックしないため、両方を実行してください。
-  全体の `npm run test:unit` は、未移行テストとNode scriptsが生成moduleを読むため、
-  引き続き事前に `build:ts` を実行します。CIも既存テストと移行済みテストの両方を検証します。
+- `npm run typecheck:tests:raw` は事前buildなしで実行できます。
+  `npm run test:unit:ts` と `npm run test:unit` は、Node scriptsが生成moduleを読むため、
+  事前に `build:ts` を実行します。`tsx` 自体は型チェックしないため、型チェックも併せて実行してください。
+  CIも既存テストと移行済みテストの両方を検証します。
 - ブラウザ回帰確認として Playwright による Chromium スモークテストを用意しています。
 
 ## テスト/静的解析(開発者向け)
@@ -232,13 +236,13 @@ flowchart TD
   - 検索フィルターUI controllerのテスト (`tests/search-filters-controller.test.mts`)
   - 検索状態保存schemaのテスト (`tests/search-state-schema.test.mts`)
   - サイドバーUIのテスト (`tests/sidebar-ui.test.mts`)
-  - 曲データJSONのcontent hash算出テスト (`tests/songs-content-hash.test.mjs`)
+  - 曲データJSONのcontent hash算出テスト (`tests/songs-content-hash.test.mts`)
   - 曲データソースのJSON優先読み込み/CSVフォールバック/キャッシュ更新テスト (`tests/songs-data-source.test.mts`)
   - 曲データJSONキャッシュのIndexedDB/旧localStorage移行テスト (`tests/songs-json-cache.test.mts`)
   - 曲データJSONスキーマのテスト (`tests/songs-json.test.mts`)
   - CSV由来の曲データ品質検証テスト (`tests/songs-data-quality.test.mts`)
-  - 曲データJSON生成の書き出し前検証テスト (`tests/build-songs-json.test.mjs`)
-  - 派生JSONのスキーマ・hash整合性検証テスト (`tests/songs-json-validation.test.mjs`)
+  - 曲データJSON生成の書き出し前検証テスト (`tests/build-songs-json.test.mts`)
+  - 派生JSONのスキーマ・hash整合性検証テスト (`tests/songs-json-validation.test.mts`)
   - ストレージ(ブックマーク上限/リネーム)の単体テスト (`tests/storage-bookmark-limit.test.mts`)
   - ストレージ(検索状態保存/復元)の単体テスト (`tests/storage-search-state.test.mts`)
   - UI設定/ストレージ互換のテスト (`tests/ui-storage-compat.test.mts`)
@@ -258,7 +262,7 @@ flowchart TD
   - `npm run build`
   - `npm run lint`
   - `npm run test:unit`（既存 `.mjs` と移行済み `.mts` の単体テストをまとめて実行）
-  - `npm run test:unit:ts`（移行済みテストのみ、build不要）
+  - `npm run test:unit:ts`（移行済みテストのみ、事前にbuild:tsを実行）
   - `npm run test:e2e`
 - Node.jsはCIと同じ24.16.0で検証しています。
 - 初回または `node_modules` がない環境では、検証コマンドの前に
