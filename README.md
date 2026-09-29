@@ -184,7 +184,7 @@ flowchart TD
 - サムネイル表示/埋め込み再生まわりでは YouTube Iframe API を動的に利用します。
 - 開発時の静的解析は TypeScript noEmit typecheck と ESLint を利用します。
 - 開発時テストは Node.js 標準の `node:test` を利用します。
-- Node単体テストはすべてTSへ移行済みです。E2Eは共通helperとヘッダーのテストをTSへ移行し、残り4ファイルは `.mjs` を使います。
+- Node単体テスト・E2Eと、それぞれの共通helperはすべてTSへ移行済みです。
   Node単体テストでは `tsx` 経由で
   `app/**/*.mts` を直接 import します。Node scriptsを対象にするテストは、
   scripts経由で `_build/app/**/*.mjs` も読むため事前buildが必要です。生成型宣言は使いません。
@@ -204,8 +204,8 @@ flowchart TD
   CIもすべての単体テストを検証します。
 - ブラウザ回帰確認として Playwright による Chromium スモークテストを用意しています。
   `tests/e2e/support/network-mocks.mts` が曲データ用の `songs-network.mts` とYouTube用の `mock-youtube.mts` を組み合わせます。
-  曲JSON・metaのルート登録は初期・通常・遅延応答で共有し、キャッシュの読み取りも曲データ用helperにまとめています。
-  TS化したE2Eは `tests/e2e/tsconfig.json` でstrictに型チェックし、`npm run typecheck` に含めています。
+  曲JSON・metaのルート登録は初期・通常・遅延応答で共有します。キャッシュの読み取り・旧形式の準備・完了通知の保留は `songs-cache.mts` にまとめています。
+  E2Eは `tests/e2e/tsconfig.json` でstrictに型チェックし、`npm run typecheck` に含めています。
   Node単体テストの設定からE2Eを除外し、ブラウザ内のテスト専用Window拡張は `tests/e2e/browser.types.d.ts` に限定します。
   E2Eの曲fixture生成helperはアプリのTSソースを直接読みます。YouTubeモックは `tests/e2e/support/youtube-iframe-api.mts` に置き、
   APIが要求された時点で既存のesbuildでJavaScriptへ変換して配信します。アプリの検証対象は引き続き `_site` の配布成果物です。
@@ -261,14 +261,15 @@ flowchart TD
   - YouTube playback state / start attempt / player adapter の単体テスト (`tests/youtube-playback-state.test.mts`, `tests/youtube-playback-start-attempt.test.mts`, `tests/youtube-player-adapter.test.mts`)
   - YouTube shared playback / thumbnail helper / unconfirmed playback start の単体テスト (`tests/youtube-shared-playback.test.mts`, `tests/youtube-thumbnail.test.mts`, `tests/youtube-unconfirmed-playback-start.test.mts`)
   - Chromium 上でのヘッダー自動非表示・キーボードフォーカス・reduced motionのテスト (`tests/e2e/header-auto-hide.spec.mts`)
-  - Chromium 上での YouTube 再生スモークテスト (`tests/e2e/youtube-smoke.spec.mjs`)
+  - Chromium 上での検索・ブックマーク・サイドバーのテスト (`tests/e2e/search.spec.mts`, `tests/e2e/bookmarks.spec.mts`, `tests/e2e/sidebar.spec.mts`)
+  - Chromium 上での YouTube 再生スモークテスト (`tests/e2e/youtube-smoke.spec.mts`)
 - `tests/test-helpers.mts`、`tests/youtube-harness.mts`、`tests/support/playback-settings-fixture.mts`、`tests/e2e/support/mock-youtube.mts`、`tests/e2e/support/ui-helpers.mts` は複数テストで共有する補助モジュールです。
 - 実行コマンド:
   - `npm run validate:songs-json`
   - `npm run build:ts`
   - `npm run typecheck`
   - `npm run typecheck:tests:raw`（Node単体テストの型チェックのみ）
-  - `npm run typecheck:e2e:raw`（TS化したE2Eと共通helperの型チェックのみ）
+  - `npm run typecheck:e2e:raw`（E2Eと共通helperの型チェックのみ）
   - `npm run check:ts-emit`
   - `npm run build`
   - `npm run lint`

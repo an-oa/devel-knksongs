@@ -2,7 +2,6 @@ import { readFile } from "node:fs/promises";
 import type { Page } from "@playwright/test";
 import { parseCsvToSongs } from "../../../app/lib/csv-parser.mts";
 import { buildSongsJsonMetaPayload, buildSongsJsonPayload } from "../../../app/lib/songs-json.mts";
-import { SONGS_JSON_CACHE_KEY } from "../../../app/config.mts";
 import { createSongsContentHash } from "../../../scripts/songs-content-hash.mjs";
 
 const SONGS_JSON_ROUTE = "**/data/songs.json*";
@@ -72,32 +71,3 @@ export async function routeDeferredSongsJsonFixture(page: Page, songs: Song[], g
     });
     return { requestStarted, releaseResponse };
 }
-
-/**
- * 実ブラウザのIndexedDBから現在の曲データJSONキャッシュを読み込む。
- */
-export async function readSongsJsonCacheText(page: Page) {
-    return page.evaluate(async (cacheKey) => {
-        return new Promise<string | null>((resolve, reject) => {
-            const opening = indexedDB.open("knksongs", 1);
-            // 読み取り補助が空のDBを作り、アプリのschema初期化を妨げないようにする。
-            opening.onupgradeneeded = () => opening.transaction?.abort();
-            opening.onerror = () => opening.error?.name === "AbortError" ? resolve(null) : reject(opening.error);
-            opening.onsuccess = () => {
-                const db = opening.result;
-                if (!db.objectStoreNames.contains("songsJsonCache")) {
-                    db.close();
-                    resolve(null);
-                    return;
-                }
-                const request = db.transaction("songsJsonCache", "readonly").objectStore("songsJsonCache").get(cacheKey);
-                request.onsuccess = () => {
-                    db.close();
-                    resolve(typeof request.result?.value === "string" ? request.result.value : null);
-                };
-                request.onerror = () => { db.close(); reject(request.error); };
-            };
-        });
-    }, SONGS_JSON_CACHE_KEY);
-}
-

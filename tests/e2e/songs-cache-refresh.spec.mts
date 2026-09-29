@@ -1,6 +1,8 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
+import { parseSongsJsonPayload } from "../../app/lib/songs-json.mts";
 import { installNetworkMocks } from "./support/network-mocks.mts";
-import { readSongsJsonCacheText, routeDeferredSongsJsonFixture } from "./support/songs-network.mts";
+import { routeDeferredSongsJsonFixture } from "./support/songs-network.mts";
+import { readSongsJsonCacheText } from "./support/songs-cache.mts";
 import { createScrollableResultSongs } from "./support/song-fixtures.mts";
 import {
     filterBySongTitle,
@@ -11,16 +13,11 @@ import {
 
 /**
  * IndexedDBへ保存されている曲タイトルを返す。
- * @param {import("@playwright/test").Page} page
- * @returns {Promise<string[]>}
  */
-async function readCachedSongTitles(page) {
+async function readCachedSongTitles(page: Page): Promise<string[]> {
     const cacheText = await readSongsJsonCacheText(page);
     if (!cacheText) return [];
-    const payload = JSON.parse(cacheText);
-    return Array.isArray(payload.songs)
-        ? payload.songs.map((song) => song.title)
-        : [];
+    return parseSongsJsonPayload(cacheText).songs.map((song) => song.title);
 }
 
 for (const [label, generatedAt] of [
@@ -60,7 +57,7 @@ test("matching public meta reuses cached songs without requesting the body", asy
     await installNetworkMocks(page);
     await page.goto("/");
     await waitForInitialLoad(page);
-    const requests = [];
+    const requests: string[] = [];
     page.on("request", (request) => {
         if (/\/data\/songs(?:-meta)?\.json/.test(request.url())) requests.push(new URL(request.url()).pathname);
     });
@@ -78,7 +75,7 @@ test("timed out public json keeps the cache through later search operations", as
     await waitForInitialLoad(page);
     await expect.poll(() => readCachedSongTitles(page)).toContain("Manual Song");
     const deferred = await routeDeferredSongsJsonFixture(page, createScrollableResultSongs(1));
-    const requests = [];
+    const requests: string[] = [];
     page.on("request", (request) => {
         if (/\/data\/songs(?:-meta)?\.json/.test(request.url())) requests.push(new URL(request.url()).pathname);
     });

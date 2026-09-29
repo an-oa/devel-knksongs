@@ -26,7 +26,7 @@
 ## テスト方針（現状）
 - 対象: 検索ロジック、日付フィルタ、ブックマーク検索、描画/再生/保存/サイドバーまわりの回帰
 - 重点ケース: ブックマーク表示時のみ有効なドラッグ並び替えと、並び順の永続化、YouTube 継続再生の失敗復旧
-- TS移行: Node単体テストとその共通helperはすべてTSへ移行済み。`tsconfig.tests.json` でstrictな型チェックを行う。E2Eは共通helperとヘッダーのテストをTS化し、残り4ファイルは `.mjs` を使う。
+- TS移行: Node単体テストとその共通helperはすべてTSへ移行済み。`tsconfig.tests.json` でstrictな型チェックを行う。E2Eとその共通helperもすべてTSへ移行済み。
   Node scriptsのJSDoc型は `allowJs: true` で参照し、scripts本体の検査範囲は `tsconfig.scripts.json` で管理する。
   E2Eの型設定は `tests/e2e/tsconfig.json` に置き、`typecheck:e2e:raw` を全体のtypecheckへ組み込む。
   E2Eのfixture生成はアプリsourceを直接参照し、ブラウザでは `_site` の配布成果物を検証する。
@@ -82,7 +82,10 @@
   - `tests/layout-anchor.test.mts`
   - `tests/results-scroll.test.mts`
   - `tests/e2e/header-auto-hide.spec.mts`
-  - `tests/e2e/youtube-smoke.spec.mjs`
+  - `tests/e2e/youtube-smoke.spec.mts`
+  - `tests/e2e/search.spec.mts`
+  - `tests/e2e/bookmarks.spec.mts`
+  - `tests/e2e/sidebar.spec.mts`
   - `tests/songs-content-hash.test.mts`
   - `tests/songs-data-source.test.mts`
   - `tests/songs-data-quality.test.mts`

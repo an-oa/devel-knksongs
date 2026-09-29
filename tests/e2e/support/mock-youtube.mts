@@ -56,3 +56,15 @@ export async function setMockVideoBehavior(page: Page, videoId: string, behavior
         window.__knkMockYoutube.setBehavior(videoId, behavior);
     }, { videoId, behavior });
 }
+
+/** 最後に生成したPlayerを再生開始・終了の順で通知し、継続再生の判定を起動する。 */
+export async function endLatestMockPlayback(page: Page): Promise<void> {
+    await page.evaluate(() => {
+        const mock = window.__knkMockYoutube;
+        if (!mock) throw new Error("YouTube mock is unavailable");
+        const playerIndex = mock.latestIndex();
+        if (playerIndex < 0) throw new Error("No mock Player has been created");
+        mock.emit(playerIndex, window.YT.PlayerState.PLAYING);
+        mock.emit(playerIndex, window.YT.PlayerState.ENDED);
+    });
+}

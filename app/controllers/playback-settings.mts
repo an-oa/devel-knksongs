@@ -37,7 +37,7 @@ type PlaybackSettingsUiState = {
 
 export type PlaybackSettingsConsoleApi = {
     setExperimentalPlaybackSettings: (value: boolean) => boolean;
-    readonly showExperimentalPlaybackSettings: boolean;
+    showExperimentalPlaybackSettings: boolean;
     readonly state: PlaybackSettingsUiSlice;
 };
 

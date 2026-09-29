@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { installNetworkMocks } from "./support/network-mocks.mts";
 import { routeSongsJsonFixture } from "./support/songs-network.mts";
 import { createScrollableResultSongs } from "./support/song-fixtures.mts";
@@ -13,7 +13,7 @@ import {
 } from "./support/ui-helpers.mts";
 
 /** 実際の矩形で、カード同士の重なりやコンテナからのはみ出しを検証する。 */
-async function expectCardsInsideLayout(page) {
+async function expectCardsInsideLayout(page: Page) {
     await expect.poll(() => page.locator("#resultList").evaluate((list) => {
         const bounds = list.getBoundingClientRect();
         const rects = Array.from(list.querySelectorAll(".song-card"), (card) => card.getBoundingClientRect());
