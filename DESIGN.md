@@ -64,7 +64,7 @@
   - `tests/storage-search-state.test.mts`
   - `tests/ui-storage-compat.test.mts`
   - `tests/ui-sync.test.mts`
-  - `tests/youtube-controller.test.mjs`
+  - `tests/youtube-controller.test.mts`
   - `tests/youtube-embed.test.mts`
   - `tests/youtube-playback-start-attempt.test.mts`
   - `tests/youtube-playback-state.test.mts`
@@ -86,7 +86,7 @@
   - `tests/fixtures/song.mts`
   - `tests/fixtures/search-song.mts`
   - `tests/test-helpers.mts`
-  - `tests/youtube-harness.mjs`
+  - `tests/youtube-harness.mts`
   - `tests/support/playback-settings-fixture.mts`
   - `tests/e2e/support/mock-youtube.mjs`
   - `tests/e2e/support/ui-helpers.mjs`
