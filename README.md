@@ -179,7 +179,7 @@ flowchart TD
 - `npm run build` がJavaScriptの内容ハッシュ付きファイル名とCSSの `?v=<sha256>` を決定し、HTML・preload・importのURLを揃えます。Pages artifactはURLや生成JavaScriptを書き換えず、`browser`・静的asset・曲JSONだけを `_site` へコピーします。`_build/app` はNode tests・scripts用で配布しません。明示バージョンはビルド時の `DEPLOY_CACHE_BUSTER` または `npm run build -- --cache-buster <version>` で指定します（artifactコマンドの `--cache-buster` は廃止）。deploy SHAは `deployment.json` に記録するため、曲JSONやemit側コメントだけの変更でCSS/JavaScriptのURLは変わりません。
 - フロントエンドのみで動作します(静的ホスティング想定)。
 - 配布物はHTML/CSS/JavaScriptのみで、実行時にnpm等の同梱依存はありません。
-- `app/**/*.mts` は source として扱い、Node scriptsは `npm run build:ts` で `_build/app/**/*.mjs` に生成された module を読みます。ブラウザ用には `npm run build` がこのemit結果をesbuildで `_build/browser` のES module bundleへまとめます。生成 `.mjs` は Git 管理対象外です。fresh checkout 後や `.mts` 変更後にブラウザで確認する場合は、`npm run build` を実行し `_build` を配信してください。`build:ts` 単体ではブラウザ用bundleを更新しません。`npm run check:ts-emit` は `_build/app` の生成 `.mjs` が存在し、`app` source tree に `.mjs` が残っていないことを確認します。`npm run build` は静的 asset と TypeScript 生成 module を `_build` へ作成し、`npm run build:pages-artifact` は `_build` を元に `_site` を作成します。`npm run typecheck` / `npm run lint` / `npm run test:unit` / `npm run build:songs-json` / `npm run validate:songs-json` は事前に `build:ts` を実行します。`npm run build:pages-artifact` は事前に `npm run build` を実行し、`npm run test:e2e` はそのPages artifactを検証します。
+- `app/**/*.mts` は source として扱い、Node scriptsは `npm run build:ts` で `_build/app/**/*.mjs` に生成された module を読みます。ブラウザ用には `npm run build` がこのemit結果をesbuildで `_build/browser` のES module bundleへまとめます。生成 `.mjs` は Git 管理対象外です。fresh checkout 後や `.mts` 変更後にブラウザで確認する場合は、`npm run build` を実行し `_build` を配信してください。`build:ts` 単体ではブラウザ用bundleを更新しません。`npm run check:ts-emit` は `_build/app` の生成 `.mjs` が存在し、`app` source tree に `.mjs` が残っていないことを確認します。`npm run build` は静的 asset と TypeScript 生成 module を `_build` へ作成し、`npm run build:pages-artifact` は `_build` を元に `_site` を作成します。`npm run lint` / `npm run test:unit` / `npm run build:songs-json` / `npm run validate:songs-json` は事前に `build:ts` を実行します。`npm run build:pages-artifact` は事前に `npm run build` を実行し、`npm run test:e2e` はそのPages artifactを検証します。
 - ブラウザ用bundleは小さい起動処理、UI、共有処理へ分割し、UIと共有処理の `modulepreload` をbuild時にHTMLへ生成します。HTML解析時に必要なファイルを並行取得できるため、module依存先を順に発見する通信待ちを減らします。esbuildは開発依存のみで、実行時の外部ライブラリは追加しません。
 - サムネイル表示/埋め込み再生まわりでは YouTube Iframe API を動的に利用します。
 - 開発時の静的解析は TypeScript noEmit typecheck と ESLint を利用します。
@@ -193,12 +193,16 @@ flowchart TD
   検索用の曲は `tests/fixtures/search-song.mts` で正規化し、factoryごとに独立した連番を持たせます。
 - Node単体テストの型チェックは `tsconfig.tests.json` で `strict: true` にしています。
   `allowJs: true` で参照先のNode scriptsのJSDoc型を取り込みます。`checkJs: false` とし、
-  scripts本体の検査範囲は `tsconfig.scripts.json` で管理し、現在は配布通知と曲データのハッシュ算出を対象にしています。
-  曲JSONの生成・検証スクリプトは、型情報が除かれた生成moduleも参照するため、本体の型チェック対象にはまだ含めていません。
+  scripts本体は `tsconfig.scripts.json` の `checkJs: true`・`strict: true` で、配布通知、曲データのハッシュ算出、曲JSONの生成・ファイル検証・成果物整合性検証を対象にしています。
+  `scripts/tsconfig.json` が同じ設定を継承し、エディターからも認識できるようにしています。
+  曲JSONスクリプトの `#app/*` import は `package.json` の `imports` で解決します。
+  TypeScriptは `types` 条件で `app/*.mts`、Nodeは `default` 条件で `_build/app/*.mjs` を参照します。
+  これにより、生成JavaScriptを再検査せずアプリの型を利用でき、型宣言の生成・コピーも不要です。
   型はアプリのsourceと共有ドメイン型の `types/song.d.ts`・`types/search-state.d.ts` を参照します。
   検索条件と日付キーの型はUI用ambient宣言から分離し、テストではUI・controller用の型定義を取り込みません。
   ESLintのTypeScriptルールは `tests/**/*.mts` に適用します。
-- `npm run typecheck:tests:raw` は事前buildなしで実行できます。
+- `npm run typecheck` は事前buildなしで全型検査を実行し、生成物を更新しません。
+  `npm run typecheck:tests:raw` と `npm run typecheck:scripts:raw` も事前buildなしで実行できます。
   `npm run test:unit:ts` と `npm run test:unit` は、Node scriptsが生成moduleを読むため、
   事前に `build:ts` を実行します。`tsx` 自体は型チェックしないため、型チェックも併せて実行してください。
   CIもすべての単体テストを検証します。

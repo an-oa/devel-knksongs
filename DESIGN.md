@@ -28,9 +28,11 @@
 - 重点ケース: ブックマーク表示時のみ有効なドラッグ並び替えと、並び順の永続化、YouTube 継続再生の失敗復旧
 - TS移行: Node単体テストとその共通helperはすべてTSへ移行済み。`tsconfig.tests.json` でstrictな型チェックを行う。E2Eとその共通helperもすべてTSへ移行済み。
   Node scriptsのJSDoc型は `allowJs: true` で参照し、scripts本体の検査範囲は `tsconfig.scripts.json` で管理する。
+  曲JSONの生成・検証は `#app/*` を通じ、型チェックではTSソース、実行時には生成JavaScriptを読む。
+  `package.json` の `imports` に参照先を集約し、`scripts/tsconfig.json` でエディターにも同じ検査設定を適用する。
   E2Eの型設定は `tests/e2e/tsconfig.json` に置き、`typecheck:e2e:raw` を全体のtypecheckへ組み込む。
   E2Eのfixture生成はアプリsourceを直接参照し、ブラウザでは `_site` の配布成果物を検証する。
-  `typecheck:tests:raw` は事前build不要。`test:unit:ts` と `test:unit` は、Node scriptsが生成moduleを読むため事前に `build:ts` を実行する。
+  `typecheck` と各領域の型検査は事前build不要で、生成物を更新しない。`test:unit:ts` と `test:unit` は、Node scriptsが生成moduleを読むため事前に `build:ts` を実行する。
 - テストファイル:
   - `tests/bookmark-storage-schema.test.mts`
   - `tests/bookmark-import-export-ui.test.mts`

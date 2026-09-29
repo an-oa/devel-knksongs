@@ -2,6 +2,12 @@
   "name": "knksongs",
   "private": true,
   "type": "module",
+  "imports": {
+    "#app/*": {
+      "types": "./app/*.mts",
+      "default": "./_build/app/*.mjs"
+    }
+  },
   "scripts": {
     "build": "node scripts/build-site.mjs",
     "build:pages-artifact": "npm run build && node scripts/build-pages-artifact.mjs --site-dir _build",
@@ -14,7 +20,7 @@
     "validate:songs-json:raw": "node scripts/validate-songs-json.mjs",
     "lint": "npm run build:ts && npm run lint:raw",
     "lint:raw": "eslint .",
-    "typecheck": "npm run build:ts && npm run typecheck:raw",
+    "typecheck": "npm run typecheck:raw",
     "typecheck:raw": "npm run typecheck:app:raw && npm run typecheck:scripts:raw && npm run typecheck:tests:raw && npm run typecheck:e2e:raw",
     "typecheck:app:raw": "tsc --project tsconfig.json",
     "typecheck:scripts:raw": "tsc --project tsconfig.scripts.json",

@@ -85,9 +85,12 @@ feat: move settings into dedicated sidebar panel
 ## TypeScript Emit During Migration
 
 - `app/**/*.mts` は TypeScript source として扱い、Node scriptsは `npm run build:ts` が `_build/app/**/*.mjs` に生成した module を読む。
+  曲JSONの生成・検証スクリプトでは `#app/*` を使い、package.json の imports で型チェック時は app/*.mts、実行時は _build/app/*.mjs へ解決する。
+  scripts本体の検査範囲は tsconfig.scripts.json で管理し、scripts/tsconfig.json が同じ設定をエディターへ提供する。生成型宣言は追加しない。
 - Node単体テストの `tests/**/*.mts` は `tsx` 経由で `app/**/*.mts` を直接 import する。
   Node scriptsのテストはscripts経由で生成moduleも読むため、`npm run test:unit:ts` は事前に `build:ts` を実行する。
-  `npm run typecheck:tests:raw` は事前 build なしで実行でき、Node scriptsのJSDoc型を `allowJs: true` で参照する。
+  `npm run typecheck` と各領域の型検査は事前 build なしで実行し、生成物を更新しない。
+  Node scriptsのJSDoc型は `allowJs: true` で参照する。
   テスト用の型宣言は生成せず、tsconfig.tests.json で source を型チェックする。
 - E2EのTSテストとhelperは `tests/e2e/tsconfig.json` で型チェックする。テスト専用のWindow拡張はE2E内に置く。
   曲fixture生成helperはアプリのTSソースを直接読み、ブラウザは `_site` の配布成果物を検証する。
