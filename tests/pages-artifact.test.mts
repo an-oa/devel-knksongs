@@ -5,7 +5,7 @@ import {
     parseArgs,
     resolvePagesArtifactOutputDir,
     resolvePagesArtifactSiteDir
-} from "../scripts/build-pages-artifact.mjs";
+} from "../scripts/build-pages-artifact.mts";
 
 
 test("pages artifact: reads source site directory from arguments", () => {

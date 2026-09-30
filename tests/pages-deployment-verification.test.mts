@@ -4,7 +4,7 @@ import {
     createVerificationUrl,
     hasExpectedDeploySha,
     verifyPagesDeployment
-} from "../scripts/verify-pages-deployment.mjs";
+} from "../scripts/verify-pages-deployment.mts";
 
 const EXPECTED_SHA = "c2abca650af9fca8ff7a2ab28627ea3c3620d9b9";
 

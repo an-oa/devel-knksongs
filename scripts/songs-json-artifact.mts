@@ -3,16 +3,16 @@ import {
     parseSongsJsonPayload,
     SONGS_JSON_SCHEMA_VERSION
 } from "#app/lib/songs-json";
-import { createSongsContentHash } from "./songs-content-hash.mjs";
+import { createSongsContentHash } from "./songs-content-hash.mts";
 
 /**
  * CSVから生成した2つのJSON成果物について、スキーマ、contentHash、生成日時の整合性を検証する。
  * 曲データの意味的品質はマスターCSVの変換時に検証済みのため、ここでは再判定しない。
- * @param {string} songsJsonText songs.jsonの内容
- * @param {string} songsMetaJsonText songs-meta.jsonの内容
- * @returns {number} 収録曲数
+ * @param songsJsonText songs.jsonの内容
+ * @param songsMetaJsonText songs-meta.jsonの内容
+ * @returns 収録曲数
  */
-export function validateSongsJsonArtifacts(songsJsonText, songsMetaJsonText) {
+export function validateSongsJsonArtifacts(songsJsonText: string, songsMetaJsonText: string): number {
     const songsPayload = parseSongsJsonPayload(songsJsonText);
     const metaPayload = parseSongsJsonMetaPayload(songsMetaJsonText);
     const issues = [];

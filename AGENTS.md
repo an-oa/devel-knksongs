@@ -86,12 +86,13 @@ feat: move settings into dedicated sidebar panel
 
 - `app/**/*.mts` は TypeScript source として扱い、Node scriptsは `npm run build:ts` が `_build/app/**/*.mjs` に生成した module を読む。
   曲JSONの生成・検証スクリプトでは `#app/*` を使い、package.json の imports で型チェック時は app/*.mts、実行時は _build/app/*.mjs へ解決する。
-  scripts本体の検査範囲は tsconfig.scripts.json で管理し、scripts/tsconfig.json が同じ設定をエディターへ提供する。生成型宣言は追加しない。
+  scripts本体は scripts/**/*.mts とし、Node 24.16.0の標準の型除去機能で直接実行する。scripts用のemitやtsxは追加しない。
+  tsconfig.scripts.json の noEmit・strict・erasableSyntaxOnly・verbatimModuleSyntax で検査し、scripts/tsconfig.json が同じ設定をエディターへ提供する。生成型宣言は追加しない。
 - Node単体テストの `tests/**/*.mts` は `tsx` 経由で `app/**/*.mts` を直接 import する。
   Node scriptsのテストはscripts経由で生成moduleも読むため、`npm run test:unit` は事前に `build:ts` を実行する。
   `npm run typecheck` と各領域の型検査、`npm run lint` は事前 build なしで実行し、生成物を更新しない。
-  アプリも strict で型検査し、lintは app/tests の .mts source を直接対象とする。_build の生成物はlint対象外とする。
-  Node scriptsのJSDoc型は `allowJs: true` で参照する。
+  アプリも strict で型検査し、lintは app/scripts/tests の .mts source を直接対象とする。_build の生成物はlint対象外とする。
+  Node scriptsは .mts source を直接参照し、scriptsと単体テストの型設定は allowJs: false とする。
   テスト用の型宣言は生成せず、tsconfig.tests.json で source を型チェックする。
 - E2EのTSテストとhelperは `tests/e2e/tsconfig.json` で型チェックする。テスト専用のWindow拡張はE2E内に置く。
   曲fixture生成helperはアプリのTSソースを直接読み、ブラウザは `_site` の配布成果物を検証する。
@@ -190,6 +191,7 @@ feat: move settings into dedicated sidebar panel
 | `index.html` | UTF-8 BOMなし | LF |
 | `styles.css` | UTF-8 BOMなし | LF |
 | `app/**/*.mts` / 生成 `_build/app/**/*.mjs` | UTF-8 BOMなし | LF |
+| `scripts/**/*.mts` | UTF-8 BOMなし | LF |
 | `tests/**/*.mts` / `tests/**/*.d.ts` | UTF-8 BOMなし | LF |
 | `.github/workflows/*.yml` | UTF-8 BOMなし | LF |
 | `playwright.config.mjs` | UTF-8 BOMなし | LF |

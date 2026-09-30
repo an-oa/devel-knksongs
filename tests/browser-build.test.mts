@@ -2,8 +2,8 @@ import test, { type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
-import { buildBrowserModules } from "../scripts/build-browser.mjs";
-import { buildPagesArtifact } from "../scripts/build-pages-artifact.mjs";
+import { buildBrowserModules } from "../scripts/build-browser.mts";
+import { buildPagesArtifact } from "../scripts/build-pages-artifact.mts";
 
 const htmlTemplate = '<head>\n<link rel="stylesheet" href="styles.css">\n  <script type="module" src="app/startup.mjs"></script>\n</head>';
 

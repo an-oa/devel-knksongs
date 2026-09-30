@@ -3,17 +3,16 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { validateSongsJsonArtifacts } from "./songs-json-artifact.mjs";
+import { validateSongsJsonArtifacts } from "./songs-json-artifact.mts";
 
 const DEFAULT_INPUT_PATH = "data/songs.json";
 const DEFAULT_META_INPUT_PATH = "data/songs-meta.json";
 
 /**
  * CLI引数を2つの派生JSON入力パスへ変換する。
- * @param {string[]} args CLI引数
- * @returns {{ inputPath: string, metaInputPath: string }}
+ * @param args CLI引数
  */
-function parseArgs(args) {
+function parseArgs(args: string[]): { inputPath: string, metaInputPath: string } {
     const options = {
         inputPath: DEFAULT_INPUT_PATH,
         metaInputPath: DEFAULT_META_INPUT_PATH
@@ -34,7 +33,7 @@ function parseArgs(args) {
             continue;
         }
         throw new Error(
-            "Usage: node scripts/validate-songs-json.mjs " +
+            "Usage: node scripts/validate-songs-json.mts " +
             "[--input data/songs.json] [--meta-input data/songs-meta.json]"
         );
     }
@@ -43,10 +42,10 @@ function parseArgs(args) {
 
 /**
  * CSVから生成された2つのJSONファイルを読み込み、派生成果物としての整合性を検証する。
- * @param {{ inputPath: string, metaInputPath: string }} options 入力ファイル
- * @returns {Promise<number>} 収録曲数
+ * @param options 入力ファイル
+ * @returns 収録曲数
  */
-export async function validateSongsJsonFiles(options) {
+export async function validateSongsJsonFiles(options: { inputPath: string, metaInputPath: string }): Promise<number> {
     const [songsJsonText, songsMetaJsonText] = await Promise.all([
         readFile(resolve(options.inputPath), "utf8"),
         readFile(resolve(options.metaInputPath), "utf8")

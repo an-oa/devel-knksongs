@@ -10,18 +10,16 @@ import {
     parseSongsJsonMetaPayload
 } from "#app/lib/songs-json";
 import { PUBLIC_CSV_URL } from "#app/config";
-import { createSongsContentHash } from "./songs-content-hash.mjs";
-import { validateSongsJsonArtifacts } from "./songs-json-artifact.mjs";
+import { createSongsContentHash } from "./songs-content-hash.mts";
+import { validateSongsJsonArtifacts } from "./songs-json-artifact.mts";
 
 const DEFAULT_OUTPUT_PATH = "data/songs.json";
 const DEFAULT_META_OUTPUT_PATH = "data/songs-meta.json";
 
 /**
  * CLI 引数を CSV 入力元と JSON 出力先へ変換する。
- * @param {string[]} args
- * @returns {{ inputPath: string, outputPath: string, metaOutputPath: string, sourceUrl: string }}
  */
-function parseArgs(args) {
+function parseArgs(args: string[]): { inputPath: string, outputPath: string, metaOutputPath: string, sourceUrl: string } {
     const options = {
         inputPath: "",
         outputPath: DEFAULT_OUTPUT_PATH,
@@ -62,10 +60,8 @@ function parseArgs(args) {
 
 /**
  * CSV テキストをローカルファイルまたは公開URLから読み込む。
- * @param {{ inputPath: string, sourceUrl: string }} options
- * @returns {Promise<string>}
  */
-async function loadCsvText(options) {
+async function loadCsvText(options: { inputPath: string, sourceUrl: string }): Promise<string> {
     if (options.inputPath) {
         return readFile(resolve(options.inputPath), "utf8");
     }
@@ -78,20 +74,15 @@ async function loadCsvText(options) {
 
 /**
  * 曲データを安定したJSON文字列へ変換する。
- * @param {unknown} payload
- * @returns {string}
  */
-function stringifyPayload(payload) {
+function stringifyPayload(payload: unknown): string {
     return `${JSON.stringify(payload, null, 2)}\n`;
 }
 
 /**
  * 既存成果物とcontentHashが同じ場合は生成日時を引き継ぎ、差分がある場合だけ更新する。
- * @param {{ metaOutputPath: string, now?: () => Date }} options
- * @param {string} contentHash
- * @returns {Promise<string>}
  */
-async function resolveGeneratedAt(options, contentHash) {
+async function resolveGeneratedAt(options: { metaOutputPath: string, now?: () => Date }, contentHash: string): Promise<string> {
     try {
         const existingMetaText = await readFile(resolve(options.metaOutputPath), "utf8");
         const existingMeta = parseSongsJsonMetaPayload(existingMetaText);
@@ -106,10 +97,14 @@ async function resolveGeneratedAt(options, contentHash) {
 
 /**
  * CSV から曲データJSONを生成してファイルへ保存する。
- * @param {{ inputPath: string, outputPath: string, metaOutputPath: string, sourceUrl: string, now?: () => Date }} options
- * @returns {Promise<number>}
  */
-export async function buildSongsJson(options) {
+export async function buildSongsJson(options: {
+    inputPath: string,
+    outputPath: string,
+    metaOutputPath: string,
+    sourceUrl: string,
+    now?: () => Date
+}): Promise<number> {
     const csvText = await loadCsvText(options);
     const songs = parseCsvToSongs(csvText);
     const contentHash = createSongsContentHash(songs);

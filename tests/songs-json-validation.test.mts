@@ -5,8 +5,8 @@ import {
     buildSongsJsonPayload,
     SONGS_JSON_SCHEMA_VERSION
 } from "../app/lib/songs-json.mts";
-import { createSongsContentHash } from "../scripts/songs-content-hash.mjs";
-import { validateSongsJsonArtifacts } from "../scripts/songs-json-artifact.mjs";
+import { createSongsContentHash } from "../scripts/songs-content-hash.mts";
+import { validateSongsJsonArtifacts } from "../scripts/songs-json-artifact.mts";
 import { createSongFixture } from "./fixtures/song.mts";
 
 const GENERATED_AT = "2026-08-14T00:00:00.000Z";

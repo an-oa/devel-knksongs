@@ -27,7 +27,12 @@
 - 対象: 検索ロジック、日付フィルタ、ブックマーク検索、描画/再生/保存/サイドバーまわりの回帰
 - 重点ケース: ブックマーク表示時のみ有効なドラッグ並び替えと、並び順の永続化、YouTube 継続再生の失敗復旧
 - 型検査: Node単体テスト・E2Eと共通helperはすべて `.mts` で記述する。アプリは `tsconfig.json`、Node単体テストは `tsconfig.tests.json` でstrictな型チェックを行う。
-  Node scriptsのJSDoc型は `allowJs: true` で参照し、scripts本体は `tsconfig.scripts.json` の `checkJs: true`・`strict: true` で、共通helperを含む `scripts/**/*.mjs` 全体を検査する。
+  Node scriptsは `.mts` sourceを直接参照し、scriptsと単体テストの型設定は `allowJs: false` とする。
+  scripts本体は `tsconfig.scripts.json` の `noEmit: true`・`strict: true` で、共通helperを含む `scripts/**/*.mts` 全体を検査する。
+  `erasableSyntaxOnly`・`verbatimModuleSyntax` でNode標準の型除去機能に対応し、Node 24.16.0でscriptsを直接実行する。
+  scripts用のemitは追加せず、配布確認・通知ジョブは外部パッケージのインストールなしで動作する。
+  配布失敗通知は、CLI・Issue更新手順、APIクライアント、通知状態の判定に分ける。APIクライアントは共通のページ取得ループに各応答形式の検証を渡す。
+  Node直接実行のテストはscripts全体をディレクトリ構造ごとコピーし、ローカルmoduleへの分割と外部パッケージ不要の実行を両立させる。
   曲JSONの生成・検証は `#app/*` を通じ、型チェックではTSソース、実行時には生成JavaScriptを読む。
   `package.json` の `imports` に参照先を集約し、`scripts/tsconfig.json` でエディターにも同じ検査設定を適用する。
   E2Eの型設定は `tests/e2e/tsconfig.json` に置き、`typecheck:e2e:raw` を全体のtypecheckへ組み込む。
@@ -373,12 +378,12 @@ IndexedDB保存：
 
 ## 制約・注意点
 - iOSでは埋め込み再生に制約あり
-- `scripts/build-browser.mjs` がesbuildの内容ハッシュ付きファイル名を使い、entry・chunk・HTMLのmodulepreloadのURLを決定する
+- `scripts/build-browser.mts` がesbuildの内容ハッシュ付きファイル名を使い、entry・chunk・HTMLのmodulepreloadのURLを決定する
 - CSSは同じビルド工程で内容のSHA-256を `styles.css?v=...` としてHTMLへ反映する
-- `scripts/build-pages-artifact.mjs` は `_build` の静的asset・`browser`・曲JSONを `_site` へコピーし、URLや生成JSを書き換えない。`app` のemit結果は公開しない
+- `scripts/build-pages-artifact.mts` は `_build` の静的asset・`browser`・曲JSONを `_site` へコピーし、URLや生成JSを書き換えない。`app` のemit結果は公開しない
 - ソースのHTMLやimportには通常バージョンを記述しない。emit側コメントだけの変更はブラウザ成果物へ影響しない
 - `DEPLOY_CACHE_BUSTER` またはbuild-siteの `--cache-buster` はビルド時に適用する。JSではbannerを通じて内容ハッシュへ、CSSではURLのバージョンへ反映する
 - deploy commit SHAはassetのバージョンと兼用せず、artifact直下の `deployment.json` に記録する
-- URL決定の仕様変更は `scripts/build-browser.mjs` と `tests/browser-build.test.mts` を合わせて更新する
+- URL決定の仕様変更は `scripts/build-browser.mts` と `tests/browser-build.test.mts` を合わせて更新する
 - `songs.json` / `songs-meta.json` の内容更新だけでは cache buster を上げず、`contentHash` による鮮度確認で反映する
 - 日付入力はセレクト方式（ブラウザ互換性優先）

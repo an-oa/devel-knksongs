@@ -1,21 +1,23 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import type { ManagedIssue } from "../scripts/deploy-pages-issue-notification.mjs";
+import { createGitHubIssueClient } from "../scripts/lib/deploy-pages-issue-client.mts";
+import type { ManagedIssue } from "../scripts/lib/deploy-pages-issue-client.mts";
 import {
     DEPLOYMENT_FAILURE_LABEL,
     DEPLOYMENT_FAILURE_MARKER,
     DEPLOYMENT_FAILURE_TITLE,
-    buildFailureReport,
     classifyDeploymentState,
-    createGitHubIssueClient,
-    createRunMarker,
     hasReportedDeploymentState,
+    isNewerWorkflowRun
+} from "../scripts/lib/deploy-pages-issue-state.mts";
+import {
+    buildFailureReport,
+    createRunMarker,
     hasRunNotification,
-    isNewerWorkflowRun,
     retryOperation,
     selectManagedIssues,
     updateDeploymentFailureIssue
-} from "../scripts/deploy-pages-issue-notification.mjs";
+} from "../scripts/deploy-pages-issue-notification.mts";
 
 type RecordedRequest = {
     method: string;

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
     parseArgs,
     resolveSiteBuildOutputDir
-} from "../scripts/build-site.mjs";
+} from "../scripts/build-site.mts";
 
 test("site build: parses output directory option", () => {
     assert.deepEqual(parseArgs([], {}), { outputDir: "_build", cacheBuster: "" });

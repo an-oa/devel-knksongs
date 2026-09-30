@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import type { Page } from "@playwright/test";
 import { parseCsvToSongs } from "../../../app/lib/csv-parser.mts";
 import { buildSongsJsonMetaPayload, buildSongsJsonPayload } from "../../../app/lib/songs-json.mts";
-import { createSongsContentHash } from "../../../scripts/songs-content-hash.mjs";
+import { createSongsContentHash } from "../../../scripts/songs-content-hash.mts";
 
 const SONGS_JSON_ROUTE = "**/data/songs.json*";
 const SONGS_META_ROUTE = "**/data/songs-meta.json*";

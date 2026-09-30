@@ -3,20 +3,17 @@
 import { copyFile, mkdir, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { buildTypeScriptModules } from "./build-ts.mjs";
-import { buildBrowserModules } from "./build-browser.mjs";
-import { resolveProjectPath } from "./lib/paths.mjs";
-import { DATA_ASSET_FILES, ROOT_ASSET_FILES } from "./lib/site-assets.mjs";
+import { buildTypeScriptModules } from "./build-ts.mts";
+import { buildBrowserModules } from "./build-browser.mts";
+import { resolveProjectPath } from "./lib/paths.mts";
+import { DATA_ASSET_FILES, ROOT_ASSET_FILES } from "./lib/site-assets.mts";
 
 const DEFAULT_BUILD_DIR = "_build";
 
 /**
  * CLI 引数から build option を作る。
- * @param {string[]} args
- * @param {Record<string, string | undefined>} [env]
- * @returns {{ outputDir: string, cacheBuster: string }}
  */
-export function parseArgs(args, env = process.env) {
+export function parseArgs(args: string[], env: Record<string, string | undefined> = process.env): { outputDir: string, cacheBuster: string } {
     const options = {
         outputDir: DEFAULT_BUILD_DIR,
         cacheBuster: (env.DEPLOY_CACHE_BUSTER || "").trim()
@@ -43,11 +40,8 @@ export function parseArgs(args, env = process.env) {
 
 /**
  * build 出力先を安全な project root 配下の directory に解決する。
- * @param {string} outputDir
- * @param {string} [rootDir]
- * @returns {string}
  */
-export function resolveSiteBuildOutputDir(outputDir, rootDir = process.cwd()) {
+export function resolveSiteBuildOutputDir(outputDir: string, rootDir: string = process.cwd()): string {
     return resolveProjectPath({
         targetPath: outputDir,
         rootDir,
@@ -58,10 +52,8 @@ export function resolveSiteBuildOutputDir(outputDir, rootDir = process.cwd()) {
 
 /**
  * 静的 asset と TypeScript 生成 JavaScript を含む site build を作る。
- * @param {{ outputDir: string, cacheBuster?: string }} options
- * @returns {Promise<string>}
  */
-export async function buildSite(options) {
+export async function buildSite(options: { outputDir: string, cacheBuster?: string }): Promise<string> {
     const outputDir = resolveSiteBuildOutputDir(options.outputDir);
     await rm(outputDir, { recursive: true, force: true });
     await mkdir(join(outputDir, "data"), { recursive: true });

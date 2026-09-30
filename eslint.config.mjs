@@ -40,9 +40,20 @@ export default defineConfig([
     {
         files: [
             "eslint.config.mjs",
-            "playwright.config.mjs",
-            "scripts/**/*.mjs"
+            "playwright.config.mjs"
         ],
+        languageOptions: {
+            ecmaVersion: "latest",
+            sourceType: "module",
+            globals: {
+                ...globals.node,
+                ...globals.es2024
+            }
+        }
+    },
+    {
+        files: ["scripts/**/*.mts"],
+        extends: [tseslint.configs.recommended],
         languageOptions: {
             ecmaVersion: "latest",
             sourceType: "module",

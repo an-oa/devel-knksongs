@@ -2,16 +2,14 @@ import { isAbsolute, relative, resolve } from "node:path";
 
 /**
  * project root 配下の安全な path に解決する。
- * @param {{
- *   targetPath: string,
- *   rootDir?: string,
- *   pathLabel: string,
- *   requiredTopLevelDirectory?: string,
- *   allowProjectRoot?: boolean
- * }} options
- * @returns {string}
  */
-export function resolveProjectPath(options) {
+export function resolveProjectPath(options: {
+    targetPath: string,
+    rootDir?: string,
+    pathLabel: string,
+    requiredTopLevelDirectory?: string,
+    allowProjectRoot?: boolean
+}): string {
     const projectRoot = resolve(options.rootDir || process.cwd());
     const resolvedPath = resolve(projectRoot, options.targetPath);
     const relativePath = relative(projectRoot, resolvedPath);
