@@ -67,7 +67,7 @@ function parseEndTimeSeconds(raw: unknown, rowNumber: number): number | null {
  * @param t
  */
 function parseCsvRFC4180(t: string): string[][] {
-    let res = [];
+    const res = [];
     let row = [];
     let field = "";
     let inQ = false;

@@ -1,8 +1,9 @@
+import type { StorageActionResult } from "../app/controllers/storage.mts";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createBookmarkUiController } from "../app/ui/bookmark/ui.mts";
 import { createSongFixture } from "./fixtures/song.mts";
-import type { BookmarkUiActionCallbackResult, BookmarkUiCallbacks } from "../app/ui/bookmark/ui.mts";
+import type { BookmarkUiCallbacks } from "../app/ui/bookmark/ui.mts";
 import { installFakeDom, invokeListener } from "./test-helpers.mts";
 
 /**
@@ -104,12 +105,12 @@ function createBookmarkHarness(options: {
     allSongsRaw?: Song[];
     bookmarks?: Parameters<typeof createBookmarkUiController>[0]["data"]["bookmarks"];
     activeBookmark?: string | null;
-    onCreateBookmark?: (name: string, data: Parameters<typeof createBookmarkUiController>[0]["data"]) => BookmarkUiActionCallbackResult;
-    onCreateBookmarkAndAdd?: (name: string, songKey: string, data: Parameters<typeof createBookmarkUiController>[0]["data"]) => BookmarkUiActionCallbackResult;
-    onAddSongToBookmarkResult?: BookmarkUiActionCallbackResult;
-    onDeleteBookmarkResult?: BookmarkUiActionCallbackResult;
-    onRenameBookmarkResult?: BookmarkUiActionCallbackResult;
-    onRemoveSongFromBookmarkResult?: BookmarkUiActionCallbackResult;
+    onCreateBookmark?: (name: string, data: Parameters<typeof createBookmarkUiController>[0]["data"]) => StorageActionResult;
+    onCreateBookmarkAndAdd?: (name: string, songKey: string, data: Parameters<typeof createBookmarkUiController>[0]["data"]) => StorageActionResult;
+    onAddSongToBookmarkResult?: StorageActionResult;
+    onDeleteBookmarkResult?: StorageActionResult;
+    onRenameBookmarkResult?: StorageActionResult;
+    onRemoveSongFromBookmarkResult?: StorageActionResult;
     onExportBookmarksResult?: ReturnType<BookmarkUiCallbacks["onExportBookmarks"]>;
     onPreviewBookmarkImportResult?: ReturnType<BookmarkUiCallbacks["onPreviewBookmarkImport"]>;
     onImportBookmarksTextResult?: ReturnType<BookmarkUiCallbacks["onImportBookmarksText"]>;
@@ -169,7 +170,7 @@ function createBookmarkHarness(options: {
         },
         onAddSongToBookmark(bookmarkId, songKey) {
             calls.addSongArgs.push([bookmarkId, songKey]);
-            return Object.hasOwn(options, "onAddSongToBookmarkResult") ? options.onAddSongToBookmarkResult : { ok: true };
+            return options.onAddSongToBookmarkResult ?? { ok: true };
         },
         onCreateBookmark(name) {
             calls.createBookmarkArgs.push(name);
@@ -192,26 +193,26 @@ function createBookmarkHarness(options: {
         },
         onDeleteBookmark(bookmarkId) {
             calls.deleteBookmarkArgs.push(bookmarkId);
-            return Object.hasOwn(options, "onDeleteBookmarkResult") ? options.onDeleteBookmarkResult : { ok: true };
+            return options.onDeleteBookmarkResult ?? { ok: true };
         },
         onRenameBookmark(bookmarkId, name) {
             calls.renameBookmarkArgs.push([bookmarkId, name]);
-            return Object.hasOwn(options, "onRenameBookmarkResult") ? options.onRenameBookmarkResult : { ok: true };
+            return options.onRenameBookmarkResult ?? { ok: true };
         },
         onRemoveSongFromBookmark(bookmarkId, songKey) {
             calls.removeSongArgs.push([bookmarkId, songKey]);
-            return Object.hasOwn(options, "onRemoveSongFromBookmarkResult") ? options.onRemoveSongFromBookmarkResult : { ok: true };
+            return options.onRemoveSongFromBookmarkResult ?? { ok: true };
         },
         onExportBookmarks() {
             calls.exportBookmarkCount += 1;
-            return Object.hasOwn(options, "onExportBookmarksResult") ? options.onExportBookmarksResult : {
+            return options.onExportBookmarksResult ?? {
                 ok: true,
                 text: "{\"version\":3,\"bookmarks\":{}}\n"
             };
         },
         onPreviewBookmarkImport(text) {
             calls.previewImportArgs.push(text);
-            return Object.hasOwn(options, "onPreviewBookmarkImportResult") ? options.onPreviewBookmarkImportResult : {
+            return options.onPreviewBookmarkImportResult ?? {
                 ok: true,
                 bookmarkCount: 1,
                 songCount: 2
@@ -219,7 +220,7 @@ function createBookmarkHarness(options: {
         },
         onImportBookmarksText(text) {
             calls.importTextArgs.push(text);
-            return Object.hasOwn(options, "onImportBookmarksTextResult") ? options.onImportBookmarksTextResult : {
+            return options.onImportBookmarksTextResult ?? {
                 ok: true,
                 bookmarkCount: 1,
                 songCount: 2
@@ -801,9 +802,28 @@ test("bookmark ui: rename cancel and delete cancel are no-ops", () => {
     }
 });
 
-for (const result of [false, null, undefined] as const) {
-    test(`bookmark ui: explicit ${result} add result keeps the panel open without a success toast`, () => {
+for (const { result, saveMessage, importMessage } of [
+    {
+        result: { ok: false, reason: "storage_write_failed" },
+        saveMessage: "ブックマークを保存できませんでした。ブラウザのストレージ設定をご確認ください。",
+        importMessage: "インポートしたブックマークを保存できませんでした。"
+    },
+    {
+        result: { ok: false, reason: "storage_reload_required" },
+        saveMessage: "別のタブでブックマークが更新された可能性があります。画面を再読み込みしてから、もう一度お試しください。",
+        importMessage: "ブックマークファイルを読み込めませんでした。"
+    },
+    {
+        result: { ok: false, reason: "unsupported_storage_version", version: 4 },
+        saveMessage: "このアプリより新しい形式のブックマークが保存されているため、変更できません。",
+        importMessage: "ブックマークファイルを読み込めませんでした。"
+    }
+] as const) {
+    test(`bookmark ui: ${result.reason} add result keeps the panel open without a success toast`, () => {
         const restoreDom = installFakeDom();
+        const previousAlert = globalThis.alert;
+        const alerts: string[] = [];
+        globalThis.alert = (message) => alerts.push(String(message));
         try {
             const { ui, calls, controller } = createBookmarkHarness({ onAddSongToBookmarkResult: result });
             controller.openBookmarkModal("song-z", {});
@@ -813,12 +833,14 @@ for (const result of [false, null, undefined] as const) {
             assert.deepEqual(calls.addSongArgs, [["bookmark-1", "song-z"]]);
             assert.equal(ui.el.bookmarkSidebarPanel.hidden, false);
             assert.equal(ui.el.bookmarkNotificationRegion.childElementCount, 0);
+            assert.deepEqual(alerts, [saveMessage]);
         } finally {
+            globalThis.alert = previousAlert;
             restoreDom();
         }
     });
 
-    test(`bookmark ui: explicit ${result} export result shows an error without saving a file`, async () => {
+    test(`bookmark ui: ${result.reason} export result shows an error without saving a file`, async () => {
         const restoreDom = installFakeDom();
         try {
             const { ui, calls, controller } = createBookmarkHarness({ onExportBookmarksResult: result });
@@ -835,7 +857,7 @@ for (const result of [false, null, undefined] as const) {
     });
 
     for (const phase of ["preview", "import"] as const) {
-        test(`bookmark ui: explicit ${result} ${phase} result prevents import success`, async () => {
+        test(`bookmark ui: ${result.reason} ${phase} result prevents import success`, async () => {
             const restoreDom = installFakeDom();
             const previousConfirm = globalThis.confirm;
             const previousAlert = globalThis.alert;
@@ -860,7 +882,7 @@ for (const result of [false, null, undefined] as const) {
                 assert.equal(confirmCount, phase === "preview" ? 0 : 1);
                 assert.deepEqual(alerts, []);
                 assert.equal(ui.el.bookmarkPanelError.hidden, false);
-                assert.equal(ui.el.bookmarkPanelError.textContent, "ブックマークファイルを読み込めませんでした。");
+                assert.equal(ui.el.bookmarkPanelError.textContent, importMessage);
                 assert.equal(ui.el.bookmarkPanelImportInput.value, "");
             } finally {
                 globalThis.confirm = previousConfirm;

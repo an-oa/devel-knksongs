@@ -11,12 +11,13 @@ export default defineConfig([
             "playwright-report/**",
             "test-results/**",
             "_site/**",
-            "_build/browser/**"
+            "_build/**"
         ]
     },
     js.configs.recommended,
     {
-        files: ["app/**/*.js", "app/**/*.mjs", "_build/app/**/*.mjs"],
+        files: ["app/**/*.mts"],
+        extends: [tseslint.configs.recommended],
         languageOptions: {
             ecmaVersion: "latest",
             sourceType: "module",
@@ -26,7 +27,7 @@ export default defineConfig([
             }
         },
         rules: {
-            "no-unused-vars": [
+            "@typescript-eslint/no-unused-vars": [
                 "error",
                 {
                     args: "after-used",

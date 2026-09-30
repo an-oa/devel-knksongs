@@ -283,11 +283,8 @@ function createAppControllers() {
     });
 
     /**
-     * storageController、sidebarController、bookmarkUiController は先に作る controller の callback から
-     * 遅延参照するため、生成後に代入する。
+     * bookmarkUiController は生成前に呼ばれる描画callbackでも参照するため、nullで初期化する。
      */
-    let storageController: ReturnType<typeof createStorageController>;
-    let sidebarController: ReturnType<typeof createSidebarController>;
     let bookmarkUiController: ReturnType<typeof createBookmarkUiController> | null = null;
 
     /**
@@ -383,7 +380,7 @@ function createAppControllers() {
      * localStorage 上の検索状態・ブックマーク保存データを読み書きする controller。
      * ブックマークの操作、インポート/エクスポート、保存後の再描画をまとめて扱う。
      */
-    storageController = createStorageController({
+    const storageController: ReturnType<typeof createStorageController> = createStorageController({
         data: appDataState,
         ui: appUiState,
         searchFiltersController,
@@ -439,7 +436,7 @@ function createAppControllers() {
     /**
      * サイドバー全体の開閉、設定パネル、ブックマークパネル、検索リセット導線を扱う controller。
      */
-    sidebarController = createSidebarController({
+    const sidebarController: ReturnType<typeof createSidebarController> = createSidebarController({
         ui: appUiState,
         callbacks: createSidebarCallbacks({
             getBookmarkUiController: () => bookmarkUiController,

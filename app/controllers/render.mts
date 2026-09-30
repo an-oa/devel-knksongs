@@ -4,9 +4,9 @@ import { tracePlayback } from "../lib/playback-debug.mjs";
 import { scheduleScrollElementIntoView } from "../lib/results-scroll.mjs";
 import { createBookmarkDragReorderController } from "../lib/render/drag-reorder.mjs";
 import type {
-    BookmarkDragReorderSaveFailure,
-    BookmarkDragReorderSaveResult
-} from "../lib/render/drag-reorder.mjs";
+    BookmarkSaveFailure,
+    BookmarkSaveResult
+} from "./bookmark-persistence.mjs";
 import { applyMasonryLayout } from "../lib/render/masonry-layout.mjs";
 import { createResultTailObserver } from "../lib/render/result-tail-observer.mjs";
 import { getBookmarkSongRef } from "../lib/song-identity.mjs";
@@ -79,8 +79,8 @@ type RenderCallbacks = {
     removeSongFromActiveBookmark: (songKey: string) => void;
     saveBookmarks: (
         bookmarks: AppDataState["bookmarks"]
-    ) => BookmarkDragReorderSaveResult;
-    notifyBookmarkSaveError: (result: BookmarkDragReorderSaveFailure) => void;
+    ) => BookmarkSaveResult;
+    notifyBookmarkSaveError: (result: BookmarkSaveFailure) => void;
 };
 
 type RenderControllerInput = {

@@ -9,7 +9,7 @@ import {
 
 /** ドラッグ対象の状態と永続化呼び出し記録を作る。 */
 function createDragHarness(options: {
-    saveResult?: import("../app/lib/render/drag-reorder.mts").BookmarkDragReorderSaveResult;
+    saveResult?: import("../app/controllers/bookmark-persistence.mts").BookmarkSaveResult;
 } = {}) {
     const data: Parameters<typeof createBookmarkDragReorderController>[0]["data"] = {
         activeBookmark: "bookmark-1",
@@ -30,7 +30,7 @@ function createDragHarness(options: {
         save: 0,
         update: 0,
         savedBookmarks: [] as Parameters<typeof createBookmarkDragReorderController>[0]["data"]["bookmarks"][],
-        saveFailures: [] as import("../app/lib/render/drag-reorder.mts").BookmarkDragReorderSaveFailure[]
+        saveFailures: [] as import("../app/controllers/bookmark-persistence.mts").BookmarkSaveFailure[]
     };
     const controller = createBookmarkDragReorderController({
         data,

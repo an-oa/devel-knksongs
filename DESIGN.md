@@ -26,13 +26,13 @@
 ## テスト方針（現状）
 - 対象: 検索ロジック、日付フィルタ、ブックマーク検索、描画/再生/保存/サイドバーまわりの回帰
 - 重点ケース: ブックマーク表示時のみ有効なドラッグ並び替えと、並び順の永続化、YouTube 継続再生の失敗復旧
-- 型検査: Node単体テスト・E2Eと共通helperはすべて `.mts` で記述する。Node単体テストは `tsconfig.tests.json` でstrictな型チェックを行う。
+- 型検査: Node単体テスト・E2Eと共通helperはすべて `.mts` で記述する。アプリは `tsconfig.json`、Node単体テストは `tsconfig.tests.json` でstrictな型チェックを行う。
   Node scriptsのJSDoc型は `allowJs: true` で参照し、scripts本体の検査範囲は `tsconfig.scripts.json` で管理する。
   曲JSONの生成・検証は `#app/*` を通じ、型チェックではTSソース、実行時には生成JavaScriptを読む。
   `package.json` の `imports` に参照先を集約し、`scripts/tsconfig.json` でエディターにも同じ検査設定を適用する。
   E2Eの型設定は `tests/e2e/tsconfig.json` に置き、`typecheck:e2e:raw` を全体のtypecheckへ組み込む。
   E2Eのfixture生成はアプリsourceを直接参照し、ブラウザでは `_site` の配布成果物を検証する。
-  `typecheck` と各領域の型検査は事前build不要で、生成物を更新しない。`test:unit` は、Node scriptsが生成moduleを読むため事前に `build:ts` を実行する。
+  `typecheck` と各領域の型検査、TSソースに直接適用するlintは事前build不要で、生成物を更新しない。`test:unit` は、Node scriptsが生成moduleを読むため事前に `build:ts` を実行する。
 - 責務分担:
   - Node単体テストは、ロジック・controller・DOMモックを使った状態遷移を検証する。
   - Node scriptsのテストは、生成されたアプリmoduleを読む実行経路と、曲JSON・ビルド・配布成果物の整合性を検証する。

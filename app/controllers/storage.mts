@@ -55,14 +55,14 @@ type StorageCallbacks = {
 };
 
 /** 保存・入力検証・インポートの失敗理由を保持する。 */
-type StorageActionFailure =
+export type StorageActionFailure =
     | BookmarkSaveFailure
     | Extract<ReturnType<typeof parseBookmarkImportJsonText>, { ok: false }>
     | { ok: false; reason: "invalid_name_type" | "empty_name" | "bookmark_not_found" | "song_not_found" | "duplicate_song" }
     | { ok: false; reason: "max_songs_per_bookmark"; limit: number };
 
 /** 各操作に必要な成功時の値と、理由付きの失敗を区別する。 */
-type StorageActionResult<Success extends { ok: true }> = Success | StorageActionFailure;
+export type StorageActionResult<Success extends { ok: true } = { ok: true }> = Success | StorageActionFailure;
 
 type StorageControllerInput = {
     data: StorageDataState;

@@ -1,11 +1,4 @@
-type BookmarkImportMessageResult = {
-    reason?: string;
-    version?: number;
-    limit?: number;
-    bookmarkName?: string;
-    bookmarkCount?: number;
-    songCount?: number;
-} | null | undefined;
+import type { StorageActionFailure } from "../../controllers/storage.mjs";
 
 /**
  * 数値を 2 桁表記へ整える。
@@ -90,13 +83,10 @@ export function readFileText(file: { text?: () => Promise<string> } | Blob): Pro
 
 /**
  * インポート失敗時の理由に応じた表示メッセージを返す。
- * @param {BookmarkImportMessageResult} result
+ * @param result
  * @returns {string}
  */
-export function getBookmarkImportErrorMessage(result: BookmarkImportMessageResult): string {
-    if (!result || !result.reason) {
-        return "ブックマークファイルを読み込めませんでした。";
-    }
+export function getBookmarkImportErrorMessage(result: StorageActionFailure): string {
     if (result.reason === "invalid_json") {
         return "JSONとして読み込めないファイルです。";
     }
@@ -123,7 +113,7 @@ export function getBookmarkImportErrorMessage(result: BookmarkImportMessageResul
     }
     if (result.reason === "max_songs_per_bookmark") {
         const limit = Number.isFinite(result.limit) ? result.limit : null;
-        const name = typeof result.bookmarkName === "string" && result.bookmarkName
+        const name = "bookmarkName" in result && result.bookmarkName
             ? `「${result.bookmarkName}」は`
             : "1つのブックマークに";
         return limit === null
@@ -135,12 +125,12 @@ export function getBookmarkImportErrorMessage(result: BookmarkImportMessageResul
 
 /**
  * インポート確認メッセージを作る。
- * @param {BookmarkImportMessageResult} preview
+ * @param preview
  * @returns {string}
  */
-export function buildBookmarkImportConfirmMessage(preview: BookmarkImportMessageResult): string {
-    const bookmarkCount = preview && Number.isFinite(preview.bookmarkCount) ? preview.bookmarkCount : 0;
-    const songCount = preview && Number.isFinite(preview.songCount) ? preview.songCount : 0;
+export function buildBookmarkImportConfirmMessage(preview: { bookmarkCount: number; songCount: number }): string {
+    const bookmarkCount = Number.isFinite(preview.bookmarkCount) ? preview.bookmarkCount : 0;
+    const songCount = Number.isFinite(preview.songCount) ? preview.songCount : 0;
     return [
         "現在のブックマークを置き換えます。",
         `${bookmarkCount}件のブックマーク、${songCount}曲をインポートします。`,

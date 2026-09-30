@@ -89,7 +89,8 @@ feat: move settings into dedicated sidebar panel
   scripts本体の検査範囲は tsconfig.scripts.json で管理し、scripts/tsconfig.json が同じ設定をエディターへ提供する。生成型宣言は追加しない。
 - Node単体テストの `tests/**/*.mts` は `tsx` 経由で `app/**/*.mts` を直接 import する。
   Node scriptsのテストはscripts経由で生成moduleも読むため、`npm run test:unit` は事前に `build:ts` を実行する。
-  `npm run typecheck` と各領域の型検査は事前 build なしで実行し、生成物を更新しない。
+  `npm run typecheck` と各領域の型検査、`npm run lint` は事前 build なしで実行し、生成物を更新しない。
+  アプリも strict で型検査し、lintは app/tests の .mts source を直接対象とする。_build の生成物はlint対象外とする。
   Node scriptsのJSDoc型は `allowJs: true` で参照する。
   テスト用の型宣言は生成せず、tsconfig.tests.json で source を型チェックする。
 - E2EのTSテストとhelperは `tests/e2e/tsconfig.json` で型チェックする。テスト専用のWindow拡張はE2E内に置く。

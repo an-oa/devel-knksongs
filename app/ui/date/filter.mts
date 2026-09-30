@@ -459,7 +459,7 @@ export function createDateFilterController({ ui }: { ui: DateFilterUiState }) {
         const currentToValue = normalizePartialDateParts(getDateSelectParts("to"));
         const currentFromKey = getCompleteDateSelectKey(currentFromValue);
         const currentToKey = getCompleteDateSelectKey(currentToValue);
-        let fromKey = clampKey(currentFromKey);
+        const fromKey = clampKey(currentFromKey);
         let toKey = clampKey(currentToKey);
         if (fromKey !== null && toKey !== null && fromKey > toKey) {
             toKey = fromKey;

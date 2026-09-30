@@ -969,8 +969,8 @@ test("render: drag reorder forwards reload-required save failures without changi
                 resultTailSentinel: document.createElement("div")
             }
         });
-        const saveFailure = { ok: false as const, reason: "storage_reload_required" };
-        const notifiedFailures: import("../app/lib/render/drag-reorder.mts").BookmarkDragReorderSaveFailure[] = [];
+        const saveFailure = { ok: false, reason: "storage_reload_required" } as const;
+        const notifiedFailures: import("../app/controllers/bookmark-persistence.mts").BookmarkSaveFailure[] = [];
         const controller = createRenderController({
             data,
             ui,

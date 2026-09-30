@@ -23,7 +23,7 @@
      - `npm run check:ts-emit`
      - `npm run lint`
      - `npm run test:unit`
-   - 型検査は事前build不要。`check:ts-emit`・`lint`・`test:unit` は必要なbuildを含む。
+   - 型検査とlintは事前build不要。`check:ts-emit`・`test:unit` は必要なbuildを含む。
      CIなどでbuild済みの生成物を再利用するときは、対応する `:raw` コマンドを使う。
    - TypeScript emit や静的 site build の入力経路に関わる変更では、
      `npm run build` も実行する。

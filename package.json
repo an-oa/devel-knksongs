@@ -18,7 +18,7 @@
     "check:ts-emit:raw": "node scripts/build-ts.mjs --check-only",
     "validate:songs-json": "npm run build:ts && npm run validate:songs-json:raw",
     "validate:songs-json:raw": "node scripts/validate-songs-json.mjs",
-    "lint": "npm run build:ts && npm run lint:raw",
+    "lint": "npm run lint:raw",
     "lint:raw": "eslint .",
     "typecheck": "npm run typecheck:raw",
     "typecheck:raw": "npm run typecheck:app:raw && npm run typecheck:scripts:raw && npm run typecheck:tests:raw && npm run typecheck:e2e:raw",

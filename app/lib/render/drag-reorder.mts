@@ -1,3 +1,4 @@
+import type { BookmarkSaveFailure, BookmarkSaveResult } from "../../controllers/bookmark-persistence.mjs";
 import { isHtmlElement } from "../dom-utils.mjs";
 import type { BookmarkRecord } from "../../state.types";
 
@@ -20,23 +21,13 @@ type BookmarkDragEvent = {
     preventDefault: () => void;
 };
 
-export type BookmarkDragReorderSaveFailure = {
-    ok: false;
-    reason: string;
-    version?: number;
-};
-
-export type BookmarkDragReorderSaveResult =
-    | { ok: true }
-    | BookmarkDragReorderSaveFailure;
-
 type BookmarkDragReorderControllerInput = {
     data: BookmarkDragReorderDataState;
     getBookmarkSongRef: (row: Song) => string;
     saveBookmarks: (
         bookmarks: Record<string, BookmarkRecord>
-    ) => BookmarkDragReorderSaveResult;
-    onSaveFailure: (result: BookmarkDragReorderSaveFailure) => void;
+    ) => BookmarkSaveResult;
+    onSaveFailure: (result: BookmarkSaveFailure) => void;
     updateDisplay: () => void;
 };
 
