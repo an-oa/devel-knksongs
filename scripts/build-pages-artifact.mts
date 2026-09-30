@@ -3,11 +3,11 @@
 import { copyFile, cp, mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { resolveProjectPath } from "./lib/paths.mjs";
+import { resolveProjectPath } from "./lib/paths.mts";
 import {
     DATA_ASSET_FILES,
     ROOT_ASSET_FILES
-} from "./lib/site-assets.mjs";
+} from "./lib/site-assets.mts";
 
 const DEFAULT_OUTPUT_DIR = "_site";
 const DEFAULT_SITE_DIR = "_build";
@@ -15,20 +15,18 @@ const DEPLOYMENT_MARKER_FILE = "deployment.json";
 
 /**
  * 公開済みcommitを識別するmarker JSONを作る。
- * @param {string} deploymentSha
- * @returns {string}
  */
-export function createDeploymentMarker(deploymentSha) {
+export function createDeploymentMarker(deploymentSha: string): string {
     return `${JSON.stringify({ sha: deploymentSha })}\n`;
 }
 
 /**
  * CLI 引数と環境変数から artifact 生成オプションを作る。
- * @param {string[]} args
- * @param {Record<string, string | undefined>} env
- * @returns {{ outputDir: string, siteDir: string, deploymentSha: string }}
  */
-export function parseArgs(args, env = process.env) {
+export function parseArgs(
+    args: string[],
+    env: Record<string, string | undefined> = process.env
+): { outputDir: string, siteDir: string, deploymentSha: string } {
     const options = {
         outputDir: env.PAGES_ARTIFACT_DIR || DEFAULT_OUTPUT_DIR,
         siteDir: env.PAGES_SITE_DIR || DEFAULT_SITE_DIR,
@@ -67,11 +65,8 @@ export function parseArgs(args, env = process.env) {
 /**
  * artifact 出力先を安全な project root 配下の directory に解決する。
  * 本番 artifact 生成で rm の対象を限定し、境界条件を単体テストするため export している。
- * @param {string} outputDir
- * @param {string} [rootDir]
- * @returns {string}
  */
-export function resolvePagesArtifactOutputDir(outputDir, rootDir = process.cwd()) {
+export function resolvePagesArtifactOutputDir(outputDir: string, rootDir: string = process.cwd()): string {
     return resolveProjectPath({
         targetPath: outputDir,
         rootDir,
@@ -82,11 +77,8 @@ export function resolvePagesArtifactOutputDir(outputDir, rootDir = process.cwd()
 
 /**
  * artifact の入力元となる静的 site directory を project root 配下に解決する。
- * @param {string} siteDir
- * @param {string} [rootDir]
- * @returns {string}
  */
-export function resolvePagesArtifactSiteDir(siteDir, rootDir = process.cwd()) {
+export function resolvePagesArtifactSiteDir(siteDir: string, rootDir: string = process.cwd()): string {
     return resolveProjectPath({
         targetPath: siteDir,
         rootDir,
@@ -97,11 +89,8 @@ export function resolvePagesArtifactSiteDir(siteDir, rootDir = process.cwd()) {
 
 /**
  * 公開に必要な静的ファイルを artifact directory へコピーする。
- * @param {string} outputDir
- * @param {string} siteDir
- * @returns {Promise<void>}
  */
-async function copySiteAssets(outputDir, siteDir) {
+async function copySiteAssets(outputDir: string, siteDir: string): Promise<void> {
     await rm(outputDir, { recursive: true, force: true });
     await mkdir(join(outputDir, "data"), { recursive: true });
     await Promise.all(ROOT_ASSET_FILES.map((fileName) => (
@@ -115,10 +104,8 @@ async function copySiteAssets(outputDir, siteDir) {
 
 /**
  * GitHub Pages へ upload する静的 artifact を生成する。
- * @param {{ outputDir: string, siteDir?: string, deploymentSha?: string }} options
- * @returns {Promise<string>}
  */
-export async function buildPagesArtifact(options) {
+export async function buildPagesArtifact(options: { outputDir: string, siteDir?: string, deploymentSha?: string }): Promise<string> {
     const outputDir = resolvePagesArtifactOutputDir(options.outputDir);
     const siteDir = resolvePagesArtifactSiteDir(options.siteDir || DEFAULT_SITE_DIR);
     await copySiteAssets(outputDir, siteDir);

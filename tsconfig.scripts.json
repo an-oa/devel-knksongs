@@ -1,7 +1,6 @@
 {
   "compilerOptions": {
-    "allowJs": true,
-    "checkJs": true,
+    "allowJs": false,
     "noEmit": true,
     "target": "ES2024",
     "module": "NodeNext",
@@ -12,14 +11,12 @@
     "noUnusedParameters": true,
     "skipLibCheck": true,
     "types": ["node"],
-    "allowImportingTsExtensions": true
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true
   },
   "include": [
-    "scripts/deploy-pages-issue-notification.mjs",
-    "scripts/songs-content-hash.mjs",
-    "scripts/build-songs-json.mjs",
-    "scripts/validate-songs-json.mjs",
-    "scripts/songs-json-artifact.mjs",
+    "scripts/**/*.mts",
     "types/song.d.ts"
   ]
 }

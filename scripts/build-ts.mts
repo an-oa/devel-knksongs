@@ -5,7 +5,7 @@ import { constants } from "node:fs";
 import { access, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { resolveProjectPath } from "./lib/paths.mjs";
+import { resolveProjectPath } from "./lib/paths.mts";
 
 const PROJECT_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const APP_DIR = join(PROJECT_ROOT, "app");
@@ -15,28 +15,22 @@ const TS_CHECK_COMMENT_PATTERN = /^\/\/ @ts-check\r?\n\r?\n?/;
 
 /**
  * OS ごとの差を吸収して npm executable 名を返す。
- * @returns {string}
  */
-function getNpmExecutable() {
+function getNpmExecutable(): string {
     return process.platform === "win32" ? "npm.cmd" : "npm";
 }
 
 /**
  * file path を git command 用の slash 区切り相対 path に変換する。
- * @param {string} filePath
- * @returns {string}
  */
-function toGitPath(filePath) {
+function toGitPath(filePath: string): string {
     return relative(PROJECT_ROOT, filePath).split(sep).join("/");
 }
 
 /**
  * command を実行し、失敗した場合はその終了コードで process を終了する。
- * @param {string} command
- * @param {string[]} args
- * @returns {void}
  */
-function runCommand(command, args) {
+function runCommand(command: string, args: string[]): void {
     const result = spawnSync(command, args, {
         cwd: PROJECT_ROOT,
         stdio: "inherit"
@@ -51,11 +45,8 @@ function runCommand(command, args) {
 
 /**
  * command の標準出力を文字列として取得する。
- * @param {string} command
- * @param {string[]} args
- * @returns {string}
  */
-function readCommand(command, args) {
+function readCommand(command: string, args: string[]): string {
     const result = spawnSync(command, args, {
         cwd: PROJECT_ROOT,
         encoding: "utf8",
@@ -72,11 +63,8 @@ function readCommand(command, args) {
 
 /**
  * build 出力先を安全な project root 配下の directory に解決する。
- * @param {string | undefined} outputDir
- * @param {string} [rootDir]
- * @returns {string}
  */
-export function resolveTypeScriptBuildOutputDir(outputDir, rootDir = PROJECT_ROOT) {
+export function resolveTypeScriptBuildOutputDir(outputDir: string | undefined, rootDir: string = PROJECT_ROOT): string {
     return resolveProjectPath({
         targetPath: outputDir || DEFAULT_BUILD_DIR,
         rootDir,
@@ -87,11 +75,8 @@ export function resolveTypeScriptBuildOutputDir(outputDir, rootDir = PROJECT_ROO
 
 /**
  * directory 配下の指定拡張子の file を再帰的に列挙する。
- * @param {string} directory
- * @param {string} extension
- * @returns {Promise<string[]>}
  */
-async function listFilesByExtension(directory, extension) {
+async function listFilesByExtension(directory: string, extension: string): Promise<string[]> {
     const entries = await readdir(directory, { withFileTypes: true });
     const nestedFiles = await Promise.all(entries.map(async (entry) => {
         const entryPath = join(directory, entry.name);
@@ -104,11 +89,8 @@ async function listFilesByExtension(directory, extension) {
 
 /**
  * directory 配下の指定拡張子の file を再帰的に列挙する。directory がない場合は空配列を返す。
- * @param {string} directory
- * @param {string} extension
- * @returns {Promise<string[]>}
  */
-async function listExistingFilesByExtension(directory, extension) {
+async function listExistingFilesByExtension(directory: string, extension: string): Promise<string[]> {
     try {
         await access(directory, constants.F_OK);
     } catch {
@@ -119,29 +101,23 @@ async function listExistingFilesByExtension(directory, extension) {
 
 /**
  * app 配下の .mts source を再帰的に列挙する。
- * @returns {Promise<string[]>}
  */
-async function listTypeScriptModuleSources() {
+async function listTypeScriptModuleSources(): Promise<string[]> {
     return listFilesByExtension(APP_DIR, ".mts");
 }
 
 /**
  * .mts source に対応する _build/app 生成 .mjs の path を返す。
- * @param {string} sourcePath
- * @param {string} outputDir
- * @returns {string}
  */
-function getEmittedModulePath(sourcePath, outputDir) {
+function getEmittedModulePath(sourcePath: string, outputDir: string): string {
     const relativeSourcePath = relative(APP_DIR, sourcePath);
     return join(outputDir, "app", relativeSourcePath).replace(/\.mts$/, ".mjs");
 }
 
 /**
  * 生成 .mjs の先頭へ手編集禁止ヘッダーを作る。
- * @param {string} sourcePath
- * @returns {string}
  */
-function createGeneratedHeader(sourcePath) {
+function createGeneratedHeader(sourcePath: string): string {
     const sourceGitPath = toGitPath(sourcePath);
     return [
         `// Generated from ${sourceGitPath}.`,
@@ -152,11 +128,8 @@ function createGeneratedHeader(sourcePath) {
 
 /**
  * 既存の生成ヘッダーを取り除き、最新の source path に合わせたヘッダーを付け直す。
- * @param {string} sourcePath
- * @param {string} emittedPath
- * @returns {Promise<void>}
  */
-async function writeGeneratedHeader(sourcePath, emittedPath) {
+async function writeGeneratedHeader(sourcePath: string, emittedPath: string): Promise<void> {
     const source = await readFile(emittedPath, "utf8");
     const sourceWithoutHeader = source
         .replace(GENERATED_HEADER_PATTERN, "")
@@ -169,10 +142,8 @@ async function writeGeneratedHeader(sourcePath, emittedPath) {
 
 /**
  * 生成 .mjs が存在することを確認する。
- * @param {string[]} emittedPaths
- * @returns {Promise<void>}
  */
-async function assertEmittedModulesExist(emittedPaths) {
+async function assertEmittedModulesExist(emittedPaths: string[]): Promise<void> {
     const missingPaths = [];
     for (const emittedPath of emittedPaths) {
         try {
@@ -193,11 +164,9 @@ async function assertEmittedModulesExist(emittedPaths) {
 /**
  * 旧方式で app 配下に生成されていた .mjs を削除する。
  * 生成ヘッダーがない .mjs は手編集の可能性があるため削除せず停止する。
- * @param {string[]} sourcePaths
- * @returns {Promise<void>}
  */
-async function removeGeneratedAdjacentModules(sourcePaths) {
-    const unsafePaths = [];
+async function removeGeneratedAdjacentModules(sourcePaths: string[]): Promise<void> {
+    const unsafePaths: string[] = [];
     await Promise.all(sourcePaths.map(async (sourcePath) => {
         const adjacentPath = sourcePath.replace(/\.mts$/, ".mjs");
         let source;
@@ -226,9 +195,8 @@ async function removeGeneratedAdjacentModules(sourcePaths) {
 
 /**
  * app 配下に .mjs が残っていないことを確認する。
- * @returns {Promise<void>}
  */
-async function assertAppModulesAbsent() {
+async function assertAppModulesAbsent(): Promise<void> {
     const modulePaths = await listExistingFilesByExtension(APP_DIR, ".mjs");
     if (modulePaths.length === 0) return;
     console.error("app .mjs files must not remain in the TypeScript source tree:");
@@ -240,10 +208,8 @@ async function assertAppModulesAbsent() {
 
 /**
  * 生成 .mjs が git 管理対象になっていないことを確認する。
- * @param {string[]} emittedPaths
- * @returns {void}
  */
-function assertEmittedModulesUntracked(emittedPaths) {
+function assertEmittedModulesUntracked(emittedPaths: string[]): void {
     const emittedGitPaths = emittedPaths.map(toGitPath);
     const trackedPaths = new Set(
         readCommand("git", ["ls-files", "--", ...emittedGitPaths])
@@ -262,10 +228,8 @@ function assertEmittedModulesUntracked(emittedPaths) {
 
 /**
  * TypeScript module を _build/app へ emit し、生成 .mjs にヘッダーを付ける。
- * @param {{ check?: boolean, outputDir?: string }} [options]
- * @returns {Promise<void>}
  */
-export async function buildTypeScriptModules(options = {}) {
+export async function buildTypeScriptModules(options: { check?: boolean, outputDir?: string } = {}): Promise<void> {
     const outputDir = resolveTypeScriptBuildOutputDir(options.outputDir);
     await rm(join(outputDir, "app"), { recursive: true, force: true });
     runCommand(getNpmExecutable(), [
@@ -292,10 +256,8 @@ export async function buildTypeScriptModules(options = {}) {
 
 /**
  * 既存の TypeScript emit 結果を検査する。CI など、直前に build 済みの経路で使う。
- * @param {{ outputDir?: string }} [options]
- * @returns {Promise<void>}
  */
-export async function checkTypeScriptEmit(options = {}) {
+export async function checkTypeScriptEmit(options: { outputDir?: string } = {}): Promise<void> {
     const outputDir = resolveTypeScriptBuildOutputDir(options.outputDir);
     const sourcePaths = await listTypeScriptModuleSources();
     const emittedPaths = sourcePaths.map((sourcePath) => getEmittedModulePath(sourcePath, outputDir));

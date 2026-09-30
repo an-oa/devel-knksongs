@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createSongsContentHash } from "../scripts/songs-content-hash.mjs";
+import { createSongsContentHash } from "../scripts/songs-content-hash.mts";
 
 test("songs content hash: creates a sha256 hash from serialized songs", () => {
     assert.equal(

@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildSongsJson } from "../scripts/build-songs-json.mjs";
-import { validateSongsJsonArtifacts } from "../scripts/songs-json-artifact.mjs";
+import { buildSongsJson } from "../scripts/build-songs-json.mts";
+import { validateSongsJsonArtifacts } from "../scripts/songs-json-artifact.mts";
 import {
     parseSongsJsonMetaPayload,
     parseSongsJsonPayload,

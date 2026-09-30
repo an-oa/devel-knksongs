@@ -8,11 +8,8 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
 
 /**
  * 公開markerが期待するcommit SHAを示しているか判定する。
- * @param {string} markerJson
- * @param {string} expectedSha
- * @returns {boolean}
  */
-export function hasExpectedDeploySha(markerJson, expectedSha) {
+export function hasExpectedDeploySha(markerJson: string, expectedSha: string): boolean {
     try {
         const marker = JSON.parse(markerJson);
         return marker !== null &&
@@ -26,12 +23,8 @@ export function hasExpectedDeploySha(markerJson, expectedSha) {
 
 /**
  * CDNとbrowser cacheを避けて公開markerを確認するURLを作る。
- * @param {string} pageUrl
- * @param {string} verificationToken
- * @param {number} attempt
- * @returns {URL}
  */
-export function createVerificationUrl(pageUrl, verificationToken, attempt) {
+export function createVerificationUrl(pageUrl: string, verificationToken: string, attempt: number): URL {
     const baseUrl = new URL(pageUrl);
     if (!baseUrl.pathname.endsWith("/")) {
         baseUrl.pathname = `${baseUrl.pathname}/`;
@@ -43,21 +36,15 @@ export function createVerificationUrl(pageUrl, verificationToken, attempt) {
 
 /**
  * 指定時間が経過するまで待機する。
- * @param {number} delayMs
- * @returns {Promise<void>}
  */
-function waitFor(delayMs) {
+function waitFor(delayMs: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, delayMs));
 }
 
 /**
  * 正の整数として解釈できる環境変数を読み込む。
- * @param {string | undefined} value
- * @param {number} fallback
- * @param {string} label
- * @returns {number}
  */
-function readPositiveInteger(value, fallback, label) {
+function readPositiveInteger(value: string | undefined, fallback: number, label: string): number {
     if (value === undefined || value === "") return fallback;
     const parsed = Number(value);
     if (!Number.isSafeInteger(parsed) || parsed <= 0) {
@@ -68,21 +55,19 @@ function readPositiveInteger(value, fallback, label) {
 
 /**
  * Pagesの公開markerを期限まで繰り返し取得し、期待するcommit SHAの反映を確認する。
- * @param {{
- *   pageUrl: string,
- *   expectedSha: string,
- *   verificationToken?: string,
- *   deadlineMs?: number,
- *   delayMs?: number,
- *   requestTimeoutMs?: number,
- *   fetchImpl?: typeof fetch,
- *   wait?: (delayMs: number) => Promise<void>,
- *   now?: () => number,
- *   createTimeoutSignal?: (timeoutMs: number) => AbortSignal
- * }} options
- * @returns {Promise<URL>}
  */
-export async function verifyPagesDeployment(options) {
+export async function verifyPagesDeployment(options: {
+    pageUrl: string,
+    expectedSha: string,
+    verificationToken?: string,
+    deadlineMs?: number,
+    delayMs?: number,
+    requestTimeoutMs?: number,
+    fetchImpl?: typeof fetch,
+    wait?: (delayMs: number) => Promise<void>,
+    now?: () => number,
+    createTimeoutSignal?: (timeoutMs: number) => AbortSignal
+}): Promise<URL> {
     const {
         pageUrl,
         expectedSha,
@@ -112,8 +97,7 @@ export async function verifyPagesDeployment(options) {
 
     const startedAt = now();
     let attempt = 0;
-    /** @type {Error | null} */
-    let lastError = null;
+    let lastError: Error | null = null;
 
     while (true) {
         const elapsedMs = now() - startedAt;

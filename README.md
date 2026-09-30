@@ -192,15 +192,16 @@ flowchart TD
   曲fixtureは `tests/fixtures/song.mts` で共有します。
   検索用の曲は `tests/fixtures/search-song.mts` で正規化し、factoryごとに独立した連番を持たせます。
 - アプリの型チェックは `tsconfig.json`、Node単体テストは `tsconfig.tests.json` で、どちらも `strict: true` にしています。
-  `allowJs: true` で参照先のNode scriptsのJSDoc型を取り込みます。`checkJs: false` とし、
-  scripts本体は `tsconfig.scripts.json` の `checkJs: true`・`strict: true` で、配布通知、曲データのハッシュ算出、曲JSONの生成・ファイル検証・成果物整合性検証を対象にしています。
+  Node scriptsも `.mts` sourceを直接参照し、scriptsと単体テストの型設定は `allowJs: false` にしています。
+  scripts本体は `tsconfig.scripts.json` の `noEmit: true`・`strict: true` で、共通helperを含む `scripts/**/*.mts` 全体を対象にしています。
+  `erasableSyntaxOnly`・`verbatimModuleSyntax` を有効にし、Nodeが型を除去して実行できる構文に限定します。
   `scripts/tsconfig.json` が同じ設定を継承し、エディターからも認識できるようにしています。
   曲JSONスクリプトの `#app/*` import は `package.json` の `imports` で解決します。
   TypeScriptは `types` 条件で `app/*.mts`、Nodeは `default` 条件で `_build/app/*.mjs` を参照します。
   これにより、生成JavaScriptを再検査せずアプリの型を利用でき、型宣言の生成・コピーも不要です。
   型はアプリのsourceと共有ドメイン型の `types/song.d.ts`・`types/search-state.d.ts` を参照します。
   検索条件と日付キーの型はUI用ambient宣言から分離し、テストではUI・controller用の型定義を取り込みません。
-  ESLintのTypeScriptルールは `app/**/*.mts` と `tests/**/*.mts` に直接適用し、生成物の `_build` は検査対象から除外します。
+  ESLintのTypeScriptルールは `app/**/*.mts`・`scripts/**/*.mts`・`tests/**/*.mts` に直接適用し、生成物の `_build` は検査対象から除外します。
 - `npm run typecheck` と `npm run lint` は事前buildなしで実行でき、生成物を更新しません。
   `npm run typecheck:tests:raw` と `npm run typecheck:scripts:raw` も事前buildなしで実行できます。
   `npm run test:unit` は、Node scriptsが生成moduleを読むため、
@@ -238,6 +239,8 @@ flowchart TD
   - Pages artifact生成とブラウザ成果物URLのテスト (`tests/pages-artifact.test.mts` / `tests/browser-build.test.mts`)
   - サイトビルドの引数・出力先のテスト (`tests/build-site.test.mts`)
   - Pages公開確認と配布失敗通知のテスト (`tests/pages-deployment-verification.test.mts` / `tests/deploy-pages-issue-notification.test.mts`)
+  - 通知APIクライアントのページ取得・不正応答のテスト (`tests/deploy-pages-issue-client.test.mts`)
+  - 配布確認・通知スクリプトのNode直接実行テスト (`tests/scripts-native-cli.test.mts`)
   - 再生継続候補の選択ロジック (`tests/playback-sequence.test.mts`)
   - 再生セッション制御のテスト (`tests/playback-session-controller.test.mts`)
   - 再生設定値reducerのテスト (`tests/playback-settings-value-reducer.test.mts`)
@@ -304,7 +307,11 @@ flowchart TD
 
 ### 環境準備
 
-- Node.jsはCIと同じ24.16.0で検証しています。
+- Node.jsはCIと同じ24.16.0を使用してください。
+- `scripts/**/*.mts` はNodeの標準の型除去機能で直接実行します（例: `node scripts/build-ts.mts`）。
+  scripts自体の事前コンパイルや `tsx` は不要です。実行時には型検査されないため、`npm run typecheck` を別途実行します。
+  曲JSONの生成・検証で参照するアプリmoduleは、従来どおり `npm run build:ts` で生成します。
+  配布確認・通知のCIジョブはNode標準moduleだけで動作し、`npm install` を必要としません。
 - 初回または `node_modules` がない環境では、検証コマンドの前に
   `npm install` を実行してください。
 - `npm run lint` は `package.json` の devDependencies にある ESLint を

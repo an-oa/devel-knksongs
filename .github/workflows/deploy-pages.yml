@@ -139,7 +139,7 @@ jobs:
         env:
           PAGE_URL: ${{ steps.deployment.outputs.page_url }}
           EXPECTED_SHA: ${{ needs.resolve.outputs.deploy-sha }}
-        run: node scripts/verify-pages-deployment.mjs
+        run: node scripts/verify-pages-deployment.mts
 
       - name: Verify deployed commit is still main
         env:
@@ -184,4 +184,4 @@ jobs:
           REPOSITORY_OWNER: ${{ github.repository_owner }}
           RESOLVE_RESULT: ${{ needs.resolve.result }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: node scripts/deploy-pages-issue-notification.mjs
+        run: node scripts/deploy-pages-issue-notification.mts
