@@ -27,7 +27,7 @@
 - 対象: 検索ロジック、日付フィルタ、ブックマーク検索、描画/再生/保存/サイドバーまわりの回帰
 - 重点ケース: ブックマーク表示時のみ有効なドラッグ並び替えと、並び順の永続化、YouTube 継続再生の失敗復旧
 - 型検査: Node単体テスト・E2Eと共通helperはすべて `.mts` で記述する。アプリは `tsconfig.json`、Node単体テストは `tsconfig.tests.json` でstrictな型チェックを行う。
-  Node scriptsのJSDoc型は `allowJs: true` で参照し、scripts本体の検査範囲は `tsconfig.scripts.json` で管理する。
+  Node scriptsのJSDoc型は `allowJs: true` で参照し、scripts本体は `tsconfig.scripts.json` の `checkJs: true`・`strict: true` で、共通helperを含む `scripts/**/*.mjs` 全体を検査する。
   曲JSONの生成・検証は `#app/*` を通じ、型チェックではTSソース、実行時には生成JavaScriptを読む。
   `package.json` の `imports` に参照先を集約し、`scripts/tsconfig.json` でエディターにも同じ検査設定を適用する。
   E2Eの型設定は `tests/e2e/tsconfig.json` に置き、`typecheck:e2e:raw` を全体のtypecheckへ組み込む。

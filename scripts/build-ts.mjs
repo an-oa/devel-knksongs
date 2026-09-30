@@ -197,6 +197,7 @@ async function assertEmittedModulesExist(emittedPaths) {
  * @returns {Promise<void>}
  */
 async function removeGeneratedAdjacentModules(sourcePaths) {
+    /** @type {string[]} */
     const unsafePaths = [];
     await Promise.all(sourcePaths.map(async (sourcePath) => {
         const adjacentPath = sourcePath.replace(/\.mts$/, ".mjs");

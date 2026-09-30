@@ -193,7 +193,7 @@ flowchart TD
   検索用の曲は `tests/fixtures/search-song.mts` で正規化し、factoryごとに独立した連番を持たせます。
 - アプリの型チェックは `tsconfig.json`、Node単体テストは `tsconfig.tests.json` で、どちらも `strict: true` にしています。
   `allowJs: true` で参照先のNode scriptsのJSDoc型を取り込みます。`checkJs: false` とし、
-  scripts本体は `tsconfig.scripts.json` の `checkJs: true`・`strict: true` で、配布通知、曲データのハッシュ算出、曲JSONの生成・ファイル検証・成果物整合性検証を対象にしています。
+  scripts本体は `tsconfig.scripts.json` の `checkJs: true`・`strict: true` で、共通helperを含む `scripts/**/*.mjs` 全体を対象にしています。
   `scripts/tsconfig.json` が同じ設定を継承し、エディターからも認識できるようにしています。
   曲JSONスクリプトの `#app/*` import は `package.json` の `imports` で解決します。
   TypeScriptは `types` 条件で `app/*.mts`、Nodeは `default` 条件で `_build/app/*.mjs` を参照します。

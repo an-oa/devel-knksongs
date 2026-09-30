@@ -15,11 +15,7 @@
     "allowImportingTsExtensions": true
   },
   "include": [
-    "scripts/deploy-pages-issue-notification.mjs",
-    "scripts/songs-content-hash.mjs",
-    "scripts/build-songs-json.mjs",
-    "scripts/validate-songs-json.mjs",
-    "scripts/songs-json-artifact.mjs",
+    "scripts/**/*.mjs",
     "types/song.d.ts"
   ]
 }
