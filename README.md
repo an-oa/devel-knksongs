@@ -172,7 +172,7 @@ flowchart TD
   差分がない場合は token 発行、コミット、CI、deploy のいずれも行いません。
   App は対象リポジトリだけへインストールし、Repository permissions は
   Contents の Read and write だけを付与します。
-- `.github/workflows/ci.yml` は `main` への push / pull request / 手動実行で `npm run validate:songs-json`、`npm run typecheck`、`npm run check:ts-emit`、`npm run build`、`npm run lint`、`npm run test:unit` を実行します。`main` の CI が成功すると `.github/workflows/deploy-pages.yml` が検証済み commit を deploy します。
+- `.github/workflows/ci.yml` は `main` への push / pull request / 手動実行で `npm run build` を実行後、曲JSON検証・型検査・emit検査・lint・単体テストの `:raw` コマンドを実行し、生成物を再利用します。`main` の CI が成功すると `.github/workflows/deploy-pages.yml` が検証済み commit を deploy します。
 - `.github/workflows/deploy-pages.yml` は workflow 全体を `queue: max` の concurrency で直列化し、成功した CI の対象を build 前、artifact 生成後、environment 待機後の deploy action 直前に `main` と照合します。待機前に古くなった run は deploy job ごと skip し、待機中に古くなった run は古い artifact を公開せず失敗として記録します。deploy 後は公開 `deployment.json` の SHA が対象 commit と一致するまで最長10分間確認し、最後に対象 commit が引き続き `main` であることを再確認してから workflow を成功扱いにします。
 - `Deploy Pages` のいずれかの job が失敗または cancel されると、`deploy-pages-failure` label と機械判定用markerを持つ公開 Issue を作成して repository owner へ assign します。同じ障害の未解決 Issue があれば新規作成せず、対象 commit、run URL、各 job の結果、検知時刻をコメントとして追記します。その後に Pages deploy が成功した場合だけ復旧コメントを付けて Issue を閉じ、古い対象の skip では閉じません。Issue 更新前に、failureまたはrecoveryの通知を完了した新しい workflow run の有無と現在の `main` SHA を再確認し、queued、notify未完了のcancelled、failure/recoveryを生じないskip構成の run だけでは古い通知を抑止しません。Issue API は一時失敗時を含めて最大3回試行し、復旧処理を完了できない場合は notify job を失敗させます。メールアドレス、secret、workflow log 本文は Issue に記録しません。
 - `main` の SHA 照合と Pages deploy API の実行は原子的ではないため、両者の間に `main` が進んだ場合は古い artifact が一時的に公開される可能性があります。この場合も公開後の再照合で workflow を失敗させますが、公開自体を原子的に防ぐ保証はありません。
@@ -184,7 +184,7 @@ flowchart TD
 - サムネイル表示/埋め込み再生まわりでは YouTube Iframe API を動的に利用します。
 - 開発時の静的解析は TypeScript noEmit typecheck と ESLint を利用します。
 - 開発時テストは Node.js 標準の `node:test` を利用します。
-- Node単体テスト・E2Eと、それぞれの共通helperはすべてTSへ移行済みです。
+- Node単体テスト・E2Eと、それぞれの共通helperはすべて `.mts` で記述します。
   Node単体テストでは `tsx` 経由で
   `app/**/*.mts` を直接 import します。Node scriptsを対象にするテストは、
   scripts経由で `_build/app/**/*.mjs` も読むため事前buildが必要です。生成型宣言は使いません。
@@ -203,7 +203,7 @@ flowchart TD
   ESLintのTypeScriptルールは `tests/**/*.mts` に適用します。
 - `npm run typecheck` は事前buildなしで全型検査を実行し、生成物を更新しません。
   `npm run typecheck:tests:raw` と `npm run typecheck:scripts:raw` も事前buildなしで実行できます。
-  `npm run test:unit:ts` と `npm run test:unit` は、Node scriptsが生成moduleを読むため、
+  `npm run test:unit` は、Node scriptsが生成moduleを読むため、
   事前に `build:ts` を実行します。`tsx` 自体は型チェックしないため、型チェックも併せて実行してください。
   CIもすべての単体テストを検証します。
 - ブラウザ回帰確認として Playwright による Chromium スモークテストを用意しています。
@@ -264,22 +264,46 @@ flowchart TD
   - YouTube埋め込みURL/API loader のテスト (`tests/youtube-embed.test.mts`)
   - YouTube playback state / start attempt / player adapter の単体テスト (`tests/youtube-playback-state.test.mts`, `tests/youtube-playback-start-attempt.test.mts`, `tests/youtube-player-adapter.test.mts`)
   - YouTube shared playback / thumbnail helper / unconfirmed playback start の単体テスト (`tests/youtube-shared-playback.test.mts`, `tests/youtube-thumbnail.test.mts`, `tests/youtube-unconfirmed-playback-start.test.mts`)
+  - Chromium 上での起動順序・曲キャッシュ更新・レスポンシブ描画のテスト (`tests/e2e/startup.spec.mts`, `tests/e2e/songs-cache-refresh.spec.mts`, `tests/e2e/responsive-results.spec.mts`)
   - Chromium 上でのヘッダー自動非表示・キーボードフォーカス・reduced motionのテスト (`tests/e2e/header-auto-hide.spec.mts`)
   - Chromium 上での検索・ブックマーク・サイドバーのテスト (`tests/e2e/search.spec.mts`, `tests/e2e/bookmarks.spec.mts`, `tests/e2e/sidebar.spec.mts`)
   - Chromium 上での YouTube 再生スモークテスト (`tests/e2e/youtube-smoke.spec.mts`)
-- `tests/test-helpers.mts`、`tests/youtube-harness.mts`、`tests/support/playback-settings-fixture.mts`、`tests/e2e/support/mock-youtube.mts`、`tests/e2e/support/ui-helpers.mts` は複数テストで共有する補助モジュールです。
-- 実行コマンド:
-  - `npm run validate:songs-json`
-  - `npm run build:ts`
-  - `npm run typecheck`
-  - `npm run typecheck:tests:raw`（Node単体テストの型チェックのみ）
-  - `npm run typecheck:e2e:raw`（E2Eと共通helperの型チェックのみ）
-  - `npm run check:ts-emit`
-  - `npm run build`
-  - `npm run lint`
-  - `npm run test:unit`（すべての `.mts` 単体テストを実行）
-  - `npm run test:unit:ts`（互換用コマンド。test:unitへ委譲）
-  - `npm run test:e2e`
+- 共通helper:
+  - DOM・YouTubeのハーネス: `tests/test-helpers.mts`、`tests/youtube-harness.mts`
+  - 曲データ・検索・保存・YouTubeのfixture: `tests/fixtures/`。再生設定のfixture: `tests/support/playback-settings-fixture.mts`
+  - E2Eの通信: `tests/e2e/support/network-mocks.mts` が `songs-network.mts` と `mock-youtube.mts` を組み合わせる。
+  - E2Eのキャッシュ操作・観測: `tests/e2e/support/songs-cache.mts`
+  - E2Eの画面操作・曲生成: `tests/e2e/support/ui-helpers.mts`、`tests/e2e/support/song-fixtures.mts`
+  - ブラウザ内YouTubeモック: `tests/e2e/support/youtube-iframe-api.mts`。API要求時にesbuildでJSへ変換して配信する。
+
+### 実行コマンド
+
+通常は下表の「コマンド」を使います。「事前build」はコマンド内で自動実行する処理です。
+生成物を再利用する場合は、対象ソースの変更を反映したbuildが完了していることを確認してから、右列のコマンドを使ってください。
+右列の「なし」は対応する再利用用コマンドがないことを表します。型検査は通常・`:raw` のどちらも生成物を必要としません。
+
+| コマンド | 事前build | 再利用用コマンド |
+| --- | --- | --- |
+| `npm run build:ts` | なし（このコマンドでTypeScriptをemit） | なし |
+| `npm run build` | TypeScript emit | なし |
+| `npm run build:pages-artifact` | `build` | なし |
+| `npm run build:songs-json` | `build:ts` | `npm run build:songs-json:raw` |
+| `npm run validate:songs-json` | `build:ts` | `npm run validate:songs-json:raw` |
+| `npm run typecheck` | なし | `npm run typecheck:raw`（同じ型検査） |
+| `npm run check:ts-emit` | TypeScript emit | `npm run check:ts-emit:raw` |
+| `npm run lint` | `build:ts` | `npm run lint:raw` |
+| `npm run test:unit` | `build:ts` | `npm run test:unit:raw` |
+| `npm run test:e2e` | `build:pages-artifact`（内部で `build`） | なし |
+
+型検査を領域ごとに実行する場合は、以下を使います。いずれも事前buildは不要です。
+
+- `npm run typecheck:app:raw`：アプリ
+- `npm run typecheck:scripts:raw`：Node scripts
+- `npm run typecheck:tests:raw`：Node単体テストと共通helper
+- `npm run typecheck:e2e:raw`：E2Eと共通helper
+
+### 環境準備
+
 - Node.jsはCIと同じ24.16.0で検証しています。
 - 初回または `node_modules` がない環境では、検証コマンドの前に
   `npm install` を実行してください。

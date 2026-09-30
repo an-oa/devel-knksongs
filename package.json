@@ -28,7 +28,6 @@
     "typecheck:e2e:raw": "tsc --project tests/e2e/tsconfig.json",
     "test:unit": "npm run build:ts && npm run test:unit:raw",
     "test:unit:raw": "node --import tsx --test \"tests/*.test.mts\"",
-    "test:unit:ts": "npm run test:unit",
     "test:e2e": "npm run build:pages-artifact && playwright test",
     "test:e2e:headed": "npm run build:pages-artifact && playwright test --headed",
     "test:e2e:debug": "npm run build:pages-artifact && playwright test --debug"

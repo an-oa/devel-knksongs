@@ -26,99 +26,20 @@
 ## テスト方針（現状）
 - 対象: 検索ロジック、日付フィルタ、ブックマーク検索、描画/再生/保存/サイドバーまわりの回帰
 - 重点ケース: ブックマーク表示時のみ有効なドラッグ並び替えと、並び順の永続化、YouTube 継続再生の失敗復旧
-- TS移行: Node単体テストとその共通helperはすべてTSへ移行済み。`tsconfig.tests.json` でstrictな型チェックを行う。E2Eとその共通helperもすべてTSへ移行済み。
+- 型検査: Node単体テスト・E2Eと共通helperはすべて `.mts` で記述する。Node単体テストは `tsconfig.tests.json` でstrictな型チェックを行う。
   Node scriptsのJSDoc型は `allowJs: true` で参照し、scripts本体の検査範囲は `tsconfig.scripts.json` で管理する。
   曲JSONの生成・検証は `#app/*` を通じ、型チェックではTSソース、実行時には生成JavaScriptを読む。
   `package.json` の `imports` に参照先を集約し、`scripts/tsconfig.json` でエディターにも同じ検査設定を適用する。
   E2Eの型設定は `tests/e2e/tsconfig.json` に置き、`typecheck:e2e:raw` を全体のtypecheckへ組み込む。
   E2Eのfixture生成はアプリsourceを直接参照し、ブラウザでは `_site` の配布成果物を検証する。
-  `typecheck` と各領域の型検査は事前build不要で、生成物を更新しない。`test:unit:ts` と `test:unit` は、Node scriptsが生成moduleを読むため事前に `build:ts` を実行する。
-- テストファイル:
-  - `tests/bookmark-storage-schema.test.mts`
-  - `tests/bookmark-import-export-ui.test.mts`
-  - `tests/bookmark-transfer.test.mts`
-  - `tests/bookmark-ui.test.mts`
-  - `tests/app-state.test.mts`
-  - `tests/stream-role.test.mts`
-  - `tests/csv-parser.test.mts`
-  - `tests/data-loader.test.mts`
-  - `tests/dom-utils.test.mts`
-  - `tests/date-filter-controller.test.mts`
-  - `tests/date-key.test.mts`
-  - `tests/partial-date.test.mts`
-  - `tests/search-boolean-filters.test.mts`
-  - `tests/search-controller.test.mts`
-  - `tests/search-filters.test.mts`
-  - `tests/search-query.test.mts`
-  - `tests/search-query-validation.test.mts`
-  - `tests/search-recommendation.test.mts`
-  - `tests/song-format.test.mts`
-  - `tests/song-identity.test.mts`
-  - `tests/format-filter.test.mts`
-  - `tests/pages-artifact.test.mts`
-  - `tests/browser-build.test.mts`
-  - `tests/build-site.test.mts`
-  - `tests/pages-deployment-verification.test.mts`
-  - `tests/deploy-pages-issue-notification.test.mts`
-  - `tests/playback-sequence.test.mts`
-  - `tests/playback-session-controller.test.mts`
-  - `tests/playback-settings-value-reducer.test.mts`
-  - `tests/render-drag-reorder.test.mts`
-  - `tests/render-layout.test.mts`
-  - `tests/render-masonry-layout.test.mts`
-  - `tests/search-filters-controller.test.mts`
-  - `tests/search-state-schema.test.mts`
-  - `tests/sidebar-ui.test.mts`
-  - `tests/storage-bookmark-limit.test.mts`
-  - `tests/storage-search-state.test.mts`
-  - `tests/ui-storage-compat.test.mts`
-  - `tests/ui-sync.test.mts`
-  - `tests/youtube-controller.test.mts`
-  - `tests/youtube-embed.test.mts`
-  - `tests/youtube-playback-start-attempt.test.mts`
-  - `tests/youtube-playback-state.test.mts`
-  - `tests/youtube-player-adapter.test.mts`
-  - `tests/youtube-shared-playback.test.mts`
-  - `tests/youtube-thumbnail.test.mts`
-  - `tests/youtube-unconfirmed-playback-start.test.mts`
-  - `tests/layout-anchor.test.mts`
-  - `tests/results-scroll.test.mts`
-  - `tests/e2e/header-auto-hide.spec.mts`
-  - `tests/e2e/youtube-smoke.spec.mts`
-  - `tests/e2e/search.spec.mts`
-  - `tests/e2e/bookmarks.spec.mts`
-  - `tests/e2e/sidebar.spec.mts`
-  - `tests/songs-content-hash.test.mts`
-  - `tests/songs-data-source.test.mts`
-  - `tests/songs-data-quality.test.mts`
-  - `tests/build-songs-json.test.mts`
-  - `tests/songs-json-cache.test.mts`
-  - `tests/songs-json.test.mts`
-  - `tests/songs-json-validation.test.mts`
-- 補助モジュール:
-  - `tests/fixtures/song.mts`
-  - `tests/fixtures/search-song.mts`
-  - `tests/test-helpers.mts`
-  - `tests/youtube-harness.mts`
-  - `tests/support/playback-settings-fixture.mts`
-  - `tests/e2e/support/network-mocks.mts`（各ネットワークモックを組み合わせる入口）
-  - `tests/e2e/support/songs-network.mts`（曲JSON・CSVの応答とIndexedDB読み取り）
-  - `tests/e2e/support/mock-youtube.mts`（YouTubeの応答とPlayer操作）
-  - `tests/e2e/support/ui-helpers.mts`
-  - `tests/e2e/support/song-fixtures.mts`
-  - `tests/e2e/support/youtube-iframe-api.mts`（ブラウザ内モック。esbuildでJS化して配信）
-- 実行コマンド:
-  - `npm run validate:songs-json`
-  - `npm run build:ts`
-  - `npm run typecheck`
-  - `npm run typecheck:tests:raw`
-  - `npm run typecheck:e2e:raw`
-  - `npm run check:ts-emit`
-  - `npm run build`
-  - `npm run lint`
-  - `npm run test:unit`（すべての `.mts` 単体テストを実行）
-  - `npm run test:unit:ts`（互換用コマンド。test:unitへ委譲）
-  - `npm run test:e2e`
+  `typecheck` と各領域の型検査は事前build不要で、生成物を更新しない。`test:unit` は、Node scriptsが生成moduleを読むため事前に `build:ts` を実行する。
+- 責務分担:
+  - Node単体テストは、ロジック・controller・DOMモックを使った状態遷移を検証する。
+  - Node scriptsのテストは、生成されたアプリmoduleを読む実行経路と、曲JSON・ビルド・配布成果物の整合性を検証する。
+  - E2Eは、実ブラウザでの起動順序、保存状態、レイアウト、キーボード操作、再生の連携を検証する。曲データとYouTubeの通信はfixtureへ置き換える。
+  - 共通helperは、DOM・曲データ・YouTube・キャッシュなどの担当領域ごとにモックと観測処理をまとめ、テスト本文にはシナリオと期待結果を残す。
+
+テストファイル一覧・実行コマンド・環境準備は、[READMEのテスト/静的解析](README.md#テスト静的解析開発者向け)で管理する。
 
 ## 主要機能
 - 検索（曲名/アーティスト名/読み、複数キーワード）

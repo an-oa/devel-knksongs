@@ -52,7 +52,8 @@ export default defineConfig([
         }
     },
     {
-        files: ["tests/**/*.mjs", "tests/**/*.mts"],
+        files: ["tests/**/*.mts"],
+        extends: [tseslint.configs.recommended],
         languageOptions: {
             ecmaVersion: "latest",
             sourceType: "module",
@@ -62,9 +63,5 @@ export default defineConfig([
                 ...globals.es2024
             }
         }
-    },
-    {
-        files: ["tests/**/*.mts"],
-        extends: [tseslint.configs.recommended]
     }
 ]);
