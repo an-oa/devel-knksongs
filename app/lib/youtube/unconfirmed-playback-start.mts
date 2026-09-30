@@ -1,16 +1,21 @@
+import type { YoutubeSharedPlaybackState } from "./shared-playback.mjs";
+
+type UnconfirmedPlaybackStartInput = {
+    getSharedPlaybackState: () => Pick<YoutubeSharedPlaybackState, "unconfirmedPlaybackStartSessionId">;
+};
+
 /**
  * YouTube 再生開始が未確定のままになったセッションを管理する。
- * @param {{ getSharedPlaybackState: Function }} input
- * @returns {{ mark: Function, clear: Function, consume: Function }}
+ * @param {UnconfirmedPlaybackStartInput} input
  */
-export function createYoutubeUnconfirmedPlaybackStartManager(input) {
+export function createYoutubeUnconfirmedPlaybackStartManager(input: UnconfirmedPlaybackStartInput) {
     const getSharedPlaybackState = input.getSharedPlaybackState;
 
     /**
      * 指定セッションを再生開始未確定として記録する。
      * @param {number} sessionId
      */
-    function mark(sessionId) {
+    function mark(sessionId: number) {
         const sharedPlayback = getSharedPlaybackState();
         sharedPlayback.unconfirmedPlaybackStartSessionId = Number.isFinite(sessionId) && sessionId > 0
             ? sessionId
@@ -22,11 +27,11 @@ export function createYoutubeUnconfirmedPlaybackStartManager(input) {
      * @param {number | undefined} sessionId
      * @returns {boolean}
      */
-    function clear(sessionId) {
+    function clear(sessionId?: number) {
         const sharedPlayback = getSharedPlaybackState();
         const unconfirmedSessionId = sharedPlayback.unconfirmedPlaybackStartSessionId || 0;
         if (!unconfirmedSessionId) return false;
-        if (Number.isFinite(sessionId) && sessionId > 0 && unconfirmedSessionId !== sessionId) {
+        if (typeof sessionId === "number" && Number.isFinite(sessionId) && sessionId > 0 && unconfirmedSessionId !== sessionId) {
             return false;
         }
         sharedPlayback.unconfirmedPlaybackStartSessionId = 0;
@@ -38,7 +43,7 @@ export function createYoutubeUnconfirmedPlaybackStartManager(input) {
      * @param {number} sessionId
      * @returns {boolean}
      */
-    function consume(sessionId) {
+    function consume(sessionId: number) {
         return clear(sessionId);
     }
 

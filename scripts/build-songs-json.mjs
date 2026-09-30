@@ -3,13 +3,13 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { parseCsvToSongs } from "../_build/app/lib/csv-parser.mjs";
+import { parseCsvToSongs } from "#app/lib/csv-parser";
 import {
     buildSongsJsonMetaPayload,
     buildSongsJsonPayload,
     parseSongsJsonMetaPayload
-} from "../_build/app/lib/songs-json.mjs";
-import { PUBLIC_CSV_URL } from "../_build/app/config.mjs";
+} from "#app/lib/songs-json";
+import { PUBLIC_CSV_URL } from "#app/config";
 import { createSongsContentHash } from "./songs-content-hash.mjs";
 import { validateSongsJsonArtifacts } from "./songs-json-artifact.mjs";
 
@@ -78,7 +78,7 @@ async function loadCsvText(options) {
 
 /**
  * 曲データを安定したJSON文字列へ変換する。
- * @param {*} payload
+ * @param {unknown} payload
  * @returns {string}
  */
 function stringifyPayload(payload) {

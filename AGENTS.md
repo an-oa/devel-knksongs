@@ -82,9 +82,20 @@ feat: move settings into dedicated sidebar panel
   記述量を減らす目的だけで `export type` や local alias を増やさない。
 - 型名で詳細を隠すより、依存元・由来・役割がファイル内で追えることを優先する。
 
-## TypeScript Emit During Migration
+## TypeScript Sources And Tests
 
-- `.mts` は TypeScript source として扱い、ブラウザ・テスト・Node scripts は `npm run build:ts` が `_build/app/**/*.mjs` に生成した module を読む。
+- `app/**/*.mts` は TypeScript source として扱い、Node scriptsは `npm run build:ts` が `_build/app/**/*.mjs` に生成した module を読む。
+  曲JSONの生成・検証スクリプトでは `#app/*` を使い、package.json の imports で型チェック時は app/*.mts、実行時は _build/app/*.mjs へ解決する。
+  scripts本体の検査範囲は tsconfig.scripts.json で管理し、scripts/tsconfig.json が同じ設定をエディターへ提供する。生成型宣言は追加しない。
+- Node単体テストの `tests/**/*.mts` は `tsx` 経由で `app/**/*.mts` を直接 import する。
+  Node scriptsのテストはscripts経由で生成moduleも読むため、`npm run test:unit` は事前に `build:ts` を実行する。
+  `npm run typecheck` と各領域の型検査、`npm run lint` は事前 build なしで実行し、生成物を更新しない。
+  アプリも strict で型検査し、lintは app/tests の .mts source を直接対象とする。_build の生成物はlint対象外とする。
+  Node scriptsのJSDoc型は `allowJs: true` で参照する。
+  テスト用の型宣言は生成せず、tsconfig.tests.json で source を型チェックする。
+- E2EのTSテストとhelperは `tests/e2e/tsconfig.json` で型チェックする。テスト専用のWindow拡張はE2E内に置く。
+  曲fixture生成helperはアプリのTSソースを直接読み、ブラウザは `_site` の配布成果物を検証する。
+  ブラウザ用YouTubeモックのTSソースはesbuildでJavaScriptへ変換し、APIの応答として配信する。
 - `app` 配下は source tree とし、`app/**/*.mjs` を残さない。手編集は `.mts` 側へ行い、必要な `.mjs` は `npm run build:ts` で `_build/app` に作り直す。
 - `.mts` source では TS の `type` / `interface` / `import type` を主に使い、同じ構造を JSDoc `@typedef` と二重管理しない。
   生成 `.mjs` 側で JSDoc 型を残す必要がある場合だけ、その理由を近接コメントで明示する。
@@ -114,12 +125,9 @@ feat: move settings into dedicated sidebar panel
 - TypeScript build や Pages artifact の入力経路に関わる変更では、`npm run build` も実行する。
 - `tests/` 配下に Node のテストがあるため、JavaScript を変更したときは
   `npm run test:unit` も基本の確認手順として実行する。
-- Codex 側の `npm run test:unit` では Node test runner の表示が
-  `tests/*.mjs` のファイル単位になり、47 件前後として報告されることがある。
-  ユーザーの実ターミナルで見える個別 `test()` 単位の件数に近づけるため、
-  UnitTest の件数を共有するときは必要に応じて
-  `node --test --test-isolation=process tests/*.mjs` も実行し、
-  305 件前後の pass/fail として併記する。
+- 単体テストの件数は、実行結果の個別 `test()` の pass/fail 件数を報告する。
+  ファイル単位で表示される環境では、build 後に
+  `node --import tsx --test --test-isolation=process "tests/*.test.mts"` を実行して確認する。
 - 曲データや生成/検証スクリプトに関わる変更では、`npm run validate:songs-json` も実行する。
 - YouTube 再生やサイドバー操作などブラウザ上の回帰に関わる変更では、
   `npm run test:e2e` も実行する。
@@ -182,6 +190,6 @@ feat: move settings into dedicated sidebar panel
 | `index.html` | UTF-8 BOMなし | LF |
 | `styles.css` | UTF-8 BOMなし | LF |
 | `app/**/*.mts` / 生成 `_build/app/**/*.mjs` | UTF-8 BOMなし | LF |
-| `tests/**/*.mjs` | UTF-8 BOMなし | LF |
+| `tests/**/*.mts` / `tests/**/*.d.ts` | UTF-8 BOMなし | LF |
 | `.github/workflows/*.yml` | UTF-8 BOMなし | LF |
 | `playwright.config.mjs` | UTF-8 BOMなし | LF |

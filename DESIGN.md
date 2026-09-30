@@ -9,7 +9,8 @@
 
 ## 全体構成
 - 静的フロントエンドのみ（HTML/CSS/JavaScript, ES Modules）。
-  `app/**/*.mts` を source とし、`npm run build:ts` で `_build/app/**/*.mjs` へ生成した JavaScript をテスト・Node scripts が読む。
+  `app/**/*.mts` を source とし、`npm run build:ts` で `_build/app/**/*.mjs` へ生成した JavaScript を Node scriptsが読む。
+  `.mts` 単体テストは `tsx` 経由でアプリsourceを直接読む。Node scriptsを対象とするテストはscripts経由で生成moduleも読む。型宣言の生成には依存しない。
   ブラウザ用は `npm run build` がemit結果をesbuildで `_build/browser` へbundleし、起動用UIと静的依存chunkのmodulepreloadをHTMLへ生成する。
   起動用UI以外のdynamic import先はpreload対象に含めない。
   起動moduleはデータ取得を開始してからUIをdynamic importし、同じ初期データPromiseを共有する。
@@ -25,74 +26,20 @@
 ## テスト方針（現状）
 - 対象: 検索ロジック、日付フィルタ、ブックマーク検索、描画/再生/保存/サイドバーまわりの回帰
 - 重点ケース: ブックマーク表示時のみ有効なドラッグ並び替えと、並び順の永続化、YouTube 継続再生の失敗復旧
-- テストファイル:
-  - `tests/bookmark-storage-schema.test.mjs`
-  - `tests/bookmark-import-export-ui.test.mjs`
-  - `tests/bookmark-transfer.test.mjs`
-  - `tests/bookmark-ui.test.mjs`
-  - `tests/app-state.test.mjs`
-  - `tests/stream-role.test.mjs`
-  - `tests/csv-parser.test.mjs`
-  - `tests/data-loader.test.mjs`
-  - `tests/dom-utils.test.mjs`
-  - `tests/date-filter-controller.test.mjs`
-  - `tests/date-key.test.mjs`
-  - `tests/partial-date.test.mjs`
-  - `tests/search-boolean-filters.test.mjs`
-  - `tests/search-controller.test.mjs`
-  - `tests/search-filters.test.mjs`
-  - `tests/search-query.test.mjs`
-  - `tests/search-query-validation.test.mjs`
-  - `tests/search-recommendation.test.mjs`
-  - `tests/song-format.test.mjs`
-  - `tests/format-filter.test.mjs`
-  - `tests/pages-artifact.test.mjs`
-  - `tests/playback-sequence.test.mjs`
-  - `tests/playback-session-controller.test.mjs`
-  - `tests/playback-settings-value-reducer.test.mjs`
-  - `tests/render-drag-reorder.test.mjs`
-  - `tests/render-layout.test.mjs`
-  - `tests/render-masonry-layout.test.mjs`
-  - `tests/search-filters-controller.test.mjs`
-  - `tests/search-state-schema.test.mjs`
-  - `tests/sidebar-ui.test.mjs`
-  - `tests/storage-bookmark-limit.test.mjs`
-  - `tests/storage-search-state.test.mjs`
-  - `tests/ui-storage-compat.test.mjs`
-  - `tests/ui-sync.test.mjs`
-  - `tests/youtube-controller.test.mjs`
-  - `tests/youtube-embed.test.mjs`
-  - `tests/youtube-playback-start-attempt.test.mjs`
-  - `tests/youtube-playback-state.test.mjs`
-  - `tests/youtube-player-adapter.test.mjs`
-  - `tests/youtube-shared-playback.test.mjs`
-  - `tests/youtube-thumbnail.test.mjs`
-  - `tests/youtube-unconfirmed-playback-start.test.mjs`
-  - `tests/layout-anchor.test.mjs`
-  - `tests/results-scroll.test.mjs`
-  - `tests/e2e/youtube-smoke.spec.mjs`
-  - `tests/songs-content-hash.test.mjs`
-  - `tests/songs-data-source.test.mjs`
-  - `tests/songs-data-quality.test.mjs`
-  - `tests/build-songs-json.test.mjs`
-  - `tests/songs-json-cache.test.mjs`
-  - `tests/songs-json.test.mjs`
-  - `tests/songs-json-validation.test.mjs`
-- 補助モジュール:
-  - `tests/test-helpers.mjs`
-  - `tests/youtube-harness.mjs`
-  - `tests/support/playback-settings-fixture.mjs`
-  - `tests/e2e/support/mock-youtube.mjs`
-  - `tests/e2e/support/ui-helpers.mjs`
-- 実行コマンド:
-  - `npm run validate:songs-json`
-  - `npm run build:ts`
-  - `npm run typecheck`
-  - `npm run check:ts-emit`
-  - `npm run build`
-  - `npm run lint`
-  - `npm run test:unit` (`node --test tests/*.mjs`)
-  - `npm run test:e2e`
+- 型検査: Node単体テスト・E2Eと共通helperはすべて `.mts` で記述する。アプリは `tsconfig.json`、Node単体テストは `tsconfig.tests.json` でstrictな型チェックを行う。
+  Node scriptsのJSDoc型は `allowJs: true` で参照し、scripts本体の検査範囲は `tsconfig.scripts.json` で管理する。
+  曲JSONの生成・検証は `#app/*` を通じ、型チェックではTSソース、実行時には生成JavaScriptを読む。
+  `package.json` の `imports` に参照先を集約し、`scripts/tsconfig.json` でエディターにも同じ検査設定を適用する。
+  E2Eの型設定は `tests/e2e/tsconfig.json` に置き、`typecheck:e2e:raw` を全体のtypecheckへ組み込む。
+  E2Eのfixture生成はアプリsourceを直接参照し、ブラウザでは `_site` の配布成果物を検証する。
+  `typecheck` と各領域の型検査、TSソースに直接適用するlintは事前build不要で、生成物を更新しない。`test:unit` は、Node scriptsが生成moduleを読むため事前に `build:ts` を実行する。
+- 責務分担:
+  - Node単体テストは、ロジック・controller・DOMモックを使った状態遷移を検証する。
+  - Node scriptsのテストは、生成されたアプリmoduleを読む実行経路と、曲JSON・ビルド・配布成果物の整合性を検証する。
+  - E2Eは、実ブラウザでの起動順序、保存状態、レイアウト、キーボード操作、再生の連携を検証する。曲データとYouTubeの通信はfixtureへ置き換える。
+  - 共通helperは、DOM・曲データ・YouTube・キャッシュなどの担当領域ごとにモックと観測処理をまとめ、テスト本文にはシナリオと期待結果を残す。
+
+テストファイル一覧・実行コマンド・環境準備は、[READMEのテスト/静的解析](README.md#テスト静的解析開発者向け)で管理する。
 
 ## 主要機能
 - 検索（曲名/アーティスト名/読み、複数キーワード）
@@ -432,6 +379,6 @@ IndexedDB保存：
 - ソースのHTMLやimportには通常バージョンを記述しない。emit側コメントだけの変更はブラウザ成果物へ影響しない
 - `DEPLOY_CACHE_BUSTER` またはbuild-siteの `--cache-buster` はビルド時に適用する。JSではbannerを通じて内容ハッシュへ、CSSではURLのバージョンへ反映する
 - deploy commit SHAはassetのバージョンと兼用せず、artifact直下の `deployment.json` に記録する
-- URL決定の仕様変更は `scripts/build-browser.mjs` と `tests/browser-build.test.mjs` を合わせて更新する
+- URL決定の仕様変更は `scripts/build-browser.mjs` と `tests/browser-build.test.mts` を合わせて更新する
 - `songs.json` / `songs-meta.json` の内容更新だけでは cache buster を上げず、`contentHash` による鮮度確認で反映する
 - 日付入力はセレクト方式（ブラウザ互換性優先）

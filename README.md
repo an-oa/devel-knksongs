@@ -172,78 +172,139 @@ flowchart TD
   差分がない場合は token 発行、コミット、CI、deploy のいずれも行いません。
   App は対象リポジトリだけへインストールし、Repository permissions は
   Contents の Read and write だけを付与します。
-- `.github/workflows/ci.yml` は `main` への push / pull request / 手動実行で `npm run validate:songs-json`、`npm run typecheck`、`npm run check:ts-emit`、`npm run build`、`npm run lint`、`npm run test:unit` を実行します。`main` の CI が成功すると `.github/workflows/deploy-pages.yml` が検証済み commit を deploy します。
+- `.github/workflows/ci.yml` は `main` への push / pull request / 手動実行で `npm run build` を実行後、曲JSON検証・型検査・emit検査・lint・単体テストの `:raw` コマンドを実行し、生成物を再利用します。`main` の CI が成功すると `.github/workflows/deploy-pages.yml` が検証済み commit を deploy します。
 - `.github/workflows/deploy-pages.yml` は workflow 全体を `queue: max` の concurrency で直列化し、成功した CI の対象を build 前、artifact 生成後、environment 待機後の deploy action 直前に `main` と照合します。待機前に古くなった run は deploy job ごと skip し、待機中に古くなった run は古い artifact を公開せず失敗として記録します。deploy 後は公開 `deployment.json` の SHA が対象 commit と一致するまで最長10分間確認し、最後に対象 commit が引き続き `main` であることを再確認してから workflow を成功扱いにします。
 - `Deploy Pages` のいずれかの job が失敗または cancel されると、`deploy-pages-failure` label と機械判定用markerを持つ公開 Issue を作成して repository owner へ assign します。同じ障害の未解決 Issue があれば新規作成せず、対象 commit、run URL、各 job の結果、検知時刻をコメントとして追記します。その後に Pages deploy が成功した場合だけ復旧コメントを付けて Issue を閉じ、古い対象の skip では閉じません。Issue 更新前に、failureまたはrecoveryの通知を完了した新しい workflow run の有無と現在の `main` SHA を再確認し、queued、notify未完了のcancelled、failure/recoveryを生じないskip構成の run だけでは古い通知を抑止しません。Issue API は一時失敗時を含めて最大3回試行し、復旧処理を完了できない場合は notify job を失敗させます。メールアドレス、secret、workflow log 本文は Issue に記録しません。
 - `main` の SHA 照合と Pages deploy API の実行は原子的ではないため、両者の間に `main` が進んだ場合は古い artifact が一時的に公開される可能性があります。この場合も公開後の再照合で workflow を失敗させますが、公開自体を原子的に防ぐ保証はありません。
 - `npm run build` がJavaScriptの内容ハッシュ付きファイル名とCSSの `?v=<sha256>` を決定し、HTML・preload・importのURLを揃えます。Pages artifactはURLや生成JavaScriptを書き換えず、`browser`・静的asset・曲JSONだけを `_site` へコピーします。`_build/app` はNode tests・scripts用で配布しません。明示バージョンはビルド時の `DEPLOY_CACHE_BUSTER` または `npm run build -- --cache-buster <version>` で指定します（artifactコマンドの `--cache-buster` は廃止）。deploy SHAは `deployment.json` に記録するため、曲JSONやemit側コメントだけの変更でCSS/JavaScriptのURLは変わりません。
 - フロントエンドのみで動作します(静的ホスティング想定)。
 - 配布物はHTML/CSS/JavaScriptのみで、実行時にnpm等の同梱依存はありません。
-- `app/**/*.mts` は source として扱い、テスト・Node scripts は `npm run build:ts` で `_build/app/**/*.mjs` に生成された module を読みます。ブラウザ用には `npm run build` がこのemit結果をesbuildで `_build/browser` のES module bundleへまとめます。生成 `.mjs` は Git 管理対象外です。fresh checkout 後や `.mts` 変更後にブラウザで確認する場合は、`npm run build` を実行し `_build` を配信してください。`build:ts` 単体ではブラウザ用bundleを更新しません。`npm run check:ts-emit` は `_build/app` の生成 `.mjs` が存在し、`app` source tree に `.mjs` が残っていないことを確認します。`npm run build` は静的 asset と TypeScript 生成 module を `_build` へ作成し、`npm run build:pages-artifact` は `_build` を元に `_site` を作成します。`npm run typecheck` / `npm run lint` / `npm run test:unit` / `npm run build:songs-json` / `npm run validate:songs-json` は事前に `build:ts` を実行します。`npm run build:pages-artifact` は事前に `npm run build` を実行し、`npm run test:e2e` はそのPages artifactを検証します。
+- `app/**/*.mts` は source として扱い、Node scriptsは `npm run build:ts` で `_build/app/**/*.mjs` に生成された module を読みます。ブラウザ用には `npm run build` がこのemit結果をesbuildで `_build/browser` のES module bundleへまとめます。生成 `.mjs` は Git 管理対象外です。fresh checkout 後や `.mts` 変更後にブラウザで確認する場合は、`npm run build` を実行し `_build` を配信してください。`build:ts` 単体ではブラウザ用bundleを更新しません。`npm run check:ts-emit` は `_build/app` の生成 `.mjs` が存在し、`app` source tree に `.mjs` が残っていないことを確認します。`npm run build` は静的 asset と TypeScript 生成 module を `_build` へ作成し、`npm run build:pages-artifact` は `_build` を元に `_site` を作成します。`npm run test:unit` / `npm run build:songs-json` / `npm run validate:songs-json` は事前に `build:ts` を実行します。`npm run build:pages-artifact` は事前に `npm run build` を実行し、`npm run test:e2e` はそのPages artifactを検証します。
 - ブラウザ用bundleは小さい起動処理、UI、共有処理へ分割し、UIと共有処理の `modulepreload` をbuild時にHTMLへ生成します。HTML解析時に必要なファイルを並行取得できるため、module依存先を順に発見する通信待ちを減らします。esbuildは開発依存のみで、実行時の外部ライブラリは追加しません。
 - サムネイル表示/埋め込み再生まわりでは YouTube Iframe API を動的に利用します。
 - 開発時の静的解析は TypeScript noEmit typecheck と ESLint を利用します。
 - 開発時テストは Node.js 標準の `node:test` を利用します。
+- Node単体テスト・E2Eと、それぞれの共通helperはすべて `.mts` で記述します。
+  Node単体テストでは `tsx` 経由で
+  `app/**/*.mts` を直接 import します。Node scriptsを対象にするテストは、
+  scripts経由で `_build/app/**/*.mjs` も読むため事前buildが必要です。生成型宣言は使いません。
+  アプリ内部の `.mjs` import は `tsx` が対応する `.mts` source へ解決します。
+  曲fixtureは `tests/fixtures/song.mts` で共有します。
+  検索用の曲は `tests/fixtures/search-song.mts` で正規化し、factoryごとに独立した連番を持たせます。
+- アプリの型チェックは `tsconfig.json`、Node単体テストは `tsconfig.tests.json` で、どちらも `strict: true` にしています。
+  `allowJs: true` で参照先のNode scriptsのJSDoc型を取り込みます。`checkJs: false` とし、
+  scripts本体は `tsconfig.scripts.json` の `checkJs: true`・`strict: true` で、配布通知、曲データのハッシュ算出、曲JSONの生成・ファイル検証・成果物整合性検証を対象にしています。
+  `scripts/tsconfig.json` が同じ設定を継承し、エディターからも認識できるようにしています。
+  曲JSONスクリプトの `#app/*` import は `package.json` の `imports` で解決します。
+  TypeScriptは `types` 条件で `app/*.mts`、Nodeは `default` 条件で `_build/app/*.mjs` を参照します。
+  これにより、生成JavaScriptを再検査せずアプリの型を利用でき、型宣言の生成・コピーも不要です。
+  型はアプリのsourceと共有ドメイン型の `types/song.d.ts`・`types/search-state.d.ts` を参照します。
+  検索条件と日付キーの型はUI用ambient宣言から分離し、テストではUI・controller用の型定義を取り込みません。
+  ESLintのTypeScriptルールは `app/**/*.mts` と `tests/**/*.mts` に直接適用し、生成物の `_build` は検査対象から除外します。
+- `npm run typecheck` と `npm run lint` は事前buildなしで実行でき、生成物を更新しません。
+  `npm run typecheck:tests:raw` と `npm run typecheck:scripts:raw` も事前buildなしで実行できます。
+  `npm run test:unit` は、Node scriptsが生成moduleを読むため、
+  事前に `build:ts` を実行します。`tsx` 自体は型チェックしないため、型チェックも併せて実行してください。
+  CIもすべての単体テストを検証します。
 - ブラウザ回帰確認として Playwright による Chromium スモークテストを用意しています。
+  `tests/e2e/support/network-mocks.mts` が曲データ用の `songs-network.mts` とYouTube用の `mock-youtube.mts` を組み合わせます。
+  曲JSON・metaのルート登録は初期・通常・遅延応答で共有します。キャッシュの読み取り・旧形式の準備・完了通知の保留は `songs-cache.mts` にまとめています。
+  E2Eは `tests/e2e/tsconfig.json` でstrictに型チェックし、`npm run typecheck` に含めています。
+  Node単体テストの設定からE2Eを除外し、ブラウザ内のテスト専用Window拡張は `tests/e2e/browser.types.d.ts` に限定します。
+  E2Eの曲fixture生成helperはアプリのTSソースを直接読みます。YouTubeモックは `tests/e2e/support/youtube-iframe-api.mts` に置き、
+  APIが要求された時点で既存のesbuildでJavaScriptへ変換して配信します。アプリの検証対象は引き続き `_site` の配布成果物です。
 
 ## テスト/静的解析(開発者向け)
 
 - 現在は以下のテストを用意しています。
-  - ブックマークのインポート/エクスポートUIのテスト (`tests/bookmark-import-export-ui.test.mjs`)
-  - ブックマーク保存スキーマ/移行のテスト (`tests/bookmark-storage-schema.test.mjs`)
-  - ブックマークJSON転送のテスト (`tests/bookmark-transfer.test.mjs`)
-  - ブックマークUIのテスト (`tests/bookmark-ui.test.mjs`)
-  - アプリ初期状態のテスト (`tests/app-state.test.mjs`)
-  - 配信上の立場の正規化/判定テスト (`tests/stream-role.test.mjs`)
-  - CSVパースのテスト (`tests/csv-parser.test.mjs`)
-  - 初期データ読み込み後の状態反映テスト (`tests/data-loader.test.mjs`)
-  - DOM補助関数のテスト (`tests/dom-utils.test.mjs`)
-  - 日付キーと部分日付の正規化/範囲判定テスト (`tests/date-key.test.mjs`, `tests/partial-date.test.mjs`)
-  - 検索クエリの解析/入力エラー表示テスト (`tests/search-query.test.mjs`, `tests/search-query-validation.test.mjs`)
-  - 楽曲の絞り込み/おすすめ選曲テスト (`tests/search-filters.test.mjs`, `tests/search-recommendation.test.mjs`)
-  - 日付フィルターUI controllerのテスト (`tests/date-filter-controller.test.mjs`)
-  - 検索/ブックマーク/おすすめ表示controllerのテスト (`tests/search-controller.test.mjs`)
-  - 楽曲形式の分類/選択判定テスト (`tests/song-format.test.mjs`)
-  - 検索booleanフィルター共有helperのテスト (`tests/search-boolean-filters.test.mjs`)
-  - フォーマット表示ラベルのテスト (`tests/format-filter.test.mjs`)
-  - Pages artifact生成とブラウザ成果物URLのテスト (`tests/pages-artifact.test.mjs` / `tests/browser-build.test.mjs`)
-  - 再生継続候補の選択ロジック (`tests/playback-sequence.test.mjs`)
-  - 再生セッション制御のテスト (`tests/playback-session-controller.test.mjs`)
-  - 再生設定値reducerのテスト (`tests/playback-settings-value-reducer.test.mjs`)
-  - 描画/レイアウトまわりの回帰テスト (`tests/render-layout.test.mjs`)
-  - ブックマーク時のドラッグ並び替えテスト (`tests/render-drag-reorder.test.mjs`)
-  - masonryレイアウト計算のテスト (`tests/render-masonry-layout.test.mjs`)
-  - レイアウト補正待機のテスト (`tests/layout-anchor.test.mjs`)
-  - 結果一覧スクロール制御のテスト (`tests/results-scroll.test.mjs`)
-  - 検索フィルターUI controllerのテスト (`tests/search-filters-controller.test.mjs`)
-  - 検索状態保存schemaのテスト (`tests/search-state-schema.test.mjs`)
-  - サイドバーUIのテスト (`tests/sidebar-ui.test.mjs`)
-  - 曲データJSONのcontent hash算出テスト (`tests/songs-content-hash.test.mjs`)
-  - 曲データソースのJSON優先読み込み/CSVフォールバック/キャッシュ更新テスト (`tests/songs-data-source.test.mjs`)
-  - 曲データJSONキャッシュのIndexedDB/旧localStorage移行テスト (`tests/songs-json-cache.test.mjs`)
-  - 曲データJSONスキーマのテスト (`tests/songs-json.test.mjs`)
-  - CSV由来の曲データ品質検証テスト (`tests/songs-data-quality.test.mjs`)
-  - 曲データJSON生成の書き出し前検証テスト (`tests/build-songs-json.test.mjs`)
-  - 派生JSONのスキーマ・hash整合性検証テスト (`tests/songs-json-validation.test.mjs`)
-  - ストレージ(ブックマーク上限/リネーム)の単体テスト (`tests/storage-bookmark-limit.test.mjs`)
-  - ストレージ(検索状態保存/復元)の単体テスト (`tests/storage-search-state.test.mjs`)
-  - UI設定/ストレージ互換のテスト (`tests/ui-storage-compat.test.mjs`)
-  - UI同期のテスト (`tests/ui-sync.test.mjs`)
-  - YouTubeサムネイル/埋め込み再生まわりの統合テスト (`tests/youtube-controller.test.mjs`)
-  - YouTube埋め込みURL/API loader のテスト (`tests/youtube-embed.test.mjs`)
-  - YouTube playback state / start attempt / player adapter の単体テスト (`tests/youtube-playback-state.test.mjs`, `tests/youtube-playback-start-attempt.test.mjs`, `tests/youtube-player-adapter.test.mjs`)
-  - YouTube shared playback / thumbnail helper / unconfirmed playback start の単体テスト (`tests/youtube-shared-playback.test.mjs`, `tests/youtube-thumbnail.test.mjs`, `tests/youtube-unconfirmed-playback-start.test.mjs`)
-  - Chromium 上での YouTube 再生スモークテスト (`tests/e2e/youtube-smoke.spec.mjs`)
-- `tests/test-helpers.mjs`、`tests/youtube-harness.mjs`、`tests/support/playback-settings-fixture.mjs`、`tests/e2e/support/mock-youtube.mjs`、`tests/e2e/support/ui-helpers.mjs` は複数テストで共有する補助モジュールです。
-- 実行コマンド:
-  - `npm run validate:songs-json`
-  - `npm run build:ts`
-  - `npm run typecheck`
-  - `npm run check:ts-emit`
-  - `npm run build`
-  - `npm run lint`
-  - `npm run test:unit` (`node --test tests/*.mjs`)
-  - `npm run test:e2e`
+  - ブックマークのインポート/エクスポートUIのテスト (`tests/bookmark-import-export-ui.test.mts`)
+  - ブックマーク保存スキーマ/移行のテスト (`tests/bookmark-storage-schema.test.mts`)
+  - ブックマークJSON転送のテスト (`tests/bookmark-transfer.test.mts`)
+  - ブックマークUIのテスト (`tests/bookmark-ui.test.mts`)
+  - アプリ初期状態のテスト (`tests/app-state.test.mts`)
+  - 配信上の立場の正規化/判定テスト (`tests/stream-role.test.mts`)
+  - CSVパースのテスト (`tests/csv-parser.test.mts`)
+  - 初期データ読み込み後の状態反映テスト (`tests/data-loader.test.mts`)
+  - DOM補助関数のテスト (`tests/dom-utils.test.mts`)
+  - 日付キーと部分日付の正規化/範囲判定テスト (`tests/date-key.test.mts`, `tests/partial-date.test.mts`)
+  - 検索クエリの解析/入力エラー表示テスト (`tests/search-query.test.mts`, `tests/search-query-validation.test.mts`)
+  - 楽曲の絞り込み/おすすめ選曲テスト (`tests/search-filters.test.mts`, `tests/search-recommendation.test.mts`)
+  - 日付フィルターUI controllerのテスト (`tests/date-filter-controller.test.mts`)
+  - 検索/ブックマーク/おすすめ表示controllerのテスト (`tests/search-controller.test.mts`)
+  - 楽曲形式の分類/選択判定テスト (`tests/song-format.test.mts`)
+  - 曲キーの生成/整合性/一意性検証テスト (`tests/song-identity.test.mts`)
+  - 検索booleanフィルター共有helperのテスト (`tests/search-boolean-filters.test.mts`)
+  - フォーマット表示ラベルのテスト (`tests/format-filter.test.mts`)
+  - Pages artifact生成とブラウザ成果物URLのテスト (`tests/pages-artifact.test.mts` / `tests/browser-build.test.mts`)
+  - サイトビルドの引数・出力先のテスト (`tests/build-site.test.mts`)
+  - Pages公開確認と配布失敗通知のテスト (`tests/pages-deployment-verification.test.mts` / `tests/deploy-pages-issue-notification.test.mts`)
+  - 再生継続候補の選択ロジック (`tests/playback-sequence.test.mts`)
+  - 再生セッション制御のテスト (`tests/playback-session-controller.test.mts`)
+  - 再生設定値reducerのテスト (`tests/playback-settings-value-reducer.test.mts`)
+  - 描画/レイアウトまわりの回帰テスト (`tests/render-layout.test.mts`)
+  - ブックマーク時のドラッグ並び替えテスト (`tests/render-drag-reorder.test.mts`)
+  - masonryレイアウト計算のテスト (`tests/render-masonry-layout.test.mts`)
+  - レイアウト補正待機のテスト (`tests/layout-anchor.test.mts`)
+  - 結果一覧スクロール制御のテスト (`tests/results-scroll.test.mts`)
+  - 検索フィルターUI controllerのテスト (`tests/search-filters-controller.test.mts`)
+  - 検索状態保存schemaのテスト (`tests/search-state-schema.test.mts`)
+  - サイドバーUIのテスト (`tests/sidebar-ui.test.mts`)
+  - 曲データJSONのcontent hash算出テスト (`tests/songs-content-hash.test.mts`)
+  - 曲データソースのJSON優先読み込み/CSVフォールバック/キャッシュ更新テスト (`tests/songs-data-source.test.mts`)
+  - 曲データJSONキャッシュのIndexedDB/旧localStorage移行テスト (`tests/songs-json-cache.test.mts`)
+  - 曲データJSONスキーマのテスト (`tests/songs-json.test.mts`)
+  - CSV由来の曲データ品質検証テスト (`tests/songs-data-quality.test.mts`)
+  - 曲データJSON生成の書き出し前検証テスト (`tests/build-songs-json.test.mts`)
+  - 派生JSONのスキーマ・hash整合性検証テスト (`tests/songs-json-validation.test.mts`)
+  - ストレージ(ブックマーク上限/リネーム)の単体テスト (`tests/storage-bookmark-limit.test.mts`)
+  - ストレージ(検索状態保存/復元)の単体テスト (`tests/storage-search-state.test.mts`)
+  - UI設定/ストレージ互換のテスト (`tests/ui-storage-compat.test.mts`)
+  - UI同期のテスト (`tests/ui-sync.test.mts`)
+  - YouTubeサムネイル/埋め込み再生まわりの統合テスト (`tests/youtube-controller.test.mts`)
+  - YouTube埋め込みURL/API loader のテスト (`tests/youtube-embed.test.mts`)
+  - YouTube playback state / start attempt / player adapter の単体テスト (`tests/youtube-playback-state.test.mts`, `tests/youtube-playback-start-attempt.test.mts`, `tests/youtube-player-adapter.test.mts`)
+  - YouTube shared playback / thumbnail helper / unconfirmed playback start の単体テスト (`tests/youtube-shared-playback.test.mts`, `tests/youtube-thumbnail.test.mts`, `tests/youtube-unconfirmed-playback-start.test.mts`)
+  - Chromium 上での起動順序・曲キャッシュ更新・レスポンシブ描画のテスト (`tests/e2e/startup.spec.mts`, `tests/e2e/songs-cache-refresh.spec.mts`, `tests/e2e/responsive-results.spec.mts`)
+  - Chromium 上でのヘッダー自動非表示・キーボードフォーカス・reduced motionのテスト (`tests/e2e/header-auto-hide.spec.mts`)
+  - Chromium 上での検索・ブックマーク・サイドバーのテスト (`tests/e2e/search.spec.mts`, `tests/e2e/bookmarks.spec.mts`, `tests/e2e/sidebar.spec.mts`)
+  - Chromium 上での YouTube 再生スモークテスト (`tests/e2e/youtube-smoke.spec.mts`)
+- 共通helper:
+  - DOM・YouTubeのハーネス: `tests/test-helpers.mts`、`tests/youtube-harness.mts`
+  - 曲データ・検索・保存・YouTubeのfixture: `tests/fixtures/`。再生設定のfixture: `tests/support/playback-settings-fixture.mts`
+  - E2Eの通信: `tests/e2e/support/network-mocks.mts` が `songs-network.mts` と `mock-youtube.mts` を組み合わせる。
+  - E2Eのキャッシュ操作・観測: `tests/e2e/support/songs-cache.mts`
+  - E2Eの画面操作・曲生成: `tests/e2e/support/ui-helpers.mts`、`tests/e2e/support/song-fixtures.mts`
+  - ブラウザ内YouTubeモック: `tests/e2e/support/youtube-iframe-api.mts`。API要求時にesbuildでJSへ変換して配信する。
+
+### 実行コマンド
+
+通常は下表の「コマンド」を使います。「事前build」はコマンド内で自動実行する処理です。
+生成物を再利用する場合は、対象ソースの変更を反映したbuildが完了していることを確認してから、右列のコマンドを使ってください。
+右列の「なし」は対応する再利用用コマンドがないことを表します。型検査とlintは通常・`:raw` のどちらも生成物を必要としません。
+
+| コマンド | 事前build | 再利用用コマンド |
+| --- | --- | --- |
+| `npm run build:ts` | なし（このコマンドでTypeScriptをemit） | なし |
+| `npm run build` | TypeScript emit | なし |
+| `npm run build:pages-artifact` | `build` | なし |
+| `npm run build:songs-json` | `build:ts` | `npm run build:songs-json:raw` |
+| `npm run validate:songs-json` | `build:ts` | `npm run validate:songs-json:raw` |
+| `npm run typecheck` | なし | `npm run typecheck:raw`（同じ型検査） |
+| `npm run check:ts-emit` | TypeScript emit | `npm run check:ts-emit:raw` |
+| `npm run lint` | なし | `npm run lint:raw` |
+| `npm run test:unit` | `build:ts` | `npm run test:unit:raw` |
+| `npm run test:e2e` | `build:pages-artifact`（内部で `build`） | なし |
+
+型検査を領域ごとに実行する場合は、以下を使います。いずれも事前buildは不要です。
+
+- `npm run typecheck:app:raw`：アプリ
+- `npm run typecheck:scripts:raw`：Node scripts
+- `npm run typecheck:tests:raw`：Node単体テストと共通helper
+- `npm run typecheck:e2e:raw`：E2Eと共通helper
+
+### 環境準備
+
+- Node.jsはCIと同じ24.16.0で検証しています。
 - 初回または `node_modules` がない環境では、検証コマンドの前に
   `npm install` を実行してください。
 - `npm run lint` は `package.json` の devDependencies にある ESLint を

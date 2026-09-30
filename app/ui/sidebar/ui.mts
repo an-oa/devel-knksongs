@@ -19,7 +19,7 @@ type SidebarBookmarkUiController = {
 };
 
 type SidebarControllerInput = {
-    ui: AppUiState;
+    ui: Pick<AppUiState, "el" | "settingsPanel">;
     callbacks: {
         getBookmarkUiController: () => SidebarBookmarkUiController | null;
         isIOSWebKit: () => boolean;
@@ -145,7 +145,7 @@ export function createSidebarController(input: SidebarControllerInput) {
         /**
          * サイドバーを開き、フォーカスとARIA状態を同期する。
          */
-        function openSidebarMenu(): void {
+        const openSidebarMenu = (): void => {
             if (sidebar.classList.contains("active")) return;
             const bookmarkUiController = getBookmarkUiController();
             closeSettingsPanel({ restoreFocus: false });
@@ -161,11 +161,12 @@ export function createSidebarController(input: SidebarControllerInput) {
             popoverController.syncExpandedState(true);
             focusSidebarFirst();
             onOpenChange?.(true);
-        }
+        };
 
         openBtn.addEventListener("click", openSidebarMenu);
 
-        closeSidebarMenu = (): void => {
+        /** サイドバーを閉じ、背景操作と開く前のフォーカスを復帰する。 */
+        const closeMenu = (): void => {
             if (!sidebar.classList.contains("active")) return;
             const bookmarkUiController = getBookmarkUiController();
             closeSettingsPanel({ restoreFocus: false });
@@ -186,10 +187,11 @@ export function createSidebarController(input: SidebarControllerInput) {
             openBtn.focus();
         };
 
-        closeBtn.addEventListener("click", () => closeSidebarMenu());
-        overlay.addEventListener("click", () => closeSidebarMenu());
+        closeSidebarMenu = closeMenu;
+        closeBtn.addEventListener("click", closeMenu);
+        overlay.addEventListener("click", closeMenu);
         sidebar.addEventListener("click", (event) => {
-            if (event.target === sidebar) closeSidebarMenu();
+            if (event.target === sidebar) closeMenu();
         });
         if (ui.el.openSettingsPanelBtn) {
             ui.el.openSettingsPanelBtn.addEventListener("click", () => {
@@ -208,7 +210,7 @@ export function createSidebarController(input: SidebarControllerInput) {
             });
         }
         if (ui.el.closeSettingsSidebarBtn) {
-            ui.el.closeSettingsSidebarBtn.addEventListener("click", () => closeSidebarMenu());
+            ui.el.closeSettingsSidebarBtn.addEventListener("click", closeMenu);
         }
         if (ui.el.openBookmarkPanelBtn) {
             ui.el.openBookmarkPanelBtn.addEventListener("click", () => {
@@ -230,7 +232,7 @@ export function createSidebarController(input: SidebarControllerInput) {
             });
         }
         if (ui.el.closeBookmarkSidebarBtn) {
-            ui.el.closeBookmarkSidebarBtn.addEventListener("click", () => closeSidebarMenu());
+            ui.el.closeBookmarkSidebarBtn.addEventListener("click", closeMenu);
         }
         document.addEventListener("keydown", (event) => {
             const bookmarkUiController = getBookmarkUiController();
@@ -247,7 +249,7 @@ export function createSidebarController(input: SidebarControllerInput) {
                     }
                     return;
                 }
-                closeSidebarMenu();
+                closeMenu();
             }
             if (event.key === "Tab") trapSidebarFocus(event, sidebar);
         });
@@ -317,12 +319,18 @@ export function createSidebarController(input: SidebarControllerInput) {
     /**
      * 日付入力時に次のセレクトへフォーカス移動する。
      * @param {HTMLSelectElement} target
-     * @param {HTMLSelectElement | null} fromYear
-     * @param {HTMLSelectElement | null} fromMonth
-     * @param {HTMLSelectElement | null} toYear
-     * @param {HTMLSelectElement | null} toMonth
+     * @param {HTMLSelectElement | null | undefined} fromYear
+     * @param {HTMLSelectElement | null | undefined} fromMonth
+     * @param {HTMLSelectElement | null | undefined} toYear
+     * @param {HTMLSelectElement | null | undefined} toMonth
      */
-    function moveDateFocusIfNeeded(target, fromYear, fromMonth, toYear, toMonth) {
+    function moveDateFocusIfNeeded(
+        target: HTMLSelectElement,
+        fromYear: HTMLSelectElement | null | undefined,
+        fromMonth: HTMLSelectElement | null | undefined,
+        toYear: HTMLSelectElement | null | undefined,
+        toMonth: HTMLSelectElement | null | undefined
+    ) {
         if (fromYear && target === fromYear && fromMonth && fromYear.value) {
             fromMonth.focus();
             return;
@@ -350,7 +358,7 @@ export function createSidebarController(input: SidebarControllerInput) {
      * サイドバー内の現在フォーカス要素を外す。
      * @param {HTMLElement} sidebar
      */
-    function blurSidebarActiveElement(sidebar) {
+    function blurSidebarActiveElement(sidebar: HTMLElement) {
         const active = document.activeElement;
         if (!(active instanceof HTMLElement)) return;
         if (!sidebar.contains(active)) return;
@@ -361,10 +369,10 @@ export function createSidebarController(input: SidebarControllerInput) {
 
     /**
      * サイドバー内でフォーカス可能な要素一覧を取得する。
-     * @param {HTMLElement | null} sidebar
+     * @param {HTMLElement | null | undefined} sidebar
      * @returns {HTMLElement[]}
      */
-    function getFocusableInSidebar(sidebar: HTMLElement | null): HTMLElement[] {
+    function getFocusableInSidebar(sidebar: HTMLElement | null | undefined): HTMLElement[] {
         if (!sidebar) return [];
         const focusable = sidebar.querySelectorAll([
             "a[href]",
@@ -376,7 +384,9 @@ export function createSidebarController(input: SidebarControllerInput) {
         ].join(","));
         return Array.from(focusable).filter((element): element is HTMLElement => {
             if (!(element instanceof HTMLElement)) return false;
-            if (element.hasAttribute("inert") || element.hidden) return false;
+            for (let ancestor: HTMLElement | null = element; ancestor; ancestor = ancestor.parentElement) {
+                if (ancestor.hasAttribute("inert") || ancestor.hidden) return false;
+            }
             const style = window.getComputedStyle(element);
             return style.display !== "none" && style.visibility !== "hidden";
         });

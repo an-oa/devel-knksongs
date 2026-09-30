@@ -1,3 +1,4 @@
+import type { YoutubeSharedPlaybackState } from "./lib/youtube/shared-playback.mjs";
 import type { RecommendedSearchCache } from "./lib/search-recommendation.mjs";
 
 /**
@@ -94,8 +95,6 @@ export type AppUiElements = Partial<{
 export type SearchUiRuntimeState = {
   /** 選択中の形式フィルタ。 */
   selectedFormats: Set<string>;
-  /** 検索デバウンス用のタイマー ID。 */
-  debounceId: number;
   /** 条件未指定時に表示するおすすめ曲のキャッシュ。 */
   recommendedCache: RecommendedSearchCache | null;
   /** 曲データ読み込みが完了して検索可能かどうか。 */
@@ -232,98 +231,12 @@ export type AppUiState = {
   bookmarkPanel: BookmarkPanelUiRuntimeState;
 };
 
-/**
- * YouTube IFrame API の Player として利用する最小限のメソッド。
- * 個別メソッドは外部 API 名をそのまま写すため、型全体の説明に集約する。
- */
-export type YoutubePlayerLike = {
-  getIframe?: () => Element | null;
-  getPlayerState?: () => number;
-  getCurrentTime?: () => number;
-  getDuration?: () => number;
-  stopVideo?: () => void;
-  destroy?: () => void;
-};
-
-/** 共有プレーヤー初期化待ち中の最新 iframe 紐付け要求。 */
-export type YoutubeSharedPlaybackPendingAttach = {
-  /** プレーヤー化する iframe。 */
-  iframe: HTMLIFrameElement | null;
-  /** iframe を紐付ける再生セッション ID。 */
-  playbackSessionId: number;
-};
-
-/** YouTube 再生開始の成否待ちを表す状態。 */
-export type YoutubePlaybackStartAttempt = {
-  /** 再生開始待ち対象のセッション ID。 */
-  sessionId: number;
-  /** 再生開始結果を呼び出し元へ返す Promise resolver。 */
-  resolve: (result: { status: string }) => void;
-  /** セットアップまたは再生開始待ちのタイマー ID。 */
-  timeoutId: ReturnType<typeof setTimeout> | null;
-  /** 失敗時の復元やログに使う再生開始コンテキスト。 */
-  context: {
-    thumbDiv?: Element | null;
-    playbackMode?: string;
-  };
-};
-
-/** 複数カード間で再利用する YouTube 共有 iframe / Player の状態。 */
-export type YoutubeSharedPlaybackState = {
-  /** 共有 iframe に紐付いた YouTube Player。 */
-  player: YoutubePlayerLike | null;
-  /** Player 初期化中に共有する Promise。 */
-  playerPromise: Promise<YoutubePlayerLike | null> | null;
-  /** Player 初期化待ち中に処理する最新の iframe 紐付け要求。 */
-  pendingAttach: YoutubeSharedPlaybackPendingAttach | null;
-  /** 共有プレーヤーとして使う iframe。 */
-  iframe: HTMLIFrameElement | null;
-  /** 共有プレーヤーを閉じるボタン。 */
-  closeButton: HTMLButtonElement | null;
-  /** iframe をカード外へ退避するための隠しノード。 */
-  parkingNode: HTMLElement | null;
-  /** 現在共有プレーヤーを表示しているサムネイル。 */
-  hostThumb: HTMLElement | null;
-  /** 現在の共有プレーヤー再生セッション ID。 */
-  sessionId: number;
-  /** 再生開始待ち中の attempt。 */
-  playbackStartAttempt: YoutubePlaybackStartAttempt | null;
-  /** 再生開始が未確定のまま保持されているセッション ID。 */
-  unconfirmedPlaybackStartSessionId: number;
-};
-
 /** YouTube API 読み込みと共有プレーヤーのランタイム状態。 */
 export type AppYoutubeRuntimeState = {
   /** YouTube IFrame API の読み込み Promise。 */
   apiPromise: Promise<unknown> | null;
   /** カード間で再利用する共有プレーヤー状態。 */
   sharedPlayback: YoutubeSharedPlaybackState | null;
-};
-
-/**
- * YouTube IFrame API が window に公開する namespace。
- * 個別プロパティは外部 API の公開名を写すため、型全体の説明に集約する。
- */
-export type YoutubeIframeApiGlobal = {
-  PlayerState: {
-    UNSTARTED: number;
-    ENDED: number;
-    PLAYING: number;
-    PAUSED: number;
-    BUFFERING: number;
-    CUED: number;
-  };
-  Player: new (
-    iframe: Element,
-    options: {
-      host?: string;
-      events?: {
-        onReady?: (event: { target?: YoutubePlayerLike }) => void;
-        onStateChange?: (event: { data?: number; target?: YoutubePlayerLike }) => void;
-        onError?: (event: { data?: number; target?: YoutubePlayerLike }) => void;
-      };
-    }
-  ) => YoutubePlayerLike;
 };
 
 /** アプリ全体の状態ルート。 */

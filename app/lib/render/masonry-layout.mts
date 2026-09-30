@@ -46,7 +46,7 @@ type MasonryGeometry = MasonryMetrics & {
  * @returns {number}
  */
 function resolvePositiveNumber(value: number | undefined, fallback: number): number {
-    return Number.isFinite(value) && value > 0 ? value : fallback;
+    return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
 /**
@@ -56,7 +56,7 @@ function resolvePositiveNumber(value: number | undefined, fallback: number): num
  * @returns {number}
  */
 function resolveNonNegativeNumber(value: number | undefined, fallback: number): number {
-    return Number.isFinite(value) && value >= 0 ? value : fallback;
+    return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : fallback;
 }
 
 /**

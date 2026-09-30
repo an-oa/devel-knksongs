@@ -42,11 +42,11 @@ type BookmarkMigrationChange = {
 /**
  * 保存済みブックマーク構造を検証し、利用可能な形へ整形する。
  * 保存 payload の正規化境界を単体テストするため export している。
- * @param {*} raw
+ * @param raw
  * 復元不能な旧数値参照は実行時モデルへ持ち込まず除外する。
  * @returns {Record<string, { name: string, createdAt: number, songs: string[] }>}
  */
-export function sanitizeBookmarks(raw) {
+export function sanitizeBookmarks(raw: unknown) {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
     const sanitized: Record<string, StoredBookmarkRecord> = {};
     for (const [id, bookmark] of Object.entries(raw as Record<string, RawBookmarkRecord>)) {
@@ -106,11 +106,10 @@ export function parseStoredBookmarksPayload(
 
 /**
  * 現行形式のブックマーク保存 payload を組み立てる。
- * @param {*} bookmarks
+ * @param bookmarks
  * @param {number} version
- * @returns {{ version: number, bookmarks: * }}
  */
-export function buildStoredBookmarksPayload(bookmarks, version) {
+export function buildStoredBookmarksPayload(bookmarks: unknown, version: number) {
     return { version, bookmarks: sanitizeBookmarks(bookmarks) };
 }
 
@@ -125,7 +124,7 @@ export function migrateLegacyBookmarkSongRefsToCurrent(input: BookmarkMigrationI
         input && input.bookmarks && typeof input.bookmarks === "object"
             ? input.bookmarks
             : {};
-    const songRows = Array.isArray(input && input.songRows) ? input.songRows : [];
+    const songRows = Array.isArray(input?.songRows) ? input.songRows : [];
     const referenceIndex = buildSongReferenceIndex(songRows);
     const changedBookmarkIds: string[] = [];
     const changes: BookmarkMigrationChange[] = [];

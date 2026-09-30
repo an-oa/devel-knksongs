@@ -2,7 +2,7 @@ import {
     parseSongsJsonMetaPayload,
     parseSongsJsonPayload,
     SONGS_JSON_SCHEMA_VERSION
-} from "../_build/app/lib/songs-json.mjs";
+} from "#app/lib/songs-json";
 import { createSongsContentHash } from "./songs-content-hash.mjs";
 
 /**

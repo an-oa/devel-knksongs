@@ -1,3 +1,4 @@
+import type { BookmarkSaveFailure, BookmarkSaveResult } from "../../controllers/bookmark-persistence.mjs";
 import { isHtmlElement } from "../dom-utils.mjs";
 import type { BookmarkRecord } from "../../state.types";
 
@@ -16,27 +17,17 @@ type BookmarkDragDataTransfer = {
 type BookmarkDragEvent = {
     currentTarget?: EventTarget | null;
     target?: EventTarget | null;
-    dataTransfer: BookmarkDragDataTransfer;
+    dataTransfer: BookmarkDragDataTransfer | null;
     preventDefault: () => void;
 };
-
-export type BookmarkDragReorderSaveFailure = {
-    ok: false;
-    reason: string;
-    version?: number;
-};
-
-export type BookmarkDragReorderSaveResult =
-    | { ok: true }
-    | BookmarkDragReorderSaveFailure;
 
 type BookmarkDragReorderControllerInput = {
     data: BookmarkDragReorderDataState;
     getBookmarkSongRef: (row: Song) => string;
     saveBookmarks: (
         bookmarks: Record<string, BookmarkRecord>
-    ) => BookmarkDragReorderSaveResult;
-    onSaveFailure: (result: BookmarkDragReorderSaveFailure) => void;
+    ) => BookmarkSaveResult;
+    onSaveFailure: (result: BookmarkSaveFailure) => void;
     updateDisplay: () => void;
 };
 
@@ -83,7 +74,7 @@ export function createBookmarkDragReorderController(input: BookmarkDragReorderCo
         const queue = orderedKeys.slice();
         const nextSongs = bookmark.songs.map((songKey) => {
             if (!reorderSet.has(songKey)) return songKey;
-            return queue.length > 0 ? queue.shift() : songKey;
+            return queue.shift() ?? songKey;
         });
 
         const changed = nextSongs.some((songKey, idx) => songKey !== bookmark.songs[idx]);
@@ -95,7 +86,7 @@ export function createBookmarkDragReorderController(input: BookmarkDragReorderCo
      * @param {BookmarkDragEvent} event
      */
     function onDragStart(event: BookmarkDragEvent): void {
-        if (!data.activeBookmark) {
+        if (!data.activeBookmark || !event.dataTransfer) {
             event.preventDefault();
             return;
         }
@@ -154,7 +145,7 @@ export function createBookmarkDragReorderController(input: BookmarkDragReorderCo
      */
     function onDrop(event: BookmarkDragEvent): void {
         const bookmarkId = data.activeBookmark;
-        if (!bookmarkId) return;
+        if (!bookmarkId || !event.dataTransfer) return;
         event.preventDefault();
         const draggedKey = event.dataTransfer.getData("text/plain");
         const targetCard = getSongCardFromTarget(event.target);

@@ -8,48 +8,36 @@ import {
 import { createBookmarkNotificationController } from "./notifications.mjs";
 import { createSidebarSubpanelController } from "../sidebar/subpanel.mjs";
 import type { AppDataState, AppUiState } from "../../state.types";
-
-export type BookmarkUiActionResult = {
-    ok: boolean;
-    reason?: string;
-    version?: number;
-    limit?: number;
-    text?: string;
-    fileName?: string;
-    bookmarkCount?: number;
-    songCount?: number;
-};
-
-export type BookmarkUiActionCallbackResult = boolean | BookmarkUiActionResult | null | undefined;
+import type { StorageActionResult } from "../../controllers/storage.mjs";
 
 export type BookmarkUiCallbacks = {
-    onSelectActiveBookmark: (bookmarkId: string) => BookmarkUiActionCallbackResult;
-    onClearActiveBookmark: () => BookmarkUiActionCallbackResult;
+    onSelectActiveBookmark: (bookmarkId: string) => StorageActionResult;
+    onClearActiveBookmark: () => StorageActionResult;
     onAddSongToBookmark: (
         bookmarkId: string,
         songKey: string
-    ) => BookmarkUiActionCallbackResult;
-    onCreateBookmark: (bookmarkName: string) => BookmarkUiActionCallbackResult;
+    ) => StorageActionResult;
+    onCreateBookmark: (bookmarkName: string) => StorageActionResult;
     onCreateBookmarkAndAdd: (
         bookmarkName: string,
         songKey: string
-    ) => BookmarkUiActionCallbackResult;
-    onDeleteBookmark: (bookmarkId: string) => BookmarkUiActionCallbackResult;
-    onRenameBookmark: (bookmarkId: string, bookmarkName: string) => BookmarkUiActionCallbackResult;
+    ) => StorageActionResult;
+    onDeleteBookmark: (bookmarkId: string) => StorageActionResult;
+    onRenameBookmark: (bookmarkId: string, bookmarkName: string) => StorageActionResult;
     onRemoveSongFromBookmark: (
         bookmarkId: string,
         songKey: string
-    ) => BookmarkUiActionCallbackResult;
+    ) => StorageActionResult;
     onRequestCloseSidebar: () => void;
-    onExportBookmarks: () => BookmarkUiActionCallbackResult;
-    onPreviewBookmarkImport: (text: string) => BookmarkUiActionCallbackResult;
-    onImportBookmarksText: (text: string) => BookmarkUiActionCallbackResult;
+    onExportBookmarks: () => StorageActionResult<{ ok: true; text: string; fileName?: string }>;
+    onPreviewBookmarkImport: (text: string) => StorageActionResult<{ ok: true; bookmarkCount: number; songCount: number }>;
+    onImportBookmarksText: (text: string) => StorageActionResult<{ ok: true; bookmarkCount: number; songCount: number }>;
     saveTextFile?: (text: string, fileName: string, mimeType: string) => Promise<void> | void;
 };
 
 type BookmarkUiControllerInput = {
-    data: AppDataState;
-    ui: AppUiState;
+    data: Pick<AppDataState, "allSongsRaw" | "bookmarks" | "activeBookmark">;
+    ui: Pick<AppUiState, "el" | "lookup" | "bookmarkPanel">;
     callbacks: BookmarkUiCallbacks;
 };
 
@@ -83,32 +71,14 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
     } = callbacks;
 
     /**
-     * 各アクションの戻り値を `{ ok, reason }` 形式に正規化する。
-     * @param {BookmarkUiActionCallbackResult} result
-     * @returns {BookmarkUiActionResult}
-     */
-    function normalizeActionResult(result) {
-        if (result && typeof result === "object") {
-            const actionResult = /** @type {Partial<BookmarkUiActionResult>} */ (result);
-            if (typeof actionResult.ok === "boolean") {
-                return /** @type {BookmarkUiActionResult} */ (actionResult);
-            }
-        }
-        if (typeof result === "boolean") {
-            return { ok: result, reason: result ? "" : "unknown" };
-        }
-        return { ok: false, reason: "unknown" };
-    }
-
-    /**
      * 上限エラー時に理由別のメッセージを表示し、通知したかどうかを返す。
-     * @param {BookmarkUiActionResult} result
+     * @param {StorageActionResult} result
      * @returns {boolean}
      */
-    function notifyIfLimitError(result) {
-        if (!result || result.ok) return false;
-        const limit = Number.isFinite(result.limit) ? result.limit : null;
+    function notifyIfLimitError(result: StorageActionResult): boolean {
+        if (result.ok === true) return false;
         if (result.reason === "max_bookmark_count") {
+            const limit = Number.isFinite(result.limit) ? result.limit : null;
             if (limit === null) {
                 alert("ブックマークの登録上限に達しています。不要なブックマークを削除してください。");
             } else {
@@ -117,6 +87,7 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
             return true;
         }
         if (result.reason === "max_songs_per_bookmark") {
+            const limit = Number.isFinite(result.limit) ? result.limit : null;
             if (limit === null) {
                 alert("1つのブックマークに登録できる曲数の上限に達しています。");
             } else {
@@ -129,22 +100,22 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
 
     /**
      * ブックマークが見つからない失敗を共通文言で通知する。
-     * @param {BookmarkUiActionResult} result
+     * @param {StorageActionResult} result
      * @returns {boolean}
      */
-    function notifyIfBookmarkNotFoundError(result) {
-        if (!result || result.ok || result.reason !== "bookmark_not_found") return false;
+    function notifyIfBookmarkNotFoundError(result: StorageActionResult): boolean {
+        if (result.ok === true || result.reason !== "bookmark_not_found") return false;
         alert("ブックマークが見つかりません。画面を更新して再度お試しください。");
         return true;
     }
 
     /**
      * ブックマーク永続化の失敗を理由別のメッセージで通知する。
-     * @param {BookmarkUiActionResult} result
+     * @param {StorageActionResult} result
      * @returns {boolean}
      */
-    function notifyIfBookmarkSaveError(result) {
-        if (!result || result.ok) return false;
+    function notifyIfBookmarkSaveError(result: StorageActionResult): boolean {
+        if (result.ok === true) return false;
         if (result.reason === "unsupported_storage_version") {
             alert("このアプリより新しい形式のブックマークが保存されているため、変更できません。");
             return true;
@@ -163,17 +134,17 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
     /**
      * 外部操作から受け取ったブックマーク保存失敗を共通文言で通知する。
      */
-    function notifyBookmarkSaveError(result: BookmarkUiActionCallbackResult): boolean {
-        return notifyIfBookmarkSaveError(normalizeActionResult(result));
+    function notifyBookmarkSaveError(result: StorageActionResult): boolean {
+        return notifyIfBookmarkSaveError(result);
     }
 
     /**
      * リネーム失敗時に理由別メッセージを表示し、通知したかどうかを返す。
-     * @param {BookmarkUiActionResult} result
+     * @param {StorageActionResult} result
      * @returns {boolean}
      */
-    function notifyIfRenameError(result) {
-        if (!result || result.ok) return false;
+    function notifyIfRenameError(result: StorageActionResult): boolean {
+        if (result.ok === true) return false;
         if (notifyIfBookmarkSaveError(result)) return true;
         if (result.reason === "empty_name") {
             alert("ブックマーク名を入力してください。");
@@ -192,11 +163,11 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
 
     /**
      * 曲追加失敗時に理由別メッセージを表示し、通知したかどうかを返す。
-     * @param {BookmarkUiActionResult} result
+     * @param {StorageActionResult} result
      * @returns {boolean}
      */
-    function notifyIfAddSongError(result) {
-        if (!result || result.ok) return false;
+    function notifyIfAddSongError(result: StorageActionResult): boolean {
+        if (result.ok === true) return false;
         if (notifyIfBookmarkSaveError(result)) return true;
         if (notifyIfLimitError(result)) return true;
         if (result.reason === "duplicate_song") {
@@ -260,7 +231,7 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
      * 空状態表示を生成する。
      * @param {string} message
      */
-    function createEmptyBookmarkElement(message) {
+    function createEmptyBookmarkElement(message: string) {
         const empty = document.createElement("div");
         empty.className = "bookmark-empty-state";
         empty.textContent = message;
@@ -271,7 +242,7 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
      * 作成欄のインラインエラーを表示する。
      * @param {string} message
      */
-    function showBookmarkPanelError(message) {
+    function showBookmarkPanelError(message: string) {
         const errorEl = ui.el.bookmarkPanelError;
         if (!errorEl) return;
         errorEl.textContent = message;
@@ -289,11 +260,10 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
      * ブックマークを JSON ファイルとしてエクスポートする。
      */
     async function exportBookmarksFromPanel() {
-        if (typeof onExportBookmarks !== "function") return;
         clearBookmarkPanelError();
         try {
-            const result = normalizeActionResult(onExportBookmarks());
-            if (!result.ok || typeof result.text !== "string") {
+            const result = onExportBookmarks();
+            if (result.ok === false) {
                 showBookmarkPanelError("ブックマークをエクスポートできませんでした。");
                 return;
             }
@@ -302,7 +272,7 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
                 : buildBookmarkExportFileName(new Date());
             await saveTextFileCallback(result.text, fileName, "application/json");
         } catch (error) {
-            if (error && error.name === "AbortError") return;
+            if (error && typeof error === "object" && "name" in error && error.name === "AbortError") return;
             showBookmarkPanelError("ブックマークをエクスポートできませんでした。");
         }
     }
@@ -323,27 +293,26 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
      */
     async function importBookmarksFromSelectedFile() {
         const input = ui.el.bookmarkPanelImportInput;
-        const file = input && input.files && input.files[0] ? input.files[0] : null;
-        if (!file || typeof onPreviewBookmarkImport !== "function" || typeof onImportBookmarksText !== "function") {
-            return;
-        }
+        if (!input) return;
+        const file = input.files?.[0] ?? null;
+        if (!file) return;
 
         clearBookmarkPanelError();
         try {
             const text = await readFileText(file);
-            const preview = normalizeActionResult(onPreviewBookmarkImport(text));
-            if (!preview.ok) {
+            const preview = onPreviewBookmarkImport(text);
+            if (preview.ok === false) {
                 showBookmarkPanelError(getBookmarkImportErrorMessage(preview));
                 return;
             }
             if (!confirm(buildBookmarkImportConfirmMessage(preview))) return;
 
-            const result = normalizeActionResult(onImportBookmarksText(text));
-            if (!result.ok) {
+            const result = onImportBookmarksText(text);
+            if (result.ok === false) {
                 showBookmarkPanelError(getBookmarkImportErrorMessage(result));
                 return;
             }
-            alert(`ブックマークを${result.bookmarkCount || 0}件インポートしました。`);
+            alert(`ブックマークを${result.bookmarkCount}件インポートしました。`);
         } catch {
             showBookmarkPanelError("ブックマークファイルを読み込めませんでした。");
         } finally {
@@ -402,11 +371,10 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
                 if (!target) return;
 
                 if (addingMode) {
-                    const pendingSongKey = bookmarkPanelUi.pendingAction.songKey;
-                    const result = normalizeActionResult(
-                        onAddSongToBookmark(id, pendingSongKey)
-                    );
-                    if (result.ok) {
+                    const pendingSongKey = bookmarkPanelUi.pendingAction?.songKey;
+                    if (!pendingSongKey) return;
+                    const result = onAddSongToBookmark(id, pendingSongKey);
+                    if (result.ok === true) {
                         bookmarkNotifications.notifySongSavedToBookmark(bookmark.name, pendingSongKey);
                         closeBookmarkModal();
                         return;
@@ -420,7 +388,7 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
                     e.stopPropagation();
                     const newName = prompt("新しいブックマーク名を入力してください:", bookmark.name);
                     if (newName === null) return;
-                    const result = normalizeActionResult(onRenameBookmark(id, newName));
+                    const result = onRenameBookmark(id, newName);
                     notifyIfRenameError(result);
                     return;
                 }
@@ -429,8 +397,8 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
                 if (deleteBtn) {
                     e.stopPropagation();
                     if (confirm(`ブックマーク「${bookmark.name}」を削除しますか？`)) {
-                        const result = normalizeActionResult(onDeleteBookmark(id));
-                        if (result.ok) {
+                        const result = onDeleteBookmark(id);
+                        if (result.ok === true) {
                             bookmarkNotifications.notifyBookmarkDeleted(bookmark.name);
                         } else {
                             if (!notifyIfBookmarkSaveError(result)) {
@@ -468,11 +436,11 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
 
         clearBookmarkPanelError();
 
-        const result = isAddingSongMode()
-            ? normalizeActionResult(onCreateBookmarkAndAdd(newName, bookmarkPanelUi.pendingAction.songKey))
-            : normalizeActionResult(onCreateBookmark(newName));
-        if (result.ok) {
-            const pendingSongKey = isAddingSongMode() ? bookmarkPanelUi.pendingAction.songKey : null;
+        const pendingSongKey = bookmarkPanelUi.pendingAction?.songKey;
+        const result = pendingSongKey
+            ? onCreateBookmarkAndAdd(newName, pendingSongKey)
+            : onCreateBookmark(newName);
+        if (result.ok === true) {
             nameInput.value = "";
             clearBookmarkPanelError();
             if (pendingSongKey) {
@@ -599,7 +567,7 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
      * ブックマーク選択の意図を状態管理側へ通知する。
      * @param {string} bookmarkId
      */
-    function setActiveBookmark(bookmarkId) {
+    function setActiveBookmark(bookmarkId: string) {
         onSelectActiveBookmark(bookmarkId);
     }
 
@@ -614,12 +582,12 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
      * 現在アクティブなブックマークから指定曲を削除する。
      * @param {string} songKey
      */
-    function removeSongFromActiveBookmark(songKey) {
+    function removeSongFromActiveBookmark(songKey: string) {
         if (!data.activeBookmark) return;
         const bookmarkId = data.activeBookmark;
         const bookmark = data.bookmarks[data.activeBookmark];
         const bookmarkName = bookmark ? bookmark.name : "";
-        const result = normalizeActionResult(onRemoveSongFromBookmark(bookmarkId, songKey));
+        const result = onRemoveSongFromBookmark(bookmarkId, songKey);
         if (result.ok && bookmarkName) {
             bookmarkNotifications.notifySongRemovedFromBookmark(bookmarkName, songKey);
             return;

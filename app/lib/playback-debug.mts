@@ -28,9 +28,9 @@ export function isAutoplayStartFallbackEnabled() {
  * 指定スコープ付きの再生系デバッグログを出力する。
  * @param {string} scope
  * @param {string} message
- * @param {*} details
+ * @param {unknown} details
  */
-export function debugPlayback(scope, message, details) {
+export function debugPlayback(scope: string, message: string, details?: unknown) {
     if (!isPlaybackDebugEnabled()) return;
     if (details === undefined) {
         console.debug(`[${scope}]`, message);
@@ -43,9 +43,9 @@ export function debugPlayback(scope, message, details) {
  * 指定スコープ付きの再生系トレースログを出力する。
  * @param {string} scope
  * @param {string} message
- * @param {*} details
+ * @param {unknown} details
  */
-export function tracePlayback(scope, message, details) {
+export function tracePlayback(scope: string, message: string, details?: unknown) {
     if (!isPlaybackDebugEnabled()) return;
     debugPlayback(scope, message, details);
     console.trace(`[${scope} trace]`, message);

@@ -1,7 +1,9 @@
 import js from "@eslint/js";
 import globals from "globals";
+import { defineConfig } from "eslint/config";
+import tseslint from "typescript-eslint";
 
-export default [
+export default defineConfig([
     {
         ignores: [
             "node_modules/**",
@@ -9,12 +11,13 @@ export default [
             "playwright-report/**",
             "test-results/**",
             "_site/**",
-            "_build/browser/**"
+            "_build/**"
         ]
     },
     js.configs.recommended,
     {
-        files: ["app/**/*.js", "app/**/*.mjs", "_build/app/**/*.mjs"],
+        files: ["app/**/*.mts"],
+        extends: [tseslint.configs.recommended],
         languageOptions: {
             ecmaVersion: "latest",
             sourceType: "module",
@@ -24,7 +27,7 @@ export default [
             }
         },
         rules: {
-            "no-unused-vars": [
+            "@typescript-eslint/no-unused-vars": [
                 "error",
                 {
                     args: "after-used",
@@ -50,7 +53,8 @@ export default [
         }
     },
     {
-        files: ["tests/**/*.mjs"],
+        files: ["tests/**/*.mts"],
+        extends: [tseslint.configs.recommended],
         languageOptions: {
             ecmaVersion: "latest",
             sourceType: "module",
@@ -61,4 +65,4 @@ export default [
             }
         }
     }
-];
+]);

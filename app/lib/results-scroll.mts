@@ -36,7 +36,8 @@ function scrollElementIntoView(
     if (!isHtmlElement(element) || !element.isConnected) return;
     const scrollContainer = findScrollableAncestor(element);
     if (!scrollContainer) return;
-    const topOffset = Number.isFinite(options && options.topOffset) ? options.topOffset : 0;
+    const requestedOffset = options?.topOffset;
+    const topOffset = typeof requestedOffset === "number" && Number.isFinite(requestedOffset) ? requestedOffset : 0;
     const behavior = options && options.behavior ? options.behavior : "auto";
     const force = Boolean(options && options.force);
     const elementRect = element.getBoundingClientRect();
@@ -45,9 +46,8 @@ function scrollElementIntoView(
         const viewTop = topOffset;
         const viewBottom = window.innerHeight || document.documentElement.clientHeight || 0;
         if (!force && elementRect.top >= viewTop && elementRect.bottom <= viewBottom) return;
-        const currentTop = Number.isFinite(document.scrollingElement && document.scrollingElement.scrollTop)
-            ? document.scrollingElement.scrollTop
-            : 0;
+        const scrollTop = document.scrollingElement?.scrollTop ?? 0;
+        const currentTop = Number.isFinite(scrollTop) ? scrollTop : 0;
         const nextTop = Math.max(0, currentTop + elementRect.top - topOffset);
         window.scrollTo({ top: nextTop, behavior });
         return;

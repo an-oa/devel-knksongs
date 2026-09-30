@@ -4,13 +4,21 @@ import type { ParsedSearchQuery } from "./search-query.mjs";
 import { matchesSelectedFormat } from "./song-format.mjs";
 import { isGuestStreamRole, normalizeStreamRole, STREAM_ROLE_HOST } from "./stream-role.mjs";
 
+/** 解析済み検索語と併用する、日付とフラグの絞り込み条件。 */
+type SearchFilterCriteria = Pick<SearchState,
+    "dateFromKey" | "dateToKey" | "collabHostOnly" | "collabGuestOnly" | "relayOnly" | "harmonyOnly"
+>;
+
 /**
  * コラボ種別フィルタの選択状態に曲行が一致するか判定する。
  * @param {{ streamRole?: string | null } | null | undefined} row
  * @param {{ collabHostOnly?: boolean, collabGuestOnly?: boolean }} searchState
  * @returns {boolean}
  */
-export function matchesCollabRoleFilters(row, searchState) {
+export function matchesCollabRoleFilters(
+    row: { streamRole?: string | null } | null | undefined,
+    searchState: Pick<SearchState, "collabHostOnly" | "collabGuestOnly">
+): boolean {
     const useHost = Boolean(searchState.collabHostOnly);
     const useGuest = Boolean(searchState.collabGuestOnly);
     if (!useHost && !useGuest) return true;
@@ -22,14 +30,14 @@ export function matchesCollabRoleFilters(row, searchState) {
 /**
  * クエリ・日付・形式・コラボ種別・フラグ条件で曲一覧を絞り込む。
  * @param {Song[]} rows
- * @param {SearchState} searchState
+ * @param searchState 日付とフラグの絞り込み条件
  * @param {Set<string>} selectedFormats
  * @param parsedQuery 解析済み検索語
  * @returns {Song[]}
  */
 export function filterSongsByCriteria(
     rows: Song[],
-    searchState: SearchState,
+    searchState: SearchFilterCriteria,
     selectedFormats: Set<string>,
     parsedQuery: ParsedSearchQuery
 ): Song[] {

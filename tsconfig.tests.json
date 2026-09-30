@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "target": "ES2024",
+    "module": "Preserve",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": false
+  },
+  "exclude": ["tests/e2e"],
+  "include": [
+    "tests/**/*.mts",
+    "types/song.d.ts",
+    "types/app-state.d.ts",
+    "types/bookmark-browser.d.ts",
+    "types/search-state.d.ts"
+  ]
+}

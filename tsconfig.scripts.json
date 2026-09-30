@@ -11,10 +11,15 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "skipLibCheck": true,
-    "types": ["node"]
+    "types": ["node"],
+    "allowImportingTsExtensions": true
   },
   "include": [
     "scripts/deploy-pages-issue-notification.mjs",
-    "tests/deploy-pages-issue-notification.test.mjs"
+    "scripts/songs-content-hash.mjs",
+    "scripts/build-songs-json.mjs",
+    "scripts/validate-songs-json.mjs",
+    "scripts/songs-json-artifact.mjs",
+    "types/song.d.ts"
   ]
 }

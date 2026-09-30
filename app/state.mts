@@ -54,7 +54,6 @@ export const appState: AppState = {
             userTouchedQuery: false,
             userTouchedFilters: false,
             hasRestoredSearchState: false,
-            debounceId: 0,
             recommendedCache: null
         },
         date: {

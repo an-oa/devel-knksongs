@@ -2,6 +2,12 @@
   "name": "knksongs",
   "private": true,
   "type": "module",
+  "imports": {
+    "#app/*": {
+      "types": "./app/*.mts",
+      "default": "./_build/app/*.mjs"
+    }
+  },
   "scripts": {
     "build": "node scripts/build-site.mjs",
     "build:pages-artifact": "npm run build && node scripts/build-pages-artifact.mjs --site-dir _build",
@@ -12,14 +18,16 @@
     "check:ts-emit:raw": "node scripts/build-ts.mjs --check-only",
     "validate:songs-json": "npm run build:ts && npm run validate:songs-json:raw",
     "validate:songs-json:raw": "node scripts/validate-songs-json.mjs",
-    "lint": "npm run build:ts && npm run lint:raw",
+    "lint": "npm run lint:raw",
     "lint:raw": "eslint .",
-    "typecheck": "npm run build:ts && npm run typecheck:raw",
-    "typecheck:raw": "npm run typecheck:app:raw && npm run typecheck:scripts:raw",
+    "typecheck": "npm run typecheck:raw",
+    "typecheck:raw": "npm run typecheck:app:raw && npm run typecheck:scripts:raw && npm run typecheck:tests:raw && npm run typecheck:e2e:raw",
     "typecheck:app:raw": "tsc --project tsconfig.json",
     "typecheck:scripts:raw": "tsc --project tsconfig.scripts.json",
+    "typecheck:tests:raw": "tsc --project tsconfig.tests.json",
+    "typecheck:e2e:raw": "tsc --project tests/e2e/tsconfig.json",
     "test:unit": "npm run build:ts && npm run test:unit:raw",
-    "test:unit:raw": "node --test tests/*.mjs",
+    "test:unit:raw": "node --import tsx --test \"tests/*.test.mts\"",
     "test:e2e": "npm run build:pages-artifact && playwright test",
     "test:e2e:headed": "npm run build:pages-artifact && playwright test --headed",
     "test:e2e:debug": "npm run build:pages-artifact && playwright test --debug"
@@ -31,6 +39,8 @@
     "esbuild": "^0.28.2",
     "eslint": "^9.39.4",
     "globals": "^17.6.0",
-    "typescript": "^6.0.3"
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.70.1"
   }
 }

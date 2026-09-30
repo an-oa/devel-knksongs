@@ -19,11 +19,12 @@
    - 初回または `node_modules` がない環境では、README.md の開発者向け準備に従い
      `npm install` を実行してから検証する。
    - `app/**/*.mts` / 型定義 / JavaScript 変更時の基本コマンド:
-     - `npm run build:ts`
      - `npm run typecheck`
      - `npm run check:ts-emit`
      - `npm run lint`
      - `npm run test:unit`
+   - 型検査とlintは事前build不要。`check:ts-emit`・`test:unit` は必要なbuildを含む。
+     CIなどでbuild済みの生成物を再利用するときは、対応する `:raw` コマンドを使う。
    - TypeScript emit や静的 site build の入力経路に関わる変更では、
      `npm run build` も実行する。
    - 曲データや生成/検証スクリプトに関わる変更では、

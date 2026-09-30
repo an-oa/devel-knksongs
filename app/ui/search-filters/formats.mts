@@ -11,7 +11,7 @@ type SearchFormatCheckboxList = {
     querySelectorAll: (selector: string) => Iterable<Element | SearchFormatCheckbox> | ArrayLike<Element | SearchFormatCheckbox>;
 };
 
-type SearchFormatOptionsList = SearchFormatCheckboxList & {
+export type SearchFormatOptionsList = SearchFormatCheckboxList & {
     childElementCount?: number;
     appendChild?: (node: Node) => Node;
 };
@@ -49,7 +49,8 @@ export function renderSearchFormatOptions(input: SearchFormatOptionsInput): bool
     if (selectedFormats.size === 0) {
         defaultFormats.forEach((format) => selectedFormats.add(format));
     }
-    if (typeof document === "undefined" || typeof formatsList.appendChild !== "function") {
+    const appendChild = formatsList.appendChild;
+    if (typeof document === "undefined" || typeof appendChild !== "function") {
         syncSearchFormatCheckboxes({ selectedFormats, formatsList });
         return false;
     }
@@ -67,7 +68,7 @@ export function renderSearchFormatOptions(input: SearchFormatOptionsInput): bool
             if (typeof onChange === "function") onChange(event);
         });
         label.append(checkbox, ` ${getFormatFilterLabel(format)}`);
-        formatsList.appendChild(label);
+        appendChild.call(formatsList, label);
     });
     syncSearchFormatCheckboxes({ selectedFormats, formatsList });
     return true;

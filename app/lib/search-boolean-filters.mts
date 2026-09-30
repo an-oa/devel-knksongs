@@ -5,27 +5,30 @@ export const SEARCH_BOOLEAN_FILTER_KEYS = [
     "harmonyOnly"
 ] as const;
 
-type SearchBooleanFilterElement = {
-    checked: boolean;
-    addEventListener: EventTarget["addEventListener"];
-};
+export type SearchBooleanFilterKey = typeof SEARCH_BOOLEAN_FILTER_KEYS[number];
 
-type SearchBooleanFilterUi = {
-    el?: Record<string, unknown>;
+type SearchBooleanFilterElement = Pick<HTMLInputElement, "checked">;
+
+/** 真偽値フィルターが必要とする最小限の要素。未設置の要素も許容する。 */
+export type SearchBooleanFilterElements<FilterElement extends SearchBooleanFilterElement = SearchBooleanFilterElement> =
+    Partial<Record<SearchBooleanFilterKey, FilterElement | null>>;
+
+type SearchBooleanFilterUi<FilterElement extends SearchBooleanFilterElement = SearchBooleanFilterElement> = {
+    el?: SearchBooleanFilterElements<FilterElement> & Record<string, unknown>;
 } | null | undefined;
 
 /**
  * 検索 boolean filter に対応する UI 要素を取得する。
  * @param {SearchBooleanFilterUi} ui
- * @param {string} key
+ * @param {SearchBooleanFilterKey} key
  * @returns {SearchBooleanFilterElement | null}
  */
-export function getSearchBooleanFilterElement(
-    ui: SearchBooleanFilterUi,
-    key: string
-): SearchBooleanFilterElement | null {
+export function getSearchBooleanFilterElement<FilterElement extends SearchBooleanFilterElement>(
+    ui: SearchBooleanFilterUi<FilterElement>,
+    key: SearchBooleanFilterKey
+): FilterElement | null {
     if (!ui || !ui.el) return null;
-    return (ui.el[key] as SearchBooleanFilterElement | null | undefined) || null;
+    return ui.el[key] || null;
 }
 
 /**
@@ -33,10 +36,12 @@ export function getSearchBooleanFilterElement(
  * @param {SearchBooleanFilterUi} ui
  * @returns {SearchBooleanFilterElement[]}
  */
-export function getSearchBooleanFilterElements(ui: SearchBooleanFilterUi): SearchBooleanFilterElement[] {
+export function getSearchBooleanFilterElements<FilterElement extends SearchBooleanFilterElement>(
+    ui: SearchBooleanFilterUi<FilterElement>
+): FilterElement[] {
     return SEARCH_BOOLEAN_FILTER_KEYS
         .map((key) => getSearchBooleanFilterElement(ui, key))
-        .filter((element): element is SearchBooleanFilterElement => Boolean(element));
+        .filter((element): element is FilterElement => Boolean(element));
 }
 
 /**
