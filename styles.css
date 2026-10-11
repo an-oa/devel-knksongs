@@ -13,6 +13,19 @@
   --focus-ring-color: var(--primary-color);
   --focus-ring-shadow: rgba(26, 115, 232, 0.28);
   --validation-error-color: #b3261e;
+  /* 小さい文字のタグは背景に対して 4.5:1 以上を保つ。 */
+  --tag-bg: #e5e7eb;
+  --tag-text: #4b5563;
+  --tag-collab-bg: #e0f2f1;
+  --tag-collab-text: #00695c;
+  --tag-relay-bg: #fff3e0;
+  --tag-relay-text: #b23c00;
+  --tag-harmony-bg: #f3e5f5;
+  --tag-harmony-text: #7b1fa2;
+  /* OFF のトラックは周囲と白いつまみの両方に対して 3:1 以上を保つ。 */
+  --switch-off-bg: #7c838e;
+  --danger-color: #c62828;
+  --danger-hover-bg: #ffebee;
 }
 
 :root.dark-theme {
@@ -28,6 +41,16 @@
   --focus-ring-color: var(--primary-color);
   --focus-ring-shadow: rgba(66, 133, 244, 0.26);
   --validation-error-color: #ffb4ab;
+  --tag-bg: #333333;
+  --tag-text: #9ca3af;
+  --tag-collab-bg: #1f3533;
+  --tag-collab-text: #80cbc4;
+  --tag-relay-bg: #3a2a17;
+  --tag-relay-text: #ffb74d;
+  --tag-harmony-bg: #33213a;
+  --tag-harmony-text: #ce93d8;
+  --danger-color: #ef9a9a;
+  --danger-hover-bg: #3e2723;
 }
 
 body {
@@ -311,7 +334,7 @@ body.hide-thumbs .thumb {
 
 .bookmark-panel-error {
   grid-column: 1 / -1;
-  color: #c62828;
+  color: var(--validation-error-color);
   font-size: 12px;
   line-height: 1.4;
 }
@@ -784,14 +807,14 @@ input[type="text"][aria-invalid="true"] {
   font-size: 9px;
   line-height: 1;
   white-space: nowrap;
-  background: var(--border-color);
-  color: var(--text-mute);
+  background: var(--tag-bg);
+  color: var(--tag-text);
   font-weight: bold;
   box-sizing: border-box;
 }
-.tag-collab { background: #e0f2f1; color: #00695c; }
-.tag-relay { background: #fff3e0; color: #e65100; }
-.tag-harmony { background: #f3e5f5; color: #7b1fa2; }
+.tag-collab { background: var(--tag-collab-bg); color: var(--tag-collab-text); }
+.tag-relay { background: var(--tag-relay-bg); color: var(--tag-relay-text); }
+.tag-harmony { background: var(--tag-harmony-bg); color: var(--tag-harmony-text); }
 
 .result-tail-sentinel {
   width: 100%;
@@ -841,7 +864,7 @@ input[type="text"][aria-invalid="true"] {
 
 .switch { position: relative; width: 34px; height: 18px; display: inline-block; flex-shrink: 0; }
 .switch input { opacity: 0; width: 0; height: 0; }
-.slider { position: absolute; cursor: pointer; inset: 0; background: #ccc; border-radius: 20px; transition: background-color .4s; }
+.slider { position: absolute; cursor: pointer; inset: 0; background: var(--switch-off-bg); border-radius: 20px; transition: background-color .4s; }
 .slider:before { position: absolute; content: ""; height: 12px; width: 12px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: transform .4s; }
 input:checked + .slider { background: var(--primary-color); }
 input:checked + .slider:before { transform: translateX(16px); }
@@ -976,20 +999,11 @@ input:checked + .slider:before { transform: translateX(16px); }
 }
 
 .remove-from-bookmark-btn {
-  color: #c62828;
+  color: var(--danger-color);
 }
 
 .remove-from-bookmark-btn:hover {
-  color: #c62828;
-  background-color: #ffebee;
-}
-
-.dark-theme .remove-from-bookmark-btn {
-  color: #ef9a9a;
-}
-
-.dark-theme .remove-from-bookmark-btn:hover {
-  background-color: #3e2723;
+  background-color: var(--danger-hover-bg);
 }
 
 .dark-theme .drag-handle {
