@@ -30,7 +30,8 @@ test("search actions: clear resets conditions before delegating active bookmark 
         },
         hasDateSelection() {
             return false;
-        }
+        },
+        commitDateSelectionClear() {}
     };
     const searchCoordinator = {
         cancelScheduledSearch() {
@@ -58,6 +59,7 @@ test("search actions: clear resets conditions before delegating active bookmark 
                 calls.filterReset += 1;
                 resetDateSelects();
             },
+            setSelectedFormatsToDefault() {},
             syncFormatCheckboxesFromState() {},
             needsFilterReset() {
                 return false;
@@ -92,6 +94,7 @@ test("search actions: query and filters are both synchronized before a single se
         ui,
         search,
         searchFiltersController: {
+            setSelectedFormatsToDefault: () => {},
             syncFormatCheckboxesFromState: () => { calls.push("sync formats"); },
             needsFilterReset: () => filtersNeedReset,
             resetFiltersToDefault: ({ resetDateSelects }) => {
@@ -101,7 +104,8 @@ test("search actions: query and filters are both synchronized before a single se
         },
         dateFilterController: {
             resetDateSelects: () => { dateSelected = false; },
-            hasDateSelection: () => dateSelected
+            hasDateSelection: () => dateSelected,
+            commitDateSelectionClear: () => {}
         },
         searchCoordinator: {
             cancelScheduledSearch: () => {},
@@ -117,4 +121,67 @@ test("search actions: query and filters are both synchronized before a single se
     });
     controller.syncSearchUI();
     assert.deepEqual(calls, ["sync formats", "search"]);
+});
+
+/**
+ * 条件の個別解除を検証するため、呼び出し順を記録する search actions を作る。
+ */
+function createRecordingActions() {
+    const calls: string[] = [];
+    const ui = {
+        el: {
+            searchBox: { value: "群青" },
+            searchBoxError: null,
+            relayOnly: { checked: true },
+            harmonyOnly: { checked: true }
+        }
+    };
+    const search = { dataReady: true, userTouchedQuery: false, userTouchedFilters: false };
+    const controller = createSearchUiActions({
+        ui,
+        search,
+        searchFiltersController: {
+            resetFiltersToDefault: () => { calls.push("reset filters"); },
+            setSelectedFormatsToDefault: () => { calls.push("default formats"); },
+            syncFormatCheckboxesFromState: () => { calls.push("sync formats"); },
+            needsFilterReset: () => false
+        },
+        dateFilterController: {
+            resetDateSelects: () => {},
+            hasDateSelection: () => false,
+            commitDateSelectionClear: (kind) => { calls.push(`clear date ${kind}`); }
+        },
+        searchCoordinator: {
+            cancelScheduledSearch: () => { calls.push("cancel"); },
+            scheduleSearch: (options) => { calls.push(`search ${options?.immediate ? "immediate" : "debounced"}`); }
+        },
+        storageController: {
+            saveSearchState: () => { calls.push("save"); },
+            clearActiveBookmark: () => { calls.push("clear bookmark"); }
+        }
+    });
+    return { calls, ui, search, controller };
+}
+
+test("search actions: clearing one condition updates state before a single immediate search and save", () => {
+    const query = createRecordingActions();
+    query.controller.clearSearchQuery();
+    assert.equal(query.ui.el.searchBox.value, "");
+    assert.equal(query.search.userTouchedQuery, true);
+    assert.deepEqual(query.calls, ["cancel", "search immediate", "save"]);
+
+    const formats = createRecordingActions();
+    formats.controller.resetFormatFilters();
+    assert.equal(formats.search.userTouchedFilters, true);
+    assert.deepEqual(formats.calls, ["default formats", "sync formats", "search immediate", "save"]);
+
+    const flag = createRecordingActions();
+    flag.controller.clearBooleanFilter("relayOnly");
+    assert.equal(flag.ui.el.relayOnly.checked, false);
+    assert.equal(flag.ui.el.harmonyOnly.checked, true);
+    assert.deepEqual(flag.calls, ["search immediate", "save"]);
+
+    const date = createRecordingActions();
+    date.controller.clearDateFilter("to");
+    assert.deepEqual(date.calls, ["clear date to"]);
 });

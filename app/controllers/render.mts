@@ -296,14 +296,29 @@ export function createRenderController({
     }
 
     /**
-     * 空結果表示用のメッセージ要素を生成する。
-     * @param {string} message
+     * 空結果表示用の要素を生成する。
+     * 0件のときは鐘のアイコンと、条件を見直すための案内を添える。
+     * @param {EmptyStateDescriptor} descriptor
      * @returns {HTMLLIElement}
      */
-    function createEmptyStateElement(message: string) {
+    function createEmptyStateElement(descriptor: EmptyStateDescriptor) {
         const empty = document.createElement("li");
         empty.className = "result-empty-state";
-        empty.textContent = message;
+        if (descriptor.kind !== "empty") {
+            empty.textContent = descriptor.message;
+            return empty;
+        }
+        const icon = document.createElement("img");
+        icon.className = "result-empty-state-icon";
+        icon.src = "bell.svg";
+        icon.alt = "";
+        const title = document.createElement("p");
+        title.className = "result-empty-state-title";
+        title.textContent = descriptor.message;
+        const hint = document.createElement("p");
+        hint.className = "result-empty-state-hint";
+        hint.textContent = "キーワードを減らすか、絞り込みを解除してみてください。";
+        empty.append(icon, title, hint);
         return empty;
     }
 
@@ -427,7 +442,7 @@ export function createRenderController({
     function renderEmptyResults(container: HTMLElement) {
         restoreActivePlayback();
         const emptyState = getEmptyStateDescriptor();
-        container.replaceChildren(createEmptyStateElement(emptyState.message));
+        container.replaceChildren(createEmptyStateElement(emptyState));
         container.style.height = "";
         resultTailObservationController.disconnect();
     }

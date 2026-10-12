@@ -39,6 +39,8 @@ type SearchControllerInput = {
         scrollResultsPaneToTop: () => void;
         getRecommendedDisplayCount?: () => number;
         getInitialDisplayCount?: (defaultCount: number) => number;
+        /** 検索結果を反映した後に、件数以外の結果の概要を更新する。 */
+        onResultsApplied?: () => void;
     };
 };
 
@@ -112,6 +114,7 @@ export function createSearchController({
         committedOutcome = outcome;
         if (ui.el.resultCount) ui.el.resultCount.innerText = outcome.label;
         updateDisplay();
+        callbacks.onResultsApplied?.();
     }
 
     /**

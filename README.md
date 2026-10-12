@@ -46,7 +46,9 @@
   - 歌枠リレー / ハモリあり / コラボ(ホスト) / コラボ(ゲスト)。
     `コラボ(ホスト)` は配信上の立場が `ホスト`、`コラボ(ゲスト)` は `ゲスト`
     の行を対象にします。両方選択するとホスト・ゲストの両方を対象にします。
-  - 条件はサイドバー(検索メニュー)から操作できます。
+  - 絞り込み条件はヘッダーの「絞り込み」ボタンで開くサイドバーから操作できます。
+  - 結果一覧の上に件数と適用中の条件(検索語・日付・動画の種類・追加条件)をチップで表示します。
+    チップの×で個別に、「すべてクリア」でまとめて解除できます。
 - YouTubeへのリンクがあります。
   - 一覧の曲名リンクから該当動画へ遷移できます。
   - サムネイル表示をONにした場合、サムネイルをクリックしてページ内で埋め込み再生できます(×で閉じてサムネに戻ります)。
@@ -78,6 +80,8 @@
     公開側の更新はページの再読み込み時に確認します。
 - 表示テーマを切り替えられます。
   - ダークモード切替に対応します(設定はブラウザに保存されます)。
+  - 配色は鐘の金色とホルスタイン柄の白黒を基調にし、ライトは白地にホルスタイン柄、
+    ダークは赤いチェック柄のヘッダーを使います。ヘッダー下とフッター上には、ライトはチェック柄、ダークは金色の線を引きます。
 - 設定パネルで表示/再生設定を切り替えられます。
   - 表示: サムネイル表示 / ダークモード
   - 再生: サムネイル表示ON時のみ、`youtube-nocookie.com` を使うプライバシー強化設定と、曲の終了時刻で止めずにアーカイブ全体を再生する設定を切り替えられます。
@@ -114,11 +118,11 @@ flowchart TD
 
 ## 使い方
 
-1. サイドバーの検索条件で、必要な絞り込みを設定します。
-2. 検索ボックスに曲名 / アーティスト名(読みでも可)を入力します。
-   日付で絞り込む場合は、`since:YYYY[-MM[-DD]]` / `until:YYYY[-MM[-DD]]` も同じボックスへ入力できます。
+1. 画面上部の検索窓に曲名 / アーティスト名(読みでも可)を入力します。
+   日付で絞り込む場合は、`since:YYYY[-MM[-DD]]` / `until:YYYY[-MM[-DD]]` も同じ検索窓へ入力できます。
    日付演算子の形をした文字列は、二重引用符で囲むと通常の検索フレーズとして扱われます。
-3. 結果一覧が更新されます。
+2. 必要に応じて「絞り込み」ボタンからサイドバーを開き、日付範囲や動画の種類などを設定します。
+3. 結果一覧と、その上の件数・条件チップが更新されます。
 4. 各行の曲名リンクで動画を開けます。
    - サムネイル表示をONにしている場合は、サムネクリックでページ内再生もできます。
 
@@ -186,6 +190,10 @@ flowchart TD
 - `npm run build` がJavaScriptの内容ハッシュ付きファイル名とCSSの `?v=<sha256>` を決定し、HTML・preload・importのURLを揃えます。Pages artifactはURLや生成JavaScriptを書き換えず、`browser`・静的asset・曲JSONだけを `_site` へコピーします。`_build/app` はNode tests・scripts用で配布しません。明示バージョンはビルド時の `DEPLOY_CACHE_BUSTER` または `npm run build -- --cache-buster <version>` で指定します（artifactコマンドの `--cache-buster` は廃止）。deploy SHAは `deployment.json` に記録するため、曲JSONやemit側コメントだけの変更でCSS/JavaScriptのURLは変わりません。
 - フロントエンドのみで動作します(静的ホスティング想定)。
 - 配布物はHTML/CSS/JavaScriptのみで、実行時にnpm等の同梱依存はありません。
+- `ogp.png`・`apple-touch-icon.png`・`favicon-32.png` は、`design/brand/` の描画元と `favicon.svg` から
+  `npm run render:brand-assets` でリポジトリ直下へ書き出します。描画には Playwright の Chromium と
+  OSの日本語フォント（Noto Sans CJK JP）を使うため、フォントが異なる環境では文字の見た目が変わります。
+  `favicon.svg` は直接編集します。
 - `app/**/*.mts` は source として扱い、Node scriptsは `npm run build:ts` で `_build/app/**/*.mjs` に生成された module を読みます。ブラウザ用には `npm run build` がこのemit結果をesbuildで `_build/browser` のES module bundleへまとめます。生成 `.mjs` は Git 管理対象外です。fresh checkout 後や `.mts` 変更後にブラウザで確認する場合は、`npm run build` を実行し `_build` を配信してください。`build:ts` 単体ではブラウザ用bundleを更新しません。`npm run check:ts-emit` は `_build/app` の生成 `.mjs` が存在し、`app` source tree に `.mjs` が残っていないことを確認します。`npm run build` は静的 asset と TypeScript 生成 module を `_build` へ作成し、`npm run build:pages-artifact` は `_build` を元に `_site` を作成します。`npm run test:unit` / `npm run build:songs-json` / `npm run validate:songs-json` は事前に `build:ts` を実行します。`npm run build:pages-artifact` は事前に `npm run build` を実行し、`npm run test:e2e` はそのPages artifactを検証します。
 - ブラウザ用bundleは小さい起動処理、UI、共有処理へ分割し、UIと共有処理の `modulepreload` をbuild時にHTMLへ生成します。HTML解析時に必要なファイルを並行取得できるため、module依存先を順に発見する通信待ちを減らします。esbuildは開発依存のみで、実行時の外部ライブラリは追加しません。
 - サムネイル表示/埋め込み再生まわりでは YouTube Iframe API を動的に利用します。
@@ -248,6 +256,7 @@ flowchart TD
   - 楽曲の絞り込み/おすすめ選曲テスト (`tests/search-filters.test.mts`, `tests/search-recommendation.test.mts`)
   - 日付フィルターUI controllerのテスト (`tests/date-filter-controller.test.mts`)
   - 検索/ブックマーク/おすすめ表示controllerのテスト (`tests/search-controller.test.mts`)
+  - 結果一覧上の条件チップ表示・解除のテスト (`tests/result-summary-controller.test.mts`)
   - 楽曲形式の分類/選択判定テスト (`tests/song-format.test.mts`)
   - 曲キーの生成/整合性/一意性検証テスト (`tests/song-identity.test.mts`)
   - 検索booleanフィルター共有helperのテスト (`tests/search-boolean-filters.test.mts`)

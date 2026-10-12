@@ -19,10 +19,8 @@ test("result tail sentinel appends search results when scrolling to the bottom",
     await page.reload();
     await waitForInitialLoad(page);
 
-    await openSidebar(page);
     await page.locator("#searchBox").fill("Scroll Artist");
     await expect(page.locator("#searchBox")).toHaveValue("Scroll Artist");
-    await closeSidebar(page);
 
     const cards = page.locator(".song-card");
     const resultTailSentinel = page.locator("#resultTailSentinel");
@@ -38,8 +36,6 @@ test("result tail sentinel appends search results when scrolling to the bottom",
 });
 
 test("search box date operators validate input and filter songs", async ({ page }) => {
-    await openSidebar(page);
-
     const searchBox = page.locator("#searchBox");
     const searchError = page.locator("#searchBoxError");
     await expect(page.locator("#searchBoxHelp")).toHaveCount(0);
@@ -61,14 +57,12 @@ test("search box date operators validate input and filter songs", async ({ page 
     await expect(searchBox).not.toHaveAttribute("aria-invalid", "true");
     await expect(searchError).toBeHidden();
     await expect(page.locator("#resultCount")).toHaveText("1 件がヒット");
-    await closeSidebar(page);
 
     await expect(getSongCard(page, "Chain Alpha")).toHaveCount(0);
     await expect(getSongCard(page, "Chain Beta")).toBeVisible();
 });
 
 test("search box restores an invalid query with its error and empty results", async ({ page }) => {
-    await openSidebar(page);
     const searchBox = page.locator("#searchBox");
     await searchBox.fill("until:2026-13");
     await expect(searchBox).toHaveAttribute("aria-invalid", "true");
@@ -78,14 +72,12 @@ test("search box restores an invalid query with its error and empty results", as
     await waitForInitialLoad(page);
 
     await expect(page.locator("#resultCount")).toHaveText("0 件がヒット");
-    await openSidebar(page);
     await expect(page.locator("#searchBox")).toHaveValue("until:2026-13");
     await expect(page.locator("#searchBox")).toHaveAttribute("aria-invalid", "true");
     await expect(page.locator("#searchBoxError")).toBeVisible();
 });
 
 test("search box treats an empty quoted query as recommendations after restore", async ({ page }) => {
-    await openSidebar(page);
     const searchBox = page.locator("#searchBox");
     await searchBox.fill('""');
     await expect(searchBox).not.toHaveAttribute("aria-invalid", "true");
@@ -96,7 +88,6 @@ test("search box treats an empty quoted query as recommendations after restore",
     await waitForInitialLoad(page);
 
     await expect(page.locator("#resultCount")).toHaveText("おすすめを表示中");
-    await openSidebar(page);
     await expect(page.locator("#searchBox")).toHaveValue('""');
     await expect(page.locator("#searchBoxError")).toBeHidden();
 });
@@ -115,7 +106,6 @@ test("search box treats quoted phrases as literal text", async ({ page }) => {
     await page.reload();
     await waitForInitialLoad(page);
 
-    await openSidebar(page);
     const searchBox = page.locator("#searchBox");
 
     await searchBox.fill("until:2026-13");
@@ -130,7 +120,6 @@ test("search box treats quoted phrases as literal text", async ({ page }) => {
     await searchBox.fill(String.raw`"Don’t say \"lazy\""`);
     await expect(searchBox).not.toHaveAttribute("aria-invalid", "true");
     await expect(page.locator("#resultCount")).toHaveText("1 件がヒット");
-    await closeSidebar(page);
     await expect(getSongCard(page, 'Don’t say "lazy"')).toBeVisible();
 });
 
@@ -172,9 +161,9 @@ test("collab role filters switch between host and guest results", async ({ page 
     await openSidebar(page);
     await clickControlLabel(page, "#collabHostOnly");
     await clickControlLabel(page, "#collabGuestOnly");
+    await closeSidebar(page);
     await page.locator("#searchBox").fill("Replay Song");
     await expect(page.locator("#searchBox")).toHaveValue("Replay Song");
-    await closeSidebar(page);
 
     await expect(getSongCard(page, "Replay Song")).toBeVisible();
 });
@@ -200,4 +189,43 @@ test("saved legacy guest frame scope is restored as collab guest filter", async 
     await expect(getSongCard(page, "Chain Alpha")).toBeVisible();
     await expect(getSongCard(page, "Manual Song")).toHaveCount(0);
     await expect(getSongCard(page, "Replay Song")).toHaveCount(0);
+});
+
+test("result summary chips show active conditions and remove them individually or together", async ({ page }) => {
+    const conditions = page.locator("#resultConditions .result-condition-chip");
+    const clearAll = page.locator("#resultClearAll");
+    await expect(conditions).toHaveCount(0);
+    await expect(clearAll).toBeHidden();
+
+    await page.locator("#searchBox").fill("Song");
+    await openSidebar(page);
+    await clickControlLabel(page, "#collabHostOnly");
+    await closeSidebar(page);
+
+    await expect(conditions).toHaveText(["「Song」×", "コラボ(ホスト)×"]);
+    await expect(clearAll).toBeVisible();
+
+    await conditions.filter({ hasText: "コラボ(ホスト)" }).click();
+    await expect(page.locator("#collabHostOnly")).not.toBeChecked();
+    await expect(conditions).toHaveText(["「Song」×"]);
+    await expect(conditions.first()).toBeFocused();
+
+    await clearAll.click();
+    await expect(page.locator("#searchBox")).toHaveValue("");
+    await expect(conditions).toHaveCount(0);
+    await expect(clearAll).toBeHidden();
+    await expect(page.locator("#resultCount")).toHaveText("おすすめを表示中");
+    await expect(page.locator("#searchBox")).toBeFocused();
+});
+
+test("long search queries keep the condition chip within a narrow page", async ({ page }) => {
+    await page.setViewportSize({ width: 393, height: 851 });
+    const longQuery = "A".repeat(120);
+    await page.locator("#searchBox").fill(longQuery);
+
+    const chip = page.locator("#resultConditions .result-condition-chip");
+    await expect(chip).toHaveAttribute("title", `「${longQuery}」`);
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(393);
+    const chipBox = await chip.boundingBox();
+    expect(chipBox && chipBox.x + chipBox.width).toBeLessThanOrEqual(393);
 });

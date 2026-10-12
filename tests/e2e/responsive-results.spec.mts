@@ -106,3 +106,42 @@ test("single-column playback and thumbnail toggles keep natural card and list he
     await expectCardsInsideLayout(page);
     expect(await page.locator("#resultList").evaluate((list) => list.style.height)).toBe("");
 });
+
+test("vertical playback expands its card without overlap and restores the masonry layout after closing", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await installNetworkMocks(page);
+    const songs = createScrollableResultSongs(8);
+    songs[1].videoOrientation = "vertical";
+    await routeSongsJsonFixture(page, songs);
+    await page.goto("/");
+    await waitForInitialLoad(page);
+    await enablePlaybackSettings(page);
+    await filterBySongTitle(page, "Scroll Artist");
+    await page.locator("#searchBox").blur();
+
+    const cards = page.locator(".song-card");
+    await expect(cards).toHaveCount(8);
+    await expect(page.locator("#resultList")).not.toHaveAttribute("data-layout-columns", "1");
+    await expectCardsInsideLayout(page);
+    /** カードごとの配置を songKey 付きで記録する。 */
+    const readPositions = () => cards.evaluateAll((nodes) => nodes.map((node) => ({
+        songKey: node.dataset.songKey || "",
+        top: node.style.top,
+        left: node.style.left
+    })));
+    const before = await readPositions();
+
+    const verticalCard = getSongCard(page, "Scroll Song 02");
+    const collapsedHeight = await verticalCard.evaluate((node) => node.getBoundingClientRect().height);
+    await verticalCard.locator(".thumb").click();
+    await expect(verticalCard.locator("iframe")).toBeVisible();
+    await expect(verticalCard.locator(".thumb")).toHaveAttribute("data-video-orientation", "vertical");
+    await expect.poll(() => verticalCard.evaluate((node) => node.getBoundingClientRect().height))
+        .toBeGreaterThan(collapsedHeight);
+    await expectCardsInsideLayout(page);
+
+    await verticalCard.locator(".thumb-close-btn").click();
+    await expect(verticalCard.locator("iframe")).toHaveCount(0);
+    await expect.poll(readPositions).toEqual(before);
+    await expectCardsInsideLayout(page);
+});

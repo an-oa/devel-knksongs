@@ -52,6 +52,15 @@ export async function closeSidebar(page: Page) {
 }
 
 /**
+ * サイドバーが開いていれば閉じる。開いている間はヘッダーの検索窓が inert になる。
+ */
+export async function closeSidebarIfOpen(page: Page) {
+    if (await page.locator("#sidebar").getAttribute("aria-hidden") === "false") {
+        await closeSidebar(page);
+    }
+}
+
+/**
  * サイドバー popover の backdrop 領域をクリックする。
  */
 export async function clickSidebarBackdrop(page: Page) {
@@ -111,16 +120,16 @@ export async function enablePlaybackSettings(page: Page, options?: { continuousP
         await ensureToggleEnabled(page, "#continuous-playback-toggle");
     }
     await page.locator("#close-settings-panel").click();
-    await expect(page.locator("#searchBox")).toBeVisible();
+    await expect(page.locator("#open-settings-panel")).toBeVisible();
 }
 
 /**
- * 曲タイトルで結果を絞り込む。
+ * サイドバーを閉じた状態で、ヘッダーの検索窓から曲タイトルで結果を絞り込む。
  */
 export async function filterBySongTitle(page: Page, query: string) {
+    await closeSidebarIfOpen(page);
     await page.locator("#searchBox").fill(query);
     await expect(page.locator("#searchBox")).toHaveValue(query);
-    await closeSidebar(page);
 }
 
 /**
@@ -134,6 +143,7 @@ export function getSongCard(page: Page, title: string) {
  * 指定した曲カードからブックマークを作成する。
  */
 export async function createBookmarkFromSong(page: Page, { bookmarkName, songTitle }: { bookmarkName: string; songTitle: string }) {
+    await closeSidebarIfOpen(page);
     await page.locator("#searchBox").fill(songTitle);
     await expect(page.locator("#searchBox")).toHaveValue(songTitle);
 

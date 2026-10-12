@@ -47,6 +47,8 @@ export type AppUiElements = Partial<{
   closeSidebarBtn: HTMLElement | null;
   resultList: HTMLElement | null;
   resultCount: HTMLElement | null;
+  resultConditions: HTMLElement | null;
+  resultClearAll: HTMLButtonElement | null;
   resultTailSentinel: HTMLElement | null;
   searchBox: HTMLInputElement | null;
   searchBoxError: HTMLElement | null;

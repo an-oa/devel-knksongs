@@ -2,7 +2,7 @@ import { getViewportHeight, isHtmlElement } from "../dom-utils.mjs";
 
 export const DEFAULT_MASONRY_GAP_PX = 12;
 export const DEFAULT_MASONRY_MIN_CARD_WIDTH_PX = 294;
-export const DEFAULT_MASONRY_CARD_CONTENT_HEIGHT_PX = 74;
+export const DEFAULT_MASONRY_CARD_CONTENT_HEIGHT_PX = 97;
 
 const MASONRY_GAP_PROPERTY = "--masonry-gap";
 const MASONRY_MIN_CARD_WIDTH_PROPERTY = "--masonry-min-card-width";
