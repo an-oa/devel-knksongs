@@ -82,10 +82,10 @@ test("storage failures allow initial results and setting changes", async ({ page
     });
     await page.reload();
     await waitForInitialLoad(page);
-    await openSidebar(page);
-    await expect(page.locator("#dateFromYear option[value='2024']")).toHaveCount(1);
     await page.locator("#searchBox").fill("Artist");
     await expect(page.locator("#resultList .song-card")).toHaveCount(6);
+    await openSidebar(page);
+    await expect(page.locator("#dateFromYear option[value='2024']")).toHaveCount(1);
     await page.locator("#open-settings-panel").click();
     await getControlLabel(page, "#theme-toggle").click();
     const checked = await page.locator("#theme-toggle").isChecked();

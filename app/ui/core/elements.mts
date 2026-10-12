@@ -37,6 +37,8 @@ export function collectUiElements(): AppUiElements {
         closeSidebarBtn: document.getElementById("close-sidebar"),
         resultList: document.getElementById("resultList"),
         resultCount: document.getElementById("resultCount"),
+        resultConditions: document.getElementById("resultConditions"),
+        resultClearAll: getButtonElementById("resultClearAll"),
         resultTailSentinel: document.getElementById("resultTailSentinel"),
         searchBox: getInputElementById("searchBox"),
         searchBoxError: document.getElementById("searchBoxError"),

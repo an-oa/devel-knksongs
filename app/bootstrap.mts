@@ -42,6 +42,7 @@ import { createSearchUiActions } from "./ui/core/search-actions.mjs";
 import { createSidebarController } from "./ui/sidebar/ui.mjs";
 import { createAutoHideHeaderController } from "./ui/header/auto-hide.mjs";
 import { createSearchFiltersController } from "./ui/search-filters/controller.mjs";
+import { createResultSummaryController } from "./ui/result-summary/controller.mjs";
 import { debugPlayback } from "./lib/playback-debug.mjs";
 import type {
     AppDataState,
@@ -51,6 +52,7 @@ import type {
 
 type SearchCallbacksInput = {
     getRenderController: () => ReturnType<typeof createRenderController>;
+    getResultSummaryController: () => ReturnType<typeof createResultSummaryController>;
     ui: AppUiState;
 };
 
@@ -100,10 +102,12 @@ const youtubeRuntimeState: AppYoutubeRuntimeState = appState.youtube;
  */
 function createSearchCallbacks({
     getRenderController,
+    getResultSummaryController,
     ui
 }: SearchCallbacksInput): Parameters<typeof createSearchController>[0]["callbacks"] {
     return {
         updateDisplay: () => getRenderController().updateDisplay(),
+        onResultsApplied: () => getResultSummaryController().render(),
         scrollResultsPaneToTop: () => scrollResultListToTop(ui.el.resultList),
         getInitialDisplayCount: (defaultCount) => estimateInitialResultDisplayCount(ui.el.resultList, {
             defaultCount,
@@ -281,6 +285,7 @@ function createAppControllers() {
         },
         callbacks: createSearchCallbacks({
             getRenderController: () => renderController,
+            getResultSummaryController: () => resultSummaryController,
             ui: appUiState
         })
     });
@@ -454,6 +459,28 @@ function createAppControllers() {
     });
 
     /**
+     * 結果一覧の上に適用中の検索条件を表示し、チップからの個別解除と一括解除を扱う controller。
+     */
+    const resultSummaryController = createResultSummaryController({
+        ui: appUiState,
+        conditions: {
+            getQuery: () => appUiState.el.searchBox?.value ?? "",
+            getDateValue: (kind) => dateFilterController.getDateSelectValue(kind),
+            getSelectedFormats: () => DEFAULT_FORMATS.filter((format) => searchUiState.selectedFormats.has(format)),
+            areAllFormatsSelected: () => searchFiltersController.areAllFormatsSelected(),
+            isBooleanFilterEnabled: (key) => appUiState.el[key]?.checked === true,
+            isBookmarkActive: () => appDataState.activeBookmark !== null
+        },
+        actions: {
+            clearSearchQuery: searchUiActions.clearSearchQuery,
+            clearDateFilter: searchUiActions.clearDateFilter,
+            resetFormatFilters: searchUiActions.resetFormatFilters,
+            clearBooleanFilter: searchUiActions.clearBooleanFilter,
+            clearSearch: searchUiActions.clearSearch
+        }
+    });
+
+    /**
      * bfcache 復帰やフォーカス復帰時に、保存済み設定と検索 UI を再同期する controller。
      */
     const uiSyncController = createUiSyncController({
@@ -479,6 +506,7 @@ function createAppControllers() {
         storageController,
         autoHideHeaderController,
         sidebarController,
+        resultSummaryController,
         uiSyncController,
         searchUiActions,
         dataLoader,
@@ -495,6 +523,7 @@ const {
     storageController,
     autoHideHeaderController,
     sidebarController,
+    resultSummaryController,
     uiSyncController,
     searchUiActions,
     dataLoader,
@@ -515,6 +544,7 @@ async function initUI(): Promise<void> {
     });
     autoHideHeaderController.setup();
     sidebarController.setupUIHandlers();
+    resultSummaryController.setup();
     storageController.restorePersistedState();
     setupTheme({ ui: appUiState });
     playbackSettingsController.setupPlaybackSettings();

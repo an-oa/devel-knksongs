@@ -97,7 +97,8 @@ test("render masonry: initial single-column count follows height and thumbnail v
         getFakeElement(container)._clientWidth = 350;
         getFakeElement(container)._rect = { top: 100, bottom: 100, left: 0, right: 350, width: 350, height: 0 };
         const options = { defaultCount: 48, showThumbnails: false, viewportHeight: 850 };
-        assert.equal(estimateInitialResultDisplayCount(container, options), 19);
+        // (850 * 2 - 100) / (既定のカード内容 97px + gap 12px) を切り上げる。
+        assert.equal(estimateInitialResultDisplayCount(container, options), 15);
         assert.equal(estimateInitialResultDisplayCount(container, { ...options, showThumbnails: true }), 12);
         assert.equal(estimateInitialResultDisplayCount(container, { ...options, viewportHeight: 3000 }), 48);
         assert.equal(estimateInitialResultDisplayCount(container, { ...options, viewportHeight: 0 }), 48);

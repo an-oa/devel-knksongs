@@ -21,6 +21,10 @@ async function createBrowserFixture(t: TestContext) {
     await Promise.all([
         writeFile(join(root, "styles.css"), "body {}"),
         writeFile(join(root, "ogp.png"), "fixture"),
+        writeFile(join(root, "favicon.svg"), "fixture"),
+        writeFile(join(root, "favicon-32.png"), "fixture"),
+        writeFile(join(root, "apple-touch-icon.png"), "fixture"),
+        writeFile(join(root, "bell.svg"), "fixture"),
         writeFile(join(root, "data/songs.json"), "{}"),
         writeFile(join(root, "data/songs-meta.json"), "{}"),
         writeFile(join(root, "app/startup.mjs"), 'import "./data.mjs"; void import("./bootstrap.mjs");'),
@@ -55,7 +59,7 @@ test("browser build: owns content-hashed URLs and publishes only browser artifac
     }
     await buildPagesArtifact({ outputDir, siteDir: root, deploymentSha: "abcdef0" });
     assert.equal(await readFile(join(outputDir, "index.html"), "utf8"), first.html);
-    assert.deepEqual((await readdir(outputDir)).sort(), ["browser", "data", "deployment.json", "index.html", "ogp.png", "styles.css"]);
+    assert.deepEqual((await readdir(outputDir)).sort(), ["apple-touch-icon.png", "bell.svg", "browser", "data", "deployment.json", "favicon-32.png", "favicon.svg", "index.html", "ogp.png", "styles.css"]);
     for (let i = 0; i < first.files.length; i++) {
         assert.equal(await readFile(join(outputDir, "browser", first.files[i]), "utf8"), first.sources[i]);
     }

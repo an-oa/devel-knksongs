@@ -25,10 +25,10 @@ async function loadScrollableResults(page: Page) {
     await routeSongsJsonFixture(page, createScrollableResultSongs(60));
     await page.reload();
     await waitForInitialLoad(page);
-    await openSidebar(page);
     await page.locator("#searchBox").fill("Scroll Artist");
-    await closeSidebar(page);
     await expect(page.locator(".song-card")).toHaveCount(48);
+    // 検索窓にフォーカスがある間はヘッダーを隠さないため、入力後にフォーカスを外す。
+    await page.locator("#searchBox").blur();
 }
 
 test("header hides on downward scroll and returns on upward scroll", async ({ page }) => {
@@ -59,9 +59,10 @@ test("Tab focus reveals the hidden header before the next frame", async ({ page 
 
     const header = page.locator(".header");
     const menuButton = page.locator("#open-sidebar");
-    const firstSongLink = page.locator(".song-card a").first();
-    await firstSongLink.focus();
-    await expect(firstSongLink).toBeFocused();
+    // ヘッダーの直後にある、結果の概要行の先頭の条件チップから Shift+Tab で戻る。
+    const firstConditionChip = page.locator("#resultConditions .result-condition-chip").first();
+    await firstConditionChip.focus();
+    await expect(firstConditionChip).toBeFocused();
     await page.evaluate(() => window.scrollTo(0, 320));
     await expect(header).toHaveClass(/is-auto-hidden/);
 

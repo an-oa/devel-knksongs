@@ -1,4 +1,5 @@
 import type { SearchUiRuntimeState } from "../../state.types";
+import type { SearchBooleanFilterElements, SearchBooleanFilterKey } from "../../lib/search-boolean-filters.mjs";
 import { clearSearchQueryValidation } from "../search-query-validation.mjs";
 
 type SearchScheduleOptions = {
@@ -10,6 +11,7 @@ type SearchActionEventOptions = Event | SearchScheduleOptions;
 type SearchActionsDateFilterController = {
     resetDateSelects: () => void;
     hasDateSelection: () => boolean;
+    commitDateSelectionClear: (kind: string) => void;
 };
 
 type SearchActionsSearchCoordinator = {
@@ -19,6 +21,7 @@ type SearchActionsSearchCoordinator = {
 
 type SearchActionsSearchFiltersController = {
     resetFiltersToDefault: (options: { resetDateSelects: () => void }) => void;
+    setSelectedFormatsToDefault: () => void;
     syncFormatCheckboxesFromState: () => void;
     needsFilterReset: (options: { hasDateSelection: () => boolean }) => boolean;
 };
@@ -32,7 +35,7 @@ type SearchUiActionsInput = {
     ui: { el: {
         searchBox?: Parameters<typeof clearSearchQueryValidation>[0];
         searchBoxError?: Parameters<typeof clearSearchQueryValidation>[1];
-    } };
+    } & SearchBooleanFilterElements };
     search: Pick<SearchUiRuntimeState, "dataReady" | "userTouchedQuery" | "userTouchedFilters">;
     searchFiltersController: SearchActionsSearchFiltersController;
     dateFilterController: SearchActionsDateFilterController;
@@ -119,6 +122,45 @@ export function createSearchUiActions({
     }
 
     /**
+     * 検索語だけを解除し、検索と保存を 1 回ずつ即時に行う。
+     */
+    function clearSearchQuery(): void {
+        clearSearchDebounce();
+        if (ui.el.searchBox) ui.el.searchBox.value = "";
+        clearSearchQueryValidation(ui.el.searchBox, ui.el.searchBoxError);
+        search.userTouchedQuery = true;
+        searchCoordinator.scheduleSearch({ immediate: true });
+        storageController.saveSearchState();
+    }
+
+    /**
+     * 指定側の日付範囲だけを解除する。検索と保存は日付 controller の変更通知で 1 回ずつ行う。
+     * @param {"from" | "to"} kind
+     */
+    function clearDateFilter(kind: "from" | "to"): void {
+        dateFilterController.commitDateSelectionClear(kind);
+    }
+
+    /**
+     * 動画の種類の選択を既定 (すべて) に戻し、UI 同期後に検索と保存を 1 回ずつ行う。
+     */
+    function resetFormatFilters(): void {
+        searchFiltersController.setSelectedFormatsToDefault();
+        searchFiltersController.syncFormatCheckboxesFromState();
+        markFilterTouched({ immediate: true });
+    }
+
+    /**
+     * 指定した真偽値フィルターだけを解除し、検索と保存を 1 回ずつ行う。
+     * @param {SearchBooleanFilterKey} key
+     */
+    function clearBooleanFilter(key: SearchBooleanFilterKey): void {
+        const checkbox = ui.el[key];
+        if (checkbox) checkbox.checked = false;
+        markFilterTouched({ immediate: true });
+    }
+
+    /**
      * 未操作時に検索語の不整合があればリセットする。
      * @returns {boolean}
      */
@@ -160,6 +202,10 @@ export function createSearchUiActions({
 
     return {
         clearSearch,
+        clearSearchQuery,
+        clearDateFilter,
+        resetFormatFilters,
+        clearBooleanFilter,
         markFilterTouched,
         markQueryTouched,
         clearSearchDebounce,

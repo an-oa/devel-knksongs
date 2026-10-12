@@ -1,33 +1,83 @@
+/*
+ * 配色は鐘の金色とホルスタインの白黒を基調にし、赤はチェック柄の線に限って使う。
+ * ライトは白地のヘッダー、ダークは赤いチェック柄のヘッダーで、テーマごとに構成を変える。
+ */
 :root {
   color-scheme: light;
-  --bg-color: #f0f2f5;
+  --bg-color: #f6f3eb;
   --card-bg: #ffffff;
-  --text-color: #1f2937;
-  --text-mute: #6b7280;
+  --text-color: #1b1b1b;
+  --text-mute: #5c574d;
   --header-bg: #ffffff;
+  --footer-bg: #ffffff;
   --sidebar-bg: #ffffff;
-  --primary-color: #1a73e8;
-  --border-color: #e5e7eb;
+  /* 文字やチェック状態に使う強調色。白地の上で 4.5:1 以上を保つため、ライトは濃い黄土色にする。 */
+  --primary-color: #8a5a00;
+  /* 塗りつぶしのボタンやチップに使う鐘の金色と、その上の文字色・境界線。 */
+  --accent-fill: #ffc928;
+  --accent-fill-hover: #ffd451;
+  --on-accent-fill: #1b1b1b;
+  --accent-fill-border: #1b1b1b;
+  --ink-color: #1b1b1b;
+  /* 曲名リンクは一般的なリンク色の青にし、押せることを色で伝える。白地の上で 4.5:1 以上。 */
+  --title-link-color: #1a73e8;
+  --border-color: #e2ddd0;
   --overlay-color: rgba(0, 0, 0, 0.4);
   --transition-speed: 0.3s;
-  --focus-ring-color: var(--primary-color);
-  --focus-ring-shadow: rgba(26, 115, 232, 0.28);
+  --focus-ring-color: #1b1b1b;
+  --focus-ring-shadow: rgba(255, 201, 40, 0.6);
   --validation-error-color: #b3261e;
+  /* ヘッダー下とフッター上に引く線。ライトはマフラーの赤いチェック柄。 */
+  --edge-line-height: 5px;
+  --edge-line: repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.5) 0 4px, transparent 4px 18px),
+    repeating-linear-gradient(90deg, transparent 0 9px, rgba(255, 255, 255, 0.35) 9px 10px, transparent 10px 18px),
+    #c62828;
+  /* 小さい文字のタグは背景に対して 4.5:1 以上を保つ。 */
+  --tag-bg: #1b1b1b;
+  --tag-text: #ffffff;
+  --tag-collab-bg: #e0f2f1;
+  --tag-collab-text: #00695c;
+  --tag-relay-bg: #fff3e0;
+  --tag-relay-text: #b23c00;
+  --tag-harmony-bg: #f3e5f5;
+  --tag-harmony-text: #7b1fa2;
+  /* OFF のトラックは周囲と白いつまみの両方に対して 3:1 以上を保つ。 */
+  --switch-off-bg: #7c838e;
+  --danger-color: #c62828;
+  --danger-hover-bg: #ffebee;
 }
 
 :root.dark-theme {
   color-scheme: dark;
-  --bg-color: #121212;
-  --card-bg: #1e1e1e;
-  --text-color: #e5e7eb;
-  --text-mute: #9ca3af;
-  --header-bg: #1e1e1e;
-  --sidebar-bg: #1e1e1e;
-  --border-color: #333333;
-  --primary-color: #4285f4;
-  --focus-ring-color: var(--primary-color);
-  --focus-ring-shadow: rgba(66, 133, 244, 0.26);
+  --bg-color: #111111;
+  --card-bg: #1c1c1c;
+  --text-color: #f2efe8;
+  --text-mute: #b3ad9f;
+  --header-bg: #a61d1d;
+  --footer-bg: #0b0b0b;
+  --sidebar-bg: #1c1c1c;
+  --primary-color: #ffc928;
+  --accent-fill-border: transparent;
+  --ink-color: #f2efe8;
+  /* ダークは青が赤と金色の配色から浮くため、押せる要素と同じ金色にする。 */
+  --title-link-color: #ffc928;
+  --border-color: #2f2d29;
+  --focus-ring-color: #ffc928;
+  --focus-ring-shadow: rgba(255, 201, 40, 0.35);
   --validation-error-color: #ffb4ab;
+  /* ダークはヘッダー全体がチェック柄なので、上下の線は鐘の金色にする。 */
+  --edge-line-height: 4px;
+  --edge-line: #ffc928;
+  --tag-bg: #f2efe8;
+  --tag-text: #1b1b1b;
+  --tag-collab-bg: #1f3533;
+  --tag-collab-text: #80cbc4;
+  --tag-relay-bg: #3a2a17;
+  --tag-relay-text: #ffb74d;
+  --tag-harmony-bg: #33213a;
+  --tag-harmony-text: #ce93d8;
+  --danger-color: #ef9a9a;
+  --danger-hover-bg: #3e2723;
 }
 
 body {
@@ -59,55 +109,217 @@ body.hide-thumbs .thumb {
 
 .header {
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  padding: 0 15px;
-  height: 60px;
+  column-gap: 20px;
+  padding: 0 20px;
+  height: 64px;
   background-color: var(--header-bg);
-  border-bottom: 1px solid var(--border-color);
   position: sticky;
   top: 0;
   z-index: 100;
   transition: transform 0.2s ease;
 }
 
-.header.is-auto-hidden { transform: translateY(-100%); }
+/* ヘッダー下の線。退避時は線ごと画面外へ出す。 */
+.header::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--edge-line-height) * -1);
+  height: var(--edge-line-height);
+  background: var(--edge-line);
+  pointer-events: none;
+}
+
+.header.is-auto-hidden { transform: translateY(calc(-100% - var(--edge-line-height))); }
 
 @media (prefers-reduced-motion: reduce) {
   .header { transition: none; }
 }
 
+/* ダークはマフラーの赤いチェック柄。文字を置く面なので柄の濃淡は控えめにする。 */
+:root.dark-theme .header {
+  background:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.28) 0 10px, transparent 10px 46px),
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.22) 0 8px, transparent 8px 32px),
+    repeating-linear-gradient(90deg, transparent 0 22px, rgba(255, 255, 255, 0.14) 22px 24px, transparent 24px 46px),
+    repeating-linear-gradient(0deg, transparent 0 18px, rgba(255, 201, 40, 0.22) 18px 20px, transparent 20px 32px),
+    var(--header-bg);
+}
+
+/* ライトのホルスタイン柄。文字・検索窓・ボタンに掛からない余白だけに置く。 */
+.header-spots {
+  position: absolute;
+  fill: #1b1b1b;
+  pointer-events: none;
+}
+:root.dark-theme .header-spots { display: none; }
+.header-spots-compact { display: none; }
+.header-spots-wide {
+  top: 0;
+  width: 170px;
+  height: 64px;
+}
+.header-spots-wide-left { right: calc(50% + 260px + 16px); }
+.header-spots-wide-right { left: calc(50% + 260px + 16px); }
+/* 検索窓の左右に斑点を置く余白がない幅では表示しない。 */
+@container header-search (max-width: 900px) {
+  .header-spots-wide { display: none; }
+}
+
 .header-title {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   margin: 0;
-  color: var(--primary-color);
-  font-size: clamp(1.5rem, 0.375rem + 6vw, 1.75rem);
-  font-weight: bold;
+  color: var(--text-color);
   line-height: 1;
-  text-align: center;
   white-space: nowrap;
 }
 
-:root.dark-theme .header-title-emoji {
-  text-shadow:
-    -1px -1px 0 #fff,
-    0 -1px 0 #fff,
-    1px -1px 0 #fff,
-    -1px 0 0 #fff,
-    1px 0 0 #fff,
-    -1px 1px 0 #fff,
-    0 1px 0 #fff,
-    1px 1px 0 #fff;
+.header-logo {
+  display: block;
+  width: 36px;
+  height: 36px;
+  flex: none;
 }
 
-.header-right { display: flex; justify-content: flex-end; }
+.header-wordmark {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.header-wordmark-sub {
+  color: var(--primary-color);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.header-wordmark-main {
+  font-size: 21px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+/* チェック柄の上の文字は、柄の明るい線と重なっても読めるよう影を付ける。 */
+:root.dark-theme .header-wordmark-sub {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85), 0 0 6px rgba(0, 0, 0, 0.6);
+}
+:root.dark-theme .header-wordmark-main {
+  color: #ffffff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+.header-search-area {
+  position: relative;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  container: header-search / inline-size;
+}
+
+.header-search {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+}
+
+.header-search-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  transform: translateY(-50%);
+  fill: none;
+  stroke: #1b1b1b;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+/* 検索窓はどちらのテーマでも白地にし、文字色をテーマに依存させない。 */
+.header-search input[type="text"] {
+  height: 40px;
+  padding: 0 16px 0 42px;
+  border: 2px solid var(--accent-fill-border);
+  border-radius: 999px;
+  background: #ffffff;
+  color: #1b1b1b;
+  font-size: 15px;
+}
+.header-search input[type="text"]::placeholder { color: #6b665c; }
+.header-search input[type="text"]:focus-visible {
+  outline: none;
+  border-color: var(--ink-color);
+  box-shadow: 0 0 0 4px var(--focus-ring-shadow);
+}
+:root.dark-theme .header-search input[type="text"]:focus-visible { border-color: var(--accent-fill); }
+.header-search input[type="text"][aria-invalid="true"] { border-color: #b3261e; }
+.header-search input[type="text"]:disabled { cursor: progress; }
+
+.header-right { position: relative; display: flex; justify-content: flex-end; }
 
 .menu-trigger-btn {
-  background: var(--primary-color);
-  border: none;
-  border-radius: 6px;
-  padding: 8px 12px;
-  color: white;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 16px 0 12px;
+  border: 2px solid var(--accent-fill-border);
+  border-radius: 999px;
+  background: var(--accent-fill);
+  color: var(--on-accent-fill);
+  font-size: 14px;
+  font-weight: 800;
   cursor: pointer;
+  box-sizing: border-box;
+}
+.menu-trigger-btn:hover { background: var(--accent-fill-hover); }
+
+.menu-trigger-icon {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+
+@media (max-width: 640px) {
+  .header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: 56px auto;
+    height: auto;
+    padding: 0 14px 12px;
+  }
+  .header-search-area {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .header-search { max-width: none; }
+  .header-logo { width: 32px; height: 32px; }
+  .header-wordmark-main { font-size: 19px; }
+  .header-spots-compact {
+    display: block;
+    top: 0;
+    left: 150px;
+    width: 108px;
+    height: 56px;
+  }
+  :root.dark-theme .header-spots-compact { display: none; }
+}
+
+/* ロゴとボタンの間に斑点を置く余白がない幅では表示しない。 */
+@media (max-width: 379px) {
+  .header-spots-compact { display: none !important; }
 }
 
 .sidebar {
@@ -149,7 +361,11 @@ body.hide-thumbs .thumb {
 .sidebar.active .sidebar-sheet { transform: translateX(0); }
 .sidebar-header { padding: 12px 16px 8px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); }
 .sidebar-title-group h2 { margin: 0; font-size: 18px; }
-#resultCount { font-size: 13px; color: var(--primary-color); font-weight: bold; }
+.sidebar-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
 .sidebar-scroll-area {
   padding: 8px 16px 16px;
   padding-bottom: 20px;
@@ -311,17 +527,17 @@ body.hide-thumbs .thumb {
 
 .bookmark-panel-error {
   grid-column: 1 / -1;
-  color: #c62828;
+  color: var(--validation-error-color);
   font-size: 12px;
   line-height: 1.4;
 }
 
 .bookmark-panel-create button {
   flex: 0 0 auto;
-  border: none;
+  border: 2px solid var(--accent-fill-border);
   border-radius: 8px;
-  background: var(--primary-color);
-  color: #fff;
+  background: var(--accent-fill);
+  color: var(--on-accent-fill);
   min-height: 40px;
   padding: 0 12px;
   font-size: 13px;
@@ -623,10 +839,95 @@ input[type="text"][aria-invalid="true"] {
   align-items: center;
 }
 
+/* 結果一覧の上に、件数と適用中の条件を表示する。 */
+.result-summary {
+  align-self: stretch;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin: 6px 0 12px;
+}
+
+.result-summary-count {
+  margin: 0 6px 0 0;
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.result-conditions {
+  display: contents;
+  list-style: none;
+}
+
+/* 長い検索語でもページ幅を広げないよう、チップは行幅と固定の上限の小さい方に収める。 */
+.result-condition {
+  display: flex;
+  min-width: 0;
+  max-width: min(100%, 360px);
+}
+
+.result-condition-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 32px;
+  padding: 0 6px 0 12px;
+  border: 2px solid var(--accent-fill-border);
+  border-radius: 999px;
+  background: var(--accent-fill);
+  color: var(--on-accent-fill);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.result-condition-chip:hover { background: var(--accent-fill-hover); }
+
+/* 表示名は 1 行に収めて末尾を省略する。全文は title と読み上げ名に残す。 */
+.result-condition-chip-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.result-condition-chip-remove {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.12);
+  font-size: 14px;
+  line-height: 1;
+}
+
+.result-clear-all {
+  min-height: 32px;
+  padding: 0 4px;
+  border: none;
+  background: none;
+  color: var(--text-color);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.container > .search-query-error {
+  align-self: stretch;
+  margin: -4px 0 12px;
+}
+
 #resultList {
   --masonry-gap: 12px;
   --masonry-min-card-width: 294px;
-  --masonry-card-content-estimate: 74px;
+  --masonry-card-content-estimate: 97px;
   position: relative;
   width: 100%;
   list-style: none;
@@ -634,14 +935,34 @@ input[type="text"][aria-invalid="true"] {
   padding: 0;
 }
 
+/*
+ * カードの枠は outline で描く。masonry はカードの高さを scrollHeight で測るため、
+ * border を使うと枠の分だけ上下のカードが重なる。
+ */
 .song-card {
   position: absolute;
   background: var(--card-bg);
-  border-radius: 8px;
+  border-radius: 12px;
+  outline: 1px solid var(--border-color);
+  outline-offset: -1px;
   overflow: hidden;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
   display: flex;
   flex-direction: column;
+  transition: outline-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* 指すカードは枠を濃くし、鐘の金色の影をずらして付ける。 */
+.song-card:hover {
+  outline-color: var(--ink-color);
+  box-shadow: 4px 4px 0 var(--accent-fill);
+}
+:root.dark-theme .song-card:hover {
+  outline-color: var(--accent-fill);
+  box-shadow: 4px 4px 0 rgba(255, 201, 40, 0.55);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .song-card { transition: none; }
 }
 
 #resultList[data-layout-columns="1"] {
@@ -659,6 +980,25 @@ input[type="text"][aria-invalid="true"] {
   padding: 50px;
   color: var(--text-mute);
   text-align: center;
+}
+
+.result-empty-state-icon {
+  display: block;
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 12px;
+}
+
+.result-empty-state-title {
+  margin: 0;
+  color: var(--text-color);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.result-empty-state-hint {
+  margin: 6px 0 0;
+  font-size: 13px;
 }
 
 .song-card-expanded {
@@ -721,30 +1061,34 @@ input[type="text"][aria-invalid="true"] {
 .thumb[data-video-id=""]::after { content: ""; }
 .thumb[data-video-id=""] { cursor: default; }
 
-.content { padding: 6px; flex-grow: 1; position: relative; }
+.content { padding: 10px 12px 6px; flex-grow: 1; position: relative; }
 .title-heading {
   margin: 0;
   font: inherit;
 }
 .title {
-  font-size: 14px;
-  font-weight: bold;
-  color: var(--primary-color);
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--title-link-color);
   margin-bottom: 2px;
-  line-height: 1.2;
-  min-height: calc(14px * 1.2);
+  line-height: 1.25;
+  min-height: calc(15px * 1.25);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .title-link { text-decoration: none; }
-.title-link:hover { text-decoration: underline; }
+.title-link:hover {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
 .artist {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--text-mute);
-  margin-bottom: 6px;
-  line-height: 1.2;
-  min-height: calc(12px * 1.2);
+  margin-bottom: 8px;
+  line-height: 1.25;
+  min-height: calc(12.5px * 1.25);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -754,10 +1098,12 @@ input[type="text"][aria-invalid="true"] {
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: center;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1;
-  border-top: 1px solid var(--border-color);
-  padding: 4px 2px 4px 6px;
+  color: var(--text-mute);
+  font-variant-numeric: tabular-nums;
+  border-top: 1px dashed var(--border-color);
+  padding: 6px 0 2px;
   gap: 4px;
   min-height: 24px;
   box-sizing: border-box;
@@ -778,20 +1124,20 @@ input[type="text"][aria-invalid="true"] {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 14px;
-  padding: 0 3px;
-  border-radius: 2px;
-  font-size: 9px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 10px;
   line-height: 1;
   white-space: nowrap;
-  background: var(--border-color);
-  color: var(--text-mute);
+  background: var(--tag-bg);
+  color: var(--tag-text);
   font-weight: bold;
   box-sizing: border-box;
 }
-.tag-collab { background: #e0f2f1; color: #00695c; }
-.tag-relay { background: #fff3e0; color: #e65100; }
-.tag-harmony { background: #f3e5f5; color: #7b1fa2; }
+.tag-collab { background: var(--tag-collab-bg); color: var(--tag-collab-text); }
+.tag-relay { background: var(--tag-relay-bg); color: var(--tag-relay-text); }
+.tag-harmony { background: var(--tag-harmony-bg); color: var(--tag-harmony-text); }
 
 .result-tail-sentinel {
   width: 100%;
@@ -801,10 +1147,11 @@ input[type="text"][aria-invalid="true"] {
 .hidden { display: none !important; }
 
 .site-footer {
+  position: relative;
   width: 100%;
-  margin: 5px auto 0;
-  padding: 10px 15px 20px;
-  border-top: 1px solid var(--border-color);
+  margin: 24px auto 0;
+  padding: calc(14px + var(--edge-line-height)) 20px 24px;
+  background: var(--footer-bg);
   color: var(--text-mute);
   font-size: 11px;
   line-height: 1.6;
@@ -813,6 +1160,16 @@ input[type="text"][aria-invalid="true"] {
 }
 
 .site-footer p { margin: 0; }
+
+.site-footer::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: var(--edge-line-height);
+  background: var(--edge-line);
+}
 
 .close-btn { background: none; border: none; font-size: 28px; color: var(--text-color); cursor: pointer; }
 .overlay { position: fixed; inset: 0; background: var(--overlay-color); z-index: 900; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
@@ -841,10 +1198,12 @@ input[type="text"][aria-invalid="true"] {
 
 .switch { position: relative; width: 34px; height: 18px; display: inline-block; flex-shrink: 0; }
 .switch input { opacity: 0; width: 0; height: 0; }
-.slider { position: absolute; cursor: pointer; inset: 0; background: #ccc; border-radius: 20px; transition: background-color .4s; }
+.slider { position: absolute; cursor: pointer; inset: 0; background: var(--switch-off-bg); border-radius: 20px; transition: background-color .4s; }
 .slider:before { position: absolute; content: ""; height: 12px; width: 12px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: transform .4s; }
 input:checked + .slider { background: var(--primary-color); }
 input:checked + .slider:before { transform: translateX(16px); }
+/* ダークの ON は地が金色になるため、白いつまみでは区別できない。つまみを濃色にして 3:1 以上を保つ。 */
+:root.dark-theme input:checked + .slider:before { background: #1b1b1b; }
 .switch input:focus + .slider {
   outline: 3px solid var(--focus-ring-color);
   outline-offset: 3px;
@@ -956,40 +1315,33 @@ input:checked + .slider:before { transform: translateX(16px); }
 /* Bookmark Song Actions */
 .add-to-bookmark-btn, .remove-from-bookmark-btn {
   background: none;
-  border: none;
-  color: var(--text-mute);
+  border: 1.5px solid var(--border-color);
+  color: var(--text-color);
   cursor: pointer;
   padding: 4px;
   font-size: 18px;
   line-height: 1;
   border-radius: 50%;
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .add-to-bookmark-btn:hover {
-  color: var(--primary-color);
-  background-color: var(--bg-color);
+  border-color: var(--accent-fill);
+  background-color: var(--accent-fill);
+  color: var(--on-accent-fill);
 }
 
 .remove-from-bookmark-btn {
-  color: #c62828;
+  color: var(--danger-color);
 }
 
 .remove-from-bookmark-btn:hover {
-  color: #c62828;
-  background-color: #ffebee;
-}
-
-.dark-theme .remove-from-bookmark-btn {
-  color: #ef9a9a;
-}
-
-.dark-theme .remove-from-bookmark-btn:hover {
-  background-color: #3e2723;
+  background-color: var(--danger-hover-bg);
 }
 
 .dark-theme .drag-handle {

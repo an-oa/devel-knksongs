@@ -10,6 +10,15 @@
   <!-- Canonical -->
   <link rel="canonical" href="https://an-oa.github.io/knksongs/" />
 
+  <!-- Icons -->
+  <!-- SVG に未対応のブラウザは PNG を使う。 -->
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <!-- ヘッダー背景に合わせる。手動のテーマ切替ではなく OS の配色設定に従う。 -->
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#1e1e1e" media="(prefers-color-scheme: dark)" />
+
   <!-- OGP -->
   <meta property="og:site_name" content="鐘輝かう 歌サーチ" />
   <meta property="og:title" content="鐘輝かう 歌サーチ" />
@@ -17,12 +26,13 @@
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://an-oa.github.io/knksongs/" />
   <meta property="og:image" content="https://an-oa.github.io/knksongs/ogp.png" />
-  <meta property="og:image:width" content="800" />
-  <meta property="og:image:height" content="800" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="鐘輝かう 歌サーチ。曲名・アーティスト名・読みで検索できる非公式ファンサイト。" />
   <meta name="color-scheme" content="light dark" />
 
   <!-- X (Twitter) -->
-  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="鐘輝かう 歌サーチ" />
   <meta name="twitter:description" content="曲名・アーティスト名・読みで検索。配信/歌みた/ショート/切り抜き/収録、コラボ種別、リレー/ハモリ、日付範囲で絞り込み。" />
   <meta name="twitter:image" content="https://an-oa.github.io/knksongs/ogp.png" />
@@ -51,24 +61,17 @@
     <div class="sidebar-sheet">
     <div class="sidebar-header">
       <div class="sidebar-title-group">
-        <h2 id="sidebar-title">検索・設定</h2>
-        <div id="resultCount">接続中...</div>
+        <h2 id="sidebar-title">絞り込み・設定</h2>
       </div>
       <button id="close-sidebar" class="close-btn" aria-label="閉じる">&times;</button>
     </div>
 
     <div class="sidebar-scroll-area">
+      <div class="sidebar-actions">
+        <button id="clearBtn" class="text-clear-btn" type="button">条件をクリア</button>
+      </div>
       <section class="sidebar-group">
         <div class="sidebar-group-body">
-          <div class="sidebar-section">
-            <div class="section-header">
-              <label class="section-label" for="searchBox">検索</label>
-              <button id="clearBtn" class="text-clear-btn">条件をクリア</button>
-            </div>
-            <input type="text" id="searchBox" placeholder="曲名・歌手・読み..." aria-errormessage="searchBoxError" disabled>
-            <p id="searchBoxError" class="search-query-error" aria-live="polite" hidden></p>
-          </div>
-
           <fieldset class="sidebar-section sidebar-fieldset">
             <legend class="section-label sidebar-fieldset-legend">日付範囲</legend>
             <div class="date-row">
@@ -245,18 +248,49 @@
 
   <main class="main-content">
     <header class="header">
-      <div class="header-left"></div>
+      <!-- ライトテーマのホルスタイン柄。狭い画面ではロゴとボタンの間だけに置く。 -->
+      <svg class="header-spots header-spots-compact" viewBox="0 0 108 56" aria-hidden="true" focusable="false">
+        <path d="M0 0h84c-2 10-10 17-21 19-8 1-12 9-22 10-12 1-23-4-28-13C10 9 4 4 0 0z"/>
+        <path d="M78 34c4-4 13-5 17 0 4 4 1 11-6 12-7 1-14-1-15-6 0-2 2-4 4-6z"/>
+      </svg>
       <h1 class="header-title">
-        <span class="header-title-emoji" aria-hidden="true">🐮🗺️🔔</span>
-        <span class="visually-hidden">鐘輝かう 歌サーチ</span>
+        <img class="header-logo" src="bell.svg" alt="" width="36" height="36">
+        <span class="header-wordmark">
+          <span class="header-wordmark-sub">鐘輝かう</span>
+          <span class="header-wordmark-main">歌サーチ</span>
+        </span>
       </h1>
+      <div class="header-search-area">
+        <svg class="header-spots header-spots-wide header-spots-wide-left" viewBox="0 0 170 64" aria-hidden="true" focusable="false">
+          <path d="M20 0h120c-3 14-14 24-29 27-11 2-17 12-31 14-17 2-32-6-39-19C35 13 25 6 20 0z"/>
+          <path d="M70 64c3-11 13-19 26-21 9-1 14-6 24-6 14 0 26 10 30 27z"/>
+        </svg>
+        <div class="header-search">
+          <svg class="header-search-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></svg>
+          <label class="visually-hidden" for="searchBox">曲名・アーティスト名・読みで検索</label>
+          <input type="text" id="searchBox" placeholder="曲名・歌手・読み..." aria-errormessage="searchBoxError" disabled>
+        </div>
+        <svg class="header-spots header-spots-wide header-spots-wide-right" viewBox="0 0 170 64" aria-hidden="true" focusable="false">
+          <path d="M10 0h100c-2 12-10 22-24 25-10 2-14 12-28 13-15 1-27-7-33-18C21 12 14 6 10 0z"/>
+          <path d="M136 30c6-6 19-7 24 0 5 6 1 15-8 17-10 2-20-2-21-9 0-3 2-6 5-8z"/>
+        </svg>
+      </div>
       <div class="header-right">
-        <button id="open-sidebar" class="menu-trigger-btn" aria-label="検索・設定を開く" aria-expanded="false" aria-controls="sidebar">☰</button>
+        <button id="open-sidebar" class="menu-trigger-btn" aria-label="絞り込み・設定を開く" aria-expanded="false" aria-controls="sidebar">
+          <svg class="menu-trigger-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+          <span>絞り込み</span>
+        </button>
       </div>
     </header>
-    
+
     <section class="container" aria-labelledby="result-list-title">
       <h2 id="result-list-title" class="visually-hidden">検索結果</h2>
+      <div class="result-summary">
+        <p id="resultCount" class="result-summary-count">接続中...</p>
+        <ul id="resultConditions" class="result-conditions" aria-label="適用中の条件"></ul>
+        <button id="resultClearAll" class="result-clear-all" type="button" hidden>すべてクリア</button>
+      </div>
+      <p id="searchBoxError" class="search-query-error" aria-live="polite" hidden></p>
       <ol id="resultList" class="result-list"></ol>
       <div id="resultTailSentinel" class="result-tail-sentinel" aria-hidden="true" hidden></div>
     </section>

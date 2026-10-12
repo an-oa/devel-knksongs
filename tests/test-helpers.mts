@@ -336,6 +336,12 @@ class FakeElement extends FakeEventTarget {
         this.attributes.delete(name);
     }
 
+    /** 登録済み listener へイベントを通知する。既定動作の取り消しは扱わない。 */
+    dispatchEvent(event: Pick<Event, "type">): boolean {
+        void this.dispatchListeners(event.type, { target: this, currentTarget: this });
+        return true;
+    }
+
     /** 記録されたクリック listener と onclick を呼ぶ。 */
     click() {
         const event = {

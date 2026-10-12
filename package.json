@@ -15,6 +15,7 @@
     "build:songs-json:raw": "node scripts/build-songs-json.mts",
     "build:ts": "node scripts/build-ts.mts",
     "check:ts-emit": "node scripts/build-ts.mts --check",
+    "render:brand-assets": "node scripts/render-brand-assets.mts",
     "check:ts-emit:raw": "node scripts/build-ts.mts --check-only",
     "validate:songs-json": "npm run build:ts && npm run validate:songs-json:raw",
     "validate:songs-json:raw": "node scripts/validate-songs-json.mts",
