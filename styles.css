@@ -19,6 +19,8 @@
   --on-accent-fill: #1b1b1b;
   --accent-fill-border: #1b1b1b;
   --ink-color: #1b1b1b;
+  /* 曲名リンクは一般的なリンク色の青にし、押せることを色で伝える。白地の上で 4.5:1 以上。 */
+  --title-link-color: #1a73e8;
   --border-color: #e2ddd0;
   --overlay-color: rgba(0, 0, 0, 0.4);
   --transition-speed: 0.3s;
@@ -57,6 +59,8 @@
   --primary-color: #ffc928;
   --accent-fill-border: transparent;
   --ink-color: #f2efe8;
+  /* ダークは青が赤と金色の配色から浮くため、押せる要素と同じ金色にする。 */
+  --title-link-color: #ffc928;
   --border-color: #2f2d29;
   --focus-ring-color: #ffc928;
   --focus-ring-shadow: rgba(255, 201, 40, 0.35);
@@ -1065,7 +1069,7 @@ input[type="text"][aria-invalid="true"] {
 .title {
   font-size: 15px;
   font-weight: 800;
-  color: var(--text-color);
+  color: var(--title-link-color);
   margin-bottom: 2px;
   line-height: 1.25;
   min-height: calc(15px * 1.25);
@@ -1076,7 +1080,6 @@ input[type="text"][aria-invalid="true"] {
 .title-link { text-decoration: none; }
 .title-link:hover {
   text-decoration: underline;
-  text-decoration-color: var(--accent-fill);
   text-decoration-thickness: 2px;
   text-underline-offset: 3px;
 }
