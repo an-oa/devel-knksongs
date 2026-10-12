@@ -2,104 +2,100 @@
 
 公開URL: [https://an-oa.github.io/knksongs/](https://an-oa.github.io/knksongs/)
 
-- 公開スプレッドシート由来の歌データを、曲名・アーティスト名(読み含む)で検索できるシンプルなWebサイトです。
-- PC / スマホ両対応です。本サイト運営者のサーバへ個人情報を送信したり、独自の解析用トラッキングを行いません(設定保持のためにローカルストレージを使用します)。
-- 通常の曲データ表示では GitHub Pages 上の生成済みJSONを取得します。JSON生成やフォールバック時には Google(スプレッドシートのCSV取得)、YouTube表示では youtube.com / youtube-nocookie.com やサムネイル配信元などへの通信が発生します。
+鐘輝かうさんの歌唱データ（公開スプレッドシート）を、曲名やアーティスト名で検索できる非公式ファンサイトです。
+PC とスマホの両方に対応しています。
 
 ---
 
 ## 目次
 
-- [主な機能](#主な機能)
-- [表示対象の条件(重要)](#表示対象の条件重要)
 - [使い方](#使い方)
-- [データソース(開発者向けメモ)](#データソース開発者向けメモ)
-- [テスト/静的解析(開発者向け)](#テスト静的解析開発者向け)
-- [設定の保存について](#設定の保存について)
+- [主な機能](#主な機能)
+- [検索の書き方](#検索の書き方)
+- [表示される曲について](#表示される曲について)
+- [プライバシーと保存データ](#プライバシーと保存データ)
 - [免責事項・権利について](#免責事項権利について)
+- [開発者向け](#開発者向け)
 
 ---
+
+## 使い方
+
+1. 画面上部の検索窓に曲名やアーティスト名を入力します。ひらがな・カタカナの読みでも検索できます。
+2. 必要に応じて「絞り込み」ボタンからサイドバーを開き、日付範囲や動画の種類などを設定します。
+3. 結果一覧と、その上の件数・条件チップが更新されます。
+4. 曲名リンクから YouTube の動画を開けます。サムネイル表示を ON にすると、ページ内でも再生できます。
 
 ## 主な機能
 
-- 曲名 / アーティスト名で検索できます。
-  - ひらがな/カタカナ等の読みでも検索できます。
-  - 複数キーワード(スペース区切り)に対応します(全角スペースも可)。
-  - `since:YYYY-MM-DD` で指定日以降、`until:YYYY-MM-DD` で指定日以前に絞り込めます。
-    年だけを指定すると `since` は1月1日、`until` は12月31日、年月を指定すると
-    `since` は月初、`until` は月末を包含境界として使います。年・年月の末尾の `-` も省略入力として扱います。
-    既存のFrom/To日付範囲と併用した場合は共通部分を検索します。
-  - 同じ日付演算子を複数指定した場合、`since` は最も新しい日、`until` は最も古い日を使います。
-    日付らしい不正な値や矛盾した範囲は、入力中またはフォーカスを外したときに通知し、結果を0件にします。
-  - `until:なんちゃら` のように日付として始まらない文字列は通常キーワードとして検索します。
-    日付演算子の形をした文字列を検索する場合は、`"until:2026-13"` のように二重引用符で囲みます。
-    空白を含む `"Song until:2026"` も1つのフレーズとして検索できます。引用符は検索要素の境界になるため、
-    `foo"bar baz"qux` は `foo`、`bar baz`、`qux` のAND検索になります。
-  - 引用句内の前後空白は無視し、連続空白は1つに揃えます。空引用句は検索条件として無視され、
-    `""` だけを入力して他の絞り込みがなければおすすめ表示になります。不正な日付や構文エラーは0件表示を優先します。
-  - 引用句内では `\"` で引用符、`\\` でバックスラッシュを検索できます。
-    全角の `＂` / `＼` も互換文字として構文に使えますが、スマート引用符の `“”` は通常文字として検索します。
-    日付演算子は完全に引用されていない要素だけを認識するため、`since:"2024"` は不正な演算子になります。
-- 絞り込みができます。
-  - 配信 / オリ曲/歌みた / ショート / 切り抜き / 収録。
-  - UI上では `オリ曲` を `歌みた` と同じ項目(「オリ曲/歌みた」)で扱います。
-  - 歌枠リレー / ハモリあり / コラボ(ホスト) / コラボ(ゲスト)。
-    `コラボ(ホスト)` は配信上の立場が `ホスト`、`コラボ(ゲスト)` は `ゲスト`
-    の行を対象にします。両方選択するとホスト・ゲストの両方を対象にします。
-  - 絞り込み条件はヘッダーの「絞り込み」ボタンで開くサイドバーから操作できます。
-  - 結果一覧の上に件数と適用中の条件(検索語・日付・動画の種類・追加条件)をチップで表示します。
-    チップの×で個別に、「すべてクリア」でまとめて解除できます。
-- YouTubeへのリンクがあります。
-  - 一覧の曲名リンクから該当動画へ遷移できます。
-  - サムネイル表示をONにした場合、サムネイルをクリックしてページ内で埋め込み再生できます(×で閉じてサムネに戻ります)。
-  - 埋め込み再生は標準では `youtube.com` 埋め込みを使用し、設定の `プライバシー強化` がONの場合は `youtube-nocookie.com` 埋め込みを使用します(曲名リンクは通常の `youtube.com` / `youtu.be` を開きます)。
-    - CSVの終了時刻がある曲は、その時刻を埋め込み再生の終了位置として使います。
-    - 一部のモバイル環境では、再生開始時刻が反映されない場合があります(端末/ブラウザ/YouTube側の挙動差によります)。
-- 段階表示(追加読み込み)に対応します。
-  - 検索結果/ブックマーク結果/おすすめは、最初に一定件数を表示し、一覧の末尾へスクロールすると追加表示します(負荷対策)。
-  - 1列の画面では、初期表示を約2画面分(最低12件、従来の初期件数が上限)に抑えます。おすすめの選曲結果は保持し、続きを同じ順番で追加します。
-- ブックマーク機能があります。
-  - ブックマークを作成し、名称変更/削除できます。
-  - 各曲を追加/削除できます。
-  - 曲の追加先ブックマーク選択や新規作成は、サイドバー内のブックマークパネルで行います。
-  - ブックマークを選択すると、その中で通常の検索/絞り込みができます。
-  - ブックマーク表示中は、各カードのドラッグハンドルで曲順を並び替えできます（通常表示/おすすめ表示ではハンドルは表示されません）。
-  - 並び替えた順序はブックマーク情報として保存され、次回表示時にも維持されます。
-  - ブックマークパネルからJSON形式でエクスポート/インポートできます。
-    - インポートは現在のブックマークを全置き換えします。
-  - ブックマーク保存用の曲参照は `videoId::##` を優先し、既存データの `archiveId::##` は読み込み時に段階移行します。
-  - 最新データに対応する曲が一時的に存在しない参照は削除せず保存し、その曲が再び配信データへ含まれた場合に復帰できるようにします。
-  - 行位置が変わると別の曲を指す旧形式の数値参照は、誤変換や上限件数の消費を避けるため読み込み時に除外します。
-  - 一方で画面内部のカード識別や描画再利用には、従来どおり `archiveId::##` ベースの `songKey` を使い続けます。
-  - 上限は「ブックマーク数: 最大20件」「1ブックマークあたり: 最大120曲」「ブックマーク名: 最大64文字」です。
-- 初期表示(おすすめ)があります。
-  - 通常表示で検索条件が未指定のときは、一定回数以上歌われた曲からおすすめ表示します。
-  - おすすめ候補は配信上の立場が `ゲスト` 以外の行から抽出します。
-  - ただしオリ曲は、1回(1動画)でもおすすめ候補に含みます。
-  - おすすめ一覧は条件変更でおすすめ表示を離れて戻っても維持されます。曲データは初回表示前に確定し、
-    公開側の更新はページの再読み込み時に確認します。
-- 表示テーマを切り替えられます。
-  - ダークモード切替に対応します(設定はブラウザに保存されます)。
-  - 配色は鐘の金色とホルスタイン柄の白黒を基調にし、ライトは白地にホルスタイン柄、
-    ダークは赤いチェック柄のヘッダーを使います。ヘッダー下とフッター上には、ライトはチェック柄、ダークは金色の線を引きます。
-- 設定パネルで表示/再生設定を切り替えられます。
-  - 表示: サムネイル表示 / ダークモード
-  - 再生: サムネイル表示ON時のみ、`youtube-nocookie.com` を使うプライバシー強化設定と、曲の終了時刻で止めずにアーカイブ全体を再生する設定を切り替えられます。
+### 検索と絞り込み
 
----
+- 曲名・アーティスト名（読みを含む）で検索できます。スペース区切りで複数キーワードを指定できます（全角スペースも可）。
+- 日付指定やフレーズ検索もできます。書き方は[検索の書き方](#検索の書き方)を参照してください。
+- サイドバーで次の条件を絞り込めます。
+  - 動画の種類: 配信 / オリ曲・歌みた / ショート / 切り抜き / 収録
+  - 追加条件: 歌枠リレー / ハモリあり / コラボ(ホスト) / コラボ(ゲスト)
+  - 日付範囲（From / To）
+- 適用中の条件は結果一覧の上にチップで表示されます。× で個別に、「すべてクリア」でまとめて解除できます。
 
-## 表示対象の条件(重要)
+### おすすめ表示
 
-このツールは、スプレッドシート(CSV)から取り込んだ全行を表示するわけではありません。次の条件を満たす行のみ表示対象になります。
+- 検索条件を何も指定していないときは、よく歌われている曲をおすすめとして表示します。
+  オリ曲は1回でも候補に入ります。コラボにゲストとして出演した配信の歌唱は集計しません。
+- おすすめの並びは、条件を変えて戻っても維持されます。ページを再読み込みすると新しく選び直します。
 
-1. 公開範囲列の値が「全体」であること。
-2. 非公開に配慮し、メモ欄(コメント等)に `URL` / `URI` を含む行は表示しないこと。
-3. `#` 列(行ID列)が空でないこと。
+### YouTube 再生
+
+- サムネイル表示を ON にすると、サムネイルをクリックしてページ内で再生できます（× で閉じます）。
+- 曲の終了時刻が登録されている場合は、その位置で再生を止めます。
+  設定で「アーカイブ全体を再生」を ON にすると、止めずに再生を続けます。
+- 設定で「プライバシー強化」を ON にすると、埋め込み再生に `youtube-nocookie.com` を使います。
+- 再生まわりの設定は、サムネイル表示が ON のときに表示されます。
+- 一部のモバイル環境では、再生開始位置が反映されない場合があります。
+
+### ブックマーク
+
+- ブックマークを作り、曲を追加・削除できます。名前の変更や削除もできます。
+- ブックマークを選ぶと、その中で検索・絞り込みができます。
+- ブックマーク表示中は、カードのドラッグハンドルで曲順を並び替えられます。並び順は保存されます。
+- JSON 形式でエクスポート・インポートできます。インポートすると現在のブックマークはすべて置き換わります。
+- 上限は、ブックマーク20件、1ブックマークあたり120曲、ブックマーク名64文字です。
+- 元データから一時的に消えた曲も、ブックマークからは削除しません。元データに戻ると再び表示されます。
+
+### 表示と設定
+
+- 検索結果は最初に一定件数を表示し、末尾までスクロールすると続きを読み込みます。
+- 設定パネルで、サムネイル表示とダークモードを切り替えられます。
+
+## 検索の書き方
+
+| 書き方 | 例 | 意味 |
+| --- | --- | --- |
+| スペース区切り | `夜 歌` | すべての語を含む曲（AND 検索） |
+| `since:日付` | `since:2024-04` | 指定日以降（この例では2024年4月1日以降） |
+| `until:日付` | `until:2024` | 指定日以前（この例では2024年12月31日以前） |
+| `"…"` | `"Song until:2026"` | 囲んだ範囲を1つのフレーズとして検索 |
+| `\"` / `\\` | `"say \"hi\""` | 引用符の中で `"` や `\` そのものを検索 |
+
+- 日付は `YYYY`、`YYYY-MM`、`YYYY-MM-DD` のいずれかで書けます。年や年月だけの場合は、期間の最初または最後の日として扱います。
+- サイドバーの日付範囲と併用すると、両方に当てはまる期間で検索します。
+  同じ演算子を複数書いた場合は、`since` は最も新しい日、`until` は最も古い日を使います。
+- `until:なんちゃら` のように日付で始まらない語は、通常のキーワードとして検索します。
+  `"until:2026-13"` のように引用符で囲んだ場合も、通常のキーワードになります。
+- 存在しない日付や、開始日が終了日より後になる範囲を指定すると、メッセージを表示して結果は0件になります。
+- 引用符は語の区切りにもなります。`foo"bar baz"qux` は `foo`・`bar baz`・`qux` の AND 検索です。
+- 全角の `＂` / `＼` も引用符・バックスラッシュとして使えます。スマート引用符（`“”`）は通常の文字として検索します。
+
+## 表示される曲について
+
+スプレッドシートのすべての行を表示するわけではありません。次の条件をすべて満たす行だけを表示します。
+
+1. 公開範囲が「全体」であること。
+2. メモ欄（コメント等）に `URL` / `URI` を含まないこと（非公開情報への配慮）。
+3. `#` 列（行ID）が空でないこと。
 4. `URL` 列が空でないこと。
 
-いずれかに該当しない行は一覧に表示されません。
-URLが空の行は、かつてアーカイブが存在した現在再生できない曲としてCSVには残しますが、
-サムネイル表示・動画再生に使う派生JSONからは正常に除外します。
+URL が空の行は、以前はアーカイブがあり、現在は再生できない曲です。スプレッドシートには記録として残りますが、このサイトには表示しません。
 
 ```mermaid
 flowchart TD
@@ -114,264 +110,35 @@ flowchart TD
     E -- Yes --> F[表示対象]
 ```
 
----
+## プライバシーと保存データ
 
-## 使い方
+本サイトの運営者のサーバへ個人情報を送ることはありません。独自のアクセス解析も行いません。
 
-1. 画面上部の検索窓に曲名 / アーティスト名(読みでも可)を入力します。
-   日付で絞り込む場合は、`since:YYYY[-MM[-DD]]` / `until:YYYY[-MM[-DD]]` も同じ検索窓へ入力できます。
-   日付演算子の形をした文字列は、二重引用符で囲むと通常の検索フレーズとして扱われます。
-2. 必要に応じて「絞り込み」ボタンからサイドバーを開き、日付範囲や動画の種類などを設定します。
-3. 結果一覧と、その上の件数・条件チップが更新されます。
-4. 各行の曲名リンクで動画を開けます。
-   - サムネイル表示をONにしている場合は、サムネクリックでページ内再生もできます。
+### 通信先
 
----
+- 曲データ: GitHub Pages 上の生成済み JSON を取得します。取得できない場合だけ、Google スプレッドシートから CSV を取得します。
+- YouTube: サムネイル表示や埋め込み再生では、`youtube.com` / `youtube-nocookie.com` やサムネイル配信元と通信します。
 
-## データソース(開発者向けメモ)
+### ブラウザに保存するデータ
 
-- 公開スプレッドシートのCSVを唯一のマスターデータとし、`songs.json` / `songs-meta.json` は
-  現在表示・再生可能な行だけを収録する派生成果物として扱います。JSONを直接修正したり、
-  JSONからCSVへデータを戻したりする更新経路は設けません。
-- 起動時は小さい `startup` module からデータ取得を開始し、UI module の取得・初期化と並行して進めます。
-  取得結果は1つのPromiseを共有するため、UI到着時の二重取得や、キャッシュがある場合の不要なJSON本体取得は行いません。
-- 通常の起動時は事前生成された `data/songs-meta.json` を確認してから曲データを表示します。
-  有効なJSONキャッシュの `contentHash` が公開metaと一致すれば再利用し、異なる場合は `data/songs.json` を
-  取得・検証して初回表示に使います。キャッシュがない場合はmetaとJSON本体を並行取得します。
-- 公開側の内容を基準とし、キャッシュの生成日時が新しくても、hashが異なる公開JSONへ置き換えます。
-  meta取得失敗時もJSON本体を試します。JSON取得・検証に失敗した場合だけ有効なJSONキャッシュへ退避し、
-  キャッシュもなければネットワークCSVへ進みます。
-- `songs.json` / `songs-meta.json` はschema Version 3として、同じ `contentHash` とUTC ISO 8601形式の
-  `generatedAt` を持ちます。公開JSON本体はmetaとhashが一致するか、metaより生成日時が新しい場合に採用します。
-  metaより古いJSONや、同じ生成日時でhashが異なるJSONは採用しません。
-  `generatedAt` はcontentHashが変わった場合だけ更新するため、CSVに変更がない定期生成では差分が発生しません。
-- 有効なJSONキャッシュがある場合、公開metaとJSON本体の通信は合計で最大5秒待ちます。
-  期限を超えた通信は中断してキャッシュへ退避し、遅れて届いた応答は採用しません。
-  metaはresponse受信と本文読込に各2秒、JSON本体はresponse受信に2秒・本文読込に30秒の段階別期限も持ち、
-  共通の5秒期限と段階別期限の早い方で打ち切ります。キャッシュがない場合は段階別期限だけを適用します。
-  CSVはresponse受信に3秒・本文読込に30秒の期限を設けます。
-- 採用した公開JSONはIndexedDBへの保存を開始し、保存完了を待たずに検証済みデータを初回表示へ反映します。
-  保存が遅い場合や失敗した場合も検索・表示を利用できます。表示後の自動再取得・次回検索での差し替えは行わず、
-  キャッシュへ退避した場合も公開側の再確認はページの再読み込み時に行います。
-- 旧localStorageキャッシュの読み取りでは移行保存を待ちません。最終的に採用したJSONだけを保存し、成功後に旧キャッシュを削除します。
-- 不正・旧schemaのキャッシュは未キャッシュとして公開JSON、ネットワークCSVの順に再取得します。公開JSONを採用できれば上書きし、採用できなければ削除を非同期で開始します。
-- 公開スプレッドシートのCSVは、事前生成JSONの元データかつJSON取得失敗時のフォールバックとして参照します(`app/config.mts` の `PUBLIC_CSV_URL` で指定し、実行時は `_build/app/config.mjs` に生成された module を読みます)。
-  公開JSONも有効なJSONキャッシュも利用できない場合にCSVを取得します。CSVはキャッシュしません。
-  旧バージョンが保存したCSVキャッシュは初期データ決定後に非同期で削除します。
-- CSVの `配信上の立場` は曲データの `streamRole` としてJSONへ保持します。
-- CSVから公開対象曲を変換した直後に、必須文字列、YouTube URL・動画ID、再生範囲を全件検証します。
-  `archiveOrder`と曲参照キーの生成規則・一意性も検証します。問題がある場合はCSV行番号を報告し、
-  どちらのJSONも書き換えません。開始位置`0`と終了位置`null`は、
-  動画全体を再生する正常値として扱います。ブラウザのCSVフォールバックも同じ変換・検証を使用します。
-  行番号は検証中だけ曲候補と対にして保持し、曲データや`songs.json`へは出力しません。
-- JSONの生成・読み込み・キャッシュ復元では、リンクがHTTPSのYouTube URLであること、
-  許可ホストと動画ID形式、URLと再生用動画IDの一致を検証します。
-- `npm run validate:songs-json` は2つの派生JSONの構文とYouTube URL、
-  各曲の必須フィールド・型・未知フィールドと曲参照キーの一意性を含むスキーマ、
-  `contentHash`と`generatedAt`同士、
-  および曲配列から再計算したhashとの一致を検証します。
-- `.github/workflows/update-songs-json.yml` は GitHub Actions 上で `npm run build:songs-json` と
-  `npm run validate:songs-json` を実行し、`data/songs.json` / `data/songs-meta.json` だけに
-  差分があることを確認します。生成・検証は `contents: read` のjobで行い、差分があれば
-  2つのJSONだけをartifactとして新しいrunnerのcommit jobへ渡します。commit jobは生成時の
-  commitが現在の `main` と一致することを確認し、`APP_CLIENT_ID` repository variable と
-  `APP_PRIVATE_KEY` repository secret から現在のリポジトリだけに有効な GitHub App token を作り、
-  App の bot user としてコミットして `main` へ push します。この通常の push を起点に CI が動き、
-  差分がない場合は token 発行、コミット、CI、deploy のいずれも行いません。
-  App は対象リポジトリだけへインストールし、Repository permissions は
-  Contents の Read and write だけを付与します。
-  commit jobではnpmやartifact内のコードを実行せず、JSONを固定の2パスへコピーします。
-  生成中に `main` が進んだ場合は古いデータのコミットをskipします。
-  すべてのworkflowで外部Actionは公式releaseのcommit SHAへ固定し、checkoutでGit認証情報を残しません。
-- `.github/workflows/ci.yml` は `main` への push / pull request / 手動実行で `npm run build` を実行後、曲JSON検証・型検査・emit検査・lint・単体テストの `:raw` コマンドを実行し、生成物を再利用します。`main` の CI が成功すると `.github/workflows/deploy-pages.yml` が検証済み commit を deploy します。
-- `.github/workflows/deploy-pages.yml` は workflow 全体を `queue: max` の concurrency で直列化し、成功した CI の対象を build 前、artifact 生成後、environment 待機後の deploy action 直前に `main` と照合します。待機前に古くなった run は deploy job ごと skip し、待機中に古くなった run は古い artifact を公開せず失敗として記録します。PagesとOIDCのwrite権限はdeploy jobだけに付与し、npm実行をbuild job、公開確認を `contents: read` のverify jobへ分離しています。verify jobは公開 `deployment.json` の SHA が対象 commit と一致するまで最長10分間確認し、最後に対象 commit が引き続き `main` であることを再確認してから workflow を成功扱いにします。
-- `Deploy Pages` のいずれかの job が失敗または cancel されると、`deploy-pages-failure` label と機械判定用markerを持つ公開 Issue を作成して repository owner へ assign します。同じ障害の未解決 Issue があれば新規作成せず、対象 commit、run URL、各 job の結果、検知時刻をコメントとして追記します。その後に Pages deployと公開確認が成功した場合だけ復旧コメントを付けて Issue を閉じ、古い対象の skip では閉じません。Issue 更新前に、failureまたはrecoveryの通知を完了した新しい workflow run の有無と現在の `main` SHA を再確認し、queued、notify未完了のcancelled、failure/recoveryを生じないskip構成の run だけでは古い通知を抑止しません。Issue API は一時失敗時を含めて最大3回試行し、復旧処理を完了できない場合は notify job を失敗させます。notify jobはNode標準APIだけを使うリポジトリの通知scriptを実行し、npm依存や生成artifactを読み込みません。メールアドレス、secret、workflow log 本文は Issue に記録しません。
-- `main` の SHA 照合と Pages deploy API の実行は原子的ではないため、両者の間に `main` が進んだ場合は古い artifact が一時的に公開される可能性があります。この場合も公開後の再照合で workflow を失敗させますが、公開自体を原子的に防ぐ保証はありません。
-- `npm run build` がJavaScriptの内容ハッシュ付きファイル名とCSSの `?v=<sha256>` を決定し、HTML・preload・importのURLを揃えます。Pages artifactはURLや生成JavaScriptを書き換えず、`browser`・静的asset・曲JSONだけを `_site` へコピーします。`_build/app` はNode tests・scripts用で配布しません。明示バージョンはビルド時の `DEPLOY_CACHE_BUSTER` または `npm run build -- --cache-buster <version>` で指定します（artifactコマンドの `--cache-buster` は廃止）。deploy SHAは `deployment.json` に記録するため、曲JSONやemit側コメントだけの変更でCSS/JavaScriptのURLは変わりません。
-- フロントエンドのみで動作します(静的ホスティング想定)。
-- 配布物はHTML/CSS/JavaScriptのみで、実行時にnpm等の同梱依存はありません。
-- `ogp.png`・`apple-touch-icon.png`・`favicon-32.png` は、`design/brand/` の描画元と `favicon.svg` から
-  `npm run render:brand-assets` でリポジトリ直下へ書き出します。描画には Playwright の Chromium と
-  OSの日本語フォント（Noto Sans CJK JP）を使うため、フォントが異なる環境では文字の見た目が変わります。
-  `favicon.svg` は直接編集します。
-- `app/**/*.mts` は source として扱い、Node scriptsは `npm run build:ts` で `_build/app/**/*.mjs` に生成された module を読みます。ブラウザ用には `npm run build` がこのemit結果をesbuildで `_build/browser` のES module bundleへまとめます。生成 `.mjs` は Git 管理対象外です。fresh checkout 後や `.mts` 変更後にブラウザで確認する場合は、`npm run build` を実行し `_build` を配信してください。`build:ts` 単体ではブラウザ用bundleを更新しません。`npm run check:ts-emit` は `_build/app` の生成 `.mjs` が存在し、`app` source tree に `.mjs` が残っていないことを確認します。`npm run build` は静的 asset と TypeScript 生成 module を `_build` へ作成し、`npm run build:pages-artifact` は `_build` を元に `_site` を作成します。`npm run test:unit` / `npm run build:songs-json` / `npm run validate:songs-json` は事前に `build:ts` を実行します。`npm run build:pages-artifact` は事前に `npm run build` を実行し、`npm run test:e2e` はそのPages artifactを検証します。
-- ブラウザ用bundleは小さい起動処理、UI、共有処理へ分割し、UIと共有処理の `modulepreload` をbuild時にHTMLへ生成します。HTML解析時に必要なファイルを並行取得できるため、module依存先を順に発見する通信待ちを減らします。esbuildは開発依存のみで、実行時の外部ライブラリは追加しません。
-- サムネイル表示/埋め込み再生まわりでは YouTube Iframe API を動的に利用します。
-- `index.html` のmeta CSPでscript・画像・iframe・通信の取得元を制限します。
-  初回描画前のテーマ初期化はインラインのままSHA-256で限定して許可し、変更時はCSPのhashも更新します。
-  `tests/content-security-policy.test.mts` がhashの一致を検証します。
-  YouTube APIのloaderとwidget用path、2種類のembed host、サムネイルhost、
-  Google SheetsとCSVのredirect先だけを外部取得元として許可しています。
-  GitHub Pagesの静的HTMLで設定できるmeta方式のため、report-onlyやframe-ancestorsは設定しません。
-- ブックマークのJSONインポートは1,000,000バイトまでとし、ファイル読み込み前とJSON解析前に上限を確認します。
-  正規化・曲参照移行後も同じ上限を確認します。エクスポートは通常整形したJSONとし、
-  整形によって上限を超える場合は空白と末尾改行を省き、取り込んだデータを再取り込みできるようにします。
-- 開発時の静的解析は TypeScript noEmit typecheck と ESLint を利用します。
-- 開発時テストは Node.js 標準の `node:test` を利用します。
-- Node単体テスト・E2Eと、それぞれの共通helperはすべて `.mts` で記述します。
-  Node単体テストでは `tsx` 経由で
-  `app/**/*.mts` を直接 import します。Node scriptsを対象にするテストは、
-  scripts経由で `_build/app/**/*.mjs` も読むため事前buildが必要です。生成型宣言は使いません。
-  アプリ内部の `.mjs` import は `tsx` が対応する `.mts` source へ解決します。
-  曲fixtureは `tests/fixtures/song.mts` で共有します。
-  検索用の曲は `tests/fixtures/search-song.mts` で正規化し、factoryごとに独立した連番を持たせます。
-- アプリの型チェックは `tsconfig.json`、Node単体テストは `tsconfig.tests.json` で、どちらも `strict: true` にしています。
-  Node scriptsも `.mts` sourceを直接参照し、scriptsと単体テストの型設定は `allowJs: false` にしています。
-  scripts本体は `tsconfig.scripts.json` の `noEmit: true`・`strict: true` で、共通helperを含む `scripts/**/*.mts` 全体を対象にしています。
-  `erasableSyntaxOnly`・`verbatimModuleSyntax` を有効にし、Nodeが型を除去して実行できる構文に限定します。
-  `scripts/tsconfig.json` が同じ設定を継承し、エディターからも認識できるようにしています。
-  曲JSONスクリプトの `#app/*` import は `package.json` の `imports` で解決します。
-  TypeScriptは `types` 条件で `app/*.mts`、Nodeは `default` 条件で `_build/app/*.mjs` を参照します。
-  これにより、生成JavaScriptを再検査せずアプリの型を利用でき、型宣言の生成・コピーも不要です。
-  型はアプリのsourceと共有ドメイン型の `types/song.d.ts`・`types/search-state.d.ts` を参照します。
-  検索条件と日付キーの型はUI用ambient宣言から分離し、テストではUI・controller用の型定義を取り込みません。
-  ESLintのTypeScriptルールは `app/**/*.mts`・`scripts/**/*.mts`・`tests/**/*.mts` に直接適用し、生成物の `_build` は検査対象から除外します。
-- `npm run typecheck` と `npm run lint` は事前buildなしで実行でき、生成物を更新しません。
-  `npm run typecheck:tests:raw` と `npm run typecheck:scripts:raw` も事前buildなしで実行できます。
-  `npm run test:unit` は、Node scriptsが生成moduleを読むため、
-  事前に `build:ts` を実行します。`tsx` 自体は型チェックしないため、型チェックも併せて実行してください。
-  CIもすべての単体テストを検証します。
-- ブラウザ回帰確認として Playwright による Chromium スモークテストを用意しています。
-  `tests/e2e/support/network-mocks.mts` が曲データ用の `songs-network.mts` とYouTube用の `mock-youtube.mts` を組み合わせます。
-  曲JSON・metaのルート登録は初期・通常・遅延応答で共有します。キャッシュの読み取り・旧形式の準備・完了通知の保留は `songs-cache.mts` にまとめています。
-  E2Eは `tests/e2e/tsconfig.json` でstrictに型チェックし、`npm run typecheck` に含めています。
-  Node単体テストの設定からE2Eを除外し、ブラウザ内のテスト専用Window拡張は `tests/e2e/browser.types.d.ts` に限定します。
-  E2Eの曲fixture生成helperはアプリのTSソースを直接読みます。YouTubeモックは `tests/e2e/support/youtube-iframe-api.mts` に置き、
-  APIが要求された時点で既存のesbuildでJavaScriptへ変換して配信します。アプリの検証対象は引き続き `_site` の配布成果物です。
+使い勝手のため、次の内容をブラウザのローカルストレージまたは IndexedDB に保存します。
 
-## テスト/静的解析(開発者向け)
+- テーマ（ダーク / ライト）。未設定のときは OS の配色設定に従います。
+- サムネイル表示、プライバシー強化、アーカイブ全体を再生の ON / OFF
+- 検索状態（検索語・絞り込み条件・日付条件・選択中のブックマーク）
+- ブックマーク（名前・曲と並び順・作成日時）
+- 曲データのキャッシュ（IndexedDB）
 
-- 現在は以下のテストを用意しています。
-  - ブックマークのインポート/エクスポートUIのテスト (`tests/bookmark-import-export-ui.test.mts`)
-  - ブックマーク保存スキーマ/移行のテスト (`tests/bookmark-storage-schema.test.mts`)
-  - ブックマークJSON転送のテスト (`tests/bookmark-transfer.test.mts`)
-  - ブックマークUIのテスト (`tests/bookmark-ui.test.mts`)
-  - アプリ初期状態のテスト (`tests/app-state.test.mts`)
-  - 配信上の立場の正規化/判定テスト (`tests/stream-role.test.mts`)
-  - CSVパースのテスト (`tests/csv-parser.test.mts`)
-  - 初期データ読み込み後の状態反映テスト (`tests/data-loader.test.mts`)
-  - DOM補助関数のテスト (`tests/dom-utils.test.mts`)
-  - 日付キーと部分日付の正規化/範囲判定テスト (`tests/date-key.test.mts`, `tests/partial-date.test.mts`)
-  - 検索クエリの解析/入力エラー表示テスト (`tests/search-query.test.mts`, `tests/search-query-validation.test.mts`)
-  - 楽曲の絞り込み/おすすめ選曲テスト (`tests/search-filters.test.mts`, `tests/search-recommendation.test.mts`)
-  - 日付フィルターUI controllerのテスト (`tests/date-filter-controller.test.mts`)
-  - 検索/ブックマーク/おすすめ表示controllerのテスト (`tests/search-controller.test.mts`)
-  - 結果一覧上の条件チップ表示・解除のテスト (`tests/result-summary-controller.test.mts`)
-  - 楽曲形式の分類/選択判定テスト (`tests/song-format.test.mts`)
-  - 曲キーの生成/整合性/一意性検証テスト (`tests/song-identity.test.mts`)
-  - 検索booleanフィルター共有helperのテスト (`tests/search-boolean-filters.test.mts`)
-  - フォーマット表示ラベルのテスト (`tests/format-filter.test.mts`)
-  - Pages artifact生成とブラウザ成果物URLのテスト (`tests/pages-artifact.test.mts` / `tests/browser-build.test.mts`)
-  - サイトビルドの引数・出力先のテスト (`tests/build-site.test.mts`)
-  - Pages公開確認と配布失敗通知のテスト (`tests/pages-deployment-verification.test.mts` / `tests/deploy-pages-issue-notification.test.mts`)
-  - 通知APIクライアントのページ取得・不正応答のテスト (`tests/deploy-pages-issue-client.test.mts`)
-  - 配布確認・通知スクリプトのNode直接実行テスト (`tests/scripts-native-cli.test.mts`)
-  - 再生継続候補の選択ロジック (`tests/playback-sequence.test.mts`)
-  - 再生セッション制御のテスト (`tests/playback-session-controller.test.mts`)
-  - 再生設定値reducerのテスト (`tests/playback-settings-value-reducer.test.mts`)
-  - 描画/レイアウトまわりの回帰テスト (`tests/render-layout.test.mts`)
-  - ブックマーク時のドラッグ並び替えテスト (`tests/render-drag-reorder.test.mts`)
-  - masonryレイアウト計算のテスト (`tests/render-masonry-layout.test.mts`)
-  - レイアウト補正待機のテスト (`tests/layout-anchor.test.mts`)
-  - 結果一覧スクロール制御のテスト (`tests/results-scroll.test.mts`)
-  - 検索フィルターUI controllerのテスト (`tests/search-filters-controller.test.mts`)
-  - 検索状態保存schemaのテスト (`tests/search-state-schema.test.mts`)
-  - サイドバーUIのテスト (`tests/sidebar-ui.test.mts`)
-  - 曲データJSONのcontent hash算出テスト (`tests/songs-content-hash.test.mts`)
-  - 曲データソースのJSON優先読み込み/CSVフォールバック/キャッシュ更新テスト (`tests/songs-data-source.test.mts`)
-  - 曲データJSONキャッシュのIndexedDB/旧localStorage移行テスト (`tests/songs-json-cache.test.mts`)
-  - 曲データJSONスキーマのテスト (`tests/songs-json.test.mts`)
-  - CSV由来の曲データ品質検証テスト (`tests/songs-data-quality.test.mts`)
-  - 曲データJSON生成の書き出し前検証テスト (`tests/build-songs-json.test.mts`)
-  - 派生JSONのスキーマ・hash整合性検証テスト (`tests/songs-json-validation.test.mts`)
-  - ストレージ(ブックマーク上限/リネーム)の単体テスト (`tests/storage-bookmark-limit.test.mts`)
-  - ストレージ(検索状態保存/復元)の単体テスト (`tests/storage-search-state.test.mts`)
-  - UI設定/ストレージ互換のテスト (`tests/ui-storage-compat.test.mts`)
-  - UI同期のテスト (`tests/ui-sync.test.mts`)
-  - YouTubeサムネイル/埋め込み再生まわりの統合テスト (`tests/youtube-controller.test.mts`)
-  - YouTube埋め込みURL/API loader のテスト (`tests/youtube-embed.test.mts`)
-  - YouTube playback state / start attempt / player adapter の単体テスト (`tests/youtube-playback-state.test.mts`, `tests/youtube-playback-start-attempt.test.mts`, `tests/youtube-player-adapter.test.mts`)
-  - YouTube shared playback / thumbnail helper / unconfirmed playback start の単体テスト (`tests/youtube-shared-playback.test.mts`, `tests/youtube-thumbnail.test.mts`, `tests/youtube-unconfirmed-playback-start.test.mts`)
-  - Chromium 上での起動順序・曲キャッシュ更新・レスポンシブ描画のテスト (`tests/e2e/startup.spec.mts`, `tests/e2e/songs-cache-refresh.spec.mts`, `tests/e2e/responsive-results.spec.mts`)
-  - Chromium 上でのヘッダー自動非表示・キーボードフォーカス・reduced motionのテスト (`tests/e2e/header-auto-hide.spec.mts`)
-  - Chromium 上での検索・ブックマーク・サイドバーのテスト (`tests/e2e/search.spec.mts`, `tests/e2e/bookmarks.spec.mts`, `tests/e2e/sidebar.spec.mts`)
-  - Chromium 上での YouTube 再生スモークテスト (`tests/e2e/youtube-smoke.spec.mts`)
-- 共通helper:
-  - DOM・YouTubeのハーネス: `tests/test-helpers.mts`、`tests/youtube-harness.mts`
-  - 曲データ・検索・保存・YouTubeのfixture: `tests/fixtures/`。再生設定のfixture: `tests/support/playback-settings-fixture.mts`
-  - E2Eの通信: `tests/e2e/support/network-mocks.mts` が `songs-network.mts` と `mock-youtube.mts` を組み合わせる。
-  - E2Eのキャッシュ操作・観測: `tests/e2e/support/songs-cache.mts`
-  - E2Eの画面操作・曲生成: `tests/e2e/support/ui-helpers.mts`、`tests/e2e/support/song-fixtures.mts`
-  - ブラウザ内YouTubeモック: `tests/e2e/support/youtube-iframe-api.mts`。API要求時にesbuildでJSへ変換して配信する。
-
-### 実行コマンド
-
-通常は下表の「コマンド」を使います。「事前build」はコマンド内で自動実行する処理です。
-生成物を再利用する場合は、対象ソースの変更を反映したbuildが完了していることを確認してから、右列のコマンドを使ってください。
-右列の「なし」は対応する再利用用コマンドがないことを表します。型検査とlintは通常・`:raw` のどちらも生成物を必要としません。
-
-| コマンド | 事前build | 再利用用コマンド |
-| --- | --- | --- |
-| `npm run build:ts` | なし（このコマンドでTypeScriptをemit） | なし |
-| `npm run build` | TypeScript emit | なし |
-| `npm run build:pages-artifact` | `build` | なし |
-| `npm run build:songs-json` | `build:ts` | `npm run build:songs-json:raw` |
-| `npm run validate:songs-json` | `build:ts` | `npm run validate:songs-json:raw` |
-| `npm run typecheck` | なし | `npm run typecheck:raw`（同じ型検査） |
-| `npm run check:ts-emit` | TypeScript emit | `npm run check:ts-emit:raw` |
-| `npm run lint` | なし | `npm run lint:raw` |
-| `npm run test:unit` | `build:ts` | `npm run test:unit:raw` |
-| `npm run test:e2e` | `build:pages-artifact`（内部で `build`） | なし |
-
-型検査を領域ごとに実行する場合は、以下を使います。いずれも事前buildは不要です。
-
-- `npm run typecheck:app:raw`：アプリ
-- `npm run typecheck:scripts:raw`：Node scripts
-- `npm run typecheck:tests:raw`：Node単体テストと共通helper
-- `npm run typecheck:e2e:raw`：E2Eと共通helper
-
-### 環境準備
-
-- Node.jsはCIと同じ24.16.0を使用してください。
-- `scripts/**/*.mts` はNodeの標準の型除去機能で直接実行します（例: `node scripts/build-ts.mts`）。
-  scripts自体の事前コンパイルや `tsx` は不要です。実行時には型検査されないため、`npm run typecheck` を別途実行します。
-  曲JSONの生成・検証で参照するアプリmoduleは、従来どおり `npm run build:ts` で生成します。
-  配布確認・通知のCIジョブはNode標準moduleだけで動作し、`npm install` を必要としません。
-- 初回または `node_modules` がない環境では、検証コマンドの前に
-  `npm install` を実行してください。
-- `npm run lint` は `package.json` の devDependencies にある ESLint を
-  使う前提です。`node_modules` がない場合、環境側の古い ESLint が
-  実行されることがあります。
-- Playwright のスモークテストを初回実行する前に、以下を準備してください。
-  - `npx playwright install chromium`
-  - `python3` が PATH 上で利用できること
-- Playwright のスモークテストでは、静的サイトはローカル配信し、CSV と YouTube Iframe API は mock / fixture に差し替えて回帰確認します。
-- `npm run test:e2e` は事前に `npm run build:pages-artifact` で `_site` を作り、Playwright 側で `python3 -m http.server 4173 --bind 127.0.0.1 --directory _site` を起動して静的サイトを配信します。
-- 現時点の Playwright 対象は Chromium です。iOS Safari は別途、実機または手動スモーク確認を想定します。
-
----
-
-## 設定の保存について
-
-このツールはサーバへ設定を送信しません。ただし、使い勝手のため以下をブラウザのローカルストレージまたは IndexedDB に保存します。
-
-- テーマ(ダーク/ライト)。
-- サムネイル表示ON/OFF。
-- 再生設定(プライバシー強化ON/OFF、アーカイブ全体を再生ON/OFF)。
-- 検索状態(検索語・絞り込み条件・日付条件・選択中のブックマーク)。
-  - localStorage key は既存利用者の互換維持のため `searchStateV1` のままです。
-    payload 内の `version` は保存 schema の版数で、key 名とは独立して更新します。
-- ブックマーク情報(ブックマーク名・曲の対応/順序・作成日時)。
-  - 保存形式は version 付き payload で管理し、旧形式は読み込み後に現行形式へ保存し直します。
-- 曲データJSONのキャッシュ(IndexedDB。旧localStorageキャッシュは読み込み時に移行します)。
-- テーマはローカルストレージを優先し、未設定時のみOSの配色設定に従います。
-
-ブラウザのデータ削除を行うと、これらの保存内容はリセットされます。
-
----
+ブラウザのサイトデータを削除すると、これらはリセットされます。
 
 ## 免責事項・権利について
 
 - 本ツールはファンによる非公式プロジェクトであり、鐘輝かう様ご本人および所属団体とは関係ありません。
 - 本ツール内で表示される名称・画像・動画等の権利は各権利者に帰属します。
 - 権利者様からの修正・削除のご要望があれば、Issue等でご連絡ください。速やかに対応します。
+
+## 開発者向け
+
+- [DEVELOPMENT.md](DEVELOPMENT.md): 環境準備、コマンド、テスト、ビルドの流れ
+- [DESIGN.md](DESIGN.md): データフロー、検索ロジック、保存形式、CI・デプロイなどの設計
+- [AGENTS.md](AGENTS.md) / [WORKFLOW.md](WORKFLOW.md): コーディング規約と作業の進め方

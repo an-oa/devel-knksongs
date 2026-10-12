@@ -44,7 +44,7 @@
   - E2Eは、実ブラウザでの起動順序、保存状態、レイアウト、キーボード操作、再生の連携を検証する。曲データとYouTubeの通信はfixtureへ置き換える。
   - 共通helperは、DOM・曲データ・YouTube・キャッシュなどの担当領域ごとにモックと観測処理をまとめ、テスト本文にはシナリオと期待結果を残す。
 
-テストファイル一覧・実行コマンド・環境準備は、[READMEのテスト/静的解析](README.md#テスト静的解析開発者向け)で管理する。
+テストの配置・実行コマンド・環境準備は、[DEVELOPMENT.md](DEVELOPMENT.md)で管理する。
 
 ## 主要機能
 - 検索（曲名/アーティスト名/読み、複数キーワード）
@@ -121,29 +121,31 @@
 
 ```mermaid
 flowchart TD
-    A[IndexedDBの曲データJSONキャッシュ確認] --> B{キャッシュあり?}
-    B -- Yes --> E[JSONキャッシュでカードを表示]
-    E --> C[低優先度でmetaと必要なJSONを確認]
-    C --> D{新しい有効なJSONあり?}
-    D -- Yes --> H[IndexedDB更新と曲データ保留]
-    D -- No --> O[表示済みキャッシュを維持]
-    H --> P[次の検索操作で適用]
-    B -- No --> F[metaとsongs.jsonを並行取得]
-    F --> G{schemaと鮮度比較を通過?}
-    G -- Yes --> Q[SongRow配列を適用しIndexedDB更新]
-    G -- No --> I[公開CSVを取得]
-    I --> J{CSV取得・検証成功?}
-    J -- Yes --> K[CSVをパースしてSongRowへ正規化]
-    J -- No --> M[読込エラー]
+    A[IndexedDB / 旧localStorageの曲データJSONキャッシュ確認] --> B{有効なキャッシュあり?}
+    B -- Yes --> C[公開metaを確認（合計5秒以内）]
+    C --> D{hashが一致?}
+    D -- Yes --> E[JSONキャッシュで表示]
+    D -- No / meta取得失敗 --> F[公開songs.jsonを取得・検証]
+    F --> G{採用できる?}
+    G -- Yes --> H[公開JSONで表示し、IndexedDB保存を開始]
+    G -- No --> E
+    B -- No --> I[metaとsongs.jsonを並行取得]
+    I --> J{schemaと鮮度比較を通過?}
+    J -- Yes --> H
+    J -- No --> K[公開CSVを取得]
+    K --> L{CSV取得・検証成功?}
+    L -- Yes --> M[CSVをパースしてSongRowへ正規化]
+    L -- No --> X[読込エラー]
     E --> N[検索/ブックマーク/おすすめ/描画]
-    P --> N
-    Q --> N
-    K --> N
+    H --> N
+    M --> N
 ```
 
 ### マスターCSVと派生JSON
 - 公開スプレッドシートのCSVを唯一のマスターデータとする。JSONを直接修正する更新経路や、
   JSONからCSVへ戻す経路は持たない
+- CSVのURLは `app/config.mts` の `PUBLIC_CSV_URL` で指定する。曲JSON生成とブラウザのCSVフォールバックの両方が参照する
+- CSVの `配信上の立場` は `streamRole` としてJSONへ保持する
 - `songs.json` / `songs-meta.json` は、現在表示・再生可能な曲を配信する派生成果物とする
 - 両JSONはschema Version 3として、同じ `contentHash` とUTC ISO 8601形式の `generatedAt` を持つ。
   `generatedAt` はcontentHashが変わった場合だけ更新し、同じ内容の定期生成では引き継ぐ
@@ -157,6 +159,8 @@ flowchart TD
 - 開始位置`0`と終了位置`null`は、ショート・切り抜き・歌みたなどの動画全体を再生する正常値とする。
   非空の不正な終了時刻・画面の向きに対する既存の警告とフォールバックは維持する
 - ブラウザのCSVフォールバックも同じ変換・品質検証を通し、CSVは検証前後を問わず保存しない
+- JSONの生成・読み込み・キャッシュ復元では、リンクがHTTPSのYouTube URLであること、
+  許可ホストと動画ID形式、URLと再生用動画IDの一致を検証する
 - 派生JSONの検証では、両ファイルの構文、各曲の必須フィールド・型・未知フィールドを含むスキーマ、
   曲参照キーの生成規則と一意性、
   `contentHash`と`generatedAt`同士の一致、曲配列から再計算したhashとの一致だけを確認し、
@@ -338,6 +342,10 @@ flowchart LR
 - 最新曲データで解決できない文字列の曲参照は削除せず保持し、将来同じ参照の曲が復帰したときに再解決する。
   旧形式の数値参照は安定した識別子ではないため、読み込み・インポート時に除外する
 - エクスポートするJSONはブックマーク保存 payload と同じ構造にし、インポート時は同じ検証/移行を通してから全置き換えで保存する
+- 上限はブックマーク数20件、1ブックマークあたり120曲、ブックマーク名64文字とする
+- インポートは1,000,000バイトまでとし、ファイル読み込み前とJSON解析前に上限を確認する。
+  正規化・曲参照移行後も同じ上限を確認する。エクスポートは通常整形したJSONとし、
+  整形によって上限を超える場合は空白と末尾改行を省き、エクスポートしたデータを再インポートできるようにする
 
 IndexedDB保存：
 - 曲データJSONキャッシュ
@@ -347,7 +355,7 @@ IndexedDB保存：
     JSON本体とmetaの整合性検証は維持し、meta取得失敗時はJSON本体だけで検証する
   - 有効なキャッシュがあればmetaとJSON本体の通信を合計5秒以内に制限し、取得・検証失敗時はキャッシュへ退避する。
     各通信段階の既存期限も維持し、早い方で打ち切る。キャッシュがなければ既存期限でmetaと本体を並行取得し、失敗時はCSVへ進む
-  - 採用した公開JSONは保存後に初回表示へ反映する。表示後は自動再取得せず、再読み込み時に公開側を確認する
+  - 採用した公開JSONは保存を開始し、完了を待たず初回表示へ反映する。表示後は自動再取得せず、再読み込み時に公開側を確認する
   - 旧localStorageの曲データJSONキャッシュは読み込み時に移行し、移行成功後に旧キャッシュを削除する
   - 廃止済みCSVキャッシュのIndexedDB keyは、起動時に削除する
 
@@ -367,8 +375,8 @@ IndexedDB保存：
 - `aria-label` / `aria-modal` / `aria-hidden`
 
 ## パフォーマンス
-- 曲データJSONをIndexedDBにキャッシュし、有効なキャッシュがあればネットワークを待たず初期表示に利用する
-- `songs-meta.json` のcontent hashと生成日時を低優先度で確認し、大きい `songs.json` の取得頻度を抑える
+- 曲データJSONをIndexedDBにキャッシュし、初回表示前に `songs-meta.json` のcontent hashが一致すれば大きい `songs.json` の取得を省く
+- 有効なキャッシュがある場合はmetaとJSON本体の通信を合計5秒以内に制限し、期限切れや失敗時はキャッシュで表示する
 - 有効なキャッシュがない場合はmetaとJSON本体を並行取得する
 - metaはresponse受信と本文読込に各2秒、JSON本体はresponse受信に2秒・本文読込に30秒、CSVは
   response受信に3秒・本文読込に30秒の期限を設け、低速な本文転送と通信停止を分けて扱う
@@ -399,3 +407,56 @@ IndexedDB保存：
 - URL決定の仕様変更は `scripts/build-browser.mts` と `tests/browser-build.test.mts` を合わせて更新する
 - `songs.json` / `songs-meta.json` の内容更新だけでは cache buster を上げず、`contentHash` による鮮度確認で反映する
 - 日付入力はセレクト方式（ブラウザ互換性優先）
+
+## セキュリティ
+- `index.html` のmeta CSPでscript・画像・iframe・通信の取得元を制限する
+- 初回描画前のテーマ初期化はインラインのままSHA-256で限定して許可する。変更時はCSPのhashも更新し、
+  `tests/content-security-policy.test.mts` でhashの一致を検証する
+- 外部取得元として許可するのは、YouTube APIのloaderとwidget用path、2種類のembed host、サムネイルhost、
+  Google SheetsとCSVのredirect先だけとする
+- GitHub Pagesの静的HTMLで設定できるmeta方式のため、report-onlyやframe-ancestorsは設定しない
+
+## CI・デプロイ
+3つのworkflowで、曲データ更新・検証・公開を分担する。
+
+| Workflow | 起動条件 | 役割 |
+| --- | --- | --- |
+| `update-songs-json.yml` | 1日2回の定期実行 / 手動実行 | CSVから曲JSONを生成・検証し、差分があれば `main` へコミットする |
+| `ci.yml` | `main` へのpush / PR / 手動実行 | build後に曲JSON検証・型検査・emit検査・lint・単体テストを実行する |
+| `deploy-pages.yml` | `main` のCI成功 | 検証済みcommitをGitHub Pagesへdeployし、公開を確認する |
+
+### 曲データ更新（update-songs-json.yml）
+- `npm run build:songs-json` と `npm run validate:songs-json` を実行し、`data/songs.json` / `data/songs-meta.json` だけに差分があることを確認する
+- 生成・検証は `contents: read` のjobで行い、差分があれば2つのJSONだけをartifactとして新しいrunnerのcommit jobへ渡す
+- commit jobは生成時のcommitが現在の `main` と一致することを確認し、`APP_CLIENT_ID` repository variable と
+  `APP_PRIVATE_KEY` repository secret から現在のリポジトリだけに有効な GitHub App token を作る。
+  App の bot user としてコミットして `main` へ push し、この通常の push を起点に CI を動かす
+- App は対象リポジトリだけへインストールし、Repository permissions は Contents の Read and write だけを付与する
+- commit jobではnpmやartifact内のコードを実行せず、JSONを固定の2パスへコピーする
+- 差分がない場合は token 発行、コミット、CI、deploy のいずれも行わない。生成中に `main` が進んだ場合は古いデータのコミットをskipする
+
+### CI（ci.yml）
+- `npm run build` を実行後、曲JSON検証・型検査・emit検査・lint・単体テストの `:raw` コマンドを実行し、生成物を再利用する
+
+### 公開（deploy-pages.yml）
+- workflow 全体を `queue: max` の concurrency で直列化し、成功した CI の対象を build 前、artifact 生成後、
+  environment 待機後の deploy action 直前に `main` と照合する
+- 待機前に古くなった run は deploy job ごと skip し、待機中に古くなった run は古い artifact を公開せず失敗として記録する
+- PagesとOIDCのwrite権限はdeploy jobだけに付与し、npm実行をbuild job、公開確認を `contents: read` のverify jobへ分離する
+- verify jobは公開 `deployment.json` の SHA が対象 commit と一致するまで最長10分間確認し、
+  最後に対象 commit が引き続き `main` であることを再確認してから workflow を成功扱いにする
+- `main` の SHA 照合と Pages deploy API の実行は原子的ではない。両者の間に `main` が進んだ場合は古い artifact が一時的に公開される可能性があり、
+  公開後の再照合で workflow を失敗させるが、公開自体を原子的に防ぐ保証はない
+
+### 配布失敗通知
+- `Deploy Pages` のいずれかの job が失敗または cancel されると、`deploy-pages-failure` label と機械判定用markerを持つ公開 Issue を作成して repository owner へ assign する
+- 同じ障害の未解決 Issue があれば新規作成せず、対象 commit、run URL、各 job の結果、検知時刻をコメントとして追記する
+- その後に Pages deployと公開確認が成功した場合だけ復旧コメントを付けて Issue を閉じ、古い対象の skip では閉じない
+- Issue 更新前に、failureまたはrecoveryの通知を完了した新しい workflow run の有無と現在の `main` SHA を再確認する。
+  queued、notify未完了のcancelled、failure/recoveryを生じないskip構成の run だけでは古い通知を抑止しない
+- Issue API は一時失敗時を含めて最大3回試行し、復旧処理を完了できない場合は notify job を失敗させる
+- notify jobはNode標準APIだけを使うリポジトリの通知scriptを実行し、npm依存や生成artifactを読み込まない
+- メールアドレス、secret、workflow log 本文は Issue に記録しない
+
+### 共通
+- すべてのworkflowで外部Actionは公式releaseのcommit SHAへ固定し、checkoutでGit認証情報を残さない

@@ -118,7 +118,7 @@ feat: move settings into dedicated sidebar panel
 
 ## Verification
 
-- 初回または `node_modules` がない環境では、README.md の開発者向け準備に従い
+- 初回または `node_modules` がない環境では、DEVELOPMENT.md の環境準備に従い
   `npm install` を実行してから検証する。
 - JavaScript や型定義を変更したときは、静的解析として `npm run typecheck` と
   `npm run lint` を基本の確認手順として実行する。
@@ -186,6 +186,7 @@ feat: move settings into dedicated sidebar panel
 | --- | --- | --- |
 | `AGENTS.md` | UTF-8 BOMなし | LF |
 | `DESIGN.md` | UTF-8 BOMなし | LF |
+| `DEVELOPMENT.md` | UTF-8 BOMなし | LF |
 | `README.md` | UTF-8 BOMなし | LF |
 | `WORKFLOW.md` | UTF-8 BOMなし | LF |
 | `index.html` | UTF-8 BOMなし | LF |

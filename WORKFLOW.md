@@ -16,7 +16,7 @@
 4. **テスト実行**
    - 変更影響に応じたテストを実行
    - 既存テストを回すだけでなく、バグ修正や仕様追加に対応する回帰テストを必要に応じて追加
-   - 初回または `node_modules` がない環境では、README.md の開発者向け準備に従い
+   - 初回または `node_modules` がない環境では、DEVELOPMENT.md の環境準備に従い
      `npm install` を実行してから検証する。
    - `app/**/*.mts` / 型定義 / JavaScript 変更時の基本コマンド:
      - `npm run typecheck`
