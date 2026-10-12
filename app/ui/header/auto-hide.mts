@@ -90,6 +90,24 @@ export function createAutoHideHeaderController(input: AutoHideHeaderControllerIn
     }
 
     /**
+     * ヘッダーの高さを、上端付近で常に表示する範囲として測り直す。
+     * 狭い画面ではヘッダーが 2 段になるため、画面幅の変更に追従させる。
+     */
+    function measureTopVisibilityBoundary(): void {
+        const header = getHeader();
+        if (!header) return;
+        topVisibilityBoundary = Math.max(0, header.getBoundingClientRect().height);
+    }
+
+    /**
+     * 画面幅の変更でヘッダーの高さが変わった場合に、表示判定の範囲を更新して再判定する。
+     */
+    function handleResize(): void {
+        measureTopVisibilityBoundary();
+        scheduleScrollSync();
+    }
+
+    /**
      * 現在位置と直前からの移動方向に応じてヘッダー表示を同期する。
      */
     function syncHeaderForScroll(): void {
@@ -154,9 +172,10 @@ export function createAutoHideHeaderController(input: AutoHideHeaderControllerIn
         const header = getHeader();
         if (!header) return;
         isSetup = true;
-        topVisibilityBoundary = Math.max(0, header.getBoundingClientRect().height);
+        measureTopVisibilityBoundary();
         showHeaderFrom(getPageScrollY());
         window.addEventListener("scroll", scheduleScrollSync, { passive: true });
+        window.addEventListener("resize", handleResize);
         window.addEventListener("pageshow", handlePageShow);
         header.addEventListener("focusin", handleHeaderFocusIn);
         header.addEventListener("focusout", handleHeaderFocusOut);

@@ -213,3 +213,25 @@ test("auto-hide header: coalesces scroll events into one animation frame", () =>
         restoreDom();
     }
 });
+
+test("auto-hide header: resizing to a taller header keeps it visible within the new height", () => {
+    const restoreDom = installFakeDom();
+    try {
+        const { header } = setupHeaderController();
+
+        // 狭い画面ではヘッダーが 2 段になり、高さが 60px から 108px へ変わる。
+        getFakeElement(header)._rect = { top: 0, bottom: 108, left: 0, right: 300, width: 300, height: 108 };
+        invokeListener(restoreDom.window, "resize", {});
+
+        scrollPageTo(restoreDom.window, 80);
+        assert.equal(header.classList.contains("is-auto-hidden"), false);
+        scrollPageTo(restoreDom.window, 108);
+        assert.equal(header.classList.contains("is-auto-hidden"), false);
+        scrollPageTo(restoreDom.window, 123);
+        assert.equal(header.classList.contains("is-auto-hidden"), false);
+        scrollPageTo(restoreDom.window, 124);
+        assert.equal(header.classList.contains("is-auto-hidden"), true);
+    } finally {
+        restoreDom();
+    }
+});

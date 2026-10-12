@@ -1202,6 +1202,8 @@ input[type="text"][aria-invalid="true"] {
 .slider:before { position: absolute; content: ""; height: 12px; width: 12px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: transform .4s; }
 input:checked + .slider { background: var(--primary-color); }
 input:checked + .slider:before { transform: translateX(16px); }
+/* ダークの ON は地が金色になるため、白いつまみでは区別できない。つまみを濃色にして 3:1 以上を保つ。 */
+:root.dark-theme input:checked + .slider:before { background: #1b1b1b; }
 .switch input:focus + .slider {
   outline: 3px solid var(--focus-ring-color);
   outline-offset: 3px;
