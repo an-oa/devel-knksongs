@@ -34,40 +34,30 @@ export function suppressYoutubeThumbnailImageSaveActions(img: Element | null | u
 }
 
 /**
- * 遅延読み込み用のサムネイル画像要素を生成する。
- * @param {string} videoId
- * @returns {HTMLImageElement | null}
+ * サムネイル画像要素を生成する。
+ * 読み込みはブラウザ標準の遅延読み込みに任せ、画面に近づいてから取得させる。
+ * @param videoId サムネイルを表示する YouTube 動画 ID
+ * @returns サムネイル画像。DOM を使えない環境では null
  */
 export function createYoutubeThumbnailImage(videoId: string) {
     if (!canUseDom()) return null;
     const img = document.createElement("img");
-    img.dataset.src = `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
+    // src より先に指定し、生成した時点で読み込みが始まらないようにする。
+    img.loading = "lazy";
+    img.src = `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
     suppressYoutubeThumbnailImageSaveActions(img);
     return img;
 }
 
 /**
  * サムネイル画像をコンテナへ適用する。
- * @param {HTMLElement} thumbDiv
- * @param {string} videoId
- * @param {{ eager?: boolean }} [options]
+ * @param thumbDiv 画像を置くサムネイル要素
+ * @param videoId サムネイルを表示する YouTube 動画 ID
  */
-export function applyYoutubeThumbnailImage(thumbDiv: HTMLElement, videoId: string, options?: { eager?: boolean }) {
+export function applyYoutubeThumbnailImage(thumbDiv: HTMLElement, videoId: string) {
     const img = createYoutubeThumbnailImage(videoId);
     if (!isHtmlElement(img)) return;
-    if (options?.eager && img.dataset.src) img.src = img.dataset.src;
     thumbDiv.replaceChildren(img);
-}
-
-/**
- * サムネイルを即時読み込みすべき可視領域内か判定する。
- * @param {HTMLElement} thumbDiv
- * @returns {boolean}
- */
-export function shouldLoadYoutubeThumbnailNow(thumbDiv: HTMLElement) {
-    const rect = thumbDiv.getBoundingClientRect();
-    const viewHeight = window.innerHeight || document.documentElement.clientHeight;
-    return rect.bottom > 0 && rect.top < viewHeight;
 }
 
 /**

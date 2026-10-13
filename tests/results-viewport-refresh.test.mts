@@ -45,7 +45,6 @@ test("results viewport refresh: resize refreshes recommendations before masonry 
         getFakeElement(resultList)._clientWidth = 320;
         let recommendationRefreshCount = 0;
         let layoutRefreshCount = 0;
-        let scrollObserverSetupCount = 0;
         const disconnect = setupResultsViewportRefresh({
             resultList,
             refreshRecommendedDisplay() {
@@ -54,9 +53,6 @@ test("results viewport refresh: resize refreshes recommendations before masonry 
             },
             refreshLayout() {
                 layoutRefreshCount += 1;
-            },
-            setupScrollObserver() {
-                scrollObserverSetupCount += 1;
             }
         });
 
@@ -67,7 +63,6 @@ test("results viewport refresh: resize refreshes recommendations before masonry 
         assert.equal(recommendationRefreshCount, 0);
 
         frames.advanceFrame();
-        assert.equal(scrollObserverSetupCount, 1);
         assert.equal(recommendationRefreshCount, 1);
         assert.equal(layoutRefreshCount, 0);
 
@@ -88,7 +83,6 @@ test("results viewport refresh: non-recommended resize refreshes masonry layout"
 
         let recommendationRefreshCount = 0;
         let layoutRefreshCount = 0;
-        let scrollObserverSetupCount = 0;
         setupResultsViewportRefresh({
             resultList: document.createElement("ol"),
             refreshRecommendedDisplay() {
@@ -97,15 +91,11 @@ test("results viewport refresh: non-recommended resize refreshes masonry layout"
             },
             refreshLayout() {
                 layoutRefreshCount += 1;
-            },
-            setupScrollObserver() {
-                scrollObserverSetupCount += 1;
             }
         });
 
         invokeListener(restoreDom.window, "resize", {});
 
-        assert.equal(scrollObserverSetupCount, 1);
         assert.equal(recommendationRefreshCount, 1);
         assert.equal(layoutRefreshCount, 1);
     } finally {
@@ -124,8 +114,7 @@ test("results viewport refresh: disconnect removes the resize listener and cance
         const disconnect = setupResultsViewportRefresh({
             resultList: document.createElement("ol"),
             refreshRecommendedDisplay: () => false,
-            refreshLayout: () => { layoutCalls += 1; },
-            setupScrollObserver() {}
+            refreshLayout: () => { layoutCalls += 1; }
         });
 
         invokeListener(cleanup.window, "resize", {});

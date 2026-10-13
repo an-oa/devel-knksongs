@@ -103,7 +103,6 @@ test("settings: failed writes still apply theme, thumbnail rendering and playbac
         const { ui, controller } = createPlaybackSettingsFixture({
             callbacks: {
                 updateDisplay: () => { calls.push("render"); },
-                setupScrollObserver: () => { calls.push("observe"); },
                 restoreActivePlayback: () => { calls.push("restore playback"); }
             }
         });
@@ -116,7 +115,7 @@ test("settings: failed writes still apply theme, thumbnail rendering and playbac
         invokeListener(ui.el.youtubeNoCookieToggle, "change", {});
         assert.equal(ui.playback.useYoutubeNoCookie, true);
         assert.equal(ui.el.youtubeNoCookieToggle.checked, true);
-        assert.deepEqual(calls, ["render", "observe", "restore playback"]);
+        assert.deepEqual(calls, ["render", "restore playback"]);
     } finally {
         globalThis.localStorage = prevLocalStorage;
         restoreDom();

@@ -44,8 +44,6 @@ function createRenderUiState<Elements extends {
     selectedFormats?: Set<string>;
     dataReady?: boolean;
     activeThumb?: HTMLElement | null;
-    showThumbnails?: boolean;
-    scrollObserver?: IntersectionObserver | null;
     cardEntriesBySongKey?: Map<string, import("../app/state.types").RenderCardEntry>;
 }) {
     return {
@@ -64,9 +62,7 @@ function createRenderUiState<Elements extends {
             pendingValues: null
         },
         playback: {
-            activeThumb: input.activeThumb ?? null,
-            showThumbnails: input.showThumbnails ?? false,
-            scrollObserver: input.scrollObserver ?? null
+            activeThumb: input.activeThumb ?? null
         },
         render: {
             cardEntriesBySongKey: input.cardEntriesBySongKey ?? new Map<string, import("../app/state.types").RenderCardEntry>()
@@ -90,7 +86,6 @@ function createRenderCallbacks(input: Partial<Parameters<typeof createRenderCont
         playThumbnail: callbacks.playThumbnail || (() => playbackStartResult(YOUTUBE_PLAYBACK_START_STATUS.FAILED)),
         restoreActivePlayback: callbacks.restoreActivePlayback || (() => {}),
         openBookmarkModal: callbacks.openBookmarkModal || (() => {}),
-        setupScrollObserver: callbacks.setupScrollObserver || (() => {}),
         removeSongFromActiveBookmark: callbacks.removeSongFromActiveBookmark || (() => {}),
         moveSongInActiveBookmark: callbacks.moveSongInActiveBookmark || (() => ({ ok: true, changed: false })),
         notifyBookmarkSaveError: callbacks.notifyBookmarkSaveError || (() => {})
@@ -509,7 +504,6 @@ test("render: playSongByKey expands display limit and starts playback for hidden
             activeBookmark: null
         });
         const ui = createRenderUiState({
-            showThumbnails: true,
             el: {
                 resultList: document.createElement("div"),
                 resultTailSentinel: document.createElement("div")
@@ -564,7 +558,6 @@ test("render: playSongByKey expands display limit in increment-sized chunks", as
             activeBookmark: null
         });
         const ui = createRenderUiState({
-            showThumbnails: true,
             el: {
                 resultList: document.createElement("div"),
                 resultTailSentinel: document.createElement("div")

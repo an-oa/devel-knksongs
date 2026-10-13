@@ -26,7 +26,6 @@ test("app state: playback runtime defaults come from playback setting defaults",
     const playback = createInitialPlaybackUiRuntimeState();
 
     assert.deepEqual(pickPlaybackSettingValues(playback), INITIAL_PLAYBACK_SETTING_VALUES);
-    assert.equal(playback.scrollObserver, null);
     assert.equal(playback.activeThumb, null);
 });
 
@@ -35,6 +34,5 @@ test("app state: appState playback uses the shared initial state helper", () => 
         pickPlaybackSettingValues(appState.ui.playback),
         INITIAL_PLAYBACK_SETTING_VALUES
     );
-    assert.equal(appState.ui.playback.scrollObserver, null);
     assert.equal(appState.ui.playback.activeThumb, null);
 });

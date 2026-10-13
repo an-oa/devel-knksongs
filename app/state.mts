@@ -31,7 +31,6 @@ export const YT_IFRAME_READY_POLL_MS = 50;
  */
 export function createInitialPlaybackUiRuntimeState(): PlaybackUiRuntimeState {
     return {
-        scrollObserver: null,
         ...INITIAL_PLAYBACK_SETTING_VALUES,
         activeThumb: null
     };

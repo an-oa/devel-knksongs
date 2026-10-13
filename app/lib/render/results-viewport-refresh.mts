@@ -2,20 +2,18 @@ type ResultsViewportRefreshInput = {
     resultList?: HTMLElement | null;
     refreshRecommendedDisplay: () => boolean;
     refreshLayout: () => void;
-    setupScrollObserver: () => void;
 };
 
 /**
  * viewport や結果一覧のサイズ変更に合わせて、結果表示に関わる再描画をまとめて行う。
- * おすすめ件数、masonry 配置、YouTube thumbnail observer を同じ frame で更新する。
- * @param {ResultsViewportRefreshInput} input
- * @returns {() => void}
+ * おすすめ件数と masonry 配置を同じ frame で更新する。
+ * @param input 監視する結果一覧と、おすすめ件数・配置の更新処理
+ * @returns 監視を解除する関数
  */
 export function setupResultsViewportRefresh({
     resultList,
     refreshRecommendedDisplay,
-    refreshLayout,
-    setupScrollObserver
+    refreshLayout
 }: ResultsViewportRefreshInput): () => void {
     let pendingFrameId: number | null = null;
     let lastObservedWidth: number | null = null;
@@ -26,7 +24,6 @@ export function setupResultsViewportRefresh({
      */
     function refreshForCurrentViewport(): void {
         pendingFrameId = null;
-        setupScrollObserver();
         if (!refreshRecommendedDisplay()) {
             refreshLayout();
         }
