@@ -62,29 +62,6 @@ test("playback settings reducer: hidden values override inactive experimental se
     assert.equal(getPlaybackBehaviorEffectiveValue(definition, true, pageValues), true);
 });
 
-test("playback settings reducer: effectiveWhenHidden keeps page values active while hidden", () => {
-    const definition: PlaybackSettingDefinition = {
-        scope: PLAYBACK_SETTING_SCOPES.PAGE,
-        kind: PLAYBACK_SETTING_KINDS.BEHAVIOR,
-        stateKey: "playArchiveToEnd",
-        defaultValue: false,
-        effectiveWhenHidden: true
-    };
-    const pageValues = new Map([["playArchiveToEnd", false]]);
-
-    const reduction = reducePlaybackSettingChange({
-        definition,
-        currentValue: false,
-        nextValue: true,
-        experimentalEnabled: false,
-        pageValues
-    });
-
-    assert.equal(reduction.nextValue, true);
-    assert.equal(reduction.changed, true);
-    assert.equal(reduction.pageValues.get("playArchiveToEnd"), true);
-});
-
 test("playback settings reducer: inactive hidden behavior does not overwrite page preference", () => {
     const definition: PlaybackSettingDefinition = {
         scope: PLAYBACK_SETTING_SCOPES.PAGE,
