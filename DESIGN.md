@@ -400,6 +400,7 @@ IndexedDB保存：
 - サムネ遅延読み込み（IntersectionObserver）
 
 ## 制約・注意点
+- IntersectionObserver を前提とし、非対応ブラウザは対象外とする。結果一覧の段階表示とサムネイルの遅延読み込みに使い、代替の監視は持たない
 - iOSでは埋め込み再生に制約あり
 - `scripts/build-browser.mts` がesbuildの内容ハッシュ付きファイル名を使い、entry・chunk・HTMLのmodulepreloadのURLを決定する
 - CSSは同じビルド工程で内容のSHA-256を `styles.css?v=...` としてHTMLへ反映する
