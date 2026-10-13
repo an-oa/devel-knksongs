@@ -231,20 +231,6 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
     }
 
     /**
-     * 現在モードに応じて作成フォームの表示を更新する。
-     */
-    function syncBookmarkPanelMode() {
-        const createWrap = ui.el.bookmarkPanelCreate;
-        const nameInput = ui.el.bookmarkPanelNewName;
-        const createBtn = ui.el.bookmarkPanelCreateBtn;
-        if (!createWrap || !nameInput || !createBtn) return;
-
-        createWrap.hidden = false;
-        nameInput.placeholder = "新規ブックマーク名";
-        createBtn.textContent = "作成";
-    }
-
-    /**
      * 空状態表示を生成する。
      * @param {string} message
      */
@@ -352,8 +338,6 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
     function renderBookmarks() {
         const container = ui.el.bookmarkList;
         if (!container) return;
-
-        syncBookmarkPanelMode();
 
         const listFocus = captureBookmarkListFocus(container);
         const sortedIds = getSortedBookmarkIds();

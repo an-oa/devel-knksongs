@@ -26,7 +26,6 @@ type SearchControllerInput = {
     };
     searchFiltersController: {
         areAllFormatsSelected: () => boolean;
-        areFormatsDefault: () => boolean;
     };
     dateFilterController: Pick<ReturnType<typeof createDateFilterController>, "getPartialDateRange">;
     constants: {
@@ -274,7 +273,6 @@ export function createSearchController({
         refreshRecommendedDisplay,
         getSearchState,
         isRecommendedMode,
-        areAllFormatsSelected: searchFiltersController.areAllFormatsSelected,
-        areFormatsDefault: searchFiltersController.areFormatsDefault
+        areAllFormatsSelected: searchFiltersController.areAllFormatsSelected
     };
 }
