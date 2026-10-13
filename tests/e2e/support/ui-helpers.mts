@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
 /**
  * 初期データ読み込み完了まで待機する。
@@ -176,9 +176,26 @@ export async function expectBookmarkToast(page: Page, message: string) {
 }
 
 /**
- * ブックマーク管理パネルを開く。
+ * ブックマーク管理パネルを開く。曲の追加後などでサイドバーが閉じていれば先に開く。
  */
 export async function openBookmarkPanel(page: Page) {
+    if (await page.locator("#sidebar").getAttribute("aria-hidden") !== "false") {
+        await openSidebar(page);
+    }
     await page.locator("#open-bookmark-panel").click();
     await expect(page.locator("#bookmark-sidebar-panel")).toBeVisible();
+}
+
+/**
+ * 対象の要素にフォーカスが届くまで Tab キーを押し、キーボードだけで到達できることを確かめる。
+ * @param page 操作するページ
+ * @param target フォーカスを届かせたい要素
+ * @param maxPresses 到達を諦めるまでに押す Tab の回数
+ */
+export async function pressTabUntilFocused(page: Page, target: Locator, maxPresses = 12) {
+    for (let pressCount = 0; pressCount < maxPresses; pressCount += 1) {
+        if (await target.evaluate((element) => element === document.activeElement)) return;
+        await page.keyboard.press("Tab");
+    }
+    await expect(target).toBeFocused();
 }

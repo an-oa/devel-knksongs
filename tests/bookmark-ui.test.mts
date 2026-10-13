@@ -114,6 +114,8 @@ function createBookmarkHarness(options: {
     onExportBookmarksResult?: ReturnType<BookmarkUiCallbacks["onExportBookmarks"]>;
     onPreviewBookmarkImportResult?: ReturnType<BookmarkUiCallbacks["onPreviewBookmarkImport"]>;
     onImportBookmarksTextResult?: ReturnType<BookmarkUiCallbacks["onImportBookmarksText"]>;
+    /** 選択・解除・削除の成功時に state を更新し、本番の storage と同じく一覧を再描画する。 */
+    rerenderOnStateChange?: boolean;
 } = {}) {
     const data: Parameters<typeof createBookmarkUiController>[0]["data"] = {
         allSongsRaw: options.allSongsRaw || [
@@ -162,10 +164,18 @@ function createBookmarkHarness(options: {
     const callbacks: BookmarkUiCallbacks = {
         onSelectActiveBookmark(bookmarkId) {
             calls.selectActiveBookmarkArgs.push(bookmarkId);
+            if (options.rerenderOnStateChange) {
+                data.activeBookmark = bookmarkId;
+                controller.renderBookmarks();
+            }
             return { ok: true };
         },
         onClearActiveBookmark() {
             calls.clearActiveBookmark += 1;
+            if (options.rerenderOnStateChange) {
+                data.activeBookmark = null;
+                controller.renderBookmarks();
+            }
             return { ok: true };
         },
         onAddSongToBookmark(bookmarkId, songKey) {
@@ -193,7 +203,12 @@ function createBookmarkHarness(options: {
         },
         onDeleteBookmark(bookmarkId) {
             calls.deleteBookmarkArgs.push(bookmarkId);
-            return options.onDeleteBookmarkResult ?? { ok: true };
+            const result = options.onDeleteBookmarkResult ?? { ok: true };
+            if (options.rerenderOnStateChange && result.ok) {
+                delete data.bookmarks[bookmarkId];
+                controller.renderBookmarks();
+            }
+            return result;
         },
         onRenameBookmark(bookmarkId, name) {
             calls.renameBookmarkArgs.push([bookmarkId, name]);
@@ -234,12 +249,24 @@ function createBookmarkHarness(options: {
         }
     };
 
+    const controller = createBookmarkUiController({ data, ui, callbacks });
     return {
         data,
         ui,
         calls,
-        controller: createBookmarkUiController({ data, ui, callbacks })
+        controller
     };
+}
+
+/**
+ * ブックマーク項目内の操作ボタンを返す。
+ * @param item ブックマーク項目
+ * @param selector 操作ボタンのセレクター
+ */
+function getBookmarkItemControl(item: HTMLElement, selector: string) {
+    const control = item.querySelector<HTMLElement>(selector);
+    assert.ok(control, `${selector} is missing`);
+    return control;
 }
 
 test("bookmark ui: selecting a bookmark delegates the intent to state management", () => {
@@ -270,7 +297,98 @@ test("bookmark ui: clearing a bookmark delegates the intent to state management"
     }
 });
 
-test("bookmark ui: add mode success adds to existing bookmark and closes the panel", () => {
+test("bookmark ui: items place a select button beside rename and delete buttons", () => {
+    const restoreDom = installFakeDom();
+    try {
+        const { ui, controller } = createBookmarkHarness({ activeBookmark: "bookmark-2" });
+        controller.renderBookmarks();
+
+        const firstItem = findBookmarkItem(ui, "bookmark-1");
+        const firstSelect = firstItem.querySelector<HTMLButtonElement>(".bookmark-item-select");
+        assert.ok(firstSelect);
+        assert.equal(firstSelect.type, "button");
+        assert.equal(firstSelect.getAttribute("aria-pressed"), "false");
+        assert.equal(getBookmarkItemControl(firstItem, ".bookmark-item-name").textContent, "First");
+        assert.equal(getBookmarkItemControl(firstItem, ".bookmark-item-count").textContent, "1");
+        for (const selector of [".bookmark-rename-btn", ".bookmark-delete-btn"]) {
+            const control = getBookmarkItemControl(firstItem, selector);
+            assert.equal(control.parentElement, firstItem, `${selector} must not be nested in the select button`);
+        }
+
+        const secondItem = findBookmarkItem(ui, "bookmark-2");
+        assert.equal(secondItem.classList.contains("active"), true);
+        assert.equal(getBookmarkItemControl(secondItem, ".bookmark-item-select").getAttribute("aria-pressed"), "true");
+
+        controller.openBookmarkModal("song-z", {});
+        const addingItem = findBookmarkItem(ui, "bookmark-1");
+        assert.equal(getBookmarkItemControl(addingItem, ".bookmark-item-select").hasAttribute("aria-pressed"), false);
+        assert.equal(addingItem.querySelector(".bookmark-rename-btn"), null);
+        assert.equal(addingItem.querySelector(".bookmark-delete-btn"), null);
+    } finally {
+        restoreDom();
+    }
+});
+
+test("bookmark ui: selecting and clearing keep focus on the same bookmark after re-render", () => {
+    const restoreDom = installFakeDom();
+    try {
+        const { ui, calls, controller } = createBookmarkHarness({ rerenderOnStateChange: true });
+        controller.renderBookmarks();
+
+        const firstItem = findBookmarkItem(ui, "bookmark-1");
+        const selectButton = getBookmarkItemControl(firstItem, ".bookmark-item-select");
+        selectButton.focus();
+        invokeListener(firstItem, "click", { target: selectButton, stopPropagation() {} });
+
+        const selectedItem = findBookmarkItem(ui, "bookmark-1");
+        const selectedButton = getBookmarkItemControl(selectedItem, ".bookmark-item-select");
+        assert.deepEqual(calls.selectActiveBookmarkArgs, ["bookmark-1"]);
+        assert.notEqual(selectedItem, firstItem);
+        assert.equal(selectedButton.getAttribute("aria-pressed"), "true");
+        assert.equal(document.activeElement, selectedButton);
+
+        invokeListener(selectedItem, "click", { target: selectedButton, stopPropagation() {} });
+
+        const clearedButton = getBookmarkItemControl(findBookmarkItem(ui, "bookmark-1"), ".bookmark-item-select");
+        assert.equal(calls.clearActiveBookmark, 1);
+        assert.equal(clearedButton.getAttribute("aria-pressed"), "false");
+        assert.equal(document.activeElement, clearedButton);
+    } finally {
+        restoreDom();
+    }
+});
+
+test("bookmark ui: deleting a focused bookmark moves focus to a nearby bookmark or the create field", () => {
+    const restoreDom = installFakeDom();
+    const previousConfirm = globalThis.confirm;
+    globalThis.confirm = () => true;
+    try {
+        const { ui, calls, controller } = createBookmarkHarness({ rerenderOnStateChange: true });
+        controller.renderBookmarks();
+
+        const firstItem = findBookmarkItem(ui, "bookmark-1");
+        const firstDelete = getBookmarkItemControl(firstItem, ".bookmark-delete-btn");
+        firstDelete.focus();
+        invokeListener(firstItem, "click", { target: firstDelete, stopPropagation() {} });
+
+        const secondItem = findBookmarkItem(ui, "bookmark-2");
+        assert.deepEqual(calls.deleteBookmarkArgs, ["bookmark-1"]);
+        assert.equal(document.activeElement, getBookmarkItemControl(secondItem, ".bookmark-item-select"));
+
+        const secondDelete = getBookmarkItemControl(secondItem, ".bookmark-delete-btn");
+        secondDelete.focus();
+        invokeListener(secondItem, "click", { target: secondDelete, stopPropagation() {} });
+
+        assert.deepEqual(calls.deleteBookmarkArgs, ["bookmark-1", "bookmark-2"]);
+        assert.equal(ui.el.bookmarkList.querySelector(".bookmark-item"), null);
+        assert.equal(document.activeElement, ui.el.bookmarkPanelNewName);
+    } finally {
+        globalThis.confirm = previousConfirm;
+        restoreDom();
+    }
+});
+
+test("bookmark ui: add mode success adds to existing bookmark, closes the panel, and returns focus", () => {
     const restoreDom = installFakeDom();
     const previousAlert = globalThis.alert;
     globalThis.alert = () => {};
@@ -282,9 +400,10 @@ test("bookmark ui: add mode success adds to existing bookmark and closes the pan
         });
 
         const firstItem = findBookmarkItem(ui, "bookmark-1");
-        assert.ok(firstItem);
+        const selectButton = getBookmarkItemControl(firstItem, ".bookmark-item-select");
+        selectButton.focus();
         invokeListener(firstItem, "click", {
-            target: firstItem,
+            target: selectButton,
             stopPropagation() {}
         });
 
@@ -292,8 +411,45 @@ test("bookmark ui: add mode success adds to existing bookmark and closes the pan
         assert.equal(ui.el.bookmarkSidebarPanel.hidden, true);
         assert.equal(ui.el.sidebarHeader.hasAttribute("inert"), false);
         assert.equal(ui.el.sidebarScrollArea.hasAttribute("inert"), false);
+        assert.equal(document.activeElement, ui.el.openBookmarkPanelBtn);
+        assert.equal(calls.requestCloseSidebar, 0);
     } finally {
         globalThis.alert = previousAlert;
+        restoreDom();
+    }
+});
+
+test("bookmark ui: add success from a card closes the sidebar like Escape", () => {
+    const restoreDom = installFakeDom();
+    try {
+        const existingHarness = createBookmarkHarness();
+        existingHarness.controller.openBookmarkModal("song-z", {
+            returnFocusEl: existingHarness.ui.el.openBookmarkPanelBtn,
+            closeSidebarOnExit: true
+        });
+        const firstItem = findBookmarkItem(existingHarness.ui, "bookmark-1");
+        invokeListener(firstItem, "click", {
+            target: getBookmarkItemControl(firstItem, ".bookmark-item-select"),
+            stopPropagation() {}
+        });
+
+        assert.deepEqual(existingHarness.calls.addSongArgs, [["bookmark-1", "song-z"]]);
+        assert.equal(existingHarness.ui.el.bookmarkSidebarPanel.hidden, true);
+        assert.equal(existingHarness.calls.requestCloseSidebar, 1);
+
+        const createHarness = createBookmarkHarness();
+        createHarness.controller.setupBookmarkHandlers();
+        createHarness.controller.openBookmarkModal("song-z", {
+            returnFocusEl: createHarness.ui.el.openBookmarkPanelBtn,
+            closeSidebarOnExit: true
+        });
+        createHarness.ui.el.bookmarkPanelNewName.value = "Card Songs";
+        invokeListener(createHarness.ui.el.bookmarkPanelCreateBtn, "click", {});
+
+        assert.deepEqual(createHarness.calls.createBookmarkAndAddArgs, [["Card Songs", "song-z"]]);
+        assert.equal(createHarness.ui.el.bookmarkSidebarPanel.hidden, true);
+        assert.equal(createHarness.calls.requestCloseSidebar, 1);
+    } finally {
         restoreDom();
     }
 });
@@ -322,7 +478,7 @@ test("bookmark ui: add mode success notifies bookmark name and song title", () =
     }
 });
 
-test("bookmark ui: create-and-add closes without leaving focus inside hidden panel", () => {
+test("bookmark ui: create-and-add closes the panel and returns focus to the opener", () => {
     const restoreDom = installFakeDom();
     try {
         const { ui, calls, controller } = createBookmarkHarness();
@@ -338,7 +494,7 @@ test("bookmark ui: create-and-add closes without leaving focus inside hidden pan
         assert.deepEqual(calls.createBookmarkAndAddArgs, [["Focus Songs", "song-z"]]);
         assert.equal(ui.el.bookmarkSidebarPanel.hidden, true);
         assert.equal(ui.el.bookmarkSidebarPanel.getAttribute("aria-hidden"), "true");
-        assert.equal(document.activeElement, null);
+        assert.equal(document.activeElement, ui.el.openBookmarkPanelBtn);
         assert.equal(ui.el.sidebarHeader.hasAttribute("inert"), false);
         assert.equal(ui.el.sidebarScrollArea.hasAttribute("inert"), false);
     } finally {

@@ -1,7 +1,16 @@
 import { test, expect } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { installNetworkMocks } from "./support/network-mocks.mts";
-import { createBookmarkFromSong, expectBookmarkToast, getBookmarkItem, getSongCard, openBookmarkPanel, openSidebar, waitForInitialLoad } from "./support/ui-helpers.mts";
+import {
+    createBookmarkFromSong,
+    expectBookmarkToast,
+    getBookmarkItem,
+    getSongCard,
+    openBookmarkPanel,
+    openSidebar,
+    pressTabUntilFocused,
+    waitForInitialLoad
+} from "./support/ui-helpers.mts";
 import { MAX_BOOKMARK_IMPORT_BYTES } from "../../app/lib/storage/bookmark-transfer.mts";
 
 test.beforeEach(async ({ page }) => {
@@ -79,6 +88,69 @@ test("active bookmark persists across reload", async ({ page }) => {
     await openSidebar(page);
     await openBookmarkPanel(page);
     await expect(getBookmarkItem(page, bookmarkName)).toHaveClass(/active/);
+});
+
+test("keyboard selects and clears a bookmark while keeping focus on it", async ({ page }) => {
+    const bookmarkName = "Keyboard Select";
+    await createBookmarkFromSong(page, {
+        bookmarkName,
+        songTitle: "Manual Song"
+    });
+    const createToast = await expectBookmarkToast(
+        page,
+        `ブックマーク「${bookmarkName}」を作成し、「Manual Song」を保存しました。`
+    );
+    await createToast.locator(".bookmark-toast-close").click();
+
+    await openBookmarkPanel(page);
+    const bookmarkItem = getBookmarkItem(page, bookmarkName);
+    const selectButton = bookmarkItem.locator(".bookmark-item-select");
+    await pressTabUntilFocused(page, selectButton);
+
+    await page.keyboard.press("Enter");
+    await expect(bookmarkItem).toHaveClass(/active/);
+    await expect(selectButton).toHaveAttribute("aria-pressed", "true");
+    await expect(selectButton).toBeFocused();
+    await expect(page.locator("#resultCount")).toHaveText(`ブックマーク: ${bookmarkName} (1 件)`);
+
+    await page.keyboard.press("Space");
+    await expect(bookmarkItem).not.toHaveClass(/active/);
+    await expect(selectButton).toHaveAttribute("aria-pressed", "false");
+    await expect(selectButton).toBeFocused();
+});
+
+test("keyboard adds a song to an existing bookmark and returns focus to the card", async ({ page }) => {
+    const bookmarkName = "Keyboard Add";
+    await createBookmarkFromSong(page, {
+        bookmarkName,
+        songTitle: "Manual Song"
+    });
+    const createToast = await expectBookmarkToast(
+        page,
+        `ブックマーク「${bookmarkName}」を作成し、「Manual Song」を保存しました。`
+    );
+    // 作成と同時の追加でも、カードから開いたサイドバーを閉じて + ボタンへ戻る。
+    await expect(page.locator("#sidebar")).toHaveAttribute("aria-hidden", "true");
+    await expect(getSongCard(page, "Manual Song").locator(".add-to-bookmark-btn")).toBeFocused();
+    await createToast.locator(".bookmark-toast-close").click();
+
+    await page.locator("#searchBox").fill("Replay Song");
+    const addButton = getSongCard(page, "Replay Song").locator(".add-to-bookmark-btn");
+    await expect(addButton).toBeVisible();
+    await addButton.focus();
+    await page.keyboard.press("Enter");
+    await expect(page.locator("#bookmark-sidebar-panel")).toBeVisible();
+
+    const selectButton = getBookmarkItem(page, bookmarkName).locator(".bookmark-item-select");
+    await pressTabUntilFocused(page, selectButton);
+    await page.keyboard.press("Enter");
+
+    await expectBookmarkToast(
+        page,
+        `ブックマーク「${bookmarkName}」に「Replay Song」を保存しました。`
+    );
+    await expect(page.locator("#sidebar")).toHaveAttribute("aria-hidden", "true");
+    await expect(addButton).toBeFocused();
 });
 
 test("bookmark deletion toast shows the deleted bookmark name", async ({ page }) => {

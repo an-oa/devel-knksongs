@@ -7,9 +7,25 @@ import {
 } from "./import-export.mjs";
 import { createBookmarkNotificationController } from "./notifications.mjs";
 import { createSidebarSubpanelController } from "../sidebar/subpanel.mjs";
+import { isHtmlElement } from "../../lib/dom-utils.mjs";
 import { MAX_BOOKMARK_IMPORT_BYTES } from "../../lib/storage/bookmark-transfer.mjs";
 import type { AppDataState, AppUiState } from "../../state.types";
 import type { StorageActionResult } from "../../controllers/storage.mjs";
+
+/** 一覧項目内で、再描画後もフォーカスを戻す対象にする操作ボタン。 */
+const BOOKMARK_ITEM_CONTROL_SELECTORS = [
+    ".bookmark-item-select",
+    ".bookmark-rename-btn",
+    ".bookmark-delete-btn"
+] as const;
+
+/** 再描画の直前に一覧内でフォーカスされていた操作。 */
+type BookmarkListFocus = {
+    bookmarkId: string;
+    controlSelector: typeof BOOKMARK_ITEM_CONTROL_SELECTORS[number];
+    /** 項目が消えた場合に、近い位置の項目へフォーカスを移すための並び位置。 */
+    index: number;
+};
 
 export type BookmarkUiCallbacks = {
     onSelectActiveBookmark: (bookmarkId: string) => StorageActionResult;
@@ -331,6 +347,7 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
 
     /**
      * ブックマークを追加モード/閲覧モードに応じて描画する。
+     * 一覧内にフォーカスがあった場合は、項目を作り直した後も同じ操作へフォーカスを戻す。
      */
     function renderBookmarks() {
         const container = ui.el.bookmarkList;
@@ -338,95 +355,165 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
 
         syncBookmarkPanelMode();
 
+        const listFocus = captureBookmarkListFocus(container);
         const sortedIds = getSortedBookmarkIds();
         if (sortedIds.length === 0) {
             container.replaceChildren(createEmptyBookmarkElement("ブックマークはまだありません。"));
+        } else {
+            const addingMode = isAddingSongMode();
+            container.replaceChildren(...sortedIds.map((id) => createBookmarkItemElement(id, addingMode)));
+        }
+        restoreBookmarkListFocus(container, listFocus);
+    }
+
+    /**
+     * ブックマーク 1 件分の一覧項目を作る。
+     * キーボードで操作できるよう選択用の button を置き、閲覧モードの変更・削除ボタンは
+     * button の入れ子にならないよう兄弟要素として並べる。
+     * @param bookmarkId 描画するブックマークの ID
+     * @param addingMode 曲の追加先を選ぶモードで描画するかどうか
+     * @returns ブックマークの一覧項目
+     */
+    function createBookmarkItemElement(bookmarkId: string, addingMode: boolean): HTMLElement {
+        const bookmark = data.bookmarks[bookmarkId];
+        const item = document.createElement("div");
+        item.className = "bookmark-item";
+        item.dataset.bookmarkId = bookmarkId;
+
+        const selectButton = document.createElement("button");
+        selectButton.type = "button";
+        selectButton.className = "bookmark-item-select";
+        const nameEl = document.createElement("span");
+        nameEl.className = "bookmark-item-name";
+        nameEl.textContent = bookmark.name;
+        nameEl.title = bookmark.name;
+        const countEl = document.createElement("span");
+        countEl.className = "bookmark-item-count";
+        countEl.textContent = String(bookmark.songs.length);
+        selectButton.append(nameEl, countEl);
+        item.append(selectButton);
+
+        if (addingMode) {
+            item.classList.add("bookmark-item-selecting");
+        } else {
+            const isActive = data.activeBookmark === bookmarkId;
+            if (isActive) item.classList.add("active");
+            selectButton.setAttribute("aria-pressed", isActive ? "true" : "false");
+
+            const renameButton = document.createElement("button");
+            renameButton.type = "button";
+            renameButton.className = "bookmark-rename-btn";
+            renameButton.setAttribute("aria-label", "ブックマーク名を変更");
+            renameButton.textContent = "変更";
+            const deleteButton = document.createElement("button");
+            deleteButton.type = "button";
+            deleteButton.className = "bookmark-delete-btn";
+            deleteButton.setAttribute("aria-label", "ブックマークを削除");
+            const deleteMark = document.createElement("span");
+            deleteMark.textContent = "×";
+            deleteButton.append(deleteMark);
+            item.append(renameButton, deleteButton);
+        }
+
+        item.addEventListener("click", (e) => {
+            handleBookmarkItemClick(e, bookmarkId, bookmark.name, addingMode);
+        });
+        return item;
+    }
+
+    /**
+     * 一覧項目内のクリックを、曲の追加・名前の変更・削除・選択の切り替えへ振り分ける。
+     * 選択用 button の Enter / Space 操作も click として届く。
+     * @param e 一覧項目で受け取った click イベント
+     * @param bookmarkId 操作対象のブックマーク ID
+     * @param bookmarkName 確認・通知に使うブックマーク名
+     * @param addingMode 曲の追加先を選ぶモードで描画した項目かどうか
+     */
+    function handleBookmarkItemClick(e: Event, bookmarkId: string, bookmarkName: string, addingMode: boolean): void {
+        const target = e.target instanceof Element ? e.target : null;
+        if (!target) return;
+
+        if (addingMode) {
+            const pendingSongKey = bookmarkPanelUi.pendingAction?.songKey;
+            if (!pendingSongKey) return;
+            const result = onAddSongToBookmark(bookmarkId, pendingSongKey);
+            if (result.ok === true) {
+                bookmarkNotifications.notifySongSavedToBookmark(bookmarkName, pendingSongKey);
+                // 戻るボタンや Esc と同じ終了処理で、カードから開いたサイドバーを閉じて操作元へ戻す。
+                closeBookmarkModal({ restoreFocus: true });
+                return;
+            }
+            notifyIfAddSongError(result);
             return;
         }
 
-        const addingMode = isAddingSongMode();
-        container.replaceChildren(...sortedIds.map((id) => {
-            const bookmark = data.bookmarks[id];
-            const item = document.createElement("div");
-            item.className = "bookmark-item";
-            item.dataset.bookmarkId = id;
+        const renameBtn = target.closest(".bookmark-rename-btn");
+        if (renameBtn) {
+            e.stopPropagation();
+            const newName = prompt("新しいブックマーク名を入力してください:", bookmarkName);
+            if (newName === null) return;
+            const result = onRenameBookmark(bookmarkId, newName);
+            notifyIfRenameError(result);
+            return;
+        }
 
-            if (addingMode) {
-                item.classList.add("bookmark-item-selecting");
-                item.innerHTML = `
-                    <span class="bookmark-item-name"></span>
-                    <span class="bookmark-item-count">${bookmark.songs.length}</span>
-                `;
-            } else {
-                item.innerHTML = `
-                    <span class="bookmark-item-name"></span>
-                    <span class="bookmark-item-count">${bookmark.songs.length}</span>
-                    <button class="bookmark-rename-btn" aria-label="ブックマーク名を変更">変更</button>
-                    <button class="bookmark-delete-btn" aria-label="ブックマークを削除"><span>&times;</span></button>
-                `;
-            }
-
-            const nameEl = item.querySelector(".bookmark-item-name");
-            if (!(nameEl instanceof HTMLElement)) return item;
-            nameEl.textContent = bookmark.name;
-            nameEl.title = bookmark.name;
-
-            if (!addingMode && data.activeBookmark === id) {
-                item.classList.add("active");
-            }
-
-            item.addEventListener("click", (e) => {
-                const target = e.target instanceof Element ? e.target : null;
-                if (!target) return;
-
-                if (addingMode) {
-                    const pendingSongKey = bookmarkPanelUi.pendingAction?.songKey;
-                    if (!pendingSongKey) return;
-                    const result = onAddSongToBookmark(id, pendingSongKey);
-                    if (result.ok === true) {
-                        bookmarkNotifications.notifySongSavedToBookmark(bookmark.name, pendingSongKey);
-                        closeBookmarkModal();
-                        return;
-                    }
-                    notifyIfAddSongError(result);
-                    return;
-                }
-
-                const renameBtn = target.closest(".bookmark-rename-btn");
-                if (renameBtn) {
-                    e.stopPropagation();
-                    const newName = prompt("新しいブックマーク名を入力してください:", bookmark.name);
-                    if (newName === null) return;
-                    const result = onRenameBookmark(id, newName);
-                    notifyIfRenameError(result);
-                    return;
-                }
-
-                const deleteBtn = target.closest(".bookmark-delete-btn");
-                if (deleteBtn) {
-                    e.stopPropagation();
-                    if (confirm(`ブックマーク「${bookmark.name}」を削除しますか？`)) {
-                        const result = onDeleteBookmark(id);
-                        if (result.ok === true) {
-                            bookmarkNotifications.notifyBookmarkDeleted(bookmark.name);
-                        } else {
-                            if (!notifyIfBookmarkSaveError(result)) {
-                                notifyIfBookmarkNotFoundError(result);
-                            }
-                        }
-                    }
-                    return;
-                }
-
-                if (data.activeBookmark === id) {
-                    clearActiveBookmark();
+        const deleteBtn = target.closest(".bookmark-delete-btn");
+        if (deleteBtn) {
+            e.stopPropagation();
+            if (confirm(`ブックマーク「${bookmarkName}」を削除しますか？`)) {
+                const result = onDeleteBookmark(bookmarkId);
+                if (result.ok === true) {
+                    bookmarkNotifications.notifyBookmarkDeleted(bookmarkName);
                 } else {
-                    setActiveBookmark(id);
+                    if (!notifyIfBookmarkSaveError(result)) {
+                        notifyIfBookmarkNotFoundError(result);
+                    }
                 }
-            });
+            }
+            return;
+        }
 
-            return item;
-        }));
+        if (data.activeBookmark === bookmarkId) {
+            clearActiveBookmark();
+        } else {
+            setActiveBookmark(bookmarkId);
+        }
+    }
+
+    /**
+     * 項目を作り直す前に、一覧内でフォーカスされている操作を記録する。
+     * @param container ブックマーク一覧の要素
+     * @returns 記録したフォーカス。一覧の外にフォーカスがある場合は null
+     */
+    function captureBookmarkListFocus(container: HTMLElement): BookmarkListFocus | null {
+        const active = document.activeElement;
+        if (!isHtmlElement(active) || !container.contains(active)) return null;
+        const item = active.closest(".bookmark-item");
+        if (!isHtmlElement(item) || !item.dataset.bookmarkId) return null;
+        const controlSelector = BOOKMARK_ITEM_CONTROL_SELECTORS.find((selector) => active.closest(selector) !== null) ??
+            ".bookmark-item-select";
+        return {
+            bookmarkId: item.dataset.bookmarkId,
+            controlSelector,
+            index: Array.from(container.children).indexOf(item)
+        };
+    }
+
+    /**
+     * 作り直した一覧で、同じブックマークの同じ操作へフォーカスを戻す。
+     * 削除などで項目がなくなった場合は同じ位置の項目へ、項目が残っていなければ作成欄へ移す。
+     * @param container ブックマーク一覧の要素
+     * @param listFocus 再描画の直前に記録したフォーカス
+     */
+    function restoreBookmarkListFocus(container: HTMLElement, listFocus: BookmarkListFocus | null): void {
+        if (!listFocus) return;
+        const items = Array.from(container.querySelectorAll(".bookmark-item")).filter(isHtmlElement);
+        const sameItem = items.find((item) => item.dataset.bookmarkId === listFocus.bookmarkId);
+        const nearbyItem = items[Math.min(listFocus.index, items.length - 1)];
+        const target = sameItem
+            ? sameItem.querySelector(listFocus.controlSelector) ?? sameItem.querySelector(".bookmark-item-select")
+            : nearbyItem?.querySelector(".bookmark-item-select") ?? ui.el.bookmarkPanelNewName;
+        if (isHtmlElement(target)) target.focus();
     }
 
     /**
@@ -454,7 +541,8 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
             clearBookmarkPanelError();
             if (pendingSongKey) {
                 bookmarkNotifications.notifySongSavedToBookmark(newName, pendingSongKey, { createdBookmark: true });
-                closeBookmarkModal();
+                // 既存ブックマークへの追加と同じく、Esc と同じ終了処理で操作元へ戻す。
+                closeBookmarkModal({ restoreFocus: true });
             } else {
                 bookmarkNotifications.notifyBookmarkCreated(newName);
                 renderBookmarks();
