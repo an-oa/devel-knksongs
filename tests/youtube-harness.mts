@@ -6,8 +6,7 @@ import { createYoutubeIframeApiFixture } from "./fixtures/youtube-api.mts";
 export const DEFAULT_YOUTUBE_CONTROLLER_CONSTANTS = {
     YT_IFRAME_API_SRC: "https://www.youtube.com/iframe_api",
     YT_IFRAME_API_SELECTOR: 'script[data-yt-iframe-api="true"]',
-    YT_IFRAME_READY_POLL_MS: 50,
-    STOP_PLAYBACK_ON_SCROLL_OUT: false
+    YT_IFRAME_READY_POLL_MS: 50
 };
 
 /** youtube 系テスト用に必要な再生 UI 状態を作る。 */

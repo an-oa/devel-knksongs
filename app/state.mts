@@ -22,7 +22,6 @@ export const SEARCH_DEBOUNCE_MS = 200;
 export const YT_IFRAME_API_SRC = "https://www.youtube.com/iframe_api";
 export const YT_IFRAME_API_SELECTOR = 'script[data-yt-iframe-api="true"]';
 export const YT_IFRAME_READY_POLL_MS = 50;
-export const STOP_PLAYBACK_ON_SCROLL_OUT = false;
 
 /**
  * 再生 UI ランタイム状態の初期値を作成する。
