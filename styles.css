@@ -1243,6 +1243,21 @@ input:checked + .slider:before { transform: translateX(16px); }
   font-weight: bold;
 }
 
+/* キーボードで選択するための button。見た目は項目の文字列のまま、名前と件数を横に並べる。 */
+.bookmark-item-select {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
 .bookmark-item-name {
   flex-grow: 1;
   white-space: nowrap;
