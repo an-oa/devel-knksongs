@@ -68,44 +68,17 @@ export function createYoutubePlaybackStartResult(status: unknown): YoutubePlayba
 }
 
 /**
- * 再生開始結果から status を返す。
- */
-function getYoutubePlaybackStartStatus(
-    playbackResult: { status: string } | boolean | null | undefined
-): YoutubePlaybackStartStatus {
-    if (playbackResult && typeof playbackResult === "object" && typeof playbackResult.status === "string") {
-        return createYoutubePlaybackStartResult(playbackResult.status).status;
-    }
-    return playbackResult === true
-        ? YOUTUBE_PLAYBACK_START_STATUS.STARTED
-        : YOUTUBE_PLAYBACK_START_STATUS.FAILED;
-}
-
-/**
- * 再生開始結果をオブジェクト形式へ正規化する。
- */
-function normalizeYoutubePlaybackStartResult(
-    playbackResult: { status: string } | boolean | null | undefined
-): YoutubePlaybackStartResult {
-    return createYoutubePlaybackStartResult(getYoutubePlaybackStartStatus(playbackResult));
-}
-
-/**
  * 再生開始結果が開始済みか返す。
  */
-export function isYoutubePlaybackStarted(
-    playbackResult: YoutubePlaybackStartResult | boolean | undefined
-): boolean {
-    return getYoutubePlaybackStartStatus(playbackResult) === YOUTUBE_PLAYBACK_START_STATUS.STARTED;
+export function isYoutubePlaybackStarted(playbackResult: YoutubePlaybackStartResult): boolean {
+    return playbackResult.status === YOUTUBE_PLAYBACK_START_STATUS.STARTED;
 }
 
 /**
  * 再生開始結果が未確定か返す。
  */
-export function isYoutubePlaybackStartUnconfirmed(
-    playbackResult: YoutubePlaybackStartResult | boolean | undefined
-): boolean {
-    return getYoutubePlaybackStartStatus(playbackResult) === YOUTUBE_PLAYBACK_START_STATUS.UNCONFIRMED;
+export function isYoutubePlaybackStartUnconfirmed(playbackResult: YoutubePlaybackStartResult): boolean {
+    return playbackResult.status === YOUTUBE_PLAYBACK_START_STATUS.UNCONFIRMED;
 }
 
 type PlaybackStartAttemptInput = {
@@ -186,9 +159,9 @@ export function createYoutubePlaybackStartAttemptManager(input: PlaybackStartAtt
 
     /**
      * 指定セッションの再生開始待ちを完了扱いにする。
-     * @param {number | undefined} sessionId
-     * @param {YoutubePlaybackStartResult} playbackResult
-     * @returns {boolean}
+     * @param sessionId 完了させる再生セッション ID。省略時は待機中の開始待ちを対象にする
+     * @param playbackResult 開始待ちの呼び出し元へ返す結果
+     * @returns 開始待ちを完了させたかどうか
      */
     function settle(sessionId: number | undefined, playbackResult: YoutubePlaybackStartResult) {
         const sharedPlayback = getSharedPlaybackState();
@@ -201,14 +174,13 @@ export function createYoutubePlaybackStartAttemptManager(input: PlaybackStartAtt
         if (attempt.timeoutId) {
             clearTimeout(attempt.timeoutId);
         }
-        const normalizedResult = normalizeYoutubePlaybackStartResult(playbackResult);
-        if (normalizedResult.status === YOUTUBE_PLAYBACK_START_STATUS.UNCONFIRMED) {
+        if (isYoutubePlaybackStartUnconfirmed(playbackResult)) {
             markUnconfirmedStart(attempt.sessionId);
-            attempt.resolve(normalizedResult);
+            attempt.resolve(playbackResult);
             return true;
         }
         clearUnconfirmedStart(attempt.sessionId);
-        attempt.resolve(normalizedResult);
+        attempt.resolve(playbackResult);
         return true;
     }
 

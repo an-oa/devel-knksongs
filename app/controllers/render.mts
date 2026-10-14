@@ -417,8 +417,7 @@ export function createRenderController({
         }
         return Promise.resolve(playThumbnail(entry.thumbDiv, buildYoutubeTarget(data.currentResults[index]), {
             playbackMode: "autoplay"
-        }))
-            .then((playbackResult) => playbackResult);
+        }));
     }
 
     /**

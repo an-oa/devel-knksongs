@@ -52,7 +52,6 @@ export type PlaybackSettingDefinition = {
     elementKey?: PlaybackSettingElementKey;
     defaultValue: boolean;
     hiddenValue?: boolean;
-    effectiveWhenHidden?: boolean;
     interactive?: boolean;
     restoreActivePlaybackOnChange?: boolean;
 } & (

@@ -64,7 +64,7 @@ export function getPlaybackBehaviorEffectiveValue(
     experimentalEnabled: boolean,
     pageValues: ReadonlyMap<string, boolean>
 ): boolean {
-    if (experimentalEnabled || definition.effectiveWhenHidden) {
+    if (experimentalEnabled) {
         return Boolean(pageValues.get(definition.stateKey));
     }
     return Boolean(definition.hiddenValue);
@@ -88,7 +88,7 @@ export function reducePlaybackSettingChange(
     const previousValue = Boolean(currentValue);
     const nextPageValues = new Map(pageValues);
     if (isPagePlaybackBehaviorDefinition(definition)) {
-        if (experimentalEnabled || definition.effectiveWhenHidden) {
+        if (experimentalEnabled) {
             nextPageValues.set(definition.stateKey, Boolean(nextValue));
         }
         const effectiveValue = getPlaybackBehaviorEffectiveValue(definition, experimentalEnabled, nextPageValues);

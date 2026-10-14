@@ -72,7 +72,6 @@ export function collectUiElements(): AppUiElements {
         bookmarkSidebarPanel: document.getElementById("bookmark-sidebar-panel"),
         closeBookmarkPanelBtn: getButtonElementById("close-bookmark-panel"),
         closeBookmarkSidebarBtn: getButtonElementById("close-bookmark-sidebar"),
-        bookmarkPanelCreate: document.getElementById("bookmark-panel-create"),
         bookmarkPanelNewName: getInputElementById("bookmark-panel-new-name"),
         bookmarkPanelError: document.getElementById("bookmark-panel-error"),
         bookmarkPanelCreateBtn: getButtonElementById("bookmark-panel-create-btn"),

@@ -16,8 +16,7 @@ import {
     makeRenderRow,
     createDataTransferMock,
     invokeListener,
-    getFakeElement,
-    setGlobalValue
+    getFakeElement
 } from "./test-helpers.mts";
 
 /** 描画と検索の共有データに、省略した初期値を補う。 */
@@ -734,126 +733,6 @@ test("bookmark: observes result tail and increases by RESULT_DISPLAY_BATCH_SIZE 
         assert.equal(data.displayLimit, 100);
         assert.equal(ui.el.resultList.children.length, 100);
         assert.equal(resultTailSentinel.hidden, true);
-    } finally {
-        globalThis.IntersectionObserver = previousIntersectionObserver;
-        cleanup();
-    }
-});
-
-test("render: result tail fallback increases display limit without IntersectionObserver", () => {
-    const cleanup = installFakeDom();
-    const previousIntersectionObserver = globalThis.IntersectionObserver;
-    setGlobalValue("IntersectionObserver", undefined);
-    try {
-        const rows = Array.from({ length: 60 }, (_, index) => makeRenderRow({
-            songKey: `song-${index + 1}`,
-            bookmarkSongKey: `song-${index + 1}`,
-            url: `https://youtu.be/video${index + 1}`
-        }));
-        const resultTailSentinel = document.createElement("div");
-        resultTailSentinel.hidden = true;
-        getFakeElement(resultTailSentinel)._rect = { top: 1300, bottom: 1301, left: 0, right: 1, width: 1, height: 1 };
-        const data = createRenderDataState({
-            allSongsRaw: rows,
-            bookmarks: {},
-            activeBookmark: null,
-            currentResults: rows,
-            displayLimit: 48
-        });
-        const ui = createRenderUiState({
-            el: {
-                resultList: document.createElement("div"),
-                resultTailSentinel
-            }
-        });
-        const controller = createRenderController({
-            data,
-            ui,
-            isAllFormatsSelected: () => true,
-            callbacks: createRenderCallbacks()
-        });
-
-        controller.updateDisplay();
-
-        assert.equal(data.displayLimit, 48);
-        assert.equal(ui.el.resultList.children.length, 48);
-        assert.equal(resultTailSentinel.hidden, false);
-        assert.equal(cleanup.window._events.get("scroll")?.size, 1);
-
-        getFakeElement(resultTailSentinel)._rect = { top: 800, bottom: 801, left: 0, right: 1, width: 1, height: 1 };
-        invokeListener(cleanup.window, "scroll", {});
-
-        assert.equal(data.displayLimit, 60);
-        assert.equal(ui.el.resultList.children.length, 60);
-        assert.equal(resultTailSentinel.hidden, true);
-        assert.equal(cleanup.window._events.has("scroll"), false);
-    } finally {
-        globalThis.IntersectionObserver = previousIntersectionObserver;
-        cleanup();
-    }
-});
-
-test("render: result tail fallback listens to the nearest scrollable ancestor", () => {
-    const cleanup = installFakeDom();
-    const previousIntersectionObserver = globalThis.IntersectionObserver;
-    setGlobalValue("IntersectionObserver", undefined);
-    try {
-        const rows = Array.from({ length: 60 }, (_, index) => makeRenderRow({
-            songKey: `song-${index + 1}`,
-            bookmarkSongKey: `song-${index + 1}`,
-            url: `https://youtu.be/video${index + 1}`
-        }));
-        const scrollContainer = document.createElement("section");
-        getFakeElement(scrollContainer)._scrollHeight = 2000;
-        getFakeElement(scrollContainer)._clientHeight = 400;
-        getFakeElement(scrollContainer)._rect = { top: 100, bottom: 500, left: 0, right: 500, width: 500, height: 400 };
-        cleanup.window.getComputedStyle = (element) => ({
-            overflowY: element === scrollContainer ? "auto" : "visible"
-        });
-
-        const resultList = document.createElement("div");
-        const resultTailSentinel = document.createElement("div");
-        resultTailSentinel.hidden = true;
-        getFakeElement(resultTailSentinel)._rect = { top: 1200, bottom: 1201, left: 0, right: 1, width: 1, height: 1 };
-        scrollContainer.appendChild(resultList);
-        scrollContainer.appendChild(resultTailSentinel);
-        document.body.appendChild(scrollContainer);
-
-        const data = createRenderDataState({
-            allSongsRaw: rows,
-            bookmarks: {},
-            activeBookmark: null,
-            currentResults: rows,
-            displayLimit: 48
-        });
-        const ui = createRenderUiState({
-            el: {
-                resultList,
-                resultTailSentinel
-            }
-        });
-        const controller = createRenderController({
-            data,
-            ui,
-            isAllFormatsSelected: () => true,
-            callbacks: createRenderCallbacks()
-        });
-
-        controller.updateDisplay();
-
-        assert.equal(data.displayLimit, 48);
-        assert.equal(resultTailSentinel.hidden, false);
-        assert.equal(getFakeElement(scrollContainer)._events.get("scroll")?.size, 1);
-        assert.equal(cleanup.window._events.has("scroll"), false);
-        assert.equal(cleanup.window._events.get("resize")?.size, 1);
-
-        getFakeElement(resultTailSentinel)._rect = { top: 900, bottom: 901, left: 0, right: 1, width: 1, height: 1 };
-        invokeListener(scrollContainer, "scroll", {});
-
-        assert.equal(data.displayLimit, 60);
-        assert.equal(ui.el.resultList.children.length, 60);
-        assert.equal(resultTailSentinel.hidden, true);
-        assert.equal(getFakeElement(scrollContainer)._events.has("scroll"), false);
     } finally {
         globalThis.IntersectionObserver = previousIntersectionObserver;
         cleanup();

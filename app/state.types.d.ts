@@ -82,7 +82,6 @@ export type AppUiElements = Partial<{
   bookmarkSidebarPanel: HTMLElement | null;
   closeBookmarkPanelBtn: HTMLButtonElement | null;
   closeBookmarkSidebarBtn: HTMLButtonElement | null;
-  bookmarkPanelCreate: HTMLElement | null;
   bookmarkPanelNewName: HTMLInputElement | null;
   bookmarkPanelError: HTMLElement | null;
   bookmarkPanelCreateBtn: HTMLButtonElement | null;

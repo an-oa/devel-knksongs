@@ -1,5 +1,3 @@
-import { createResultTailFallbackObserver } from "./result-tail-fallback.mjs";
-
 const DEFAULT_RESULT_TAIL_PREFETCH_MARGIN_PX = 480;
 
 type ResultTailObserverInput = {
@@ -16,9 +14,9 @@ type ResultTailObserverController = {
 
 /**
  * 検索結果末尾の sentinel を監視し、下端付近で次の batch を追加表示する controller を作る。
- * IntersectionObserver 非対応環境では scroll/resize 監視へ切り替える。
- * @param {ResultTailObserverInput} input
- * @returns {ResultTailObserverController}
+ * IntersectionObserver 非対応のブラウザは対象外とし、代替の監視は持たない。
+ * @param input 監視する sentinel の取得と、追加表示の判定・実行
+ * @returns 監視の開始と停止を行う controller
  */
 export function createResultTailObserver({
     getSentinel,
@@ -30,12 +28,6 @@ export function createResultTailObserver({
     const marginPx = Number.isFinite(prefetchMarginPx) && prefetchMarginPx >= 0
         ? prefetchMarginPx
         : DEFAULT_RESULT_TAIL_PREFETCH_MARGIN_PX;
-    const resultTailFallbackObserver = createResultTailFallbackObserver({
-        getSentinel,
-        hasMoreResults,
-        extendDisplayedResults,
-        prefetchMarginPx: marginPx
-    });
 
     /**
      * 検索結果末尾の監視を停止し、sentinel を非表示にする。
@@ -45,7 +37,6 @@ export function createResultTailObserver({
             resultTailObserver.disconnect();
             resultTailObserver = null;
         }
-        resultTailFallbackObserver.disconnect();
         const sentinel = getSentinel();
         if (sentinel) sentinel.hidden = true;
     }
@@ -67,10 +58,6 @@ export function createResultTailObserver({
         const sentinel = getSentinel();
         if (!sentinel || !hasMoreResults()) return;
         sentinel.hidden = false;
-        if (typeof IntersectionObserver !== "function") {
-            resultTailFallbackObserver.observe();
-            return;
-        }
         resultTailObserver = new IntersectionObserver(handleIntersection, {
             rootMargin: `0px 0px ${marginPx}px 0px`,
             threshold: 0

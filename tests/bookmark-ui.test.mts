@@ -68,7 +68,6 @@ function createBookmarkUiState() {
             openBookmarkPanelBtn,
             bookmarkSidebarPanel,
             closeBookmarkPanelBtn,
-            bookmarkPanelCreate,
             bookmarkPanelNewName,
             bookmarkPanelError,
             bookmarkPanelCreateBtn,

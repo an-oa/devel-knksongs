@@ -59,7 +59,6 @@ type YoutubeConstants = {
     YT_IFRAME_API_SRC: string;
     YT_IFRAME_API_SELECTOR: string;
     YT_IFRAME_READY_POLL_MS: number;
-    STOP_PLAYBACK_ON_SCROLL_OUT: boolean;
 };
 
 type YoutubePlaybackError = Error & {
@@ -122,8 +121,7 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
     const {
         YT_IFRAME_API_SRC,
         YT_IFRAME_API_SELECTOR,
-        YT_IFRAME_READY_POLL_MS,
-        STOP_PLAYBACK_ON_SCROLL_OUT
+        YT_IFRAME_READY_POLL_MS
     } = constants;
     const playbackUi = ui.playback;
     let refreshLayout: () => void = () => {};
@@ -858,36 +856,17 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
     }
 
     /**
-     * スクロール監視結果に応じて画像読み込みや再生停止を処理する。
+     * 画面に入ったサムネイルの画像を読み込む。
      */
     function handleScrollObserver(entries: IntersectionObserverEntry[]) {
         entries.forEach((entry) => {
             const thumb = entry.target;
-            if (!isHtmlElement(thumb)) return;
-            if (entry.isIntersecting) {
-                const img = thumb.querySelector("img");
-                const srcAttr = img ? img.getAttribute("src") : null;
-                if (img && (!srcAttr || srcAttr === "about:blank")) {
-                    const dataSrc = img.dataset.src;
-                    if (dataSrc) img.src = dataSrc;
-                }
-                return;
-            }
-            if (!entry.isIntersecting) {
-                if (!STOP_PLAYBACK_ON_SCROLL_OUT) return;
-                playbackStartAttempts.cancelForThumb(thumb);
-                if (!detachSharedPlayback(thumb)) return;
-                const videoId = thumb.dataset.videoId;
-                setPlaybackSessionId(thumb, 0);
-                thumb.classList.remove("playing");
-                setYoutubeThumbnailOrientation(thumb, "landscape");
-                setYoutubeThumbnailExpandedCardState(thumb, false);
-                if (videoId) {
-                    applyYoutubeThumbnailImage(thumb, videoId, undefined);
-                } else {
-                    thumb.replaceChildren();
-                }
-                refreshCardLayoutSoon(thumb);
+            if (!isHtmlElement(thumb) || !entry.isIntersecting) return;
+            const img = thumb.querySelector("img");
+            const srcAttr = img ? img.getAttribute("src") : null;
+            if (img && (!srcAttr || srcAttr === "about:blank")) {
+                const dataSrc = img.dataset.src;
+                if (dataSrc) img.src = dataSrc;
             }
         });
     }

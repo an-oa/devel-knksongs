@@ -14,7 +14,6 @@ import {
     YT_IFRAME_API_SRC,
     YT_IFRAME_API_SELECTOR,
     YT_IFRAME_READY_POLL_MS,
-    STOP_PLAYBACK_ON_SCROLL_OUT,
     appState
 } from "./state.mjs";
 import { initialSongsSnapshot } from "./startup-data.mjs";
@@ -346,8 +345,7 @@ function createAppControllers() {
         constants: {
             YT_IFRAME_API_SRC,
             YT_IFRAME_API_SELECTOR,
-            YT_IFRAME_READY_POLL_MS,
-            STOP_PLAYBACK_ON_SCROLL_OUT
+            YT_IFRAME_READY_POLL_MS
         }
     });
 
