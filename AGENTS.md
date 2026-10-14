@@ -49,8 +49,11 @@ feat: move settings into dedicated sidebar panel
   `app/controllers/youtube.mts` では、この形式が主流になっている。
 - 短い委譲関数や一部テスト補助関数では省略されている箇所もあるが、新しく関数を追加するときは、関数の先頭に JSDoc を付けて機能を説明する。
 - 必要に応じて `@param` `@returns` を付け、既存コードの粒度に合わせて簡潔に書く。
-- JSDoc の `@param {*} ` は既存コードでは残っているが、新規関数や触った関数では可能な範囲で具体的な型へ寄せる。
-  例: `Element | null | undefined`、`string`、`number`、`Record<string, *>`。
+- `.mts` では型を TypeScript の型注釈だけに書き、JSDoc の `@param` `@returns` には `{型}` を書かない。
+  名前と説明だけを書く。例: `@param songKey 追加する曲の参照キー`。
+- 既存コードに残る `@param {型}` `@returns {型}` は TS の型注釈との二重管理なので、
+  その関数を触るときに `{型}` を削除する。型しか書かれていない行は、説明を補うか行ごと削除する。
+  一括置換では整理しない。
 - DOM 要素を受け取る関数では、呼び出し元だけに依存せず、
   必要に応じて `isHtmlElement` などの実行時チェックで境界を守る。
 - module 内 helper を単体テストで直接検証するために export する場合は、`__test__` へ分けず通常の named export のままにしてよい。
@@ -60,7 +63,7 @@ feat: move settings into dedicated sidebar panel
 ## JavaScript Type References
 
 - アプリ内の特定 module が所有する状態やデータ構造の型は、可能な限りその実装 module の近くに
-  JSDoc `@typedef` として置き、利用側では `import("./path/to/module.mjs").TypeName` 形式で参照元を明示する。
+  TypeScript の `type` / `interface` として置き、利用側では `import type` で参照元を明示する。
 - `types/**/*.d.ts` の ambient 宣言は、ブラウザ API の拡張や複数 module にまたがる共有ドメイン型など、
   所有 module を自然に決めにくい型に限定する。
 - 実装に所有者がある型を ambient に追加しない。やむを得ず追加する場合は、どの実装領域の型なのか、
