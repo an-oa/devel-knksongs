@@ -26,6 +26,7 @@ import { createYoutubeController, extractYoutubeInfo } from "./controllers/youtu
 import { createBookmarkPersistenceController } from "./controllers/bookmark-persistence.mjs";
 import { createStorageController } from "./controllers/storage.mjs";
 import { createBookmarkUiController } from "./ui/bookmark/ui.mjs";
+import { isIOSWebKit } from "./lib/dom-utils.mjs";
 import { scrollResultListToTop } from "./lib/results-scroll.mjs";
 import { estimateInitialResultDisplayCount, estimateMasonryVisibleCardCount } from "./lib/render/masonry-layout.mjs";
 import { setupResultsViewportRefresh } from "./lib/render/results-viewport-refresh.mjs";
@@ -72,16 +73,6 @@ type StorageCallbacksInput = {
 type BookmarkUiCallbacksInput = {
     storageController: ReturnType<typeof createStorageController>;
     getSidebarController: () => ReturnType<typeof createSidebarController> | null;
-};
-
-type SidebarCallbacksInput = {
-    getBookmarkUiController: () => ReturnType<typeof createBookmarkUiController> | null;
-    youtubeController: ReturnType<typeof createYoutubeController>;
-    dateFilterController: ReturnType<typeof createDateFilterController>;
-    markFilterTouched: ReturnType<typeof createSearchUiActions>["markFilterTouched"];
-    markQueryTouched: ReturnType<typeof createSearchUiActions>["markQueryTouched"];
-    clearSearch: ReturnType<typeof createSearchUiActions>["clearSearch"];
-    onOpenChange: (open: boolean) => void;
 };
 
 type YoutubePlaybackHooksInput = {
@@ -188,30 +179,6 @@ function createBookmarkUiCallbacks({
             const sidebarController = getSidebarController();
             if (sidebarController) sidebarController.closeSidebarMenu();
         }
-    };
-}
-
-/**
- * サイドバー controller から各 controller へ委譲する callback 群を作成する。
- */
-function createSidebarCallbacks({
-    getBookmarkUiController,
-    youtubeController,
-    dateFilterController,
-    markFilterTouched,
-    markQueryTouched,
-    clearSearch,
-    onOpenChange
-}: SidebarCallbacksInput): Parameters<typeof createSidebarController>[0]["callbacks"] {
-    return {
-        getBookmarkUiController,
-        isIOSWebKit: () => youtubeController.isIOSWebKit(),
-        markFilterTouched,
-        markQueryTouched,
-        commitDateInputChange: (target, options) => dateFilterController.commitDateInputChange(target, options),
-        commitDateSelectionClear: (kind) => dateFilterController.commitDateSelectionClear(kind),
-        clearSearch,
-        onOpenChange
     };
 }
 
@@ -439,19 +406,14 @@ function createAppControllers() {
     });
 
     /**
-     * サイドバー全体の開閉、設定パネル、ブックマークパネル、検索リセット導線を扱う controller。
+     * サイドバー全体の開閉、設定パネル、ブックマークパネルを扱う controller。
      */
     const sidebarController: ReturnType<typeof createSidebarController> = createSidebarController({
         ui: appUiState,
-        callbacks: createSidebarCallbacks({
+        callbacks: {
             getBookmarkUiController: () => bookmarkUiController,
-            youtubeController,
-            dateFilterController,
-            markFilterTouched: searchUiActions.markFilterTouched,
-            markQueryTouched: searchUiActions.markQueryTouched,
-            clearSearch: searchUiActions.clearSearch,
             onOpenChange: autoHideHeaderController.handleSidebarOpenChange
-        })
+        }
     });
 
     /**
@@ -494,11 +456,11 @@ function createAppControllers() {
 
     return {
         searchFiltersController,
+        dateFilterController,
         searchController,
         searchCoordinator,
         renderController,
         playbackSettingsController,
-        youtubeController,
         storageController,
         autoHideHeaderController,
         sidebarController,
@@ -512,10 +474,10 @@ function createAppControllers() {
 
 const {
     searchFiltersController,
+    dateFilterController,
     searchCoordinator,
     renderController,
     playbackSettingsController,
-    youtubeController,
     storageController,
     autoHideHeaderController,
     sidebarController,
@@ -533,13 +495,15 @@ let resultsViewportRefreshCleanup: (() => void) | null = null;
  */
 async function initUI(): Promise<void> {
     appUiState.el = collectUiElements();
-    if (youtubeController.isIOSWebKit()) document.documentElement.classList.add("ios");
+    if (isIOSWebKit()) document.documentElement.classList.add("ios");
 
     searchFiltersController.setupFilterOptions({
         onFilterChange: searchUiActions.markFilterTouched
     });
     autoHideHeaderController.setup();
     sidebarController.setupUIHandlers();
+    searchUiActions.setupSearchFormHandlers();
+    dateFilterController.setupDateSelectHandlers({ isIOSWebKit });
     resultSummaryController.setup();
     storageController.restorePersistedState();
     setupTheme({ ui: appUiState });

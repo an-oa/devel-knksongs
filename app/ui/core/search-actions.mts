@@ -1,6 +1,12 @@
 import type { SearchUiRuntimeState } from "../../state.types";
+import { isHtmlElement } from "../../lib/dom-utils.mjs";
+import { getSearchBooleanFilterElements } from "../../lib/search-boolean-filters.mjs";
 import type { SearchBooleanFilterElements, SearchBooleanFilterKey } from "../../lib/search-boolean-filters.mjs";
-import { clearSearchQueryValidation } from "../search-query-validation.mjs";
+import {
+    clearSearchQueryValidation,
+    clearSearchQueryValidationIfValid,
+    validateSearchQueryInput
+} from "../search-query-validation.mjs";
 import type { DateSelectKind } from "../date/filter.mjs";
 
 type SearchScheduleOptions = {
@@ -36,6 +42,7 @@ type SearchUiActionsInput = {
     ui: { el: {
         searchBox?: Parameters<typeof clearSearchQueryValidation>[0];
         searchBoxError?: Parameters<typeof clearSearchQueryValidation>[1];
+        clearBtn?: Pick<HTMLButtonElement, "addEventListener"> | null;
     } & SearchBooleanFilterElements };
     search: Pick<SearchUiRuntimeState, "dataReady" | "userTouchedQuery" | "userTouchedFilters">;
     searchFiltersController: SearchActionsSearchFiltersController;
@@ -201,6 +208,31 @@ export function createSearchUiActions({
         }
     }
 
+    /**
+     * 検索語・真偽値フィルター・条件クリアボタンの操作を受け付ける。
+     * 検索語とフィルターの要素は値の読み書きに必要な形だけを型で受け取るため、
+     * イベントを付ける前に実際の要素かを確かめる。
+     */
+    function setupSearchFormHandlers(): void {
+        getSearchBooleanFilterElements(ui).forEach((checkbox) => {
+            if (!isHtmlElement(checkbox)) return;
+            checkbox.addEventListener("change", () => {
+                markFilterTouched();
+            });
+        });
+        const searchBox = ui.el.searchBox;
+        if (isHtmlElement(searchBox)) {
+            searchBox.addEventListener("input", () => {
+                clearSearchQueryValidationIfValid(ui.el.searchBox, ui.el.searchBoxError);
+                markQueryTouched();
+            });
+            searchBox.addEventListener("blur", () => {
+                validateSearchQueryInput(ui.el.searchBox, ui.el.searchBoxError);
+            });
+        }
+        ui.el.clearBtn?.addEventListener("click", clearSearch);
+    }
+
     return {
         clearSearch,
         clearSearchQuery,
@@ -211,6 +243,7 @@ export function createSearchUiActions({
         markQueryTouched,
         clearSearchDebounce,
         resetSearchConditions,
-        syncSearchUI
+        syncSearchUI,
+        setupSearchFormHandlers
     };
 }

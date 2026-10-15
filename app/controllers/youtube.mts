@@ -99,7 +99,6 @@ type YoutubeController = {
     setLayoutHook: (fn: () => void) => void;
     setPlaybackEndedHook: (fn: (payload: { songKey: string }) => void) => void;
     setPlaybackStartFailedHook: (fn: (payload: PlaybackStartFailedPayload) => void) => void;
-    isIOSWebKit: () => boolean;
     ensureThumbnailPlaybackReady: () => void;
     playThumbnail: (
         thumbDiv: Element | null | undefined,
@@ -287,17 +286,6 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
         completeEndedPlayback: (thumbDiv, sessionId) => completeEndedPlayback(thumbDiv, sessionId),
         debug: (message, details) => debugPlayback("youtube", message, details)
     });
-
-    /**
-     * 実行環境がiOS系WebKitかどうかを判定する。
-     */
-    function isIOSWebKit() {
-        const hasTouch = navigator.maxTouchPoints > 0 || "ontouchstart" in window;
-        const webkitTouchCallout = CSS.supports && CSS.supports("-webkit-touch-callout", "none");
-        const webkitOverflowScrolling = CSS.supports && CSS.supports("-webkit-overflow-scrolling", "touch");
-        const isWebKit = webkitTouchCallout || webkitOverflowScrolling;
-        return hasTouch && isWebKit;
-    }
 
     const youtubeApi = {
         ensureReady() {
@@ -1010,7 +998,6 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
         setLayoutHook,
         setPlaybackEndedHook,
         setPlaybackStartFailedHook,
-        isIOSWebKit,
         ensureThumbnailPlaybackReady: ensureYoutubeApiForThumbnails,
         playThumbnail,
         updateThumbnail,

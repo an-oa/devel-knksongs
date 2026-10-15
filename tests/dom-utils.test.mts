@@ -4,9 +4,10 @@ import {
     canUseDom,
     getHeaderHeight,
     getViewportHeight,
-    isHtmlElement
+    isHtmlElement,
+    isIOSWebKit
 } from "../app/lib/dom-utils.mts";
-import { installFakeDom } from "./test-helpers.mts";
+import { installFakeDom, setGlobalValue } from "./test-helpers.mts";
 
 test("dom utils: isHtmlElement and canUseDom reflect fake dom environment", () => {
     const cleanup = installFakeDom();
@@ -48,6 +49,24 @@ test("dom utils: getViewportHeight prefers window height and falls back to docum
         document.documentElement._clientHeight = 640;
 
         assert.equal(getViewportHeight(), 640);
+    } finally {
+        cleanup();
+    }
+});
+
+test("dom utils: isIOSWebKit requires touch support and a WebKit-only CSS property", () => {
+    const cleanup = installFakeDom();
+    try {
+        assert.equal(isIOSWebKit(), false);
+
+        setGlobalValue("navigator", { maxTouchPoints: 5 });
+        assert.equal(isIOSWebKit(), false, "touch alone is not iOS WebKit");
+
+        setGlobalValue("CSS", { supports: (property: string) => property === "-webkit-touch-callout" });
+        assert.equal(isIOSWebKit(), true);
+
+        setGlobalValue("navigator", { maxTouchPoints: 0 });
+        assert.equal(isIOSWebKit(), false, "WebKit CSS without touch is not iOS WebKit");
     } finally {
         cleanup();
     }

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createSearchUiActions } from "../app/ui/core/search-actions.mts";
+import { installFakeDom, invokeListener } from "./test-helpers.mts";
 
 test("search actions: clear resets conditions before delegating active bookmark cleanup", () => {
     const calls = {
@@ -124,22 +125,14 @@ test("search actions: query and filters are both synchronized before a single se
 });
 
 /**
- * 条件の個別解除を検証するため、呼び出し順を記録する search actions を作る。
+ * search actions が委譲する controller を、呼び出し順を記録するモックとして作る。
+ * @param calls 呼び出し名を追記する配列
  */
-function createRecordingActions() {
-    const calls: string[] = [];
-    const ui = {
-        el: {
-            searchBox: { value: "群青" },
-            searchBoxError: null,
-            relayOnly: { checked: true },
-            harmonyOnly: { checked: true }
-        }
-    };
-    const search = { dataReady: true, userTouchedQuery: false, userTouchedFilters: false };
-    const controller = createSearchUiActions({
-        ui,
-        search,
+function createRecordingDependencies(calls: string[]): Pick<
+    Parameters<typeof createSearchUiActions>[0],
+    "searchFiltersController" | "dateFilterController" | "searchCoordinator" | "storageController"
+> {
+    return {
         searchFiltersController: {
             resetFiltersToDefault: () => { calls.push("reset filters"); },
             setSelectedFormatsToDefault: () => { calls.push("default formats"); },
@@ -159,6 +152,27 @@ function createRecordingActions() {
             saveSearchState: () => { calls.push("save"); },
             clearActiveBookmark: () => { calls.push("clear bookmark"); }
         }
+    };
+}
+
+/**
+ * 条件の個別解除を検証するため、呼び出し順を記録する search actions を作る。
+ */
+function createRecordingActions() {
+    const calls: string[] = [];
+    const ui = {
+        el: {
+            searchBox: { value: "群青" },
+            searchBoxError: null,
+            relayOnly: { checked: true },
+            harmonyOnly: { checked: true }
+        }
+    };
+    const search = { dataReady: true, userTouchedQuery: false, userTouchedFilters: false };
+    const controller = createSearchUiActions({
+        ui,
+        search,
+        ...createRecordingDependencies(calls)
     });
     return { calls, ui, search, controller };
 }
@@ -184,4 +198,59 @@ test("search actions: clearing one condition updates state before a single immed
     const date = createRecordingActions();
     date.controller.clearDateFilter("to");
     assert.deepEqual(date.calls, ["clear date to"]);
+});
+
+test("search actions: form handlers mark query and filter changes and clear the search", () => {
+    const restoreDom = installFakeDom();
+    try {
+        const calls: string[] = [];
+        const ui = {
+            el: {
+                searchBox: document.createElement("input"),
+                searchBoxError: document.createElement("p"),
+                clearBtn: document.createElement("button"),
+                collabHostOnly: document.createElement("input"),
+                collabGuestOnly: document.createElement("input"),
+                relayOnly: document.createElement("input"),
+                harmonyOnly: document.createElement("input")
+            }
+        };
+        ui.el.searchBoxError.hidden = true;
+        const search = { dataReady: true, userTouchedQuery: false, userTouchedFilters: false };
+        const controller = createSearchUiActions({
+            ui,
+            search,
+            ...createRecordingDependencies(calls)
+        });
+        controller.setupSearchFormHandlers();
+
+        ui.el.relayOnly.checked = true;
+        invokeListener(ui.el.relayOnly, "change", { target: ui.el.relayOnly });
+        assert.equal(search.userTouchedFilters, true);
+        assert.deepEqual(calls.splice(0), ["search debounced", "save"]);
+
+        ui.el.searchBox.value = "since:2024-13";
+        invokeListener(ui.el.searchBox, "input", { target: ui.el.searchBox });
+        assert.equal(search.userTouchedQuery, true);
+        assert.deepEqual(calls.splice(0), ["search debounced", "save"]);
+        assert.equal(ui.el.searchBoxError.hidden, true);
+
+        invokeListener(ui.el.searchBox, "blur", { target: ui.el.searchBox });
+        assert.equal(ui.el.searchBoxError.hidden, false);
+        assert.equal(ui.el.searchBox.getAttribute("aria-invalid"), "true");
+        assert.deepEqual(calls, []);
+
+        ui.el.searchBox.value = "since:2024-12";
+        invokeListener(ui.el.searchBox, "input", { target: ui.el.searchBox });
+        assert.equal(ui.el.searchBoxError.hidden, true);
+        assert.equal(ui.el.searchBox.getAttribute("aria-invalid"), null);
+        assert.deepEqual(calls.splice(0), ["search debounced", "save"]);
+
+        invokeListener(ui.el.clearBtn, "click", {});
+        assert.equal(ui.el.searchBox.value, "");
+        assert.equal(search.userTouchedQuery, false);
+        assert.deepEqual(calls, ["cancel", "reset filters", "clear bookmark"]);
+    } finally {
+        restoreDom();
+    }
 });
