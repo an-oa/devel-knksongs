@@ -9,6 +9,7 @@ import {
 import type { SearchBooleanFilterElements } from "../lib/search-boolean-filters.mjs";
 import { collectSearchBooleanFilterState } from "../lib/search-boolean-filters.mjs";
 import { getBookmarkSongRef } from "../lib/song-identity.mjs";
+import type { DateSelectKind } from "../ui/date/filter.mjs";
 import type {
     BookmarkLoadResult,
     BookmarkSaveFailure,
@@ -48,7 +49,7 @@ type StorageSearchFiltersController = {
 };
 
 type StorageCallbacks = {
-    getDateSelectValue: (kind: string) => string;
+    getDateSelectValue: (kind: DateSelectKind) => string;
     applyPendingDateValues: () => void;
     renderBookmarks: () => void;
     updateDisplay: () => void;
@@ -366,9 +367,9 @@ export function createStorageController({
 
     /**
      * 保存時の日付条件を、UI適用前は保留値から、適用後はselect要素から取得する。
-     * @param {"from" | "to"} kind
+     * @param kind 値を読む側
      */
-    function getDateValueForStorage(kind: "from" | "to"): string {
+    function getDateValueForStorage(kind: DateSelectKind): string {
         if (dateUi.pendingValues) {
             const pendingValue = dateUi.pendingValues[kind];
             return typeof pendingValue === "string" ? pendingValue : "";

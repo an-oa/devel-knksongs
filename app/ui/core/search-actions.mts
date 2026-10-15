@@ -1,6 +1,7 @@
 import type { SearchUiRuntimeState } from "../../state.types";
 import type { SearchBooleanFilterElements, SearchBooleanFilterKey } from "../../lib/search-boolean-filters.mjs";
 import { clearSearchQueryValidation } from "../search-query-validation.mjs";
+import type { DateSelectKind } from "../date/filter.mjs";
 
 type SearchScheduleOptions = {
     immediate?: boolean;
@@ -11,7 +12,7 @@ type SearchActionEventOptions = Event | SearchScheduleOptions;
 type SearchActionsDateFilterController = {
     resetDateSelects: () => void;
     hasDateSelection: () => boolean;
-    commitDateSelectionClear: (kind: string) => void;
+    commitDateSelectionClear: (kind: DateSelectKind) => void;
 };
 
 type SearchActionsSearchCoordinator = {
@@ -135,9 +136,9 @@ export function createSearchUiActions({
 
     /**
      * 指定側の日付範囲だけを解除する。検索と保存は日付 controller の変更通知で 1 回ずつ行う。
-     * @param {"from" | "to"} kind
+     * @param kind 解除する側
      */
-    function clearDateFilter(kind: "from" | "to"): void {
+    function clearDateFilter(kind: DateSelectKind): void {
         dateFilterController.commitDateSelectionClear(kind);
     }
 

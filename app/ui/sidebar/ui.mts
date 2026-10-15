@@ -5,6 +5,7 @@ import {
 } from "../search-query-validation.mjs";
 import { createSidebarPopoverController } from "./popover.mjs";
 import { createSidebarSubpanelController } from "./subpanel.mjs";
+import type { DateSelectKind } from "../date/filter.mjs";
 import type { AppUiState } from "../../state.types";
 
 type SidebarBookmarkUiController = {
@@ -26,7 +27,7 @@ type SidebarControllerInput = {
         markFilterTouched: (options?: { immediate?: boolean }) => void;
         markQueryTouched: () => void;
         commitDateInputChange: (target: HTMLSelectElement, options?: { resetDependentValues?: boolean }) => void;
-        commitDateSelectionClear: (kind: string) => void;
+        commitDateSelectionClear: (kind: DateSelectKind) => void;
         clearSearch: () => void;
         onOpenChange?: (open: boolean) => void;
     };
