@@ -16,8 +16,7 @@ function createPlaybackSettingsCallbacks(input: PlaybackSettingsFixtureInput["ca
     return {
         ensureThumbnailPlaybackReady: input.ensureThumbnailPlaybackReady ?? (() => {}),
         restoreActivePlayback: input.restoreActivePlayback ?? (() => {}),
-        updateDisplay: input.updateDisplay ?? (() => {}),
-        setupScrollObserver: input.setupScrollObserver ?? (() => {})
+        updateDisplay: input.updateDisplay ?? (() => {})
     };
 }
 
@@ -37,8 +36,7 @@ export function createPlaybackSettingsFixture(input: PlaybackSettingsFixtureInpu
         playArchiveToEnd: state.playArchiveToEnd ?? false,
         continuousPlayback: state.continuousPlayback ?? false,
         loopPlayback: state.loopPlayback ?? false,
-        activeThumb: state.activeThumb ?? null,
-        scrollObserver: null
+        activeThumb: state.activeThumb ?? null
     };
     const ui = {
         el: {

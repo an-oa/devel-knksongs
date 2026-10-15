@@ -50,7 +50,6 @@ type PlaybackSettingsCallbacks = {
     ensureThumbnailPlaybackReady: () => void;
     restoreActivePlayback: () => void;
     updateDisplay: () => void;
-    setupScrollObserver: () => void;
 };
 
 type PlaybackSettingsControllerInput = {
@@ -78,7 +77,6 @@ export function createPlaybackSettingsController({ ui, callbacks }: PlaybackSett
     const ensureThumbnailPlaybackReady = callbacks.ensureThumbnailPlaybackReady;
     const restoreActivePlayback = callbacks.restoreActivePlayback;
     const updateDisplay = callbacks.updateDisplay;
-    const setupScrollObserver = callbacks.setupScrollObserver;
     let didApplyInitialPlaybackSettingValues = false;
     const playbackBehaviorPageValues = new Map<string, boolean>();
 
@@ -251,13 +249,12 @@ export function createPlaybackSettingsController({ ui, callbacks }: PlaybackSett
 
     /**
      * 保存値からサムネイル表示が切り替わった後の描画を更新する。
-     * @param {boolean} previousValue
-     * @param {boolean} nextValue
+     * @param previousValue 切り替え前の表示設定
+     * @param nextValue 切り替え後の表示設定
      */
     function afterThumbnailStorageApply(previousValue: boolean, nextValue: boolean): void {
         if (previousValue === nextValue || !searchUiState.dataReady) return;
         updateDisplay();
-        setupScrollObserver();
     }
 
     /**
@@ -265,7 +262,6 @@ export function createPlaybackSettingsController({ ui, callbacks }: PlaybackSett
      */
     function afterThumbnailToggleChange(): void {
         updateDisplay();
-        setupScrollObserver();
         applyExperimentalPlaybackSettingValues("afterToggleChange");
     }
 

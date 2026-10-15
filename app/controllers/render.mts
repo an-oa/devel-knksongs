@@ -32,7 +32,7 @@ type RenderUiElements = {
 type RenderUiState = {
     el: RenderUiElements;
     search: Pick<SearchUiRuntimeState, "dataReady" | "selectedFormats">;
-    playback: Pick<PlaybackUiRuntimeState, "activeThumb" | "showThumbnails" | "scrollObserver">;
+    playback: Pick<PlaybackUiRuntimeState, "activeThumb">;
     render: RenderUiRuntimeState;
 };
 
@@ -48,18 +48,9 @@ type EmptyStateDescriptor = {
     message: string;
 };
 
-type ResultNodeBuildResult = {
-    nodes: HTMLElement[];
-    entries: RenderCardEntry[];
-};
-
 type DisplayState = {
     container: HTMLElement;
     results: Song[];
-};
-
-type RenderedDisplayState = {
-    entries: RenderCardEntry[];
 };
 
 type RenderCallbacks = {
@@ -72,7 +63,6 @@ type RenderCallbacks = {
     ) => Promise<YoutubePlaybackStartResult> | YoutubePlaybackStartResult;
     restoreActivePlayback: () => void;
     openBookmarkModal: (songKey: string) => void;
-    setupScrollObserver: () => void;
     removeSongFromActiveBookmark: (songKey: string) => void;
     moveSongInActiveBookmark: (fromSongKey: string, toSongKey: string) => StorageActionResult<{ ok: true; changed: boolean }>;
     notifyBookmarkSaveError: (result: StorageActionFailure) => void;
@@ -105,7 +95,6 @@ export function createRenderController({
     const playThumbnail = callbacks.playThumbnail;
     const restoreActivePlayback = callbacks.restoreActivePlayback;
     const openBookmarkModal = callbacks.openBookmarkModal;
-    const setupScrollObserver = callbacks.setupScrollObserver;
     const removeSongFromActiveBookmark = callbacks.removeSongFromActiveBookmark;
     const moveSongInActiveBookmark = callbacks.moveSongInActiveBookmark;
     const notifyBookmarkSaveError = callbacks.notifyBookmarkSaveError;
@@ -482,12 +471,11 @@ export function createRenderController({
 
     /**
      * 結果配列からカードノードを再利用しつつ構築する。
-     * @param {Song[]} results
-     * @returns {ResultNodeBuildResult}
+     * @param results 表示する曲の配列
+     * @returns 表示順に並べたカード要素
      */
-    function buildResultNodes(results: Song[]): ResultNodeBuildResult {
+    function buildResultNodes(results: Song[]): HTMLElement[] {
         const nextEntriesBySongKey = new Map<string, RenderCardEntry>();
-        const entries = [];
         const nodes = [];
         for (let i = 0; i < results.length; i++) {
             const row = results[i];
@@ -504,11 +492,10 @@ export function createRenderController({
 
             updateCardFromRow(entry, results[i], i);
             nextEntriesBySongKey.set(rowKey, entry);
-            entries.push(entry);
             nodes.push(entry.card);
         }
         renderUi.cardEntriesBySongKey = nextEntriesBySongKey;
-        return { nodes, entries };
+        return nodes;
     }
 
     /**
@@ -601,17 +588,6 @@ export function createRenderController({
     }
 
     /**
-     * 表示中カードのサムネイルをIntersectionObserverへ登録する。
-     * @param {RenderCardEntry[]} entries
-     */
-    function observeVisibleThumbnails(entries: RenderCardEntry[]) {
-        if (!playbackUi.showThumbnails || !playbackUi.scrollObserver) return;
-        for (const entry of entries) {
-            playbackUi.scrollObserver.observe(entry.thumbDiv);
-        }
-    }
-
-    /**
      * 描画に必要なコンテナ・結果・モード情報をまとめる。
      * @returns {DisplayState | null}
      */
@@ -625,50 +601,30 @@ export function createRenderController({
     }
 
     /**
-     * 描画前に監視状態を初期化し、必要なら監視を再設定する。
-     */
-    function prepareDisplayObservation() {
-        if (playbackUi.scrollObserver) playbackUi.scrollObserver.disconnect();
-        if (playbackUi.showThumbnails && !playbackUi.scrollObserver) setupScrollObserver();
-    }
-
-    /**
      * 表示状態に応じて空結果または結果カードを描画する。
-     * @param {DisplayState} displayState
-     * @returns {RenderedDisplayState | null}
+     * @param displayState 描画先のコンテナと表示する曲
+     * @returns 結果カードを描画した場合は true、空結果を描画した場合は false
      */
-    function renderDisplayState(displayState: DisplayState): RenderedDisplayState | null {
+    function renderDisplayState(displayState: DisplayState): boolean {
         const { container, results } = displayState;
         if (results.length === 0) {
             renderEmptyResults(container);
-            return null;
+            return false;
         }
-        const { nodes, entries } = buildResultNodes(results);
-        reconcileResultNodes(container, nodes);
+        reconcileResultNodes(container, buildResultNodes(results));
         refreshLayout();
-        return { entries };
+        return true;
     }
 
     /**
-     * 描画後のサムネイル監視と末尾監視を更新する。
-     * @param {RenderedDisplayState} rendered
-     */
-    function monitorDisplayState(rendered: RenderedDisplayState) {
-        observeVisibleThumbnails(rendered.entries);
-        resultTailObservationController.observe();
-    }
-
-    /**
-     * 収集・描画・監視更新までの表示更新パイプラインを行う。
+     * 収集・描画・末尾監視の更新までの表示更新パイプラインを行う。
      */
     function updateDisplay() {
         tracePlayback("render", "updateDisplay", undefined);
         const displayState = collectDisplayState();
         if (!displayState) return;
-        prepareDisplayObservation();
-        const rendered = renderDisplayState(displayState);
-        if (!rendered) return;
-        monitorDisplayState(rendered);
+        if (!renderDisplayState(displayState)) return;
+        resultTailObservationController.observe();
     }
 
     return {

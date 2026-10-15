@@ -128,8 +128,6 @@ export type DateUiRuntimeState = {
 
 /** サムネイル表示と連続再生に関わる UI ランタイム状態。 */
 export type PlaybackUiRuntimeState = {
-  /** サムネイルの遅延読み込みに使う IntersectionObserver。 */
-  scrollObserver: IntersectionObserver | null;
   /** サムネイル画像を表示するかどうか。 */
   showThumbnails: boolean;
   /** 実験的な再生設定を表示するかどうか。 */

@@ -1,5 +1,5 @@
 import { createLayoutRefreshScheduler } from "../lib/layout-anchor.mjs";
-import { canUseDom, getHeaderHeight, isHtmlElement } from "../lib/dom-utils.mjs";
+import { canUseDom, isHtmlElement } from "../lib/dom-utils.mjs";
 import { debugPlayback, tracePlayback } from "../lib/playback-debug.mjs";
 import {
     applyYoutubePlayerIframeAttributes,
@@ -23,8 +23,7 @@ import {
     revealYoutubePlaybackCardIfNeeded,
     setYoutubeThumbnailExpandedCardState,
     setYoutubeThumbnailOrientation,
-    setYoutubeThumbnailPlaybackState,
-    shouldLoadYoutubeThumbnailNow
+    setYoutubeThumbnailPlaybackState
 } from "../lib/youtube/thumbnail.mjs";
 import {
     createYoutubePlaybackState,
@@ -104,7 +103,6 @@ type YoutubeController = {
     setPlaybackStartFailedHook: (fn: (payload: PlaybackStartFailedPayload) => void) => void;
     isIOSWebKit: () => boolean;
     ensureThumbnailPlaybackReady: () => void;
-    setupScrollObserver: () => void;
     playThumbnail: (
         thumbDiv: Element | null | undefined,
         yt: YoutubeTarget | null | undefined,
@@ -856,39 +854,6 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
     }
 
     /**
-     * 画面に入ったサムネイルの画像を読み込む。
-     */
-    function handleScrollObserver(entries: IntersectionObserverEntry[]) {
-        entries.forEach((entry) => {
-            const thumb = entry.target;
-            if (!isHtmlElement(thumb) || !entry.isIntersecting) return;
-            const img = thumb.querySelector("img");
-            const srcAttr = img ? img.getAttribute("src") : null;
-            if (img && (!srcAttr || srcAttr === "about:blank")) {
-                const dataSrc = img.dataset.src;
-                if (dataSrc) img.src = dataSrc;
-            }
-        });
-    }
-
-    /**
-     * サムネイル可視判定用のIntersectionObserverを再設定する。
-     */
-    function setupScrollObserver() {
-        const headerHeight = getHeaderHeight();
-        if (playbackUi.scrollObserver) playbackUi.scrollObserver.disconnect();
-        const observer = new IntersectionObserver(handleScrollObserver, {
-            threshold: 0,
-            rootMargin: `-${headerHeight}px 0px 0px 0px`
-        });
-        playbackUi.scrollObserver = observer;
-        if (!playbackUi.showThumbnails) return;
-        document.querySelectorAll(".thumb").forEach((thumb) => {
-            observer.observe(thumb);
-        });
-    }
-
-    /**
      * 埋め込み再生を解除して通常サムネイル表示へ戻す。
      */
     function restoreThumbnail(
@@ -917,7 +882,7 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
         setYoutubeThumbnailPlaybackState(thumbDiv, "stopped");
         setYoutubeThumbnailExpandedCardState(thumbDiv, false);
         if (videoId) {
-            applyYoutubeThumbnailImage(thumbDiv, videoId, { eager: true });
+            applyYoutubeThumbnailImage(thumbDiv, videoId);
         } else {
             thumbDiv.replaceChildren();
         }
@@ -1041,9 +1006,6 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
             });
         };
         thumbDiv.appendChild(img);
-        if (shouldLoadYoutubeThumbnailNow(thumbDiv) && img.dataset.src) {
-            img.src = img.dataset.src;
-        }
     }
 
     return {
@@ -1052,7 +1014,6 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
         setPlaybackStartFailedHook,
         isIOSWebKit,
         ensureThumbnailPlaybackReady: ensureYoutubeApiForThumbnails,
-        setupScrollObserver,
         playThumbnail,
         updateThumbnail,
         restoreActivePlayback

@@ -134,7 +134,6 @@ function createRenderCallbacks({
         playThumbnail: (thumbDiv, yt, options) => getYoutubeController().playThumbnail(thumbDiv, yt, options),
         restoreActivePlayback: () => getYoutubeController().restoreActivePlayback(),
         openBookmarkModal: (songKey) => getSidebarController().openBookmarkModal(songKey),
-        setupScrollObserver: () => getYoutubeController().setupScrollObserver(),
         removeSongFromActiveBookmark: (songKey) => getSidebarController().removeSongFromActiveBookmark(songKey),
         moveSongInActiveBookmark: (fromSongKey, toSongKey) => getStorageController().moveSongInActiveBookmark(fromSongKey, toSongKey),
         notifyBookmarkSaveError: (result) => {
@@ -331,8 +330,7 @@ function createAppControllers() {
         callbacks: {
             ensureThumbnailPlaybackReady: () => youtubeController.ensureThumbnailPlaybackReady(),
             restoreActivePlayback: () => youtubeController.restoreActivePlayback(),
-            updateDisplay: () => renderController.updateDisplay(),
-            setupScrollObserver: () => youtubeController.setupScrollObserver()
+            updateDisplay: () => renderController.updateDisplay()
         }
     });
 
@@ -547,14 +545,12 @@ async function initUI(): Promise<void> {
     setupTheme({ ui: appUiState });
     playbackSettingsController.setupPlaybackSettings();
     exposePlaybackSettingsConsoleApi();
-    youtubeController.setupScrollObserver();
     uiSyncController.setupSyncEvents();
     if (resultsViewportRefreshCleanup) resultsViewportRefreshCleanup();
     resultsViewportRefreshCleanup = setupResultsViewportRefresh({
         resultList: appUiState.el.resultList,
         refreshRecommendedDisplay: () => searchCoordinator.refreshRecommendedDisplay(),
-        refreshLayout: () => renderController.refreshLayout(),
-        setupScrollObserver: () => youtubeController.setupScrollObserver()
+        refreshLayout: () => renderController.refreshLayout()
     });
     const initialData = await dataLoader.loadInitialData();
     if (!initialData.loaded) return;
