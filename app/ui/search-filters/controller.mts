@@ -17,7 +17,7 @@ type SearchFiltersSearchState = Pick<SearchUiRuntimeState, "selectedFormats" | "
 type SearchFiltersDateState = Pick<DateUiRuntimeState, "pendingValues"> & Partial<DateUiRuntimeState>;
 
 type SearchFiltersUiState = {
-    el: { formatsList?: SearchFormatOptionsList | null } & SearchBooleanFilterElements & Record<string, unknown>;
+    el: { formatsList?: SearchFormatOptionsList | null } & SearchBooleanFilterElements;
     search: SearchFiltersSearchState;
     date?: SearchFiltersDateState | null;
 };

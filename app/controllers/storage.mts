@@ -23,7 +23,7 @@ import type {
 type StorageDataState = Pick<AppDataState, "allSongsRaw" | "bookmarks" | "activeBookmark" | "currentResults">;
 
 type StorageUiElements = { searchBox?: Pick<HTMLInputElement, "value"> | null } &
-    SearchBooleanFilterElements & Record<string, unknown>;
+    SearchBooleanFilterElements;
 
 type StorageUiState = {
     el: StorageUiElements;

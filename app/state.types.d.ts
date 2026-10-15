@@ -90,7 +90,7 @@ export type AppUiElements = Partial<{
   bookmarkPanelImportInput: HTMLInputElement | null;
   bookmarkList: HTMLElement | null;
   bookmarkNotificationRegion: HTMLElement | null;
-}> & Record<string, Element | null | undefined>;
+}>;
 
 /** 検索 UI の入力状態や派生キャッシュ。 */
 export type SearchUiRuntimeState = {
