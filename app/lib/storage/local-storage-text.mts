@@ -11,6 +11,20 @@ type LocalStorageTextRemover = {
 };
 
 /**
+ * ブラウザの localStorage を取り出す。
+ * アクセスが禁止されている環境では警告して null を返し、呼び出し元は保存なしで処理を続ける。
+ * @returns localStorage。使えない場合は null
+ */
+export function getBrowserLocalStorage(): Storage | null {
+    try {
+        return globalThis.localStorage ?? null;
+    } catch (error) {
+        console.warn("localStorageにアクセスできませんでした", error);
+        return null;
+    }
+}
+
+/**
  * localStorage から文字列を安全に読み込む。
  */
 export function getLocalStorageText(

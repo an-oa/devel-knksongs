@@ -4,6 +4,7 @@ import {
     createLegacyLocalStorageSongsJsonCacheAdapter,
     createLegacyLocalStorageTextCacheAdapter
 } from "./storage/songs-json-cache.mjs";
+import { getBrowserLocalStorage } from "./storage/local-storage-text.mjs";
 import { createSongsDataSource } from "./songs-data-source.mjs";
 
 type BrowserSongsDataSourceInput = {
@@ -14,19 +15,6 @@ type BrowserSongsDataSourceInput = {
     obsoleteCsvCacheKey: string;
     obsoleteLegacyCsvCacheKey: string;
 };
-
-/**
- * ブラウザの localStorage を安全に取得する。
- * @returns {Storage | null}
- */
-function getBrowserLocalStorage(): Storage | null {
-    try {
-        return globalThis.localStorage ?? null;
-    } catch (error) {
-        console.warn("localStorageを参照できませんでした", error);
-        return null;
-    }
-}
 
 /**
  * ブラウザ保存領域を使う曲データ取得元を作成する。
