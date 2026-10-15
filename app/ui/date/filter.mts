@@ -1,4 +1,4 @@
-import { dateKeyToParts } from "../../lib/date-key.mjs";
+import { dateKeyToParts, toDateKey } from "../../lib/date-key.mjs";
 import { isHtmlElement } from "../../lib/dom-utils.mjs";
 import {
     getPartialDateKeyRange,
@@ -130,12 +130,12 @@ export function createDateFilterController({ ui, onDateSelectionChange }: {
 
     /**
      * 完全年月日の部分日付値から日付キーを返す。
-     * @param {PartialDateValue | null} value
-     * @returns {number | null}
+     * @param value 日付セレクトから読んだ部分日付値
+     * @returns 日付キー。年月日がそろっていなければ null
      */
     function getCompleteDateSelectKey(value: PartialDateValue | null): number | null {
         if (!value || value.precision !== "day" || value.month === null || value.day === null) return null;
-        return value.year * 10000 + value.month * 100 + value.day;
+        return toDateKey({ year: value.year, month: value.month, day: value.day });
     }
 
     /**
@@ -392,16 +392,10 @@ export function createDateFilterController({ ui, onDateSelectionChange }: {
 
     /**
      * 日付キーを `YYYY-MM-DD` 形式へ整形する。
-     * @param {number} key
-     * @returns {string}
+     * @param key 整形する日付キー
      */
     function formatDateKeyForInput(key: number): string {
-        const year = Math.floor(key / 10000);
-        const month = Math.floor((key % 10000) / 100);
-        const day = key % 100;
-        const mm = String(month).padStart(2, "0");
-        const dd = String(day).padStart(2, "0");
-        return `${year}-${mm}-${dd}`;
+        return formatDateSelectValue({ ...dateKeyToParts(key), precision: "day" });
     }
 
     /**

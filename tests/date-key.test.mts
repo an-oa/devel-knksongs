@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { dateKeyToParts, isWithinDateRange, parseDateKey } from "../app/lib/date-key.mts";
+import { dateKeyToParts, isWithinDateRange, parseDateKey, toDateKey } from "../app/lib/date-key.mts";
 
 test("parseDateKey: valid and invalid dates", () => {
     assert.equal(parseDateKey("2024-02-29"), 20240229);
@@ -23,4 +23,10 @@ test("date key helpers: parse, split, and range checks", () => {
     assert.deepEqual(dateKeyToParts(20240209), { year: 2024, month: 2, day: 9 });
     assert.equal(isWithinDateRange({ dateKey: 20240209 }, 20240201, 20240210), true);
     assert.equal(isWithinDateRange({ dateKey: 20240209 }, 20240210, null), false);
+});
+
+test("toDateKey: builds keys that dateKeyToParts splits back", () => {
+    assert.equal(toDateKey({ year: 2024, month: 2, day: 9 }), 20240209);
+    assert.equal(toDateKey({ year: 2025, month: 12, day: 31 }), 20251231);
+    assert.deepEqual(dateKeyToParts(toDateKey({ year: 2024, month: 2, day: 29 })), { year: 2024, month: 2, day: 29 });
 });

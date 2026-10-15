@@ -1,5 +1,4 @@
 import { getPartialDateKeyRange, normalizePartialDateParts } from "./partial-date.mjs";
-import type { PartialDateKeyRange } from "./partial-date.mjs";
 import { normalizeForSearch } from "./search-normalization.mjs";
 
 export type SearchQueryIssue =
@@ -80,7 +79,7 @@ function tokenizeSearchQuery(query: string): TokenizedSearchQuery {
  * @param operand 日付演算子の値
  * @returns 有効な日付範囲。無効な場合はnull
  */
-function parseDateSearchOperand(operand: string): PartialDateKeyRange | null {
+function parseDateSearchOperand(operand: string): SearchDateRange | null {
     const completeMatch = COMPLETE_DATE_SEARCH_OPERAND_PATTERN.exec(operand);
     if (completeMatch) {
         return getPartialDateKeyRange(normalizePartialDateParts({
