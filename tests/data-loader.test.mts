@@ -118,7 +118,7 @@ test("data loader: loaded songs enable search and report that initial conditions
     }
 });
 
-test("data loader: cache source shows cache status and skips reset when pending state exists", async () => {
+test("data loader: cache source skips reset when pending state exists and leaves the count to the search", async () => {
     const restoreDom = installFakeDom();
     try {
         const harness = createDataLoaderHarness({
@@ -134,7 +134,7 @@ test("data loader: cache source shows cache status and skips reset when pending 
         const result = await loader.loadInitialData();
 
         assert.equal(harness.data.allSongsRaw.length, 1);
-        assert.equal(harness.ui.el.resultCount.innerText, "キャッシュを表示中");
+        assert.equal(harness.ui.el.resultCount.innerText, "データを読み込み中...");
         assert.equal(harness.ui.search.dataReady, true);
         assert.equal(harness.ui.el.searchBox.disabled, false);
         assert.deepEqual(result, { loaded: true, shouldResetConditions: false });

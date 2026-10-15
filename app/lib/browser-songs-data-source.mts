@@ -3,8 +3,8 @@ import {
     createIndexedDbTextCacheStore,
     createLegacyLocalStorageSongsJsonCacheAdapter,
     createLegacyLocalStorageTextCacheAdapter
-} from "../../lib/storage/songs-json-cache.mjs";
-import { createSongsDataSource } from "../../lib/songs-data-source.mjs";
+} from "./storage/songs-json-cache.mjs";
+import { createSongsDataSource } from "./songs-data-source.mjs";
 
 type BrowserSongsDataSourceInput = {
     publicSongsJsonUrl: string;
