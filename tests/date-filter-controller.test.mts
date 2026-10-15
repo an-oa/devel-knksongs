@@ -3,26 +3,33 @@ import type { DateUiRuntimeState } from "../app/state.types";
 import assert from "node:assert/strict";
 import { createDateFilterController } from "../app/ui/date/filter.mts";
 import { createSearchSongFixtureFactory } from "./fixtures/search-song.mts";
-import { installFakeDom } from "./test-helpers.mts";
+import { installFakeAnimationFrames, installFakeDom, invokeListener } from "./test-helpers.mts";
 
 const makeRow = createSearchSongFixtureFactory();
 
 /**
  * 日付コントローラー検証用の UI 状態を作る。
+ * 年月日のセレクトは、実ページと同じく .date-select-group で側ごとにまとめる。
  */
 function createDateUiState() {
     const date: DateUiRuntimeState = { bounds: null, index: null, pendingValues: null };
-    return {
-        el: {
-            dateFromYear: document.createElement("select"),
-            dateFromMonth: document.createElement("select"),
-            dateFromDay: document.createElement("select"),
-            dateToYear: document.createElement("select"),
-            dateToMonth: document.createElement("select"),
-            dateToDay: document.createElement("select")
-        },
-        date
+    const el = {
+        dateFromYear: document.createElement("select"),
+        dateFromMonth: document.createElement("select"),
+        dateFromDay: document.createElement("select"),
+        dateToYear: document.createElement("select"),
+        dateToMonth: document.createElement("select"),
+        dateToDay: document.createElement("select"),
+        clearDateFromBtn: document.createElement("button"),
+        clearDateToBtn: document.createElement("button")
     };
+    const fromGroup = document.createElement("div");
+    fromGroup.className = "date-select-group";
+    fromGroup.append(el.dateFromYear, el.dateFromMonth, el.dateFromDay);
+    const toGroup = document.createElement("div");
+    toGroup.className = "date-select-group";
+    toGroup.append(el.dateToYear, el.dateToMonth, el.dateToDay);
+    return { el, date, fromGroup };
 }
 
 
@@ -331,6 +338,94 @@ test("createDateFilterController: applyPendingDateValues restores selections and
         assert.equal(controller.getDateSelectValue("from"), "2024-02-10");
         assert.equal(controller.getDateSelectValue("to"), "2024-03-05");
         assert.equal(ui.date.pendingValues, null);
+    } finally {
+        restoreDom();
+    }
+});
+
+test("createDateFilterController: ios year change clears lower date selects and removes updating class after two frames", () => {
+    const restoreDom = installFakeDom();
+    const frames = installFakeAnimationFrames();
+    try {
+        const ui = createDateUiState();
+        ui.el.dateFromYear.value = "2026";
+        ui.el.dateFromMonth.value = "03";
+        ui.el.dateFromDay.value = "11";
+        let notificationCount = 0;
+        const controller = createDateFilterController({
+            ui,
+            onDateSelectionChange: () => notificationCount++
+        });
+
+        controller.setupDateSelectHandlers({ isIOSWebKit: () => true });
+        invokeListener(ui.el.dateFromYear, "change", { target: ui.el.dateFromYear });
+
+        assert.equal(ui.fromGroup.classList.contains("is-updating"), true);
+        assert.equal(ui.el.dateFromMonth.value, "");
+        assert.equal(ui.el.dateFromDay.value, "");
+        assert.equal(notificationCount, 1);
+        assert.equal(document.activeElement, null);
+
+        frames.advanceFrame();
+        assert.equal(ui.fromGroup.classList.contains("is-updating"), true);
+        frames.advanceFrame();
+        assert.equal(ui.fromGroup.classList.contains("is-updating"), false);
+    } finally {
+        frames.cleanup();
+        restoreDom();
+    }
+});
+
+test("createDateFilterController: selecting year or month moves focus to the next select on the same side", () => {
+    const restoreDom = installFakeDom();
+    try {
+        const ui = createDateUiState();
+        const controller = createDateFilterController({ ui });
+        controller.applyDateInputRange([
+            makeRow({ dateKey: 20240210 }),
+            makeRow({ dateKey: 20240305 })
+        ]);
+        controller.setupDateSelectHandlers({ isIOSWebKit: () => false });
+
+        ui.el.dateToYear.value = "2024";
+        invokeListener(ui.el.dateToYear, "change", { target: ui.el.dateToYear });
+        assert.equal(document.activeElement, ui.el.dateToMonth);
+
+        ui.el.dateToMonth.value = "03";
+        invokeListener(ui.el.dateToMonth, "change", { target: ui.el.dateToMonth });
+        assert.equal(document.activeElement, ui.el.dateToDay);
+        assert.equal(ui.fromGroup.classList.contains("is-updating"), false);
+
+        ui.el.dateFromYear.value = "";
+        invokeListener(ui.el.dateFromYear, "change", { target: ui.el.dateFromYear });
+        assert.equal(document.activeElement, ui.el.dateToDay);
+    } finally {
+        restoreDom();
+    }
+});
+
+test("createDateFilterController: clear buttons clear only their own side", () => {
+    const restoreDom = installFakeDom();
+    try {
+        const ui = createDateUiState();
+        let notificationCount = 0;
+        const controller = createDateFilterController({
+            ui,
+            onDateSelectionChange: () => notificationCount++
+        });
+        controller.applyDateInputRange([
+            makeRow({ dateKey: 20240210 }),
+            makeRow({ dateKey: 20240305 })
+        ]);
+        controller.applyDateSelectValue("from", "2024-02-10");
+        controller.applyDateSelectValue("to", "2024-03-05");
+        controller.setupDateSelectHandlers({ isIOSWebKit: () => false });
+
+        invokeListener(ui.el.clearDateToBtn, "click", {});
+
+        assert.equal(controller.getDateSelectValue("from"), "2024-02-10");
+        assert.equal(controller.getDateSelectValue("to"), "");
+        assert.equal(notificationCount, 1);
     } finally {
         restoreDom();
     }

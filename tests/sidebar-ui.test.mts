@@ -1,8 +1,7 @@
 import test from "node:test";
-import { createDateFilterController } from "../app/ui/date/filter.mts";
 import assert from "node:assert/strict";
 import { createSidebarController } from "../app/ui/sidebar/ui.mts";
-import { installFakeDom, invokeListener, installFakeAnimationFrames } from "./test-helpers.mts";
+import { installFakeDom, invokeListener } from "./test-helpers.mts";
 
 /**
  * サイドバーUIテスト用の最小状態を作る。
@@ -33,14 +32,6 @@ function createSidebarUiState() {
     const collabGuestOnly = document.createElement("input");
     const relayOnly = document.createElement("input");
     const harmonyOnly = document.createElement("input");
-    const dateFromYear = document.createElement("select");
-    const dateFromMonth = document.createElement("select");
-    const dateFromDay = document.createElement("select");
-    const dateToYear = document.createElement("select");
-    const dateToMonth = document.createElement("select");
-    const dateToDay = document.createElement("select");
-    const clearDateFromBtn = document.createElement("button");
-    const clearDateToBtn = document.createElement("button");
 
     openSidebarBtn.setAttribute("id", "open-sidebar");
     closeSidebarBtn.setAttribute("id", "close-sidebar");
@@ -51,14 +42,8 @@ function createSidebarUiState() {
     bookmarkSidebarPanel.hidden = true;
 
     sidebarHeader.append(closeSidebarBtn, clearBtn);
-    const fromGroup = document.createElement("div");
-    fromGroup.className = "date-select-group";
-    fromGroup.append(dateFromYear, dateFromMonth, dateFromDay);
-    const toGroup = document.createElement("div");
-    toGroup.className = "date-select-group";
-    toGroup.append(dateToYear, dateToMonth, dateToDay);
     sidebarScrollArea.append(
-        searchBox, fromGroup, clearDateFromBtn, toGroup, clearDateToBtn,
+        searchBox,
         collabHostOnly, collabGuestOnly, relayOnly, harmonyOnly,
         openBookmarkPanelBtn, openSettingsPanelBtn
     );
@@ -91,15 +76,7 @@ function createSidebarUiState() {
                 collabHostOnly,
                 collabGuestOnly,
                 relayOnly,
-                harmonyOnly,
-                dateFromYear,
-                dateFromMonth,
-                dateFromDay,
-                dateToYear,
-                dateToMonth,
-                dateToDay,
-                clearDateFromBtn,
-                clearDateToBtn
+                harmonyOnly
             },
             settingsPanel: {
                 returnFocusEl: null
@@ -109,8 +86,7 @@ function createSidebarUiState() {
         closeSidebarBtn,
         overlay,
         mainContent,
-        clearBtn,
-        fromGroup
+        clearBtn
     };
 }
 
@@ -142,11 +118,8 @@ function createSidebarCallbacks(state: {
     const bookmarkUiController = state.bookmarkUiController ?? createBookmarkUiMock().controller;
     return {
         getBookmarkUiController: () => bookmarkUiController,
-        isIOSWebKit: () => false,
         markFilterTouched: () => {},
         markQueryTouched: () => {},
-        commitDateInputChange: () => {},
-        commitDateSelectionClear: () => {},
         clearSearch: () => {},
         onOpenChange: state.onOpenChange
     };
@@ -353,46 +326,6 @@ test("sidebar: escape prioritizes settings panel over bookmark panel", () => {
         assert.equal(bookmarkCloseCount, 1);
         assert.equal(document.activeElement, ui.el.openSettingsPanelBtn);
     } finally {
-        restoreDom();
-    }
-});
-
-test("sidebar: ios year change clears lower date selects and removes updating class after two frames", () => {
-    const restoreDom = installFakeDom();
-    const frames = installFakeAnimationFrames();
-    try {
-        const { ui, fromGroup } = createSidebarUiState();
-        ui.el.dateFromYear.value = "2026";
-        ui.el.dateFromMonth.value = "03";
-        ui.el.dateFromDay.value = "11";
-        const markFilterTouchedArgs: ({ immediate?: boolean } | undefined)[] = [];
-        const dateController = createDateFilterController({
-            ui: { el: ui.el, date: { bounds: null, index: null, pendingValues: null } },
-            onDateSelectionChange: () => markFilterTouchedArgs.push({ immediate: true })
-        });
-        const controller = createSidebarController({
-            ui,
-            callbacks: {
-                ...createSidebarCallbacks(),
-                isIOSWebKit: () => true,
-                commitDateInputChange: dateController.commitDateInputChange
-            }
-        });
-
-        controller.setupUIHandlers();
-        invokeListener(ui.el.dateFromYear, "change", { target: ui.el.dateFromYear });
-
-        assert.equal(fromGroup.classList.contains("is-updating"), true);
-        assert.equal(ui.el.dateFromMonth.value, "");
-        assert.equal(ui.el.dateFromDay.value, "");
-        assert.deepEqual(markFilterTouchedArgs, [{ immediate: true }]);
-
-        frames.advanceFrame();
-        assert.equal(fromGroup.classList.contains("is-updating"), true);
-        frames.advanceFrame();
-        assert.equal(fromGroup.classList.contains("is-updating"), false);
-    } finally {
-        frames.cleanup();
         restoreDom();
     }
 });

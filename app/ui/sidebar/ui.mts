@@ -5,7 +5,6 @@ import {
 } from "../search-query-validation.mjs";
 import { createSidebarPopoverController } from "./popover.mjs";
 import { createSidebarSubpanelController } from "./subpanel.mjs";
-import type { DateSelectKind } from "../date/filter.mjs";
 import type { AppUiState } from "../../state.types";
 
 type SidebarBookmarkUiController = {
@@ -23,11 +22,8 @@ type SidebarControllerInput = {
     ui: Pick<AppUiState, "el" | "settingsPanel">;
     callbacks: {
         getBookmarkUiController: () => SidebarBookmarkUiController | null;
-        isIOSWebKit: () => boolean;
         markFilterTouched: (options?: { immediate?: boolean }) => void;
         markQueryTouched: () => void;
-        commitDateInputChange: (target: HTMLSelectElement, options?: { resetDependentValues?: boolean }) => void;
-        commitDateSelectionClear: (kind: DateSelectKind) => void;
         clearSearch: () => void;
         onOpenChange?: (open: boolean) => void;
     };
@@ -48,11 +44,8 @@ export function createSidebarController(input: SidebarControllerInput) {
     });
     const {
         getBookmarkUiController,
-        isIOSWebKit,
         markFilterTouched,
         markQueryTouched,
-        commitDateInputChange,
-        commitDateSelectionClear,
         clearSearch,
         onOpenChange
     } = callbacks;
@@ -117,7 +110,7 @@ export function createSidebarController(input: SidebarControllerInput) {
     }
 
     /**
-     * 検索 UI・サイドバー・日付入力・各種ボタンのイベントを設定する。
+     * 検索 UI・サイドバー・各種ボタンのイベントを設定する。
      */
     function setupUIHandlers(): void {
         const sidebar = ui.el.sidebar;
@@ -125,12 +118,6 @@ export function createSidebarController(input: SidebarControllerInput) {
         const closeBtn = ui.el.closeSidebarBtn;
         const overlay = ui.el.sidebarOverlay;
         const clearBtn = ui.el.clearBtn;
-        const dateFromYear = ui.el.dateFromYear;
-        const dateFromMonth = ui.el.dateFromMonth;
-        const dateFromDay = ui.el.dateFromDay;
-        const dateToYear = ui.el.dateToYear;
-        const dateToMonth = ui.el.dateToMonth;
-        const dateToDay = ui.el.dateToDay;
         let lastFocusedElement: HTMLElement | null = null;
 
         if (!sidebar || !openBtn || !closeBtn || !overlay || !clearBtn) return;
@@ -269,76 +256,8 @@ export function createSidebarController(input: SidebarControllerInput) {
             });
         }
 
-        [dateFromYear, dateFromMonth, dateFromDay, dateToYear, dateToMonth, dateToDay].forEach((element) => {
-            if (!element) return;
-            element.addEventListener("change", () => {
-                const isIOS = isIOSWebKit();
-                const group = element.closest(".date-select-group");
-                const isYearChange = element === dateFromYear || element === dateToYear;
-                const isMonthChange = element === dateFromMonth || element === dateToMonth;
-                if (isIOS && group && (isYearChange || isMonthChange)) {
-                    group.classList.add("is-updating");
-                } else {
-                    moveDateFocusIfNeeded(element, dateFromYear, dateFromMonth, dateToYear, dateToMonth);
-                }
-                commitDateInputChange(element, { resetDependentValues: isIOS });
-                if (isIOS && group && (isYearChange || isMonthChange)) {
-                    requestAnimationFrame(() => {
-                        requestAnimationFrame(() => {
-                            group.classList.remove("is-updating");
-                        });
-                    });
-                }
-            });
-        });
-
-        [ui.el.clearDateFromBtn, ui.el.clearDateToBtn].forEach((button, index) => {
-            if (!button) return;
-            button.addEventListener("click", () => {
-                commitDateSelectionClear(index === 0 ? "from" : "to");
-            });
-        });
-
         clearBtn.addEventListener("click", clearSearch);
         setupBookmarkHandlers();
-    }
-
-    /**
-     * 日付入力時に次のセレクトへフォーカス移動する。
-     * @param {HTMLSelectElement} target
-     * @param {HTMLSelectElement | null | undefined} fromYear
-     * @param {HTMLSelectElement | null | undefined} fromMonth
-     * @param {HTMLSelectElement | null | undefined} toYear
-     * @param {HTMLSelectElement | null | undefined} toMonth
-     */
-    function moveDateFocusIfNeeded(
-        target: HTMLSelectElement,
-        fromYear: HTMLSelectElement | null | undefined,
-        fromMonth: HTMLSelectElement | null | undefined,
-        toYear: HTMLSelectElement | null | undefined,
-        toMonth: HTMLSelectElement | null | undefined
-    ) {
-        if (fromYear && target === fromYear && fromMonth && fromYear.value) {
-            fromMonth.focus();
-            return;
-        }
-        if (fromMonth && target === fromMonth && fromMonth.value) {
-            const fromDay = ui.el.dateFromDay;
-            if (fromDay) {
-                fromDay.focus();
-                return;
-            }
-        }
-        if (toYear && target === toYear && toMonth && toYear.value) {
-            toMonth.focus();
-            return;
-        }
-        if (toMonth && target === toMonth && toMonth.value) {
-            const toDay = ui.el.dateToDay;
-            if (toDay) {
-                toDay.focus();
-            }
-        }
     }
 
     /**

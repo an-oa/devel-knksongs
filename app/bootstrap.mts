@@ -77,7 +77,6 @@ type BookmarkUiCallbacksInput = {
 
 type SidebarCallbacksInput = {
     getBookmarkUiController: () => ReturnType<typeof createBookmarkUiController> | null;
-    dateFilterController: ReturnType<typeof createDateFilterController>;
     markFilterTouched: ReturnType<typeof createSearchUiActions>["markFilterTouched"];
     markQueryTouched: ReturnType<typeof createSearchUiActions>["markQueryTouched"];
     clearSearch: ReturnType<typeof createSearchUiActions>["clearSearch"];
@@ -196,7 +195,6 @@ function createBookmarkUiCallbacks({
  */
 function createSidebarCallbacks({
     getBookmarkUiController,
-    dateFilterController,
     markFilterTouched,
     markQueryTouched,
     clearSearch,
@@ -204,11 +202,8 @@ function createSidebarCallbacks({
 }: SidebarCallbacksInput): Parameters<typeof createSidebarController>[0]["callbacks"] {
     return {
         getBookmarkUiController,
-        isIOSWebKit,
         markFilterTouched,
         markQueryTouched,
-        commitDateInputChange: (target, options) => dateFilterController.commitDateInputChange(target, options),
-        commitDateSelectionClear: (kind) => dateFilterController.commitDateSelectionClear(kind),
         clearSearch,
         onOpenChange
     };
@@ -444,7 +439,6 @@ function createAppControllers() {
         ui: appUiState,
         callbacks: createSidebarCallbacks({
             getBookmarkUiController: () => bookmarkUiController,
-            dateFilterController,
             markFilterTouched: searchUiActions.markFilterTouched,
             markQueryTouched: searchUiActions.markQueryTouched,
             clearSearch: searchUiActions.clearSearch,
@@ -492,6 +486,7 @@ function createAppControllers() {
 
     return {
         searchFiltersController,
+        dateFilterController,
         searchController,
         searchCoordinator,
         renderController,
@@ -509,6 +504,7 @@ function createAppControllers() {
 
 const {
     searchFiltersController,
+    dateFilterController,
     searchCoordinator,
     renderController,
     playbackSettingsController,
@@ -536,6 +532,7 @@ async function initUI(): Promise<void> {
     });
     autoHideHeaderController.setup();
     sidebarController.setupUIHandlers();
+    dateFilterController.setupDateSelectHandlers({ isIOSWebKit });
     resultSummaryController.setup();
     storageController.restorePersistedState();
     setupTheme({ ui: appUiState });

@@ -29,7 +29,9 @@ type DateFilterUiElements = Pick<
     "dateFromDay" |
     "dateToYear" |
     "dateToMonth" |
-    "dateToDay"
+    "dateToDay" |
+    "clearDateFromBtn" |
+    "clearDateToBtn"
 >;
 
 type DateFilterUiState = {
@@ -494,6 +496,62 @@ export function createDateFilterController({ ui, onDateSelectionChange }: {
         onDateSelectionChange?.();
     }
 
+    /**
+     * 年か月を選んだら、同じ側の次のセレクトへフォーカスを移す。
+     * @param target 値が変わったセレクト
+     */
+    function moveDateFocusIfNeeded(target: HTMLSelectElement): void {
+        for (const kind of ["from", "to"] as const) {
+            const { year, month, day } = getDateSelectElements(kind);
+            if (target === year && target.value) {
+                month?.focus();
+                return;
+            }
+            if (target === month && target.value) {
+                day?.focus();
+                return;
+            }
+        }
+    }
+
+    /**
+     * 日付セレクトとクリアボタンの操作を受け付ける。
+     * iOS 系の WebKit では、年か月を変えたときに下位の値を消し、選択肢を作り直す間は is-updating を付ける。
+     * それ以外の環境では、選んだ値に応じて次のセレクトへフォーカスを移す。
+     * @param options 実行環境が iOS 系の WebKit かを返す関数
+     */
+    function setupDateSelectHandlers({ isIOSWebKit }: { isIOSWebKit: () => boolean }): void {
+        const { dateFromYear, dateFromMonth, dateFromDay, dateToYear, dateToMonth, dateToDay } = ui.el;
+        [dateFromYear, dateFromMonth, dateFromDay, dateToYear, dateToMonth, dateToDay].forEach((element) => {
+            if (!element) return;
+            element.addEventListener("change", () => {
+                const isIOS = isIOSWebKit();
+                const group = element.closest(".date-select-group");
+                const isYearChange = element === dateFromYear || element === dateToYear;
+                const isMonthChange = element === dateFromMonth || element === dateToMonth;
+                if (isIOS && group && (isYearChange || isMonthChange)) {
+                    group.classList.add("is-updating");
+                } else {
+                    moveDateFocusIfNeeded(element);
+                }
+                commitDateInputChange(element, { resetDependentValues: isIOS });
+                if (isIOS && group && (isYearChange || isMonthChange)) {
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(() => {
+                            group.classList.remove("is-updating");
+                        });
+                    });
+                }
+            });
+        });
+        ([["from", ui.el.clearDateFromBtn], ["to", ui.el.clearDateToBtn]] as const).forEach(([kind, button]) => {
+            if (!button) return;
+            button.addEventListener("click", () => {
+                commitDateSelectionClear(kind);
+            });
+        });
+    }
+
     return {
         hasDateSelection,
         getDateSelectValue,
@@ -507,6 +565,7 @@ export function createDateFilterController({ ui, onDateSelectionChange }: {
         clampDateInputsToBounds,
         clampDateInputsIfNeeded,
         commitDateInputChange,
-        commitDateSelectionClear
+        commitDateSelectionClear,
+        setupDateSelectHandlers
     };
 }
