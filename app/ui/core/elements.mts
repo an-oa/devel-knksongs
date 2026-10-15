@@ -1,6 +1,10 @@
 import type { AppUiElements } from "../../state.types";
 import { getStoredSettingText, setStoredSettingText } from "../../lib/storage/settings-storage.mjs";
 
+// index.html の埋め込みスクリプトも、初回描画前のテーマ適用で同じキーを直接読む。
+// あちらは module を import できないため、キー名を変えるときは両方を揃える。
+const THEME_STORAGE_KEY = "theme";
+
 /**
  * 指定 ID の input 要素参照を返す。
  * @param {string} id
@@ -97,7 +101,7 @@ export function applyDocumentTheme(isDarkMode: boolean): void {
  */
 export function applyThemeFromStorage({ ui }: { ui: { el: AppUiElements } }): void {
     const themeToggle = ui.el.themeToggle;
-    const savedTheme = getStoredSettingText("theme");
+    const savedTheme = getStoredSettingText(THEME_STORAGE_KEY);
     const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
     const isDarkMode = savedTheme ? savedTheme === "dark" : systemPrefersDark;
     applyDocumentTheme(isDarkMode);
@@ -114,6 +118,6 @@ export function setupTheme({ ui }: { ui: { el: AppUiElements } }): void {
     themeToggle.addEventListener("change", () => {
         const isDarkNow = themeToggle.checked;
         applyDocumentTheme(isDarkNow);
-        setStoredSettingText("theme", isDarkNow ? "dark" : "light");
+        setStoredSettingText(THEME_STORAGE_KEY, isDarkNow ? "dark" : "light");
     });
 }
