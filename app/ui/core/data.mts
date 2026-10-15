@@ -40,13 +40,10 @@ export function createDataLoader(input: DataLoaderInput) {
 
     /**
      * 曲配列を状態と曲データ由来のUIへ反映する。
-     * @param {Song[]} songs
-     * @param {string | null} statusLabel
+     * 件数表示は、この直後に行う検索が結果で書き換える。
+     * @param songs 読み込んだ曲データ
      */
-    function applyLoadedSongs(
-        songs: Song[],
-        statusLabel: string | null
-    ): void {
+    function applyLoadedSongs(songs: Song[]): void {
         data.allSongsRaw = songs;
         searchUiState.recommendedCache = null;
         const dateBounds = applyDateInputRange(data.allSongsRaw);
@@ -55,18 +52,6 @@ export function createDataLoader(input: DataLoaderInput) {
         }
         if (ui.el.searchBox) ui.el.searchBox.disabled = false;
         searchUiState.dataReady = true;
-        if (statusLabel && ui.el.resultCount) {
-            ui.el.resultCount.innerText = statusLabel;
-        }
-    }
-
-    /**
-     * 初期スナップショットを状態へ反映する。
-     * @param snapshot 初期表示に使う曲データ
-     */
-    function applyInitialSnapshot(snapshot: SongsSnapshot): void {
-        const statusLabel = snapshot.source === "cache" ? "キャッシュを表示中" : null;
-        applyLoadedSongs(snapshot.songs, statusLabel);
     }
 
     /** 初期データの取得・検証完了後に、曲データと検索UIを有効にする。 */
@@ -80,7 +65,7 @@ export function createDataLoader(input: DataLoaderInput) {
         const shouldResetConditions = !searchUiState.dataReady &&
             !searchUiState.hasRestoredSearchState &&
             !dateUi.pendingValues;
-        applyInitialSnapshot(snapshot);
+        applyLoadedSongs(snapshot.songs);
         return { loaded: true, shouldResetConditions };
     }
 
