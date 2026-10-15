@@ -6,7 +6,7 @@ import {
     LEGACY_CSV_CACHE_KEY,
     CSV_CACHE_KEY
 } from "./config.mjs";
-import { createBrowserSongsDataSource } from "./ui/core/data-source.mjs";
+import { createBrowserSongsDataSource } from "./lib/browser-songs-data-source.mjs";
 
 // UI module の取得・初期化と並行して開始し、bootstrap でも同じ Promise を利用する。
 const songsDataSource = createBrowserSongsDataSource({
