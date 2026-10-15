@@ -9,7 +9,7 @@ import { installFakeDom } from "./test-helpers.mts";
 
 /**
  * storage コントローラーへ検索条件 UI controller を注入して作る。
- * テストで指定しなかった定数は、形式の制限なし・保存 version 1 として補う。
+ * テストで省略した定数と undefined を渡した定数は、保存 version 1・上限なし・形式なしとして補う。
  */
 function createStorageControllerForTest(input: {
     data: Parameters<typeof createStorageController>[0]["data"];
@@ -23,13 +23,14 @@ function createStorageControllerForTest(input: {
         cancelScheduledSearch?: () => void;
     };
 }) {
+    // スプレッドで補うと undefined を渡したキーが既定値を上書きするため、定数ごとに補う。
     const constants = {
-        DEFAULT_FORMATS: [],
-        BOOKMARK_STORAGE_VERSION: 1,
-        MAX_BOOKMARK_COUNT: Number.POSITIVE_INFINITY,
-        MAX_SONGS_PER_BOOKMARK: Number.POSITIVE_INFINITY,
-        MAX_BOOKMARK_NAME_LENGTH: Number.POSITIVE_INFINITY,
-        ...input.constants
+        ...input.constants,
+        DEFAULT_FORMATS: input.constants.DEFAULT_FORMATS ?? [],
+        BOOKMARK_STORAGE_VERSION: input.constants.BOOKMARK_STORAGE_VERSION ?? 1,
+        MAX_BOOKMARK_COUNT: input.constants.MAX_BOOKMARK_COUNT ?? Number.POSITIVE_INFINITY,
+        MAX_SONGS_PER_BOOKMARK: input.constants.MAX_SONGS_PER_BOOKMARK ?? Number.POSITIVE_INFINITY,
+        MAX_BOOKMARK_NAME_LENGTH: input.constants.MAX_BOOKMARK_NAME_LENGTH ?? Number.POSITIVE_INFINITY
     };
     const bookmarkPersistenceController = createBookmarkPersistenceController({
         data: input.data,
