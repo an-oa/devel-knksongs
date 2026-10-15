@@ -11,7 +11,7 @@ import {
     createYoutubePlaybackStartResult,
     YOUTUBE_PLAYBACK_START_STATUS
 } from "../lib/youtube/playback-start-attempt.mjs";
-import type { YoutubePlaybackStartResult } from "../lib/youtube/playback-start-attempt.mjs";
+import type { YoutubePlaybackMode, YoutubePlaybackStartResult } from "../lib/youtube/playback-start-attempt.mjs";
 import type { YoutubeTarget } from "../lib/youtube/embed.mjs";
 import { suppressYoutubeThumbnailContextMenu } from "../lib/youtube/thumbnail.mjs";
 import type {
@@ -59,7 +59,7 @@ type RenderCallbacks = {
     playThumbnail: (
         thumbDiv: HTMLElement,
         yt: YoutubeTarget,
-        options?: { playbackMode?: string }
+        options?: { playbackMode?: YoutubePlaybackMode }
     ) => Promise<YoutubePlaybackStartResult> | YoutubePlaybackStartResult;
     restoreActivePlayback: () => void;
     openBookmarkModal: (songKey: string) => void;

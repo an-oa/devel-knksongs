@@ -21,7 +21,14 @@ export function createBookmarkReorderFixture({ data, saveBookmarks, updateDispla
             saveBookmarks: (bookmarks = data.bookmarks) => saveBookmarks(bookmarks),
             replaceBookmarksFromConfirmedImport: saveBookmarks
         },
-        constants: { SEARCH_STATE_KEY: "reorder-search-state" },
+        constants: {
+            SEARCH_STATE_KEY: "reorder-search-state",
+            DEFAULT_FORMATS: [],
+            BOOKMARK_STORAGE_VERSION: 1,
+            MAX_BOOKMARK_COUNT: Number.POSITIVE_INFINITY,
+            MAX_SONGS_PER_BOOKMARK: Number.POSITIVE_INFINITY,
+            MAX_BOOKMARK_NAME_LENGTH: Number.POSITIVE_INFINITY
+        },
         callbacks: {
             getDateSelectValue: () => "",
             applyPendingDateValues: () => {},

@@ -32,7 +32,7 @@ type PlaybackSettingsUiElements = Pick<
     "playArchiveToEndToggle" |
     "continuousPlaybackToggle" |
     "loopPlaybackToggle"
-> & Record<string, Element | null | undefined>;
+>;
 
 type PlaybackSettingsUiState = {
     el: PlaybackSettingsUiElements;

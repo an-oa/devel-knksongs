@@ -9,6 +9,7 @@ import {
 import type { SearchBooleanFilterElements } from "../lib/search-boolean-filters.mjs";
 import { collectSearchBooleanFilterState } from "../lib/search-boolean-filters.mjs";
 import { getBookmarkSongRef } from "../lib/song-identity.mjs";
+import type { DateSelectKind } from "../ui/date/filter.mjs";
 import type {
     BookmarkLoadResult,
     BookmarkSaveFailure,
@@ -23,7 +24,7 @@ import type {
 type StorageDataState = Pick<AppDataState, "allSongsRaw" | "bookmarks" | "activeBookmark" | "currentResults">;
 
 type StorageUiElements = { searchBox?: Pick<HTMLInputElement, "value"> | null } &
-    SearchBooleanFilterElements & Record<string, unknown>;
+    SearchBooleanFilterElements;
 
 type StorageUiState = {
     el: StorageUiElements;
@@ -35,11 +36,11 @@ type StorageUiState = {
 
 type StorageConstants = {
     SEARCH_STATE_KEY: string;
-    DEFAULT_FORMATS?: string[];
-    BOOKMARK_STORAGE_VERSION?: number;
-    MAX_BOOKMARK_COUNT?: number;
-    MAX_SONGS_PER_BOOKMARK?: number;
-    MAX_BOOKMARK_NAME_LENGTH?: number;
+    DEFAULT_FORMATS: string[];
+    BOOKMARK_STORAGE_VERSION: number;
+    MAX_BOOKMARK_COUNT: number;
+    MAX_SONGS_PER_BOOKMARK: number;
+    MAX_BOOKMARK_NAME_LENGTH: number;
 };
 
 type StorageSearchFiltersController = {
@@ -48,7 +49,7 @@ type StorageSearchFiltersController = {
 };
 
 type StorageCallbacks = {
-    getDateSelectValue: (kind: string) => string;
+    getDateSelectValue: (kind: DateSelectKind) => string;
     applyPendingDateValues: () => void;
     renderBookmarks: () => void;
     updateDisplay: () => void;
@@ -83,7 +84,7 @@ type StorageControllerInput = {
 
 /**
  * ブックマークと検索状態の保存・復元を扱うストレージコントローラーを作成する。
- * @param {StorageControllerInput} input
+ * @param input 保存対象の state と UI、保存形式と上限の定数、保存後に呼ぶ callback
  */
 export function createStorageController({
     data,
@@ -97,11 +98,11 @@ export function createStorageController({
     const dateUi = ui.date;
     const {
         SEARCH_STATE_KEY,
-        DEFAULT_FORMATS = [],
-        BOOKMARK_STORAGE_VERSION = 1,
-        MAX_BOOKMARK_COUNT = Number.POSITIVE_INFINITY,
-        MAX_SONGS_PER_BOOKMARK = Number.POSITIVE_INFINITY,
-        MAX_BOOKMARK_NAME_LENGTH = Number.POSITIVE_INFINITY
+        DEFAULT_FORMATS,
+        BOOKMARK_STORAGE_VERSION,
+        MAX_BOOKMARK_COUNT,
+        MAX_SONGS_PER_BOOKMARK,
+        MAX_BOOKMARK_NAME_LENGTH
     } = constants;
     const {
         loadBookmarksFromStorage,
@@ -366,9 +367,9 @@ export function createStorageController({
 
     /**
      * 保存時の日付条件を、UI適用前は保留値から、適用後はselect要素から取得する。
-     * @param {"from" | "to"} kind
+     * @param kind 値を読む側
      */
-    function getDateValueForStorage(kind: "from" | "to"): string {
+    function getDateValueForStorage(kind: DateSelectKind): string {
         if (dateUi.pendingValues) {
             const pendingValue = dateUi.pendingValues[kind];
             return typeof pendingValue === "string" ? pendingValue : "";

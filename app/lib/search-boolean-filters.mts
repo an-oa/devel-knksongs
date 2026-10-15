@@ -14,7 +14,7 @@ export type SearchBooleanFilterElements<FilterElement extends SearchBooleanFilte
     Partial<Record<SearchBooleanFilterKey, FilterElement | null>>;
 
 type SearchBooleanFilterUi<FilterElement extends SearchBooleanFilterElement = SearchBooleanFilterElement> = {
-    el?: SearchBooleanFilterElements<FilterElement> & Record<string, unknown>;
+    el?: SearchBooleanFilterElements<FilterElement>;
 } | null | undefined;
 
 /**

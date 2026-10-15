@@ -2,8 +2,7 @@ import { getFormatFilterLabel } from "../../lib/format-filter.mjs";
 import { SEARCH_BOOLEAN_FILTER_KEYS } from "../../lib/search-boolean-filters.mjs";
 import type { SearchBooleanFilterKey } from "../../lib/search-boolean-filters.mjs";
 import type { AppUiElements } from "../../state.types";
-
-type DateFilterKind = "from" | "to";
+import type { DateSelectKind } from "../date/filter.mjs";
 
 /** 概要行に表示する適用中の条件 1 件。 */
 type ResultConditionChip = {
@@ -20,7 +19,7 @@ type ResultSummaryControllerInput = {
     /** 現在の検索条件を読み取る。概要行は入力要素を直接変更しない。 */
     conditions: {
         getQuery: () => string;
-        getDateValue: (kind: DateFilterKind) => string;
+        getDateValue: (kind: DateSelectKind) => string;
         /** 選択中の動画の種類を、既定の並び順で返す。 */
         getSelectedFormats: () => string[];
         areAllFormatsSelected: () => boolean;
@@ -30,7 +29,7 @@ type ResultSummaryControllerInput = {
     /** 条件の解除。いずれも状態更新・UI 同期の後に、検索と保存を 1 回ずつ即時に行う。 */
     actions: {
         clearSearchQuery: () => void;
-        clearDateFilter: (kind: DateFilterKind) => void;
+        clearDateFilter: (kind: DateSelectKind) => void;
         resetFormatFilters: () => void;
         clearBooleanFilter: (key: SearchBooleanFilterKey) => void;
         clearSearch: () => void;

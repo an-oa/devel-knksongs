@@ -20,7 +20,7 @@ type SearchControllerInput = {
             searchBox?: Parameters<typeof validateSearchQueryInput>[0];
             searchBoxError?: Parameters<typeof validateSearchQueryInput>[1];
             resultCount?: Pick<HTMLElement, "innerText"> | null;
-        } & SearchBooleanFilterElements & Record<string, unknown>;
+        } & SearchBooleanFilterElements;
         search: Pick<SearchUiRuntimeState, "selectedFormats" | "recommendedCache">;
         lookup: LookupUiRuntimeState;
     };
