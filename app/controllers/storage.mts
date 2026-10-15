@@ -36,11 +36,11 @@ type StorageUiState = {
 
 type StorageConstants = {
     SEARCH_STATE_KEY: string;
-    DEFAULT_FORMATS?: string[];
-    BOOKMARK_STORAGE_VERSION?: number;
-    MAX_BOOKMARK_COUNT?: number;
-    MAX_SONGS_PER_BOOKMARK?: number;
-    MAX_BOOKMARK_NAME_LENGTH?: number;
+    DEFAULT_FORMATS: string[];
+    BOOKMARK_STORAGE_VERSION: number;
+    MAX_BOOKMARK_COUNT: number;
+    MAX_SONGS_PER_BOOKMARK: number;
+    MAX_BOOKMARK_NAME_LENGTH: number;
 };
 
 type StorageSearchFiltersController = {
@@ -84,7 +84,7 @@ type StorageControllerInput = {
 
 /**
  * ブックマークと検索状態の保存・復元を扱うストレージコントローラーを作成する。
- * @param {StorageControllerInput} input
+ * @param input 保存対象の state と UI、保存形式と上限の定数、保存後に呼ぶ callback
  */
 export function createStorageController({
     data,
@@ -98,11 +98,11 @@ export function createStorageController({
     const dateUi = ui.date;
     const {
         SEARCH_STATE_KEY,
-        DEFAULT_FORMATS = [],
-        BOOKMARK_STORAGE_VERSION = 1,
-        MAX_BOOKMARK_COUNT = Number.POSITIVE_INFINITY,
-        MAX_SONGS_PER_BOOKMARK = Number.POSITIVE_INFINITY,
-        MAX_BOOKMARK_NAME_LENGTH = Number.POSITIVE_INFINITY
+        DEFAULT_FORMATS,
+        BOOKMARK_STORAGE_VERSION,
+        MAX_BOOKMARK_COUNT,
+        MAX_SONGS_PER_BOOKMARK,
+        MAX_BOOKMARK_NAME_LENGTH
     } = constants;
     const {
         loadBookmarksFromStorage,

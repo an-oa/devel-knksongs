@@ -9,25 +9,38 @@ import { installFakeDom } from "./test-helpers.mts";
 
 /**
  * storage コントローラーへ検索条件 UI controller を注入して作る。
+ * テストで指定しなかった定数は、形式の制限なし・保存 version 1 として補う。
  */
 function createStorageControllerForTest(input: {
     data: Parameters<typeof createStorageController>[0]["data"];
     ui: Parameters<typeof createStorageController>[0]["ui"] & Parameters<typeof createSearchFiltersController>[0]["ui"];
-    constants: Parameters<typeof createStorageController>[0]["constants"] & { BOOKMARK_STORAGE_KEY?: string };
+    constants: Partial<Parameters<typeof createStorageController>[0]["constants"]> & {
+        SEARCH_STATE_KEY: string;
+        BOOKMARK_STORAGE_KEY?: string;
+    };
     callbacks: Omit<Parameters<typeof createStorageController>[0]["callbacks"], "cancelScheduledSearch" | "updateDisplay"> & {
         updateDisplay?: () => void;
         cancelScheduledSearch?: () => void;
     };
 }) {
+    const constants = {
+        DEFAULT_FORMATS: [],
+        BOOKMARK_STORAGE_VERSION: 1,
+        MAX_BOOKMARK_COUNT: Number.POSITIVE_INFINITY,
+        MAX_SONGS_PER_BOOKMARK: Number.POSITIVE_INFINITY,
+        MAX_BOOKMARK_NAME_LENGTH: Number.POSITIVE_INFINITY,
+        ...input.constants
+    };
     const bookmarkPersistenceController = createBookmarkPersistenceController({
         data: input.data,
         constants: {
-            storageKey: input.constants.BOOKMARK_STORAGE_KEY ?? "bookmarksTest",
-            storageVersion: input.constants.BOOKMARK_STORAGE_VERSION ?? 1
+            storageKey: constants.BOOKMARK_STORAGE_KEY ?? "bookmarksTest",
+            storageVersion: constants.BOOKMARK_STORAGE_VERSION
         }
     });
     return createStorageController({
         ...input,
+        constants,
         bookmarkPersistenceController,
         callbacks: {
             updateDisplay: () => {},
@@ -36,7 +49,7 @@ function createStorageControllerForTest(input: {
         },
         searchFiltersController: createSearchFiltersController({
             ui: input.ui,
-            defaultFormats: input.constants.DEFAULT_FORMATS
+            defaultFormats: constants.DEFAULT_FORMATS
         })
     });
 }

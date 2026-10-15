@@ -60,9 +60,10 @@ function setupStorageController({
             DEFAULT_FORMATS: [],
             SEARCH_STATE_KEY: "searchStateTest",
             BOOKMARK_STORAGE_VERSION: 3,
-            MAX_BOOKMARK_COUNT: maxBookmarkCount,
-            MAX_SONGS_PER_BOOKMARK: maxSongsPerBookmark,
-            MAX_BOOKMARK_NAME_LENGTH: maxBookmarkNameLength
+            // 上限を指定しないテストでは、その上限を設けない。
+            MAX_BOOKMARK_COUNT: maxBookmarkCount ?? Number.POSITIVE_INFINITY,
+            MAX_SONGS_PER_BOOKMARK: maxSongsPerBookmark ?? Number.POSITIVE_INFINITY,
+            MAX_BOOKMARK_NAME_LENGTH: maxBookmarkNameLength ?? Number.POSITIVE_INFINITY
         },
         callbacks: {
             getDateSelectValue: () => "",
