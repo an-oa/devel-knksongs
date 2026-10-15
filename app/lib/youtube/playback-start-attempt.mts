@@ -12,6 +12,9 @@ export const YOUTUBE_PLAYBACK_START_STATUS = Object.freeze({
     UNCONFIRMED: "unconfirmed"
 });
 
+/** 再生を始めた方法。カードのクリックは manual、連続再生による自動開始は autoplay。 */
+export type YoutubePlaybackMode = "manual" | "autoplay";
+
 export type YoutubePlaybackStartStatus =
     typeof YOUTUBE_PLAYBACK_START_STATUS[keyof typeof YOUTUBE_PLAYBACK_START_STATUS];
 
@@ -30,7 +33,7 @@ export type YoutubePlaybackStartAttempt = {
     /** 失敗時の復元やログに使う再生開始コンテキスト。 */
     context: {
         thumbDiv?: Element | null;
-        playbackMode?: string;
+        playbackMode?: YoutubePlaybackMode;
     };
 };
 
@@ -45,7 +48,7 @@ type YoutubePlaybackStartAttemptManager = {
 };
 
 type PlaybackStartFailureOptions = {
-    playbackMode?: string;
+    playbackMode?: YoutubePlaybackMode;
     reason: string;
     wasPlaybackStartUnconfirmed?: boolean;
 };

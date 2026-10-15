@@ -36,7 +36,7 @@ import {
     createYoutubePlaybackStartResult,
     YOUTUBE_PLAYBACK_START_STATUS
 } from "../lib/youtube/playback-start-attempt.mjs";
-import type { YoutubePlaybackStartResult } from "../lib/youtube/playback-start-attempt.mjs";
+import type { YoutubePlaybackMode, YoutubePlaybackStartResult } from "../lib/youtube/playback-start-attempt.mjs";
 import { createYoutubeUnconfirmedPlaybackStartManager } from "../lib/youtube/unconfirmed-playback-start.mjs";
 import {
     createYoutubePlayerAdapter
@@ -63,8 +63,6 @@ type YoutubeConstants = {
 type YoutubePlaybackError = Error & {
     code?: string;
 };
-
-type YoutubePlaybackMode = "manual" | "autoplay" | string;
 
 type PlaybackStartFailureOptions = {
     playbackMode?: YoutubePlaybackMode;
@@ -170,10 +168,10 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
     }
 
     /**
-     * 再生開始方法を返す。
+     * サムネイルに保存した再生開始方法を返す。保存がなければクリックによる開始として扱う。
      */
-    function getPlaybackMode(thumbDiv: Element | null | undefined) {
-        return isHtmlElement(thumbDiv) ? (thumbDiv.dataset.playbackMode || "manual") : "manual";
+    function getPlaybackMode(thumbDiv: Element | null | undefined): YoutubePlaybackMode {
+        return isHtmlElement(thumbDiv) && thumbDiv.dataset.playbackMode === "autoplay" ? "autoplay" : "manual";
     }
 
     /**
