@@ -1,4 +1,4 @@
-import { dateKeyToParts, parseDateKey } from "./date-key.mjs";
+import { dateKeyToParts, parseDateKey, toDateKey } from "./date-key.mjs";
 
 export type PartialDatePrecision = "year" | "month" | "day";
 
@@ -13,11 +13,6 @@ export type PartialDateValue = {
     month: number | null;
     day: number | null;
     precision: PartialDatePrecision;
-};
-
-export type PartialDateKeyRange = {
-    minKey: number;
-    maxKey: number;
 };
 
 /**
@@ -71,24 +66,23 @@ export function normalizePartialDateParts(parts: PartialDatePartsInput): Partial
 
 /**
  * 部分日付値を、検索で利用する包含境界の最小・最大日付キーへ変換する。
- * @param {PartialDateValue | null | undefined} value
- * @returns {PartialDateKeyRange | null}
+ * @param value 年・年月・年月日のいずれかの精度を持つ部分日付値
+ * @returns 両端を含む日付キーの範囲。値がなければ null
  */
 export function getPartialDateKeyRange(
     value: PartialDateValue | null | undefined
-): PartialDateKeyRange | null {
+): SearchDateRange | null {
     if (!value) return null;
     const { year, month, day } = value;
     if (value.precision === "year" || month === null) {
-        return { minKey: year * 10000 + 101, maxKey: year * 10000 + 1231 };
+        return { minKey: toDateKey({ year, month: 1, day: 1 }), maxKey: toDateKey({ year, month: 12, day: 31 }) };
     }
     if (value.precision === "month" || day === null) {
-        const daysInMonth = getDaysInMonth(year, month);
         return {
-            minKey: year * 10000 + month * 100 + 1,
-            maxKey: year * 10000 + month * 100 + daysInMonth
+            minKey: toDateKey({ year, month, day: 1 }),
+            maxKey: toDateKey({ year, month, day: getDaysInMonth(year, month) })
         };
     }
-    const key = year * 10000 + month * 100 + day;
+    const key = toDateKey({ year, month, day });
     return { minKey: key, maxKey: key };
 }

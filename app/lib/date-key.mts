@@ -1,7 +1,16 @@
 /**
+ * 年・月・日から `YYYYMMDD` 形式の数値キーを作る。
+ * @param parts 実在を確かめ済みの年・月・日
+ * @returns 日付キー
+ */
+export function toDateKey(parts: { year: number; month: number; day: number }): number {
+    return parts.year * 10000 + parts.month * 100 + parts.day;
+}
+
+/**
  * 日付文字列を `YYYYMMDD` 形式の数値キーへ解析する。
- * @param {string | null | undefined} raw
- * @returns {number | null}
+ * @param raw YYYY-MM-DD または YYYY/MM/DD 形式の日付文字列
+ * @returns 日付キー。実在しない日付や形式外の文字列なら null
  */
 export function parseDateKey(raw: string | null | undefined): number | null {
     if (!raw) return null;
@@ -15,7 +24,7 @@ export function parseDateKey(raw: string | null | undefined): number | null {
     const date = new Date(year, month - 1, day);
     if (Number.isNaN(date.getTime())) return null;
     if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null;
-    return year * 10000 + month * 100 + day;
+    return toDateKey({ year, month, day });
 }
 
 /**

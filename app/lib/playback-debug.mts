@@ -1,42 +1,28 @@
+import { isDebugFlagEnabled, writeDebugLog } from "./debug-log.mjs";
+
 /**
  * 再生系デバッグログの有効状態を返す。
- * @returns {boolean}
  */
-function isPlaybackDebugEnabled() {
-    try {
-        if (window.__KNK_DEBUG_YOUTUBE__ === true) return true;
-        return localStorage.getItem("debugYoutubePlayer") === "true";
-    } catch {
-        return false;
-    }
+function isPlaybackDebugEnabled(): boolean {
+    return isDebugFlagEnabled("__KNK_DEBUG_YOUTUBE__", "debugYoutubePlayer");
 }
 
 /**
  * autoplay の開始待ちに fallback を使うデバッグ設定の有効状態を返す。
- * @returns {boolean}
  */
-export function isAutoplayStartFallbackEnabled() {
-    try {
-        if (window.__KNK_AUTOPLAY_START_FALLBACK__ === true) return true;
-        return localStorage.getItem("debugAutoplayStartFallback") === "true";
-    } catch {
-        return false;
-    }
+export function isAutoplayStartFallbackEnabled(): boolean {
+    return isDebugFlagEnabled("__KNK_AUTOPLAY_START_FALLBACK__", "debugAutoplayStartFallback");
 }
 
 /**
  * 指定スコープ付きの再生系デバッグログを出力する。
- * @param {string} scope
- * @param {string} message
- * @param {unknown} details
+ * @param scope ログの出どころ
+ * @param message ログ本文
+ * @param details 付加情報
  */
 export function debugPlayback(scope: string, message: string, details?: unknown) {
     if (!isPlaybackDebugEnabled()) return;
-    if (details === undefined) {
-        console.debug(`[${scope}]`, message);
-        return;
-    }
-    console.debug(`[${scope}]`, message, details);
+    writeDebugLog(`[${scope}]`, message, details);
 }
 
 /**
