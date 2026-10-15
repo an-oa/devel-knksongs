@@ -1,8 +1,32 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { installNetworkMocks } from "./support/network-mocks.mts";
 import { routeSongsJsonFixture } from "./support/songs-network.mts";
 import { createScrollableResultSongs } from "./support/song-fixtures.mts";
 import { clickSidebarBackdrop, expectSidebarPopoverClosed, expectSidebarPopoverOpen, getControlLabel, openSidebar, openSettingsPanel, waitForInitialLoad } from "./support/ui-helpers.mts";
+
+/**
+ * 日付の絞り込みを検証するため、2024/02/10・03/05・03/20 の 3 曲を用意する。
+ */
+function createDatedSongs() {
+    const dates = [20240210, 20240305, 20240320];
+    return createScrollableResultSongs(3).map((song, index) => ({
+        ...song,
+        dateKey: dates[index],
+        date: ["2024/02/10", "2024/03/05", "2024/03/20"][index]
+    }));
+}
+
+/**
+ * 保存済みの検索条件から日付範囲を読む。
+ */
+async function readSavedDateRange(page: Page) {
+    return page.evaluate(() => {
+        const saved = localStorage.getItem("searchStateV1");
+        if (!saved) return null;
+        const { dateFrom, dateTo } = JSON.parse(saved);
+        return { dateFrom, dateTo };
+    });
+}
 
 test.beforeEach(async ({ page }) => {
     await installNetworkMocks(page);
@@ -46,14 +70,8 @@ test("theme toggle syncs native color scheme", async ({ page }) => {
 });
 
 test("date month change searches and stores the corrected selection", async ({ page }) => {
-    const dates = [20240210, 20240305, 20240320];
-    const songs = createScrollableResultSongs(3).map((song, index) => ({
-        ...song,
-        dateKey: dates[index],
-        date: ["2024/02/10", "2024/03/05", "2024/03/20"][index]
-    }));
     await page.evaluate(() => localStorage.clear());
-    await routeSongsJsonFixture(page, songs);
+    await routeSongsJsonFixture(page, createDatedSongs());
     await page.reload();
     await waitForInitialLoad(page);
     await openSidebar(page);
@@ -70,6 +88,31 @@ test("date month change searches and stores the corrected selection", async ({ p
         const saved = localStorage.getItem("searchStateV1");
         return saved ? JSON.parse(saved).dateFrom : null;
     })).toBe("2024-03");
+});
+
+test("date clear button clears only its own side and searches again", async ({ page }) => {
+    await routeSongsJsonFixture(page, createDatedSongs());
+    await page.reload();
+    await waitForInitialLoad(page);
+    await openSidebar(page);
+    await page.locator("#dateFromYear").selectOption("2024");
+    await page.locator("#dateFromMonth").selectOption("03");
+    await page.locator("#dateToYear").selectOption("2024");
+    await page.locator("#dateToMonth").selectOption("03");
+    await page.locator("#dateToDay").selectOption("05");
+    await expect(page.locator("#resultList .song-card")).toHaveCount(1);
+    await expect(page.locator("#resultList")).toContainText("Scroll Song 02");
+    await expect.poll(() => readSavedDateRange(page)).toEqual({ dateFrom: "2024-03", dateTo: "2024-03-05" });
+
+    await page.locator("#clearDateFromBtn").click();
+
+    await expect(page.locator("#dateFromYear")).toHaveValue("");
+    await expect(page.locator("#dateFromMonth")).toHaveValue("");
+    await expect(page.locator("#dateToDay")).toHaveValue("05");
+    await expect(page.locator("#resultList .song-card")).toHaveCount(2);
+    await expect(page.locator("#resultList")).toContainText("Scroll Song 01");
+    await expect(page.locator("#resultList")).toContainText("Scroll Song 02");
+    await expect.poll(() => readSavedDateRange(page)).toEqual({ dateFrom: "", dateTo: "2024-03-05" });
 });
 
 test("storage failures allow initial results and setting changes", async ({ page }) => {

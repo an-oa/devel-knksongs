@@ -218,6 +218,30 @@ test("result summary chips show active conditions and remove them individually o
     await expect(page.locator("#searchBox")).toBeFocused();
 });
 
+test("clear conditions button resets the search form, results, and saved state", async ({ page }) => {
+    await page.locator("#searchBox").fill("Song");
+    await openSidebar(page);
+    await clickControlLabel(page, "#collabHostOnly");
+    await page.locator("#dateFromYear").selectOption("2024");
+    await page.locator("#dateFromMonth").selectOption("01");
+    await page.locator("#dateFromDay").selectOption("02");
+    await expect(page.locator("#resultCount")).toHaveText("1 件がヒット");
+    await expect(getSongCard(page, "Replay Song")).toBeVisible();
+
+    await page.locator("#clearBtn").click();
+
+    await expect(page.locator("#searchBox")).toHaveValue("");
+    await expect(page.locator("#collabHostOnly")).not.toBeChecked();
+    await expect(page.locator("#dateFromYear")).toHaveValue("");
+    await expect(page.locator("#dateFromMonth")).toHaveValue("");
+    await expect(page.locator("#dateFromDay")).toHaveValue("");
+    await expect(page.locator("#resultCount")).toHaveText("おすすめを表示中");
+    await expect.poll(() => page.evaluate(() => {
+        const saved = localStorage.getItem("searchStateV1");
+        return saved ? JSON.parse(saved) : null;
+    })).toMatchObject({ query: "", collabHostOnly: false, dateFrom: "", dateTo: "" });
+});
+
 test("long search queries keep the condition chip within a narrow page", async ({ page }) => {
     await page.setViewportSize({ width: 393, height: 851 });
     const longQuery = "A".repeat(120);
