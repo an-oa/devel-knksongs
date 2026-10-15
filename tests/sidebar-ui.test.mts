@@ -72,9 +72,7 @@ function createSidebarUiState() {
     };
 }
 
-type BookmarkUiMockOverrides = Partial<NonNullable<
-    ReturnType<Parameters<typeof createSidebarController>[0]["callbacks"]["getBookmarkUiController"]>
->>;
+type BookmarkUiMockOverrides = Partial<Parameters<typeof createSidebarController>[0]["bookmarkUiController"]>;
 
 /** ブックマーク操作の既定モックと、モーダルを開く呼び出し記録を作る。 */
 function createBookmarkUiMock(overrides: BookmarkUiMockOverrides = {}) {
@@ -86,21 +84,19 @@ function createBookmarkUiMock(overrides: BookmarkUiMockOverrides = {}) {
         openBookmarkModal(...args: Parameters<NonNullable<BookmarkUiMockOverrides["openBookmarkModal"]>>) {
             openBookmarkCalls.push(args);
         },
-        removeSongFromActiveBookmark() {},
         ...overrides
     };
     return { controller, openBookmarkCalls };
 }
 
-/** サイドバーコントローラー用のコールバックを作る。 */
-function createSidebarCallbacks(state: {
+/** サイドバーコントローラーへ渡すブックマーク UI とコールバックを作る。 */
+function createSidebarDependencies(state: {
     bookmarkUiController?: ReturnType<typeof createBookmarkUiMock>["controller"];
     onOpenChange?: Parameters<typeof createSidebarController>[0]["callbacks"]["onOpenChange"];
-} = {}): Parameters<typeof createSidebarController>[0]["callbacks"] {
-    const bookmarkUiController = state.bookmarkUiController ?? createBookmarkUiMock().controller;
+} = {}): Omit<Parameters<typeof createSidebarController>[0], "ui"> {
     return {
-        getBookmarkUiController: () => bookmarkUiController,
-        onOpenChange: state.onOpenChange
+        bookmarkUiController: state.bookmarkUiController ?? createBookmarkUiMock().controller,
+        callbacks: { onOpenChange: state.onOpenChange }
     };
 }
 
@@ -111,7 +107,7 @@ test("sidebar: opening settings panel makes background inert and focuses back bu
         let closedBookmarkModal = 0;
         const controller = createSidebarController({
             ui,
-            callbacks: createSidebarCallbacks({
+            ...createSidebarDependencies({
                 bookmarkUiController: createBookmarkUiMock({
                     closeBookmarkModal() {
                         closedBookmarkModal += 1;
@@ -141,7 +137,7 @@ test("sidebar: escape closes settings panel, removes inert, and restores focus",
         const { ui, openSidebarBtn } = createSidebarUiState();
         const controller = createSidebarController({
             ui,
-            callbacks: createSidebarCallbacks()
+            ...createSidebarDependencies()
         });
 
         controller.setupUIHandlers();
@@ -177,7 +173,7 @@ test("sidebar: openBookmarkModal opens sidebar first when closed and passes clos
         const { controller: bookmarkUiController, openBookmarkCalls } = createBookmarkUiMock();
         const controller = createSidebarController({
             ui,
-            callbacks: createSidebarCallbacks({ bookmarkUiController })
+            ...createSidebarDependencies({ bookmarkUiController })
         });
 
         controller.setupUIHandlers();
@@ -204,7 +200,7 @@ test("sidebar: open button aria-expanded follows sidebar open state", () => {
         const openChangeCalls: boolean[] = [];
         const controller = createSidebarController({
             ui,
-            callbacks: createSidebarCallbacks({
+            ...createSidebarDependencies({
                 onOpenChange(open) {
                     openChangeCalls.push(open);
                 }
@@ -244,7 +240,7 @@ test("sidebar: native popover opens without fallback overlay and backdrop click 
         };
         const controller = createSidebarController({
             ui,
-            callbacks: createSidebarCallbacks()
+            ...createSidebarDependencies()
         });
 
         controller.setupUIHandlers();
@@ -276,7 +272,7 @@ test("sidebar: escape prioritizes settings panel over bookmark panel", () => {
         let bookmarkCloseCount = 0;
         const controller = createSidebarController({
             ui,
-            callbacks: createSidebarCallbacks({
+            ...createSidebarDependencies({
                 bookmarkUiController: createBookmarkUiMock({
                     closeBookmarkModal() {
                         bookmarkCloseCount += 1;
@@ -304,6 +300,69 @@ test("sidebar: escape prioritizes settings panel over bookmark panel", () => {
         assert.equal(ui.el.bookmarkSidebarPanel.hidden, false);
         assert.equal(bookmarkCloseCount, 1);
         assert.equal(document.activeElement, ui.el.openSettingsPanelBtn);
+    } finally {
+        restoreDom();
+    }
+});
+
+test("sidebar: isOpen and closeSidebarMenu follow the open state and restore focus", () => {
+    const restoreDom = installFakeDom();
+    try {
+        const { ui, openSidebarBtn } = createSidebarUiState();
+        const openChangeCalls: boolean[] = [];
+        const controller = createSidebarController({
+            ui,
+            ...createSidebarDependencies({
+                onOpenChange(open) {
+                    openChangeCalls.push(open);
+                }
+            })
+        });
+
+        controller.setupUIHandlers();
+        assert.equal(controller.isOpen(), false);
+        openSidebarBtn.focus();
+        invokeListener(openSidebarBtn, "click", {});
+        assert.equal(controller.isOpen(), true);
+
+        controller.closeSidebarMenu();
+        controller.closeSidebarMenu();
+
+        assert.equal(controller.isOpen(), false);
+        assert.equal(ui.el.sidebar.classList.contains("active"), false);
+        assert.deepEqual(openChangeCalls, [true, false]);
+        assert.equal(document.activeElement, openSidebarBtn);
+    } finally {
+        restoreDom();
+    }
+});
+
+test("sidebar: openBookmarkModal keeps an open sidebar open after the modal closes", () => {
+    const restoreDom = installFakeDom();
+    try {
+        const { ui, openSidebarBtn } = createSidebarUiState();
+        const openChangeCalls: boolean[] = [];
+        const { controller: bookmarkUiController, openBookmarkCalls } = createBookmarkUiMock();
+        const controller = createSidebarController({
+            ui,
+            ...createSidebarDependencies({
+                bookmarkUiController,
+                onOpenChange(open) {
+                    openChangeCalls.push(open);
+                }
+            })
+        });
+
+        controller.setupUIHandlers();
+        invokeListener(openSidebarBtn, "click", {});
+        controller.openBookmarkModal("song-7");
+
+        assert.equal(controller.isOpen(), true);
+        assert.deepEqual(openChangeCalls, [true]);
+        assert.equal(openBookmarkCalls.length, 1);
+        const [songKey, options] = openBookmarkCalls[0];
+        assert.equal(songKey, "song-7");
+        assert.equal(options?.closeSidebarOnExit, false);
     } finally {
         restoreDom();
     }

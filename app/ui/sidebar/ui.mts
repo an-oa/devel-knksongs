@@ -10,13 +10,12 @@ type SidebarBookmarkUiController = {
         songKey: string,
         options?: { returnFocusEl?: HTMLElement | null; closeSidebarOnExit?: boolean }
     ) => void;
-    removeSongFromActiveBookmark: (songKey: string) => void;
 };
 
 type SidebarControllerInput = {
     ui: Pick<AppUiState, "el" | "settingsPanel">;
+    bookmarkUiController: SidebarBookmarkUiController;
     callbacks: {
-        getBookmarkUiController: () => SidebarBookmarkUiController | null;
         onOpenChange?: (open: boolean) => void;
     };
 };
@@ -25,7 +24,7 @@ type SidebarControllerInput = {
  * サイドバー関連の UI 操作をまとめるコントローラーを作成する。
  */
 export function createSidebarController(input: SidebarControllerInput) {
-    const { ui, callbacks } = input;
+    const { ui, bookmarkUiController, callbacks } = input;
     const settingsPanelUi = ui.settingsPanel;
     const settingsSubpanel = createSidebarSubpanelController({
         getPanel: () => ui.el.settingsSidebarPanel,
@@ -34,8 +33,11 @@ export function createSidebarController(input: SidebarControllerInput) {
         getOpener: () => ui.el.openSettingsPanelBtn,
         state: settingsPanelUi
     });
-    const { getBookmarkUiController, onOpenChange } = callbacks;
-    let closeSidebarMenu: (() => void) | null = null;
+    const { onOpenChange } = callbacks;
+    // DOM 要素は initUI で集めるため、Popover の制御は setupUIHandlers で作る。
+    // 作る前と、必要な要素がないときは、サイドバーの開閉は何もしない。
+    let popoverController: ReturnType<typeof createSidebarPopoverController> | null = null;
+    let lastFocusedElement: HTMLElement | null = null;
 
     /**
      * 表示設定パネルを開く。
@@ -57,42 +59,68 @@ export function createSidebarController(input: SidebarControllerInput) {
     }
 
     /**
-     * ブックマーク UI ハンドラーの初期化を委譲する。
+     * サイドバーが開いているかを返す。開閉状態は sidebar 要素の active クラスを正とする。
+     * @returns 開いていれば true
      */
-    function setupBookmarkHandlers(): void {
-        const bookmarkUiController = getBookmarkUiController();
-        if (!bookmarkUiController) return;
-        bookmarkUiController.setupBookmarkHandlers();
+    function isOpen(): boolean {
+        return ui.el.sidebar?.classList.contains("active") === true;
     }
 
     /**
-     * 曲追加用のブックマークモーダル表示を委譲する。
-     * @param {string} songKey
+     * サイドバーを開き、フォーカスとARIA状態を同期する。
+     */
+    function openSidebarMenu(): void {
+        const sidebar = ui.el.sidebar;
+        const overlay = ui.el.sidebarOverlay;
+        if (!popoverController || !sidebar || !overlay || isOpen()) return;
+        closeSettingsPanel({ restoreFocus: false });
+        bookmarkUiController.closeBookmarkModal({ restoreFocus: false });
+        popoverController.clearPendingHide();
+        const usesPopover = popoverController.show();
+        sidebar.classList.add("active");
+        if (!usesPopover) overlay.classList.add("show");
+        lastFocusedElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        popoverController.setMainContentInert(true);
+        popoverController.syncExpandedState(true);
+        focusSidebarFirst();
+        onOpenChange?.(true);
+    }
+
+    /** サイドバーを閉じ、背景操作と開く前のフォーカスを復帰する。 */
+    function closeSidebarMenu(): void {
+        const sidebar = ui.el.sidebar;
+        const overlay = ui.el.sidebarOverlay;
+        if (!popoverController || !sidebar || !overlay || !isOpen()) return;
+        closeSettingsPanel({ restoreFocus: false });
+        bookmarkUiController.closeBookmarkModal({ restoreFocus: false });
+        blurSidebarActiveElement(sidebar);
+        sidebar.classList.remove("active");
+        overlay.classList.remove("show");
+        popoverController.scheduleHideAfterClose();
+        popoverController.setMainContentInert(false);
+        popoverController.syncExpandedState(false);
+        onOpenChange?.(false);
+        if (lastFocusedElement) {
+            lastFocusedElement.focus();
+            return;
+        }
+        ui.el.openSidebarBtn?.focus();
+    }
+
+    /**
+     * 曲追加用のブックマークモーダルを開く。
+     * サイドバーが閉じていれば先に開き、モーダルを閉じるときにサイドバーも閉じるよう伝える。
+     * @param songKey 追加する曲の参照キー
      */
     function openBookmarkModal(songKey: string): void {
-        const bookmarkUiController = getBookmarkUiController();
-        const sidebar = ui.el.sidebar;
-        const openBtn = ui.el.openSidebarBtn;
-        if (!bookmarkUiController || !sidebar || !openBtn) return;
+        if (!ui.el.sidebar) return;
         const returnFocusEl = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-        const sidebarWasActive = sidebar.classList.contains("active");
-        if (!sidebarWasActive) {
-            openBtn.click();
-        }
+        const sidebarWasOpen = isOpen();
+        if (!sidebarWasOpen) openSidebarMenu();
         bookmarkUiController.openBookmarkModal(songKey, {
             returnFocusEl,
-            closeSidebarOnExit: !sidebarWasActive
+            closeSidebarOnExit: !sidebarWasOpen
         });
-    }
-
-    /**
-     * アクティブブックマークからの曲削除を委譲する。
-     * @param {string} songKey
-     */
-    function removeSongFromActiveBookmark(songKey: string): void {
-        const bookmarkUiController = getBookmarkUiController();
-        if (!bookmarkUiController) return;
-        bookmarkUiController.removeSongFromActiveBookmark(songKey);
     }
 
     /**
@@ -103,73 +131,24 @@ export function createSidebarController(input: SidebarControllerInput) {
         const openBtn = ui.el.openSidebarBtn;
         const closeBtn = ui.el.closeSidebarBtn;
         const overlay = ui.el.sidebarOverlay;
-        let lastFocusedElement: HTMLElement | null = null;
 
         if (!sidebar || !openBtn || !closeBtn || !overlay) return;
-        const popoverController = createSidebarPopoverController({
+        popoverController = createSidebarPopoverController({
             sidebar,
             sidebarSheet: ui.el.sidebarSheet,
             mainContent: ui.el.mainContent,
             openButton: openBtn
         });
 
-        /**
-         * サイドバーを開き、フォーカスとARIA状態を同期する。
-         */
-        const openSidebarMenu = (): void => {
-            if (sidebar.classList.contains("active")) return;
-            const bookmarkUiController = getBookmarkUiController();
-            closeSettingsPanel({ restoreFocus: false });
-            if (bookmarkUiController) {
-                bookmarkUiController.closeBookmarkModal({ restoreFocus: false });
-            }
-            popoverController.clearPendingHide();
-            const usesPopover = popoverController.show();
-            sidebar.classList.add("active");
-            if (!usesPopover) overlay.classList.add("show");
-            lastFocusedElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-            popoverController.setMainContentInert(true);
-            popoverController.syncExpandedState(true);
-            focusSidebarFirst();
-            onOpenChange?.(true);
-        };
-
         openBtn.addEventListener("click", openSidebarMenu);
-
-        /** サイドバーを閉じ、背景操作と開く前のフォーカスを復帰する。 */
-        const closeMenu = (): void => {
-            if (!sidebar.classList.contains("active")) return;
-            const bookmarkUiController = getBookmarkUiController();
-            closeSettingsPanel({ restoreFocus: false });
-            if (bookmarkUiController) {
-                bookmarkUiController.closeBookmarkModal({ restoreFocus: false });
-            }
-            blurSidebarActiveElement(sidebar);
-            sidebar.classList.remove("active");
-            overlay.classList.remove("show");
-            popoverController.scheduleHideAfterClose();
-            popoverController.setMainContentInert(false);
-            popoverController.syncExpandedState(false);
-            onOpenChange?.(false);
-            if (lastFocusedElement) {
-                lastFocusedElement.focus();
-                return;
-            }
-            openBtn.focus();
-        };
-
-        closeSidebarMenu = closeMenu;
-        closeBtn.addEventListener("click", closeMenu);
-        overlay.addEventListener("click", closeMenu);
+        closeBtn.addEventListener("click", closeSidebarMenu);
+        overlay.addEventListener("click", closeSidebarMenu);
         sidebar.addEventListener("click", (event) => {
-            if (event.target === sidebar) closeMenu();
+            if (event.target === sidebar) closeSidebarMenu();
         });
         if (ui.el.openSettingsPanelBtn) {
             ui.el.openSettingsPanelBtn.addEventListener("click", () => {
-                const bookmarkUiController = getBookmarkUiController();
-                if (bookmarkUiController) {
-                    bookmarkUiController.closeBookmarkModal({ restoreFocus: false });
-                }
+                bookmarkUiController.closeBookmarkModal({ restoreFocus: false });
                 openSettingsPanel({
                     returnFocusEl: ui.el.openSettingsPanelBtn
                 });
@@ -181,32 +160,25 @@ export function createSidebarController(input: SidebarControllerInput) {
             });
         }
         if (ui.el.closeSettingsSidebarBtn) {
-            ui.el.closeSettingsSidebarBtn.addEventListener("click", closeMenu);
+            ui.el.closeSettingsSidebarBtn.addEventListener("click", closeSidebarMenu);
         }
         if (ui.el.openBookmarkPanelBtn) {
             ui.el.openBookmarkPanelBtn.addEventListener("click", () => {
-                const bookmarkUiController = getBookmarkUiController();
                 closeSettingsPanel({ restoreFocus: false });
-                if (bookmarkUiController) {
-                    bookmarkUiController.openBookmarkBrowser({
-                        returnFocusEl: ui.el.openBookmarkPanelBtn
-                    });
-                }
+                bookmarkUiController.openBookmarkBrowser({
+                    returnFocusEl: ui.el.openBookmarkPanelBtn
+                });
             });
         }
         if (ui.el.closeBookmarkPanelBtn) {
             ui.el.closeBookmarkPanelBtn.addEventListener("click", () => {
-                const bookmarkUiController = getBookmarkUiController();
-                if (bookmarkUiController) {
-                    bookmarkUiController.closeBookmarkModal({ restoreFocus: true });
-                }
+                bookmarkUiController.closeBookmarkModal({ restoreFocus: true });
             });
         }
         if (ui.el.closeBookmarkSidebarBtn) {
-            ui.el.closeBookmarkSidebarBtn.addEventListener("click", closeMenu);
+            ui.el.closeBookmarkSidebarBtn.addEventListener("click", closeSidebarMenu);
         }
         document.addEventListener("keydown", (event) => {
-            const bookmarkUiController = getBookmarkUiController();
             if (event.key === "Escape") {
                 if (ui.el.settingsSidebarPanel && !ui.el.settingsSidebarPanel.hidden) {
                     event.preventDefault();
@@ -215,17 +187,15 @@ export function createSidebarController(input: SidebarControllerInput) {
                 }
                 if (ui.el.bookmarkSidebarPanel && !ui.el.bookmarkSidebarPanel.hidden) {
                     event.preventDefault();
-                    if (bookmarkUiController) {
-                        bookmarkUiController.closeBookmarkModal({ restoreFocus: true });
-                    }
+                    bookmarkUiController.closeBookmarkModal({ restoreFocus: true });
                     return;
                 }
-                closeMenu();
+                closeSidebarMenu();
             }
             if (event.key === "Tab") trapSidebarFocus(event, sidebar);
         });
 
-        setupBookmarkHandlers();
+        bookmarkUiController.setupBookmarkHandlers();
     }
 
     /**
@@ -306,12 +276,8 @@ export function createSidebarController(input: SidebarControllerInput) {
 
     return {
         setupUIHandlers,
+        isOpen,
         openBookmarkModal,
-        removeSongFromActiveBookmark,
-        closeSidebarMenu: () => {
-            if (typeof closeSidebarMenu === "function") {
-                closeSidebarMenu();
-            }
-        }
+        closeSidebarMenu
     };
 }

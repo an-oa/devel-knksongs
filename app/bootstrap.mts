@@ -72,7 +72,7 @@ type StorageCallbacksInput = {
 
 type BookmarkUiCallbacksInput = {
     storageController: ReturnType<typeof createStorageController>;
-    getSidebarController: () => ReturnType<typeof createSidebarController> | null;
+    getSidebarController: () => ReturnType<typeof createSidebarController>;
 };
 
 type YoutubePlaybackHooksInput = {
@@ -110,7 +110,7 @@ function createSearchCallbacks({
 }
 
 /**
- * 描画 controller から検索・YouTube・サイドバー・保存へ委譲する callback 群を作成する。
+ * 描画 controller から YouTube・サイドバー・保存・ブックマーク UI へ委譲する callback 群を作成する。
  * controller 生成順の循環を避けるため、後続 controller は呼び出し時に getter で解決する。
  */
 function createRenderCallbacks({
@@ -125,7 +125,10 @@ function createRenderCallbacks({
         playThumbnail: (thumbDiv, yt, options) => getYoutubeController().playThumbnail(thumbDiv, yt, options),
         restoreActivePlayback: () => getYoutubeController().restoreActivePlayback(),
         openBookmarkModal: (songKey) => getSidebarController().openBookmarkModal(songKey),
-        removeSongFromActiveBookmark: (songKey) => getSidebarController().removeSongFromActiveBookmark(songKey),
+        removeSongFromActiveBookmark: (songKey) => {
+            const bookmarkUiController = getBookmarkUiController();
+            if (bookmarkUiController) bookmarkUiController.removeSongFromActiveBookmark(songKey);
+        },
         moveSongInActiveBookmark: (fromSongKey, toSongKey) => getStorageController().moveSongInActiveBookmark(fromSongKey, toSongKey),
         notifyBookmarkSaveError: (result) => {
             const bookmarkUiController = getBookmarkUiController();
@@ -175,10 +178,7 @@ function createBookmarkUiCallbacks({
         onExportBookmarks: () => storageController.exportBookmarksAsJsonText(),
         onPreviewBookmarkImport: (text) => storageController.parseBookmarkImportText(text),
         onImportBookmarksText: (text) => storageController.importBookmarksFromJsonText(text),
-        onRequestCloseSidebar: () => {
-            const sidebarController = getSidebarController();
-            if (sidebarController) sidebarController.closeSidebarMenu();
-        }
+        onRequestCloseSidebar: () => getSidebarController().closeSidebarMenu()
     };
 }
 
@@ -390,7 +390,7 @@ function createAppControllers() {
      */
     const autoHideHeaderController = createAutoHideHeaderController({
         ui: appUiState,
-        isSidebarOpen: () => appUiState.el.sidebar?.classList.contains("active") === true
+        isSidebarOpen: () => sidebarController.isOpen()
     });
 
     /**
@@ -410,8 +410,8 @@ function createAppControllers() {
      */
     const sidebarController: ReturnType<typeof createSidebarController> = createSidebarController({
         ui: appUiState,
+        bookmarkUiController,
         callbacks: {
-            getBookmarkUiController: () => bookmarkUiController,
             onOpenChange: autoHideHeaderController.handleSidebarOpenChange
         }
     });
