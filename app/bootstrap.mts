@@ -26,6 +26,7 @@ import { createYoutubeController, extractYoutubeInfo } from "./controllers/youtu
 import { createBookmarkPersistenceController } from "./controllers/bookmark-persistence.mjs";
 import { createStorageController } from "./controllers/storage.mjs";
 import { createBookmarkUiController } from "./ui/bookmark/ui.mjs";
+import { isIOSWebKit } from "./lib/dom-utils.mjs";
 import { scrollResultListToTop } from "./lib/results-scroll.mjs";
 import { estimateInitialResultDisplayCount, estimateMasonryVisibleCardCount } from "./lib/render/masonry-layout.mjs";
 import { setupResultsViewportRefresh } from "./lib/render/results-viewport-refresh.mjs";
@@ -76,7 +77,6 @@ type BookmarkUiCallbacksInput = {
 
 type SidebarCallbacksInput = {
     getBookmarkUiController: () => ReturnType<typeof createBookmarkUiController> | null;
-    youtubeController: ReturnType<typeof createYoutubeController>;
     dateFilterController: ReturnType<typeof createDateFilterController>;
     markFilterTouched: ReturnType<typeof createSearchUiActions>["markFilterTouched"];
     markQueryTouched: ReturnType<typeof createSearchUiActions>["markQueryTouched"];
@@ -196,7 +196,6 @@ function createBookmarkUiCallbacks({
  */
 function createSidebarCallbacks({
     getBookmarkUiController,
-    youtubeController,
     dateFilterController,
     markFilterTouched,
     markQueryTouched,
@@ -205,7 +204,7 @@ function createSidebarCallbacks({
 }: SidebarCallbacksInput): Parameters<typeof createSidebarController>[0]["callbacks"] {
     return {
         getBookmarkUiController,
-        isIOSWebKit: () => youtubeController.isIOSWebKit(),
+        isIOSWebKit,
         markFilterTouched,
         markQueryTouched,
         commitDateInputChange: (target, options) => dateFilterController.commitDateInputChange(target, options),
@@ -445,7 +444,6 @@ function createAppControllers() {
         ui: appUiState,
         callbacks: createSidebarCallbacks({
             getBookmarkUiController: () => bookmarkUiController,
-            youtubeController,
             dateFilterController,
             markFilterTouched: searchUiActions.markFilterTouched,
             markQueryTouched: searchUiActions.markQueryTouched,
@@ -498,7 +496,6 @@ function createAppControllers() {
         searchCoordinator,
         renderController,
         playbackSettingsController,
-        youtubeController,
         storageController,
         autoHideHeaderController,
         sidebarController,
@@ -515,7 +512,6 @@ const {
     searchCoordinator,
     renderController,
     playbackSettingsController,
-    youtubeController,
     storageController,
     autoHideHeaderController,
     sidebarController,
@@ -533,7 +529,7 @@ let resultsViewportRefreshCleanup: (() => void) | null = null;
  */
 async function initUI(): Promise<void> {
     appUiState.el = collectUiElements();
-    if (youtubeController.isIOSWebKit()) document.documentElement.classList.add("ios");
+    if (isIOSWebKit()) document.documentElement.classList.add("ios");
 
     searchFiltersController.setupFilterOptions({
         onFilterChange: searchUiActions.markFilterTouched
