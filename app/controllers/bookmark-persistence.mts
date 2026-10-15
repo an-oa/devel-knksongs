@@ -3,6 +3,7 @@ import {
     migrateLegacyBookmarkSongRefsToCurrent,
     parseStoredBookmarksPayload
 } from "../lib/storage/bookmark-schema.mjs";
+import { isDebugFlagEnabled, writeDebugLog } from "../lib/debug-log.mjs";
 import type { AppDataState, BookmarkRecord } from "../state.types";
 
 export type BookmarkSaveFailure =
@@ -51,29 +52,13 @@ export function createBookmarkPersistenceController({
     let bookmarkStorageSnapshot: string | null | undefined = null;
 
     /**
-     * ブックマーク移行デバッグログの有効状態を返す。
-     */
-    function isBookmarkMigrationDebugEnabled(): boolean {
-        try {
-            if (window.__KNK_DEBUG_BOOKMARK_MIGRATION__ === true) return true;
-            return localStorage.getItem("debugBookmarkMigration") === "true";
-        } catch {
-            return false;
-        }
-    }
-
-    /**
-     * ブックマーク移行まわりのデバッグログを出力する。
+     * ブックマーク移行まわりのデバッグログを、フラグが有効なときだけ出力する。
      * @param message ログ本文
      * @param details 付加情報
      */
     function debugBookmarkMigration(message: string, details?: unknown): void {
-        if (!isBookmarkMigrationDebugEnabled()) return;
-        if (details === undefined) {
-            console.debug("[bookmark-migration]", message);
-            return;
-        }
-        console.debug("[bookmark-migration]", message, details);
+        if (!isDebugFlagEnabled("__KNK_DEBUG_BOOKMARK_MIGRATION__", "debugBookmarkMigration")) return;
+        writeDebugLog("[bookmark-migration]", message, details);
     }
 
     /**
