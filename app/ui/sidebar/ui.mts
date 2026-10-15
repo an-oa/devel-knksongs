@@ -1,8 +1,3 @@
-import { getSearchBooleanFilterElements } from "../../lib/search-boolean-filters.mjs";
-import {
-    clearSearchQueryValidationIfValid,
-    validateSearchQueryInput
-} from "../search-query-validation.mjs";
 import { createSidebarPopoverController } from "./popover.mjs";
 import { createSidebarSubpanelController } from "./subpanel.mjs";
 import type { AppUiState } from "../../state.types";
@@ -22,9 +17,6 @@ type SidebarControllerInput = {
     ui: Pick<AppUiState, "el" | "settingsPanel">;
     callbacks: {
         getBookmarkUiController: () => SidebarBookmarkUiController | null;
-        markFilterTouched: (options?: { immediate?: boolean }) => void;
-        markQueryTouched: () => void;
-        clearSearch: () => void;
         onOpenChange?: (open: boolean) => void;
     };
 };
@@ -42,13 +34,7 @@ export function createSidebarController(input: SidebarControllerInput) {
         getOpener: () => ui.el.openSettingsPanelBtn,
         state: settingsPanelUi
     });
-    const {
-        getBookmarkUiController,
-        markFilterTouched,
-        markQueryTouched,
-        clearSearch,
-        onOpenChange
-    } = callbacks;
+    const { getBookmarkUiController, onOpenChange } = callbacks;
     let closeSidebarMenu: (() => void) | null = null;
 
     /**
@@ -110,17 +96,16 @@ export function createSidebarController(input: SidebarControllerInput) {
     }
 
     /**
-     * 検索 UI・サイドバー・各種ボタンのイベントを設定する。
+     * サイドバーの開閉と、設定パネル・ブックマークパネルの操作イベントを設定する。
      */
     function setupUIHandlers(): void {
         const sidebar = ui.el.sidebar;
         const openBtn = ui.el.openSidebarBtn;
         const closeBtn = ui.el.closeSidebarBtn;
         const overlay = ui.el.sidebarOverlay;
-        const clearBtn = ui.el.clearBtn;
         let lastFocusedElement: HTMLElement | null = null;
 
-        if (!sidebar || !openBtn || !closeBtn || !overlay || !clearBtn) return;
+        if (!sidebar || !openBtn || !closeBtn || !overlay) return;
         const popoverController = createSidebarPopoverController({
             sidebar,
             sidebarSheet: ui.el.sidebarSheet,
@@ -240,23 +225,6 @@ export function createSidebarController(input: SidebarControllerInput) {
             if (event.key === "Tab") trapSidebarFocus(event, sidebar);
         });
 
-        getSearchBooleanFilterElements(ui).forEach((checkbox) => {
-            if (!checkbox) return;
-            checkbox.addEventListener("change", () => {
-                markFilterTouched();
-            });
-        });
-        if (ui.el.searchBox) {
-            ui.el.searchBox.addEventListener("input", () => {
-                clearSearchQueryValidationIfValid(ui.el.searchBox, ui.el.searchBoxError);
-                markQueryTouched();
-            });
-            ui.el.searchBox.addEventListener("blur", () => {
-                validateSearchQueryInput(ui.el.searchBox, ui.el.searchBoxError);
-            });
-        }
-
-        clearBtn.addEventListener("click", clearSearch);
         setupBookmarkHandlers();
     }
 

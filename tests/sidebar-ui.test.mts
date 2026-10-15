@@ -20,33 +20,22 @@ function createSidebarUiState() {
     const openSidebarBtn = document.createElement("button");
     const closeSidebarBtn = document.createElement("button");
     const overlay = document.createElement("div");
-    const clearBtn = document.createElement("button");
     const openSettingsPanelBtn = document.createElement("button");
     const closeSettingsPanelBtn = document.createElement("button");
     const closeSettingsSidebarBtn = document.createElement("button");
     const openBookmarkPanelBtn = document.createElement("button");
     const closeBookmarkPanelBtn = document.createElement("button");
     const closeBookmarkSidebarBtn = document.createElement("button");
-    const searchBox = document.createElement("input");
-    const collabHostOnly = document.createElement("input");
-    const collabGuestOnly = document.createElement("input");
-    const relayOnly = document.createElement("input");
-    const harmonyOnly = document.createElement("input");
 
     openSidebarBtn.setAttribute("id", "open-sidebar");
     closeSidebarBtn.setAttribute("id", "close-sidebar");
     overlay.setAttribute("id", "sidebar-overlay");
-    clearBtn.setAttribute("id", "clearBtn");
 
     settingsSidebarPanel.hidden = true;
     bookmarkSidebarPanel.hidden = true;
 
-    sidebarHeader.append(closeSidebarBtn, clearBtn);
-    sidebarScrollArea.append(
-        searchBox,
-        collabHostOnly, collabGuestOnly, relayOnly, harmonyOnly,
-        openBookmarkPanelBtn, openSettingsPanelBtn
-    );
+    sidebarHeader.append(closeSidebarBtn);
+    sidebarScrollArea.append(openBookmarkPanelBtn, openSettingsPanelBtn);
     settingsSidebarPanel.append(closeSettingsPanelBtn, closeSettingsSidebarBtn);
     bookmarkSidebarPanel.append(closeBookmarkPanelBtn, closeBookmarkSidebarBtn);
     sidebar.append(sidebarHeader, sidebarScrollArea, settingsSidebarPanel, bookmarkSidebarPanel);
@@ -63,7 +52,6 @@ function createSidebarUiState() {
                 mainContent,
                 openSidebarBtn,
                 closeSidebarBtn,
-                clearBtn,
                 settingsSidebarPanel,
                 bookmarkSidebarPanel,
                 openSettingsPanelBtn,
@@ -71,12 +59,7 @@ function createSidebarUiState() {
                 closeSettingsSidebarBtn,
                 openBookmarkPanelBtn,
                 closeBookmarkPanelBtn,
-                closeBookmarkSidebarBtn,
-                searchBox,
-                collabHostOnly,
-                collabGuestOnly,
-                relayOnly,
-                harmonyOnly
+                closeBookmarkSidebarBtn
             },
             settingsPanel: {
                 returnFocusEl: null
@@ -85,8 +68,7 @@ function createSidebarUiState() {
         openSidebarBtn,
         closeSidebarBtn,
         overlay,
-        mainContent,
-        clearBtn
+        mainContent
     };
 }
 
@@ -118,9 +100,6 @@ function createSidebarCallbacks(state: {
     const bookmarkUiController = state.bookmarkUiController ?? createBookmarkUiMock().controller;
     return {
         getBookmarkUiController: () => bookmarkUiController,
-        markFilterTouched: () => {},
-        markQueryTouched: () => {},
-        clearSearch: () => {},
         onOpenChange: state.onOpenChange
     };
 }

@@ -75,14 +75,6 @@ type BookmarkUiCallbacksInput = {
     getSidebarController: () => ReturnType<typeof createSidebarController> | null;
 };
 
-type SidebarCallbacksInput = {
-    getBookmarkUiController: () => ReturnType<typeof createBookmarkUiController> | null;
-    markFilterTouched: ReturnType<typeof createSearchUiActions>["markFilterTouched"];
-    markQueryTouched: ReturnType<typeof createSearchUiActions>["markQueryTouched"];
-    clearSearch: ReturnType<typeof createSearchUiActions>["clearSearch"];
-    onOpenChange: (open: boolean) => void;
-};
-
 type YoutubePlaybackHooksInput = {
     youtubeController: ReturnType<typeof createYoutubeController>;
     renderController: ReturnType<typeof createRenderController>;
@@ -187,25 +179,6 @@ function createBookmarkUiCallbacks({
             const sidebarController = getSidebarController();
             if (sidebarController) sidebarController.closeSidebarMenu();
         }
-    };
-}
-
-/**
- * サイドバー controller から各 controller へ委譲する callback 群を作成する。
- */
-function createSidebarCallbacks({
-    getBookmarkUiController,
-    markFilterTouched,
-    markQueryTouched,
-    clearSearch,
-    onOpenChange
-}: SidebarCallbacksInput): Parameters<typeof createSidebarController>[0]["callbacks"] {
-    return {
-        getBookmarkUiController,
-        markFilterTouched,
-        markQueryTouched,
-        clearSearch,
-        onOpenChange
     };
 }
 
@@ -433,17 +406,14 @@ function createAppControllers() {
     });
 
     /**
-     * サイドバー全体の開閉、設定パネル、ブックマークパネル、検索リセット導線を扱う controller。
+     * サイドバー全体の開閉、設定パネル、ブックマークパネルを扱う controller。
      */
     const sidebarController: ReturnType<typeof createSidebarController> = createSidebarController({
         ui: appUiState,
-        callbacks: createSidebarCallbacks({
+        callbacks: {
             getBookmarkUiController: () => bookmarkUiController,
-            markFilterTouched: searchUiActions.markFilterTouched,
-            markQueryTouched: searchUiActions.markQueryTouched,
-            clearSearch: searchUiActions.clearSearch,
             onOpenChange: autoHideHeaderController.handleSidebarOpenChange
-        })
+        }
     });
 
     /**
@@ -532,6 +502,7 @@ async function initUI(): Promise<void> {
     });
     autoHideHeaderController.setup();
     sidebarController.setupUIHandlers();
+    searchUiActions.setupSearchFormHandlers();
     dateFilterController.setupDateSelectHandlers({ isIOSWebKit });
     resultSummaryController.setup();
     storageController.restorePersistedState();
