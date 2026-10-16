@@ -59,7 +59,40 @@ test("mobile recommendations append the same selection and retain it across colu
     await expectCardsInsideLayout(page);
 });
 
-test("wide recommendations retain more than 48 cards when shrinking to mobile", async ({ page }) => {
+/** 結果カードの曲キーを表示順に返す。 */
+async function readCardKeys(page: Page) {
+    return page.locator(".song-card").evaluateAll((nodes) => nodes.map((node) => node.dataset.songKey));
+}
+
+test("recommendations return to 48 cards after widening and narrowing again at the top", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await installNetworkMocks(page);
+    const songs = createScrollableResultSongs(200).map((song) => ({ ...song, format: "オリ曲" }));
+    await routeSongsJsonFixture(page, songs);
+    await page.goto("/");
+    await waitForInitialLoad(page);
+    const cards = page.locator(".song-card");
+    await expect(cards).toHaveCount(48);
+    const initialKeys = await readCardKeys(page);
+
+    // ブラウザの表示を 25% に縮小したときと同じ広さにする。
+    await page.setViewportSize({ width: 5120, height: 3200 });
+    await expect.poll(() => cards.count()).toBeGreaterThan(48);
+    const wideKeys = await readCardKeys(page);
+    expect(wideKeys.slice(0, 48)).toEqual(initialKeys);
+
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await expect(cards).toHaveCount(48);
+    expect(await readCardKeys(page)).toEqual(initialKeys);
+    await expectCardsInsideLayout(page);
+
+    await page.setViewportSize({ width: 5120, height: 3200 });
+    await expect(cards).toHaveCount(wideKeys.length);
+    expect(await readCardKeys(page)).toEqual(wideKeys);
+    await expectCardsInsideLayout(page);
+});
+
+test("narrowing while scrolled keeps the cards above the screen and one screen below", async ({ page }) => {
     await page.setViewportSize({ width: 3840, height: 2160 });
     await installNetworkMocks(page);
     const songs = createScrollableResultSongs(160).map((song) => ({ ...song, format: "オリ曲" }));
@@ -68,18 +101,35 @@ test("wide recommendations retain more than 48 cards when shrinking to mobile", 
     await waitForInitialLoad(page);
     const cards = page.locator(".song-card");
     await expect.poll(() => cards.count()).toBeGreaterThan(48);
-    const wideKeys = await cards.evaluateAll((nodes) => nodes.map((node) => node.dataset.songKey));
+    const wideKeys = await readCardKeys(page);
+
+    // おすすめは画面を埋める件数なので、カードを見積もりより高くして再配置し、スクロールできる状態を作る。
+    await page.evaluate(() => {
+        document.querySelectorAll<HTMLElement>("#resultList .song-card").forEach((card) => {
+            card.style.minHeight = "600px";
+        });
+        window.dispatchEvent(new Event("resize"));
+    });
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollHeight)).toBeGreaterThan(4000);
+    await page.evaluate(() => {
+        const cardNodes = Array.from(document.querySelectorAll("#resultList .song-card"));
+        const columnCount = Number(document.querySelector("#resultList")?.getAttribute("data-layout-columns"));
+        window.scrollTo(0, window.scrollY + cardNodes[columnCount * 2].getBoundingClientRect().top);
+    });
 
     await page.setViewportSize({ width: 393, height: 851 });
     await expect(page.locator("#resultList")).toHaveAttribute("data-layout-columns", "1");
-    await expect(cards).toHaveCount(wideKeys.length);
-    expect(await cards.evaluateAll((nodes) => nodes.map((node) => node.dataset.songKey))).toEqual(wideKeys);
-    await expectCardsInsideLayout(page);
-
-    await page.setViewportSize({ width: 3840, height: 2160 });
-    await expect(page.locator("#resultList")).not.toHaveAttribute("data-layout-columns", "1");
-    await expect(cards).toHaveCount(wideKeys.length);
-    expect(await cards.evaluateAll((nodes) => nodes.map((node) => node.dataset.songKey))).toEqual(wideKeys);
+    // 並び直した後の画面で、上へ過ぎたカードと画面 1 つ分（最低 48 件）だけが残る状態に落ち着く。
+    await expect.poll(() => page.evaluate((wideCount) => {
+        const cardNodes = Array.from(document.querySelectorAll("#resultList .song-card"));
+        const firstUnpassedIndex = cardNodes.findIndex((card) => card.getBoundingClientRect().bottom > 0);
+        const scrolledPastCount = firstUnpassedIndex === -1 ? cardNodes.length : firstUnpassedIndex;
+        return cardNodes.length === Math.min(wideCount, scrolledPastCount + 48);
+    }, wideKeys.length)).toBe(true);
+    const narrowKeys = await readCardKeys(page);
+    expect(narrowKeys.length).toBeGreaterThan(48);
+    expect(narrowKeys.length).toBeLessThan(wideKeys.length);
+    expect(narrowKeys).toEqual(wideKeys.slice(0, narrowKeys.length));
     await expectCardsInsideLayout(page);
 });
 

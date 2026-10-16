@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
     applyMasonryLayout,
+    countSongCardsScrolledPast,
     estimateInitialResultDisplayCount,
     estimateMasonryVisibleCardCount,
     getMasonryColumnCount
@@ -196,6 +197,33 @@ test("render masonry: estimated visible count expands beyond the minimum for tal
             viewportHeight: 900
         }), 48);
         assert.equal(estimateMasonryVisibleCardCount(null, { minItemCount: 48 }), 48);
+    } finally {
+        cleanup();
+    }
+});
+
+test("render masonry: counts song cards scrolled past the top of the viewport", () => {
+    const cleanup = installFakeDom();
+    try {
+        const container = document.createElement("div");
+        const bottoms = [-300, -10, 0, 40, -5, 300];
+        bottoms.forEach((bottom) => {
+            const card = document.createElement("div");
+            card.className = "song-card";
+            getFakeElement(card)._rect = { top: bottom - 100, bottom, left: 0, right: 100, width: 100, height: 100 };
+            container.appendChild(card);
+        });
+        const sentinel = document.createElement("div");
+        getFakeElement(sentinel)._rect = { top: -200, bottom: -100, left: 0, right: 100, width: 100, height: 100 };
+        container.insertBefore(sentinel, container.firstChild);
+
+        assert.equal(countSongCardsScrolledPast(container), 3);
+
+        Array.from(container.querySelectorAll(".song-card")).forEach((card) => {
+            getFakeElement(card)._rect = { top: -200, bottom: -100, left: 0, right: 100, width: 100, height: 100 };
+        });
+        assert.equal(countSongCardsScrolledPast(container), 6);
+        assert.equal(countSongCardsScrolledPast(null), 0);
     } finally {
         cleanup();
     }

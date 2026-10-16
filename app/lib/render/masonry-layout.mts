@@ -182,6 +182,23 @@ export function estimateMasonryVisibleCardCount(
 }
 
 /**
+ * 画面の上端より上へ過ぎた結果カードの数を返す。
+ * DOM 順で最初に下端が画面の上端より下にあるカードの手前までを数える。
+ * 複数列はカードを DOM 順に列へ割り当てるので、読み進めた位置の目安になる。
+ * @param container 結果カードを並べた一覧
+ * @returns 画面より上へ過ぎたカードの数。一覧がなければ 0
+ */
+export function countSongCardsScrolledPast(container: unknown): number {
+    if (!isHtmlElement(container)) return 0;
+    const cards = Array.from((container as HTMLElement).children).filter((node): node is HTMLElement => (
+        isHtmlElement(node) &&
+        (node as HTMLElement).classList.contains("song-card")
+    ));
+    const firstUnpassedIndex = cards.findIndex((card) => card.getBoundingClientRect().bottom > 0);
+    return firstUnpassedIndex === -1 ? cards.length : firstUnpassedIndex;
+}
+
+/**
  * 1列の初期描画を約2画面分（最低12件）に絞り、残りは既存の末尾監視で追加する。
  * 複数列や寸法未確定時は呼び出し元の件数を保つ。おすすめの抽選件数は変更しない。
  */
