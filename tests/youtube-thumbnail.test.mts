@@ -2,12 +2,19 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
     applyYoutubeThumbnailImage,
+    clearYoutubeThumbnailPlaybackTarget,
     createYoutubeThumbnailImage,
     getSongKeyFromYoutubeThumb,
+    getYoutubeThumbnailPlaybackEndSeconds,
+    getYoutubeThumbnailPlaybackMode,
+    getYoutubeThumbnailPlaybackSessionId,
     preventYoutubeThumbnailDefaultAction,
     setYoutubeThumbnailExpandedCardState,
     setYoutubeThumbnailOrientation,
+    setYoutubeThumbnailPlaybackMode,
+    setYoutubeThumbnailPlaybackSessionId,
     setYoutubeThumbnailPlaybackState,
+    setYoutubeThumbnailPlaybackTarget,
     suppressYoutubeThumbnailContextMenu
 } from "../app/lib/youtube/thumbnail.mts";
 import { installFakeDom, invokeListener } from "./test-helpers.mts";
@@ -85,6 +92,81 @@ test("youtube thumbnail: orientation, playing state, and expanded card state are
 
         assert.equal(thumb.classList.contains("playing"), false);
         assert.equal(card.classList.contains("song-card-expanded"), false);
+    } finally {
+        cleanup();
+    }
+});
+
+test("youtube thumbnail: playback mode defaults to manual and can be stored or cleared", () => {
+    const cleanup = installFakeDom();
+    try {
+        const thumb = document.createElement("div");
+        assert.equal(getYoutubeThumbnailPlaybackMode(thumb), "manual");
+        assert.equal(getYoutubeThumbnailPlaybackMode(null), "manual");
+
+        setYoutubeThumbnailPlaybackMode(thumb, "autoplay");
+        assert.equal(thumb.dataset.playbackMode, "autoplay");
+        assert.equal(getYoutubeThumbnailPlaybackMode(thumb), "autoplay");
+
+        setYoutubeThumbnailPlaybackMode(thumb);
+        assert.equal(thumb.dataset.playbackMode, undefined);
+        assert.equal(getYoutubeThumbnailPlaybackMode(thumb), "manual");
+    } finally {
+        cleanup();
+    }
+});
+
+test("youtube thumbnail: playback session id is stored only for positive values", () => {
+    const cleanup = installFakeDom();
+    try {
+        const thumb = document.createElement("div");
+        assert.equal(getYoutubeThumbnailPlaybackSessionId(thumb), 0);
+        assert.equal(getYoutubeThumbnailPlaybackSessionId(null), 0);
+
+        setYoutubeThumbnailPlaybackSessionId(thumb, 7);
+        assert.equal(thumb.dataset.playbackSessionId, "7");
+        assert.equal(getYoutubeThumbnailPlaybackSessionId(thumb), 7);
+
+        setYoutubeThumbnailPlaybackSessionId(thumb, 0);
+        assert.equal(thumb.dataset.playbackSessionId, undefined);
+        assert.equal(getYoutubeThumbnailPlaybackSessionId(thumb), 0);
+        assert.doesNotThrow(() => setYoutubeThumbnailPlaybackSessionId(null, 3));
+    } finally {
+        cleanup();
+    }
+});
+
+test("youtube thumbnail: playback target stores end seconds and clears back to the thumbnail", () => {
+    const cleanup = installFakeDom();
+    try {
+        const thumb = document.createElement("div");
+        setYoutubeThumbnailPlaybackTarget(thumb, {
+            videoId: "video1",
+            playbackKey: "video1:5:25",
+            playbackEndSeconds: 25
+        });
+        assert.equal(thumb.dataset.videoId, "video1");
+        assert.equal(thumb.dataset.playbackKey, "video1:5:25");
+        assert.equal(getYoutubeThumbnailPlaybackEndSeconds(thumb), 25);
+
+        setYoutubeThumbnailPlaybackTarget(thumb, {
+            videoId: "video1",
+            playbackKey: "video1:5:",
+            playbackEndSeconds: 0
+        });
+        assert.equal(thumb.dataset.playbackEndSeconds, undefined);
+        assert.equal(getYoutubeThumbnailPlaybackEndSeconds(thumb), null);
+
+        setYoutubeThumbnailPlaybackTarget(thumb, {
+            videoId: "video2",
+            playbackKey: "video2:0:30",
+            playbackEndSeconds: 30
+        });
+        clearYoutubeThumbnailPlaybackTarget(thumb, "video2");
+        assert.equal(thumb.dataset.videoId, "video2");
+        assert.equal(thumb.dataset.playbackKey, "");
+        assert.equal(thumb.dataset.playbackEndSeconds, undefined);
+        assert.equal(getYoutubeThumbnailPlaybackEndSeconds(null), null);
     } finally {
         cleanup();
     }

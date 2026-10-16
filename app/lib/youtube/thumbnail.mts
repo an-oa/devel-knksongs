@@ -1,5 +1,13 @@
 import { canUseDom, getHeaderHeight, isHtmlElement } from "../dom-utils.mjs";
 import { scheduleScrollElementIntoView } from "../results-scroll.mjs";
+import type { YoutubePlaybackMode } from "./playback-start-attempt.mjs";
+
+/** 埋め込み再生の対象として、サムネイルの dataset へ保存する値。 */
+export type YoutubePlaybackTargetMetadata = {
+    videoId: string;
+    playbackKey: string;
+    playbackEndSeconds: number | null;
+};
 
 /**
  * サムネイル上のブラウザ標準保存導線をキャンセルする。
@@ -113,4 +121,105 @@ export function revealYoutubePlaybackCardIfNeeded(thumbDiv: unknown) {
         topOffset: getHeaderHeight(),
         behavior: "smooth"
     });
+}
+
+/**
+ * サムネイルに保存した再生開始方法を返す。保存がなければクリックによる開始として扱う。
+ * @param thumbDiv 再生開始方法を読むサムネイル要素
+ * @returns 自動再生なら "autoplay"、それ以外は "manual"
+ */
+export function getYoutubeThumbnailPlaybackMode(thumbDiv: Element | null | undefined): YoutubePlaybackMode {
+    return isHtmlElement(thumbDiv) && thumbDiv.dataset.playbackMode === "autoplay" ? "autoplay" : "manual";
+}
+
+/**
+ * 再生開始方法をサムネイルへ保存する。省略すると保存を解除する。
+ * @param thumbDiv 再生開始方法を保存するサムネイル要素
+ * @param playbackMode 保存する再生開始方法
+ */
+export function setYoutubeThumbnailPlaybackMode(thumbDiv: HTMLElement, playbackMode?: YoutubePlaybackMode) {
+    if (typeof playbackMode === "string" && playbackMode) {
+        thumbDiv.dataset.playbackMode = playbackMode;
+        return;
+    }
+    delete thumbDiv.dataset.playbackMode;
+}
+
+/**
+ * サムネイルに紐づく再生セッション ID を返す。
+ * @param thumbDiv 再生セッション ID を読むサムネイル要素
+ * @returns 再生セッション ID。紐づいていなければ 0
+ */
+export function getYoutubeThumbnailPlaybackSessionId(thumbDiv: unknown) {
+    const value = isHtmlElement(thumbDiv) ? thumbDiv.dataset.playbackSessionId : "";
+    const sessionId = Number.parseInt(String(value || ""), 10);
+    return Number.isFinite(sessionId) ? sessionId : 0;
+}
+
+/**
+ * サムネイルに再生セッション ID を設定する。0 以下を渡すと解除する。
+ * @param thumbDiv 再生セッション ID を設定するサムネイル要素
+ * @param sessionId 設定する再生セッション ID
+ */
+export function setYoutubeThumbnailPlaybackSessionId(thumbDiv: Element | null | undefined, sessionId: number) {
+    if (!isHtmlElement(thumbDiv)) return;
+    if (Number.isFinite(sessionId) && sessionId > 0) {
+        thumbDiv.dataset.playbackSessionId = String(sessionId);
+        return;
+    }
+    delete thumbDiv.dataset.playbackSessionId;
+}
+
+/**
+ * サムネイルに再生終了秒数を保存する。正の値でなければ保存を解除する。
+ * @param thumbDiv 再生終了秒数を保存するサムネイル要素
+ * @param endSeconds 保存する再生終了秒数
+ */
+function setPlaybackEndSeconds(
+    thumbDiv: HTMLElement,
+    endSeconds: number | null | undefined
+): void {
+    if (Number.isFinite(endSeconds) && Number(endSeconds) > 0) {
+        thumbDiv.dataset.playbackEndSeconds = String(endSeconds);
+        return;
+    }
+    delete thumbDiv.dataset.playbackEndSeconds;
+}
+
+/**
+ * サムネイルに再生対象の値を保存する。
+ * @param thumbDiv 再生対象を保存するサムネイル要素
+ * @param playbackTarget 保存する再生対象
+ */
+export function setYoutubeThumbnailPlaybackTarget(
+    thumbDiv: HTMLElement,
+    playbackTarget: YoutubePlaybackTargetMetadata
+): void {
+    thumbDiv.dataset.videoId = playbackTarget.videoId;
+    thumbDiv.dataset.playbackKey = playbackTarget.playbackKey;
+    setPlaybackEndSeconds(thumbDiv, playbackTarget.playbackEndSeconds);
+}
+
+/**
+ * サムネイルの再生対象を、通常のサムネイル表示用の値へ戻す。
+ * @param thumbDiv 再生対象を戻すサムネイル要素
+ * @param videoId サムネイルに表示する YouTube 動画 ID
+ */
+export function clearYoutubeThumbnailPlaybackTarget(thumbDiv: HTMLElement, videoId: string): void {
+    setYoutubeThumbnailPlaybackTarget(thumbDiv, {
+        videoId,
+        playbackKey: "",
+        playbackEndSeconds: null
+    });
+}
+
+/**
+ * サムネイルに保存した再生終了秒数を返す。
+ * @param thumbDiv 再生終了秒数を読むサムネイル要素
+ * @returns 再生終了秒数。保存がなければ null
+ */
+export function getYoutubeThumbnailPlaybackEndSeconds(thumbDiv: Element | null | undefined): number | null {
+    if (!isHtmlElement(thumbDiv)) return null;
+    const endSeconds = Number(thumbDiv.dataset.playbackEndSeconds);
+    return Number.isFinite(endSeconds) && endSeconds > 0 ? endSeconds : null;
 }
