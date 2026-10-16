@@ -132,3 +132,96 @@ test("results viewport refresh: disconnect removes the resize listener and cance
         cleanup();
     }
 });
+
+/**
+ * 指定した下端の位置を持つ結果カードを並べた一覧を作り、ページへ置く。
+ * @param bottoms 各カードの下端の位置
+ */
+function createResultListWithCards(bottoms: number[]) {
+    const resultList = document.createElement("ol");
+    const cards = bottoms.map((bottom) => {
+        const card = document.createElement("li");
+        card.className = "song-card";
+        getFakeElement(card)._rect = { top: bottom - 100, bottom, left: 0, right: 100, width: 100, height: 100 };
+        return card;
+    });
+    resultList.append(...cards);
+    document.body.appendChild(resultList);
+    return { resultList, cards };
+}
+
+test("results viewport refresh: resize keeps the first card not scrolled past at the same position", () => {
+    const restoreDom = installFakeDom();
+    const previousResizeObserver = globalThis.ResizeObserver;
+    try {
+        setGlobalValue("ResizeObserver", undefined);
+        const { resultList, cards } = createResultListWithCards([-40, 60, 160]);
+        Object.assign(getFakeElement(document.body), { scrollTop: 500 });
+        const calls: string[] = [];
+        Object.assign(restoreDom.window, {
+            scrollBy(options: ScrollToOptions) {
+                calls.push(`scroll ${options.top}`);
+            }
+        });
+        setupResultsViewportRefresh({
+            resultList,
+            refreshRecommendedDisplay() {
+                calls.push("recommendations");
+                return false;
+            },
+            refreshLayout() {
+                calls.push("layout");
+                getFakeElement(cards[1])._rect = { top: 140, bottom: 240, left: 0, right: 100, width: 100, height: 100 };
+            },
+            onReadingPositionRestored() {
+                calls.push("restored");
+            }
+        });
+
+        invokeListener(restoreDom.window, "resize", {});
+
+        // 位置を合わせた後の画面で、おすすめを減らすときに残すカードを数える。
+        assert.deepEqual(calls, ["layout", "scroll 180", "restored", "recommendations"]);
+    } finally {
+        setGlobalValue("ResizeObserver", previousResizeObserver);
+        restoreDom();
+    }
+});
+
+test("results viewport refresh: resize at the top of the page keeps the page at the top", () => {
+    const restoreDom = installFakeDom();
+    const previousResizeObserver = globalThis.ResizeObserver;
+    try {
+        setGlobalValue("ResizeObserver", undefined);
+        const { resultList, cards } = createResultListWithCards([160, 260]);
+        Object.assign(getFakeElement(document.body), { scrollTop: 0 });
+        const scrollCalls: (number | undefined)[] = [];
+        Object.assign(restoreDom.window, {
+            scrollBy(options: ScrollToOptions) {
+                scrollCalls.push(options.top);
+            }
+        });
+        let layoutRefreshCount = 0;
+        let restoredCount = 0;
+        setupResultsViewportRefresh({
+            resultList,
+            refreshRecommendedDisplay: () => false,
+            refreshLayout() {
+                layoutRefreshCount += 1;
+                getFakeElement(cards[0])._rect = { top: 110, bottom: 210, left: 0, right: 100, width: 100, height: 100 };
+            },
+            onReadingPositionRestored() {
+                restoredCount += 1;
+            }
+        });
+
+        invokeListener(restoreDom.window, "resize", {});
+
+        assert.equal(layoutRefreshCount, 1);
+        assert.deepEqual(scrollCalls, []);
+        assert.equal(restoredCount, 0);
+    } finally {
+        setGlobalValue("ResizeObserver", previousResizeObserver);
+        restoreDom();
+    }
+});

@@ -523,7 +523,8 @@ async function initUI(): Promise<void> {
     resultsViewportRefreshCleanup = setupResultsViewportRefresh({
         resultList: appUiState.el.resultList,
         refreshRecommendedDisplay: () => searchCoordinator.refreshRecommendedDisplay(),
-        refreshLayout: () => renderController.refreshLayout()
+        refreshLayout: () => renderController.refreshLayout(),
+        onReadingPositionRestored: () => autoHideHeaderController.resetScrollBaseline()
     });
     const initialData = await dataLoader.loadInitialData();
     if (!initialData.loaded) return;

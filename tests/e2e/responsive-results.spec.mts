@@ -7,9 +7,13 @@ import {
     clickControlLabel,
     closeSidebar,
     enablePlaybackSettings,
+    expectSidebarPopoverClosed,
     filterBySongTitle,
+    getBookmarkItem,
     getSongCard,
+    openBookmarkPanel,
     openSettingsPanel,
+    openSidebar,
     waitForInitialLoad
 } from "./support/ui-helpers.mts";
 
@@ -64,6 +68,90 @@ test("mobile recommendations append the same selection and retain it across colu
 async function readCardKeys(page: Page) {
     return page.locator(".song-card").evaluateAll((nodes) => nodes.map((node) => node.dataset.songKey));
 }
+
+/** 画面の上端より上へ過ぎていない最初のカードと、その上端の位置を、読んでいる位置として返す。 */
+async function readReadingPosition(page: Page) {
+    return page.evaluate(() => {
+        const cardNodes = Array.from(document.querySelectorAll<HTMLElement>("#resultList .song-card"));
+        const card = cardNodes.find((node) => node.getBoundingClientRect().bottom > 0);
+        return card ? { songKey: card.dataset.songKey, top: Math.round(card.getBoundingClientRect().top) } : null;
+    });
+}
+
+/** 指定位置のカードを画面の上の方まで読み進め、少し戻ってヘッダーを表示した状態にする。 */
+async function readUntilCard(page: Page, cardIndex: number) {
+    const header = page.locator(".header");
+    await page.evaluate((index) => {
+        const card = document.querySelectorAll("#resultList .song-card")[index];
+        window.scrollTo(0, window.scrollY + card.getBoundingClientRect().top - 120);
+    }, cardIndex);
+    await expect(header).toHaveClass(/is-auto-hidden/);
+    await page.evaluate(() => window.scrollBy(0, -40));
+    await expect(header).not.toHaveClass(/is-auto-hidden/);
+}
+
+/**
+ * 狭めても戻しても、読んでいたカードが同じ位置に見え、ヘッダーも表示されたままであることを確かめる。
+ * 640px 以下ではヘッダーが 2 段になり、その分だけ内容が下がるので、ヘッダーが 1 段のままの幅で確かめる。
+ */
+async function expectReadingPositionKeptAcrossResize(page: Page, wideColumnCount: string) {
+    const readingPosition = await readReadingPosition(page);
+    expect(readingPosition).not.toBeNull();
+
+    await page.setViewportSize({ width: 700, height: 800 });
+    await expect(page.locator("#resultList")).toHaveAttribute("data-layout-columns", "2");
+    await expect.poll(() => readReadingPosition(page)).toEqual(readingPosition);
+    await expect(page.locator(".header")).not.toHaveClass(/is-auto-hidden/);
+
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await expect(page.locator("#resultList")).toHaveAttribute("data-layout-columns", wideColumnCount);
+    await expect.poll(() => readReadingPosition(page)).toEqual(readingPosition);
+    await expect(page.locator(".header")).not.toHaveClass(/is-auto-hidden/);
+}
+
+test("search results keep the card being read in place when narrowing and widening", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await installNetworkMocks(page);
+    await routeSongsJsonFixture(page, createScrollableResultSongs(120));
+    await page.goto("/");
+    await waitForInitialLoad(page);
+    await page.locator("#searchBox").fill("Scroll Artist");
+    await expect(page.locator("#resultCount")).toHaveText("120 件がヒット");
+    // 検索ボックスにフォーカスがあるとヘッダーが隠れないので、外してから読み進める。
+    await page.locator("#searchBox").blur();
+    const columnCount = await page.locator("#resultList").getAttribute("data-layout-columns");
+    expect(Number(columnCount)).toBeGreaterThan(1);
+
+    await readUntilCard(page, 24);
+    await expectReadingPositionKeptAcrossResize(page, columnCount ?? "");
+});
+
+test("bookmark results keep the card being read in place when narrowing and widening", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await installNetworkMocks(page);
+    const songs = createScrollableResultSongs(80);
+    await routeSongsJsonFixture(page, songs);
+    await page.goto("/");
+    await page.evaluate((songKeys) => {
+        localStorage.setItem("bookmarksV1", JSON.stringify({
+            version: 3,
+            bookmarks: { b1: { name: "Long Favorites", songs: songKeys, createdAt: 1 } }
+        }));
+    }, songs.map((song) => song.bookmarkSongKey));
+    await page.reload();
+    await waitForInitialLoad(page);
+    await openSidebar(page);
+    await openBookmarkPanel(page);
+    await getBookmarkItem(page, "Long Favorites").click();
+    await expect(page.locator("#resultCount")).toHaveText("ブックマーク: Long Favorites (80 件)");
+    await page.locator("#close-bookmark-sidebar").click();
+    await expectSidebarPopoverClosed(page);
+    const columnCount = await page.locator("#resultList").getAttribute("data-layout-columns");
+    expect(Number(columnCount)).toBeGreaterThan(1);
+
+    await readUntilCard(page, 24);
+    await expectReadingPositionKeptAcrossResize(page, columnCount ?? "");
+});
 
 test("recommendations return to 48 cards after widening and narrowing again at the top", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
@@ -188,7 +276,7 @@ test("shrinking only the height keeps the recommendations on screen while a vert
     await expectCardsInsideLayout(page);
 });
 
-test("narrowing while scrolled keeps the cards above the screen and one screen below", async ({ page }) => {
+test("narrowing while scrolled keeps the recommendation being read and the cards above it", async ({ page }) => {
     await page.setViewportSize({ width: 3840, height: 2160 });
     await installNetworkMocks(page);
     const songs = createScrollableResultSongs(160).map((song) => ({ ...song, format: "オリ曲" }));
@@ -207,25 +295,24 @@ test("narrowing while scrolled keeps the cards above the screen and one screen b
         window.dispatchEvent(new Event("resize"));
     });
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollHeight)).toBeGreaterThan(4000);
-    await page.evaluate(() => {
+    const scrolledPastCount = await page.evaluate(() => {
         const cardNodes = Array.from(document.querySelectorAll("#resultList .song-card"));
         const columnCount = Number(document.querySelector("#resultList")?.getAttribute("data-layout-columns"));
         window.scrollTo(0, window.scrollY + cardNodes[columnCount * 2].getBoundingClientRect().top);
+        return cardNodes.findIndex((card) => card.getBoundingClientRect().bottom > 0);
     });
+    const keptCount = Math.min(wideKeys.length, scrolledPastCount + 48);
+    expect(scrolledPastCount).toBeGreaterThan(0);
+    expect(keptCount).toBeLessThan(wideKeys.length);
+    const readingPosition = await readReadingPosition(page);
+    expect(readingPosition?.songKey).toBe(wideKeys[scrolledPastCount]);
 
-    await page.setViewportSize({ width: 393, height: 851 });
-    await expect(page.locator("#resultList")).toHaveAttribute("data-layout-columns", "1");
-    // 並び直した後の画面で、上へ過ぎたカードと画面 1 つ分（最低 48 件）だけが残る状態に落ち着く。
-    await expect.poll(() => page.evaluate((wideCount) => {
-        const cardNodes = Array.from(document.querySelectorAll("#resultList .song-card"));
-        const firstUnpassedIndex = cardNodes.findIndex((card) => card.getBoundingClientRect().bottom > 0);
-        const scrolledPastCount = firstUnpassedIndex === -1 ? cardNodes.length : firstUnpassedIndex;
-        return cardNodes.length === Math.min(wideCount, scrolledPastCount + 48);
-    }, wideKeys.length)).toBe(true);
-    const narrowKeys = await readCardKeys(page);
-    expect(narrowKeys.length).toBeGreaterThan(48);
-    expect(narrowKeys.length).toBeLessThan(wideKeys.length);
-    expect(narrowKeys).toEqual(wideKeys.slice(0, narrowKeys.length));
+    // ヘッダーが 1 段のままの幅へ狭め、ヘッダーの高さの変化で位置がずれないようにする。
+    await page.setViewportSize({ width: 700, height: 851 });
+    await expect(page.locator("#resultList")).toHaveAttribute("data-layout-columns", "2");
+    await expect(cards).toHaveCount(keptCount);
+    expect(await readCardKeys(page)).toEqual(wideKeys.slice(0, keptCount));
+    await expect.poll(() => readReadingPosition(page)).toEqual(readingPosition);
     await expectCardsInsideLayout(page);
 });
 
