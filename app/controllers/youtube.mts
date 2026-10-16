@@ -553,10 +553,12 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
         if (playbackMode === "autoplay") {
             logAutoplayPlaybackFailure(thumbDiv, options);
         }
-        const expectedGeneration = playbackState.transitionGeneration + 1;
-        Promise.resolve(restoreThumbnail(thumbDiv, thumbDiv.dataset.videoId || "")).then((restored) => {
+        const restoring = restoreThumbnail(thumbDiv, thumbDiv.dataset.videoId || "");
+        // サムネイルへ戻した直後の世代を控え、レイアウト更新を待つ間に別の再生へ移っていないか確かめる。
+        const restoredGeneration = playbackState.transitionGeneration;
+        Promise.resolve(restoring).then((restored) => {
             if (!restored) return;
-            if (expectedGeneration !== playbackState.transitionGeneration) return;
+            if (restoredGeneration !== playbackState.transitionGeneration) return;
             if (!shouldNotifyStartFailure) return;
             debugPlayback("youtube", "playback start failed hook", {
                 songKey: failedSongKey,

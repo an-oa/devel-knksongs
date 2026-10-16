@@ -1366,6 +1366,50 @@ test("youtube: playThumbnail resolves failed result and restores the thumbnail a
     }
 });
 
+test("youtube: playback start failure does not notify after a newer playback starts", async () => {
+    const cleanup = installFakeDom();
+    const fakeFrames = installFakeAnimationFrames();
+    try {
+        const ui = createYoutubeUiState({});
+        const { controller } = createYoutubeControllerHarness({ ui });
+        const failedCalls: Parameters<Parameters<typeof controller.setPlaybackStartFailedHook>[0]>[0][] = [];
+        controller.setPlaybackStartFailedHook((payload) => {
+            failedCalls.push(payload);
+        });
+        const players = installYoutubePlayerFixture();
+
+        const failedCard = document.createElement("div");
+        failedCard.className = "song-card";
+        failedCard.dataset.songKey = "song:failed";
+        document.body.appendChild(failedCard);
+        const failedThumb = document.createElement("div");
+        failedCard.appendChild(failedThumb);
+        const failedPlayback = controller.playThumbnail(failedThumb, { isVertical: false, videoId: "video-failed", startSeconds: 0 });
+        await setImmediate();
+
+        const nextCard = document.createElement("div");
+        nextCard.className = "song-card";
+        nextCard.dataset.songKey = "song:next";
+        document.body.appendChild(nextCard);
+        const nextThumb = document.createElement("div");
+        nextCard.appendChild(nextThumb);
+
+        players[0].emitError(150);
+        assertPlaybackStartStatus(await failedPlayback, YOUTUBE_PLAYBACK_START_STATUS.FAILED);
+        controller.playThumbnail(nextThumb, { isVertical: false, videoId: "video-next", startSeconds: 0 });
+        await setImmediate();
+
+        while (fakeFrames.pendingCount > 0) fakeFrames.advanceFrame();
+        await setImmediate();
+
+        assert.deepEqual(failedCalls, []);
+        assert.equal(ui.playback.activeThumb, nextThumb);
+    } finally {
+        fakeFrames.cleanup();
+        cleanup();
+    }
+});
+
 test("youtube: autoplay timeout emits debug logs only when debug mode is enabled", async () => {
     const cleanup = installFakeDom();
     const fakeTimeouts = installFakeTimeouts();
