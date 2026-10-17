@@ -405,6 +405,40 @@ test("narrowing while scrolled keeps the recommendation being read and the cards
     await expectCardsInsideLayout(page);
 });
 
+/** カードの 4 隅の角丸を、左上・右上・右下・左下の順に返す。 */
+async function readCardCornerRadii(page: Page) {
+    return page.locator(".song-card").first().evaluate((card) => {
+        const style = window.getComputedStyle(card);
+        return [
+            style.borderTopLeftRadius,
+            style.borderTopRightRadius,
+            style.borderBottomRightRadius,
+            style.borderBottomLeftRadius
+        ];
+    });
+}
+
+test("cards square their top corners while thumbnails are shown so thumbnails and videos reach the corners", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await installNetworkMocks(page);
+    await page.goto("/");
+    await waitForInitialLoad(page);
+    await filterBySongTitle(page, "Artist");
+    await expect(page.locator(".song-card")).toHaveCount(6);
+    // サムネイルを表示していないときは、隅で切り取るものがないので 4 隅とも丸い。
+    await expect.poll(() => readCardCornerRadii(page)).toEqual(["12px", "12px", "12px", "12px"]);
+
+    await enablePlaybackSettings(page);
+    await closeSidebar(page);
+    await expect.poll(() => readCardCornerRadii(page)).toEqual(["0px", "0px", "12px", "12px"]);
+
+    await openSettingsPanel(page);
+    await clickControlLabel(page, "#thumbnail-toggle");
+    await page.locator("#close-settings-panel").click();
+    await closeSidebar(page);
+    await expect.poll(() => readCardCornerRadii(page)).toEqual(["12px", "12px", "12px", "12px"]);
+});
+
 test("single-column playback and thumbnail toggles keep natural card and list heights", async ({ page }) => {
     await page.setViewportSize({ width: 393, height: 851 });
     await installNetworkMocks(page);

@@ -938,11 +938,12 @@ input[type="text"][aria-invalid="true"] {
 /*
  * カードの枠は outline で描く。masonry はカードの高さを scrollHeight で測るため、
  * border を使うと枠の分だけ上下のカードが重なる。
+ * サムネイルと再生中の動画を隅まで見せるため、上の 2 隅は角にする。
  */
 .song-card {
   position: absolute;
   background: var(--card-bg);
-  border-radius: 12px;
+  border-radius: 0 0 12px 12px;
   outline: 1px solid var(--border-color);
   outline-offset: -1px;
   overflow: hidden;
@@ -950,6 +951,9 @@ input[type="text"][aria-invalid="true"] {
   flex-direction: column;
   transition: outline-color 0.15s ease, box-shadow 0.15s ease;
 }
+
+/* サムネイルを表示しない間は、隅で切り取るものがないので 4 隅とも丸くする。 */
+body.hide-thumbs .song-card { border-radius: 12px; }
 
 /* 指すカードは枠を濃くし、鐘の金色の影をずらして付ける。 */
 .song-card:hover {
