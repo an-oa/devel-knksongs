@@ -2,6 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 import { installNetworkMocks } from "./support/network-mocks.mts";
 import { routeSongsJsonFixture } from "./support/songs-network.mts";
 import { createScrollableResultSongs } from "./support/song-fixtures.mts";
+import { waitForMockYoutube } from "./support/mock-youtube.mts";
 import {
     clickControlLabel,
     closeSidebar,
@@ -89,6 +90,101 @@ test("recommendations return to 48 cards after widening and narrowing again at t
     await page.setViewportSize({ width: 5120, height: 3200 });
     await expect(cards).toHaveCount(wideKeys.length);
     expect(await readCardKeys(page)).toEqual(wideKeys);
+    await expectCardsInsideLayout(page);
+});
+
+test("recommendations return to 48 cards after a 1080p screen is zoomed out and back", async ({ page }) => {
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await installNetworkMocks(page);
+    const songs = createScrollableResultSongs(300).map((song) => ({ ...song, format: "オリ曲" }));
+    await routeSongsJsonFixture(page, songs);
+    await page.goto("/");
+    await waitForInitialLoad(page);
+    const cards = page.locator(".song-card");
+    await expect(cards).toHaveCount(48);
+    const initialKeys = await readCardKeys(page);
+
+    // 25% 表示では列数が大きく増えるので、並び直す前の配置で画面内のカードを数えると件数が戻らなくなる。
+    await page.setViewportSize({ width: 7680, height: 4320 });
+    await expect.poll(() => cards.count()).toBeGreaterThan(200);
+
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await expect(cards).toHaveCount(48);
+    expect(await readCardKeys(page)).toEqual(initialKeys);
+    await expectCardsInsideLayout(page);
+});
+
+test("narrowing at the top keeps the recommendation that is playing", async ({ page }) => {
+    await page.setViewportSize({ width: 5120, height: 3200 });
+    await installNetworkMocks(page);
+    const songs = createScrollableResultSongs(200).map((song) => ({ ...song, format: "オリ曲" }));
+    await routeSongsJsonFixture(page, songs);
+    await page.goto("/");
+    await waitForInitialLoad(page);
+    await enablePlaybackSettings(page);
+    await closeSidebar(page);
+    const cards = page.locator(".song-card");
+    await expect.poll(() => cards.count()).toBeGreaterThan(100);
+    const wideKeys = await readCardKeys(page);
+
+    const playingCard = cards.nth(100);
+    await playingCard.locator(".thumb").click();
+    await waitForMockYoutube(page);
+    await expect(playingCard.locator("iframe")).toBeVisible();
+    await page.evaluate(() => window.scrollTo(0, 0));
+
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await expect(cards).toHaveCount(101);
+    expect(await readCardKeys(page)).toEqual(wideKeys.slice(0, 101));
+    await expect(cards.nth(100).locator("iframe")).toHaveCount(1);
+});
+
+test("shrinking only the height keeps the recommendations on screen while a vertical video plays", async ({ page }) => {
+    await page.setViewportSize({ width: 3840, height: 2160 });
+    await installNetworkMocks(page);
+    const songs = createScrollableResultSongs(160).map((song) => {
+        const url = `https://www.youtube.com/shorts/${song.videoId}`;
+        return { ...song, format: "オリ曲", url, legacySongKey: `${song.songKey}::${url}` };
+    });
+    await routeSongsJsonFixture(page, songs);
+    await page.goto("/");
+    await waitForInitialLoad(page);
+    await enablePlaybackSettings(page);
+    await closeSidebar(page);
+    const cards = page.locator(".song-card");
+    await expect.poll(() => cards.count()).toBeGreaterThan(48);
+    const wideKeys = await readCardKeys(page);
+
+    // 先頭のカードで縦動画を再生すると、そのカードだけが縦に伸び、列ごとの高さがそろわなくなる。
+    const playingCard = cards.first();
+    await playingCard.locator(".thumb").click();
+    await waitForMockYoutube(page);
+    await expect(playingCard).toHaveClass(/song-card-expanded/);
+    // カードが伸びた後の位置合わせが数フレーム後にスクロールを動かすので、終わるのを待ってから読み進める。
+    await page.evaluate(() => new Promise((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    }));
+    await page.evaluate(() => window.scrollTo(0, 400));
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(400);
+    const shrunkHeight = 1650;
+    // 高さだけを縮めても配置は変わらないので、縮めた後に一部でも見えるカードを先に調べておく。
+    // スクロール中なので、画面の下端で途切れるカードも残す必要がある。
+    const keysOnShrunkScreen = await page.evaluate((viewportHeight) => (
+        Array.from(document.querySelectorAll<HTMLElement>("#resultList .song-card"))
+            .filter((card) => card.getBoundingClientRect().top < viewportHeight)
+            .map((card) => card.dataset.songKey)
+    ), shrunkHeight);
+    expect(keysOnShrunkScreen.length).toBeGreaterThan(72);
+
+    await page.setViewportSize({ width: 3840, height: shrunkHeight });
+    await page.evaluate(() => new Promise((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(resolve));
+    }));
+    // 伸びたカードの列は後ろのカードが下へずれるので、画面内のカードは先頭から連続した並びにならない。
+    const keptKeys = await readCardKeys(page);
+    expect(keptKeys).toEqual(expect.arrayContaining(keysOnShrunkScreen));
+    expect(keptKeys).toEqual(wideKeys.slice(0, keptKeys.length));
+    await expect(playingCard.locator("iframe")).toHaveCount(1);
     await expectCardsInsideLayout(page);
 });
 

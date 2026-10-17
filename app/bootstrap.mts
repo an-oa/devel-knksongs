@@ -30,6 +30,7 @@ import { isIOSWebKit } from "./lib/dom-utils.mjs";
 import { scrollResultListToTop } from "./lib/results-scroll.mjs";
 import {
     countSongCardsScrolledPast,
+    countSongCardsToKeep,
     estimateInitialResultDisplayCount,
     estimateMasonryVisibleCardCount
 } from "./lib/render/masonry-layout.mjs";
@@ -110,7 +111,10 @@ function createSearchCallbacks({
         getRecommendedDisplayCount: () => estimateMasonryVisibleCardCount(ui.el.resultList, {
             minItemCount: RANDOM_DISPLAY_COUNT
         }),
-        getScrolledPastResultCount: () => countSongCardsScrolledPast(ui.el.resultList)
+        getScrolledPastResultCount: () => countSongCardsScrolledPast(ui.el.resultList),
+        getResultCountToKeep: () => countSongCardsToKeep(ui.el.resultList, {
+            requiredElement: ui.playback.activeThumb
+        })
     };
 }
 

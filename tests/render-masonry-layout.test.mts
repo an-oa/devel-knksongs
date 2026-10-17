@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
     applyMasonryLayout,
     countSongCardsScrolledPast,
+    countSongCardsToKeep,
     estimateInitialResultDisplayCount,
     estimateMasonryVisibleCardCount,
     getMasonryColumnCount
@@ -224,6 +225,42 @@ test("render masonry: counts song cards scrolled past the top of the viewport", 
         });
         assert.equal(countSongCardsScrolledPast(container), 6);
         assert.equal(countSongCardsScrolledPast(null), 0);
+    } finally {
+        cleanup();
+    }
+});
+
+test("render masonry: counts cards to keep through the last fully visible card and the required card", () => {
+    const cleanup = installFakeDom();
+    try {
+        const container = document.createElement("div");
+        // ページの先頭では、下端が 800 以内のカード（-300・100・700 の 3 枚）と、指定したカードまでを残す。
+        // 750 のカードは画面の下端で途切れる。
+        const tops = [-300, 900, 100, 1200, 700, 750];
+        const cards = tops.map((top) => {
+            const card = document.createElement("div");
+            card.className = "song-card";
+            getFakeElement(card)._rect = { top, bottom: top + 100, left: 0, right: 100, width: 100, height: 100 };
+            container.appendChild(card);
+            return card;
+        });
+        const playingThumb = document.createElement("div");
+        cards[3].appendChild(playingThumb);
+
+        assert.equal(countSongCardsToKeep(container, { viewportHeight: 800 }), 5);
+        getFakeElement(cards[4])._rect = { top: 1300, bottom: 1400, left: 0, right: 100, width: 100, height: 100 };
+        assert.equal(countSongCardsToKeep(container, { viewportHeight: 800 }), 3);
+        assert.equal(countSongCardsToKeep(container, { viewportHeight: 800, requiredElement: playingThumb }), 4);
+        assert.equal(countSongCardsToKeep(container, {
+            viewportHeight: 800,
+            requiredElement: document.createElement("div")
+        }), 3);
+        assert.equal(countSongCardsToKeep(null), 0);
+
+        // スクロールしているときは、下端で途切れた 750 のカードも残す。
+        Object.assign(getFakeElement(document.body), { scrollTop: 120 });
+        document.body.appendChild(container);
+        assert.equal(countSongCardsToKeep(container, { viewportHeight: 800 }), 6);
     } finally {
         cleanup();
     }

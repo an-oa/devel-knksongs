@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { setupResultsViewportRefresh } from "../app/lib/render/results-viewport-refresh.mts";
 import { getFakeElement, installFakeDom, setGlobalValue, installFakeAnimationFrames, invokeListener } from "./test-helpers.mts";
 
-test("results viewport refresh: resize refreshes recommendations before masonry layout", () => {
+test("results viewport refresh: resize lays out the results before refreshing recommendations", () => {
     const restoreDom = installFakeDom();
     const previousResizeObserver = globalThis.ResizeObserver;
     const frames = installFakeAnimationFrames();
@@ -43,16 +43,15 @@ test("results viewport refresh: resize refreshes recommendations before masonry 
 
         const resultList = document.createElement("ol");
         getFakeElement(resultList)._clientWidth = 320;
-        let recommendationRefreshCount = 0;
-        let layoutRefreshCount = 0;
+        const calls: string[] = [];
         const disconnect = setupResultsViewportRefresh({
             resultList,
             refreshRecommendedDisplay() {
-                recommendationRefreshCount += 1;
+                calls.push("recommendations");
                 return true;
             },
             refreshLayout() {
-                layoutRefreshCount += 1;
+                calls.push("layout");
             }
         });
 
@@ -60,11 +59,10 @@ test("results viewport refresh: resize refreshes recommendations before masonry 
         assert.ok(observer);
         assert.equal(observer.observedElement, resultList);
         observer.resize(640);
-        assert.equal(recommendationRefreshCount, 0);
+        assert.deepEqual(calls, []);
 
         frames.advanceFrame();
-        assert.equal(recommendationRefreshCount, 1);
-        assert.equal(layoutRefreshCount, 0);
+        assert.deepEqual(calls, ["layout", "recommendations"]);
 
         disconnect();
         assert.equal(observer.observedElement, null);
