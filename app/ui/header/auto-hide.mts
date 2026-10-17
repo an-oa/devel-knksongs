@@ -182,6 +182,14 @@ export function createAutoHideHeaderController(input: AutoHideHeaderControllerIn
     }
 
     /**
+     * プログラムでスクロール位置を合わせた後に、今の位置を方向判定の起点にし直す。
+     * 利用者のスクロールではないので、ヘッダーの表示状態は変えない。
+     */
+    function resetScrollBaseline(): void {
+        resetScrollTracking(getPageScrollY());
+    }
+
+    /**
      * サイドバーの開閉通知を受けてヘッダーを表示し、方向判定をやり直す。
      * 開閉状態そのものは入力された getter から参照する。
      */
@@ -191,6 +199,7 @@ export function createAutoHideHeaderController(input: AutoHideHeaderControllerIn
 
     return {
         setup,
-        handleSidebarOpenChange
+        handleSidebarOpenChange,
+        resetScrollBaseline
     };
 }

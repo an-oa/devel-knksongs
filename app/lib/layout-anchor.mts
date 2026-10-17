@@ -1,6 +1,7 @@
 import { isHtmlElement } from "./dom-utils.mjs";
 
-type ViewportAnchor = {
+/** レイアウト更新の前後で、同じ要素を同じ見た目の位置に保つための記録。 */
+export type ViewportAnchor = {
     element: HTMLElement;
     container: HTMLElement;
     top: number;
@@ -26,10 +27,10 @@ export function findScrollableAncestor(element: Element | null | undefined): HTM
 
 /**
  * レイアウト更新後に元の見えていた位置へ戻すためのアンカー情報を作る。
- * @param {Element | null | undefined} element
- * @returns {ViewportAnchor | null}
+ * @param element 見えていた位置を保つ要素
+ * @returns アンカー情報。要素が DOM にない場合は null
  */
-function createViewportAnchor(element: Element | null | undefined): ViewportAnchor | null {
+export function createViewportAnchor(element: Element | null | undefined): ViewportAnchor | null {
     if (!isHtmlElement(element) || !element.isConnected) return null;
     return {
         element,
@@ -40,10 +41,9 @@ function createViewportAnchor(element: Element | null | undefined): ViewportAnch
 
 /**
  * アンカー要素の見えていた位置を維持するようスクロール位置を補正する。
- * @param {ViewportAnchor | null | undefined} anchor
- * @returns {void}
+ * @param anchor createViewportAnchor で記録したアンカー情報
  */
-function restoreViewportAnchor(anchor: ViewportAnchor | null | undefined): void {
+export function restoreViewportAnchor(anchor: ViewportAnchor | null | undefined): void {
     if (!anchor || !isHtmlElement(anchor.element) || !anchor.element.isConnected) return;
     const nextTop = anchor.element.getBoundingClientRect().top;
     const delta = nextTop - anchor.top;

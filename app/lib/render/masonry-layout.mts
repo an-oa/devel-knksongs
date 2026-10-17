@@ -195,6 +195,15 @@ function getSongCards(container: HTMLElement): HTMLElement[] {
 }
 
 /**
+ * DOM 順で最初に、下端が画面の上端より下にある結果カードの位置を返す。
+ * @param cards DOM 順の結果カード
+ * @returns カードの位置。すべて画面より上へ過ぎていれば -1
+ */
+function findFirstCardIndexNotScrolledPast(cards: HTMLElement[]): number {
+    return cards.findIndex((card) => card.getBoundingClientRect().bottom > 0);
+}
+
+/**
  * 画面の上端より上へ過ぎた結果カードの数を返す。
  * DOM 順で最初に下端が画面の上端より下にあるカードの手前までを数える。
  * 複数列はカードを DOM 順に列へ割り当てるので、読み進めた位置の目安になる。
@@ -205,7 +214,7 @@ function getSongCards(container: HTMLElement): HTMLElement[] {
 export function countSongCardsScrolledPast(container: unknown): number {
     if (!isHtmlElement(container)) return 0;
     const cards = getSongCards(container as HTMLElement);
-    const firstUnpassedIndex = cards.findIndex((card) => card.getBoundingClientRect().bottom > 0);
+    const firstUnpassedIndex = findFirstCardIndexNotScrolledPast(cards);
     return firstUnpassedIndex === -1 ? cards.length : firstUnpassedIndex;
 }
 
@@ -237,6 +246,17 @@ export function countSongCardsToKeep(
     const requiredCard = requiredElement?.closest(".song-card");
     const requiredIndex = requiredCard ? cards.indexOf(requiredCard as HTMLElement) : -1;
     return Math.max(keptCount, requiredIndex + 1);
+}
+
+/**
+ * 読んでいる位置の目印として、画面の上端より上へ過ぎていない最初の結果カードを返す。
+ * @param container 結果カードを並べた一覧
+ * @returns 結果カード。一覧がない、またはすべて過ぎていれば null
+ */
+export function findFirstSongCardNotScrolledPast(container: unknown): HTMLElement | null {
+    if (!isHtmlElement(container)) return null;
+    const cards = getSongCards(container as HTMLElement);
+    return cards[findFirstCardIndexNotScrolledPast(cards)] ?? null;
 }
 
 /**

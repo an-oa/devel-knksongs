@@ -235,3 +235,20 @@ test("auto-hide header: resizing to a taller header keeps it visible within the 
         restoreDom();
     }
 });
+
+test("auto-hide header: resetting the baseline after a programmatic scroll keeps the header state", () => {
+    const restoreDom = installFakeDom();
+    try {
+        const { controller, header } = setupHeaderController(300);
+
+        window.scrollY = 900;
+        controller.resetScrollBaseline();
+        scrollPageTo(restoreDom.window, 900);
+        assert.equal(header.classList.contains("is-auto-hidden"), false);
+
+        scrollPageTo(restoreDom.window, 916);
+        assert.equal(header.classList.contains("is-auto-hidden"), true);
+    } finally {
+        restoreDom();
+    }
+});
