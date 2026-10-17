@@ -6,7 +6,8 @@ type ResultsViewportRefreshInput = {
 
 /**
  * viewport や結果一覧のサイズ変更に合わせて、結果表示に関わる再描画をまとめて行う。
- * おすすめ件数と masonry 配置を同じ frame で更新する。
+ * masonry 配置とおすすめ件数を同じ frame で更新する。
+ * おすすめを減らすときに画面内のカードを数えられるよう、先に今の幅で並び直す。
  * @param input 監視する結果一覧と、おすすめ件数・配置の更新処理
  * @returns 監視を解除する関数
  */
@@ -24,9 +25,8 @@ export function setupResultsViewportRefresh({
      */
     function refreshForCurrentViewport(): void {
         pendingFrameId = null;
-        if (!refreshRecommendedDisplay()) {
-            refreshLayout();
-        }
+        refreshLayout();
+        refreshRecommendedDisplay();
     }
 
     /**

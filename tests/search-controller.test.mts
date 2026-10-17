@@ -194,6 +194,8 @@ function createSearchCallbacks(callbacks: Partial<Parameters<typeof createSearch
         updateDisplay: callbacks.updateDisplay || (() => {}),
         scrollResultsPaneToTop: callbacks.scrollResultsPaneToTop || (() => {}),
         getRecommendedDisplayCount: callbacks.getRecommendedDisplayCount,
+        getScrolledPastResultCount: callbacks.getScrolledPastResultCount,
+        getResultCountToKeep: callbacks.getResultCountToKeep,
         getInitialDisplayCount: callbacks.getInitialDisplayCount
     };
 }
@@ -526,7 +528,7 @@ test("createSearchController: single オリ曲 performance is eligible for recom
     assert.equal(ui.el.resultCount.innerText, "おすすめを表示中");
 });
 
-test("createSearchController: recommendation selection and rendering retain their limits on resize", () => {
+test("createSearchController: recommendation resize keeps cards scrolled past and shrinks back at the top", () => {
     const rows = Array.from({ length: 160 }, (_, index) =>
         makeRow({
             archiveId: `a${index + 1}`,
@@ -566,6 +568,8 @@ test("createSearchController: recommendation selection and rendering retain thei
     const defaultFormats = ["配信", "歌みた", "ショート"];
     let recommendedDisplayCount = 48;
     let initialDisplayCount = 12;
+    let scrolledPastCount = 0;
+    let resultCountToKeep = 0;
     let scrollCount = 0;
     let updateCount = 0;
     const controller = createSearchControllerForTest({
@@ -575,6 +579,8 @@ test("createSearchController: recommendation selection and rendering retain thei
         defaultFormats,
         callbacks: createSearchCallbacks({
             getRecommendedDisplayCount: () => recommendedDisplayCount,
+            getScrolledPastResultCount: () => scrolledPastCount,
+            getResultCountToKeep: () => resultCountToKeep,
             getInitialDisplayCount: () => initialDisplayCount,
             updateDisplay: () => {
                 updateCount += 1;
@@ -601,7 +607,8 @@ test("createSearchController: recommendation selection and rendering retain thei
     assert.equal(data.displayLimit, 24);
     assert.equal(updateCount, 2);
 
-    data.displayLimit = 40; // Simulate incremental rendering before shrinking.
+    data.displayLimit = 40; // Simulate incremental rendering and scrolling before shrinking.
+    scrolledPastCount = 38;
     recommendedDisplayCount = 10;
     const retainedResults = data.currentResults;
     assert.equal(controller.refreshRecommendedDisplay(), false);
@@ -621,8 +628,9 @@ test("createSearchController: recommendation selection and rendering retain thei
 
     recommendedDisplayCount = 48;
     initialDisplayCount = 12;
+    scrolledPastCount = 60;
     const expandedSongs = data.currentResults.slice();
-    assert.equal(controller.refreshRecommendedDisplay(), false);
+    assert.equal(controller.refreshRecommendedDisplay(), false, "cards scrolled past and one viewport below stay");
     assert.deepEqual(data.currentResults, expandedSongs);
     assert.equal(data.currentResults.length, 108);
     assert.equal(data.displayLimit, 108);
@@ -630,12 +638,33 @@ test("createSearchController: recommendation selection and rendering retain thei
     assert.equal(scrollCount, 1);
     assert.equal(updateCount, 3);
 
+    scrolledPastCount = 20;
+    assert.equal(controller.refreshRecommendedDisplay(), true, "only cards below one viewport are removed");
+    assert.deepEqual(data.currentResults, expandedSongs.slice(0, 68));
+    assert.equal(data.displayLimit, 68);
+    assert.equal(updateCount, 4);
+
+    scrolledPastCount = 0;
+    resultCountToKeep = 60;
+    assert.equal(controller.refreshRecommendedDisplay(), true, "cards on screen or the playing card stay");
+    assert.deepEqual(data.currentResults, expandedSongs.slice(0, 60));
+    assert.equal(data.displayLimit, 60);
+    assert.equal(updateCount, 5);
+
+    resultCountToKeep = 0;
+    assert.equal(controller.refreshRecommendedDisplay(), true, "the top of the list returns to the viewport count");
+    assert.deepEqual(data.currentResults, firstRecommendedSongs);
+    assert.equal(data.displayLimit, 48);
+    assert.equal(scrollCount, 1);
+    assert.equal(updateCount, 6);
+
     ui.el.searchBox.value = "おすすめ1";
     recommendedDisplayCount = 120;
     initialDisplayCount = 120;
     assert.equal(controller.refreshRecommendedDisplay(), true, "resize uses the committed mode without collecting inputs");
     assert.equal(data.currentResults.length, 120);
-    assert.equal(updateCount, 4);
+    assert.deepEqual(data.currentResults.slice(0, 108), expandedSongs);
+    assert.equal(updateCount, 7);
     assert.equal(ui.el.resultCount.innerText, "おすすめを表示中");
 });
 

@@ -37,6 +37,10 @@ type SearchControllerInput = {
         updateDisplay: () => void;
         scrollResultsPaneToTop: () => void;
         getRecommendedDisplayCount?: () => number;
+        /** 画面の上端より上へ過ぎた結果カードの数を返す。おすすめを減らすときに残す範囲を決める。 */
+        getScrolledPastResultCount?: () => number;
+        /** おすすめを減らすときに必ず残す結果カードの数を返す。画面に見えているカードや再生中のカードまでを含める。 */
+        getResultCountToKeep?: () => number;
         getInitialDisplayCount?: (defaultCount: number) => number;
         /** 検索結果を反映した後に、件数以外の結果の概要を更新する。 */
         onResultsApplied?: () => void;
@@ -77,6 +81,9 @@ export function createSearchController({
     const updateDisplay = callbacks.updateDisplay;
     const scrollResultsPaneToTop = callbacks.scrollResultsPaneToTop;
     const getRecommendedDisplayCount = callbacks.getRecommendedDisplayCount || (() => RANDOM_DISPLAY_COUNT);
+    // 未指定のときは、すべてのカードを過ぎたものとして扱い、縮小してもおすすめを減らさない。
+    const getScrolledPastResultCount = callbacks.getScrolledPastResultCount || (() => data.currentResults.length);
+    const getResultCountToKeep = callbacks.getResultCountToKeep || (() => 0);
     // 確定時の結果とモードを保持する。追加表示後の上限は data.displayLimit を参照する。
     let committedOutcome: SearchOutcome | null = null;
 
@@ -222,7 +229,16 @@ export function createSearchController({
         return Math.max(RANDOM_DISPLAY_COUNT, count);
     }
 
-    /** 選曲件数と描画上限を個別に決め、リサイズ時は既存の選曲・追加表示を保持する。 */
+    /**
+     * callback から受け取った件数を、0 以上の整数にそろえる。
+     * @param count callback が返した件数
+     * @returns 0 以上の整数。数でなければ 0
+     */
+    function toResultCount(count: number): number {
+        return Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
+    }
+
+    /** 選曲件数と描画上限を個別に決め、リサイズ時は残すと決めた件数までの選曲・追加表示を保つ。 */
     function buildRecommendedOutcome(retainedResultCount = 0, retainedDisplayLimit = 0): SearchOutcome {
         const recommendedCount = getRecommendedResultCount();
         const results = pickRecommended(Math.max(recommendedCount, retainedResultCount));
@@ -253,14 +269,24 @@ export function createSearchController({
     }
 
     /**
-     * 確定済みのおすすめ結果で件数が増える場合だけ表示を更新する。
+     * 確定済みのおすすめ結果を、今の表示領域に合わせて増減する。
+     * 狭まったときは、画面より上へ過ぎたカードと、そこから画面 1 つ分を残し、それより下だけを減らす。
+     * 画面に見えているカードと再生中のカードは、この目安より後ろにあっても残す。
+     * 選曲は cache の先頭から取るので、増減しても並びは変わらない。
      * 検索待機中の抑制は呼び出し元の検索 coordinator が担う。
      * リサイズ追随用のため、検索結果ペインのスクロール位置は維持する。
-     * @returns {boolean}
+     * @returns 表示を更新したら true
      */
     function refreshRecommendedDisplay(): boolean {
         if (committedOutcome?.mode !== "recommended") return false;
-        const outcome = buildRecommendedOutcome(data.currentResults.length, data.displayLimit);
+        const keptResultCount = Math.min(
+            data.currentResults.length,
+            Math.max(
+                toResultCount(getScrolledPastResultCount()) + getRecommendedResultCount(),
+                toResultCount(getResultCountToKeep())
+            )
+        );
+        const outcome = buildRecommendedOutcome(keptResultCount, Math.min(data.displayLimit, keptResultCount));
         if (outcome.results.length === data.currentResults.length && outcome.displayLimit === data.displayLimit) {
             return false;
         }

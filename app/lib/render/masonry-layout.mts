@@ -1,4 +1,5 @@
 import { getViewportHeight, isHtmlElement } from "../dom-utils.mjs";
+import { findScrollableAncestor } from "../layout-anchor.mjs";
 
 export const DEFAULT_MASONRY_GAP_PX = 12;
 export const DEFAULT_MASONRY_MIN_CARD_WIDTH_PX = 294;
@@ -182,6 +183,63 @@ export function estimateMasonryVisibleCardCount(
 }
 
 /**
+ * 一覧の直下にある結果カードを DOM 順に返す。
+ * @param container 結果カードを並べた一覧
+ * @returns 結果カードの配列
+ */
+function getSongCards(container: HTMLElement): HTMLElement[] {
+    return Array.from(container.children).filter((node): node is HTMLElement => (
+        isHtmlElement(node) &&
+        (node as HTMLElement).classList.contains("song-card")
+    ));
+}
+
+/**
+ * 画面の上端より上へ過ぎた結果カードの数を返す。
+ * DOM 順で最初に下端が画面の上端より下にあるカードの手前までを数える。
+ * 複数列はカードを DOM 順に列へ割り当てるので、読み進めた位置の目安になる。
+ * 列ごとに高さが違うと目安からずれるので、画面内のカードは countSongCardsToKeep で別に数える。
+ * @param container 結果カードを並べた一覧
+ * @returns 画面より上へ過ぎたカードの数。一覧がなければ 0
+ */
+export function countSongCardsScrolledPast(container: unknown): number {
+    if (!isHtmlElement(container)) return 0;
+    const cards = getSongCards(container as HTMLElement);
+    const firstUnpassedIndex = cards.findIndex((card) => card.getBoundingClientRect().bottom > 0);
+    return firstUnpassedIndex === -1 ? cards.length : firstUnpassedIndex;
+}
+
+/**
+ * 一覧を減らすときに、必ず残すカードの数を返す。
+ * 画面に見えているカードと画面より上へ過ぎたカード、指定した要素を含むカードまでを、DOM 順の先頭から数える。
+ * ページの先頭では、最初に表示したときと同じ見え方に戻すため、全体が見えているカードだけを見えていると扱う。
+ * スクロールしているときは、画面の下端で途切れたカードを消すと空白になるので、一部でも見えていれば残す。
+ * @param container 結果カードを並べた一覧
+ * @param options 画面の高さと、必ず残す要素（再生中のサムネイルなど）
+ * @returns 必ず残すカードの数。一覧がなければ 0
+ */
+export function countSongCardsToKeep(
+    container: unknown,
+    { viewportHeight = getViewportHeight(), requiredElement = null }: {
+        viewportHeight?: number;
+        requiredElement?: Element | null;
+    } = {}
+): number {
+    if (!isHtmlElement(container)) return 0;
+    const cards = getSongCards(container as HTMLElement);
+    const keepsPartlyVisibleCards = findScrollableAncestor(container as HTMLElement).scrollTop > 0;
+    let keptCount = 0;
+    cards.forEach((card, index) => {
+        const rect = card.getBoundingClientRect();
+        const isVisible = keepsPartlyVisibleCards ? rect.top < viewportHeight : rect.bottom <= viewportHeight;
+        if (isVisible) keptCount = index + 1;
+    });
+    const requiredCard = requiredElement?.closest(".song-card");
+    const requiredIndex = requiredCard ? cards.indexOf(requiredCard as HTMLElement) : -1;
+    return Math.max(keptCount, requiredIndex + 1);
+}
+
+/**
  * 1列の初期描画を約2画面分（最低12件）に絞り、残りは既存の末尾監視で追加する。
  * 複数列や寸法未確定時は呼び出し元の件数を保つ。おすすめの抽選件数は変更しない。
  */
@@ -208,10 +266,7 @@ export function estimateInitialResultDisplayCount(
 export function applyMasonryLayout(container: unknown, options: MasonryLayoutOptions = {}): void {
     if (!isHtmlElement(container)) return;
     const masonryContainer = container as HTMLElement;
-    const cards = Array.from(masonryContainer.children).filter((node): node is HTMLElement => (
-        isHtmlElement(node) &&
-        (node as HTMLElement).classList.contains("song-card")
-    ));
+    const cards = getSongCards(masonryContainer);
     if (cards.length === 0) {
         masonryContainer.style.height = "";
         return;

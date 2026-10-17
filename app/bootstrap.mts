@@ -28,7 +28,12 @@ import { createStorageController } from "./controllers/storage.mjs";
 import { createBookmarkUiController } from "./ui/bookmark/ui.mjs";
 import { isIOSWebKit } from "./lib/dom-utils.mjs";
 import { scrollResultListToTop } from "./lib/results-scroll.mjs";
-import { estimateInitialResultDisplayCount, estimateMasonryVisibleCardCount } from "./lib/render/masonry-layout.mjs";
+import {
+    countSongCardsScrolledPast,
+    countSongCardsToKeep,
+    estimateInitialResultDisplayCount,
+    estimateMasonryVisibleCardCount
+} from "./lib/render/masonry-layout.mjs";
 import { setupResultsViewportRefresh } from "./lib/render/results-viewport-refresh.mjs";
 import {
     collectUiElements,
@@ -105,6 +110,10 @@ function createSearchCallbacks({
         }),
         getRecommendedDisplayCount: () => estimateMasonryVisibleCardCount(ui.el.resultList, {
             minItemCount: RANDOM_DISPLAY_COUNT
+        }),
+        getScrolledPastResultCount: () => countSongCardsScrolledPast(ui.el.resultList),
+        getResultCountToKeep: () => countSongCardsToKeep(ui.el.resultList, {
+            requiredElement: ui.playback.activeThumb
         })
     };
 }
