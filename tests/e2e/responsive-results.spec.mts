@@ -69,18 +69,68 @@ async function readCardKeys(page: Page) {
     return page.locator(".song-card").evaluateAll((nodes) => nodes.map((node) => node.dataset.songKey));
 }
 
-/** 画面の上端より上へ過ぎていない最初のカードと、その上端の位置を、読んでいる位置として返す。 */
+/** 画面の上端より上へ過ぎていない最初のカードを、読んでいる位置の目印として、その上端の位置とともに返す。 */
 async function readReadingPosition(page: Page) {
     return page.evaluate(() => {
         const cardNodes = Array.from(document.querySelectorAll<HTMLElement>("#resultList .song-card"));
         const card = cardNodes.find((node) => node.getBoundingClientRect().bottom > 0);
-        return card ? { songKey: card.dataset.songKey, top: Math.round(card.getBoundingClientRect().top) } : null;
+        return card ? { songKey: card.dataset.songKey ?? "", top: Math.round(card.getBoundingClientRect().top) } : null;
     });
 }
 
-/** 指定位置のカードを画面の上の方まで読み進め、少し戻ってヘッダーを表示した状態にする。 */
+/**
+ * 指定したカードの上端の位置を返す。
+ * 列数が変わると同じ行に並ぶカードが入れ替わるので、リサイズ後は目印にしたカードそのもので比べる。
+ */
+async function readCardTop(page: Page, songKey: string) {
+    return page.evaluate((key) => {
+        const card = Array.from(document.querySelectorAll<HTMLElement>("#resultList .song-card"))
+            .find((node) => node.dataset.songKey === key);
+        return card ? Math.round(card.getBoundingClientRect().top) : null;
+    }, songKey);
+}
+
+/**
+ * 指定したカードの上端が、期待した位置にあることを確かめる。
+ * カードの位置は小数になり、位置合わせは 1px 未満のずれを補正しないので、1px までの差は許す。
+ */
+async function expectCardTop(page: Page, songKey: string, top: number) {
+    await expect.poll(async () => {
+        const actualTop = await readCardTop(page, songKey);
+        return actualTop === null ? Number.POSITIVE_INFINITY : Math.abs(actualTop - top);
+    }).toBeLessThanOrEqual(1);
+}
+
+/** 末尾の追加表示を最後まで進め、読み進める途中で件数が変わらないようにする。 */
+async function showAllResults(page: Page, resultCount: number) {
+    await expect.poll(() => page.evaluate(() => {
+        document.querySelector("#resultTailSentinel")?.scrollIntoView();
+        return document.querySelectorAll("#resultList .song-card").length;
+    })).toBe(resultCount);
+}
+
+/**
+ * 指定した数の animation frame を待つ。
+ * スクロールはブラウザが次の frame で知らせるので、読んでいた位置が記録されてからリサイズするために使う。
+ */
+async function waitForAnimationFrames(page: Page, frameCount = 2) {
+    await page.evaluate((count) => new Promise<void>((resolve) => {
+        const step = (remaining: number) => {
+            if (remaining <= 0) {
+                resolve();
+                return;
+            }
+            requestAnimationFrame(() => step(remaining - 1));
+        };
+        step(count);
+    }), frameCount);
+}
+
+/** 先頭から指定位置のカードを画面の上の方まで読み進め、少し戻ってヘッダーを表示した状態にする。 */
 async function readUntilCard(page: Page, cardIndex: number) {
     const header = page.locator(".header");
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await expect(header).not.toHaveClass(/is-auto-hidden/);
     await page.evaluate((index) => {
         const card = document.querySelectorAll("#resultList .song-card")[index];
         window.scrollTo(0, window.scrollY + card.getBoundingClientRect().top - 120);
@@ -96,16 +146,16 @@ async function readUntilCard(page: Page, cardIndex: number) {
  */
 async function expectReadingPositionKeptAcrossResize(page: Page, wideColumnCount: string) {
     const readingPosition = await readReadingPosition(page);
-    expect(readingPosition).not.toBeNull();
+    if (!readingPosition) throw new Error("No card is being read");
 
     await page.setViewportSize({ width: 700, height: 800 });
     await expect(page.locator("#resultList")).toHaveAttribute("data-layout-columns", "2");
-    await expect.poll(() => readReadingPosition(page)).toEqual(readingPosition);
+    await expectCardTop(page, readingPosition.songKey, readingPosition.top);
     await expect(page.locator(".header")).not.toHaveClass(/is-auto-hidden/);
 
     await page.setViewportSize({ width: 1280, height: 800 });
     await expect(page.locator("#resultList")).toHaveAttribute("data-layout-columns", wideColumnCount);
-    await expect.poll(() => readReadingPosition(page)).toEqual(readingPosition);
+    await expectCardTop(page, readingPosition.songKey, readingPosition.top);
     await expect(page.locator(".header")).not.toHaveClass(/is-auto-hidden/);
 }
 
@@ -124,6 +174,46 @@ test("search results keep the card being read in place when narrowing and wideni
 
     await readUntilCard(page, 24);
     await expectReadingPositionKeptAcrossResize(page, columnCount ?? "");
+});
+
+test("search results with thumbnails keep the card being read in place when widening from one column", async ({ page }) => {
+    await page.setViewportSize({ width: 393, height: 800 });
+    await installNetworkMocks(page);
+    await routeSongsJsonFixture(page, createScrollableResultSongs(120));
+    await page.goto("/");
+    await waitForInitialLoad(page);
+    await enablePlaybackSettings(page);
+    await closeSidebar(page);
+    await page.locator("#searchBox").fill("Scroll Artist");
+    await expect(page.locator("#resultCount")).toHaveText("120 件がヒット");
+    await page.locator("#searchBox").blur();
+    await expect(page.locator("#resultList")).toHaveAttribute("data-layout-columns", "1");
+    await showAllResults(page, 120);
+
+    // 25 曲目の上端が画面から 30px はみ出す位置まで読み進める。
+    // 1 列ではカードが通常の並びなので、リサイズが知らされる時点でブラウザが先に並び直している。
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.evaluate(() => {
+        const card = document.querySelectorAll("#resultList .song-card")[24];
+        window.scrollTo(0, window.scrollY + card.getBoundingClientRect().top + 30);
+    });
+    await waitForAnimationFrames(page);
+    const readingPosition = await readReadingPosition(page);
+    if (!readingPosition) throw new Error("No card is being read");
+    expect(readingPosition).toEqual({ songKey: "scroll-archive-25::1", top: -30 });
+
+    // 読んでいた位置はリサイズ前に記録しているので、ヘッダーが 2 段から 1 段に縮んでも、画面上の位置は変わらない。
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await expect(page.locator("#resultList")).toHaveAttribute("data-layout-columns", "4");
+    await expectCardTop(page, readingPosition.songKey, readingPosition.top);
+
+    // 4 列では同じ行のカードが横に並ぶので、狭め直すときの目印は、その行で DOM 順が最初のカードになる。
+    // 複数列のカードはブラウザのスクロール補正が効かないが、記録した位置に合わせるので、ヘッダーが伸びても位置は変わらない。
+    const wideReadingPosition = await readReadingPosition(page);
+    if (!wideReadingPosition) throw new Error("No card is being read");
+    await page.setViewportSize({ width: 393, height: 800 });
+    await expect(page.locator("#resultList")).toHaveAttribute("data-layout-columns", "1");
+    await expectCardTop(page, wideReadingPosition.songKey, wideReadingPosition.top);
 });
 
 test("bookmark results keep the card being read in place when narrowing and widening", async ({ page }) => {
@@ -249,11 +339,10 @@ test("shrinking only the height keeps the recommendations on screen while a vert
     await waitForMockYoutube(page);
     await expect(playingCard).toHaveClass(/song-card-expanded/);
     // カードが伸びた後の位置合わせが数フレーム後にスクロールを動かすので、終わるのを待ってから読み進める。
-    await page.evaluate(() => new Promise((resolve) => {
-        requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    }));
+    await waitForAnimationFrames(page, 3);
     await page.evaluate(() => window.scrollTo(0, 400));
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(400);
+    await waitForAnimationFrames(page);
     const shrunkHeight = 1650;
     // 高さだけを縮めても配置は変わらないので、縮めた後に一部でも見えるカードを先に調べておく。
     // スクロール中なので、画面の下端で途切れるカードも残す必要がある。
@@ -265,9 +354,7 @@ test("shrinking only the height keeps the recommendations on screen while a vert
     expect(keysOnShrunkScreen.length).toBeGreaterThan(72);
 
     await page.setViewportSize({ width: 3840, height: shrunkHeight });
-    await page.evaluate(() => new Promise((resolve) => {
-        requestAnimationFrame(() => requestAnimationFrame(resolve));
-    }));
+    await waitForAnimationFrames(page);
     // 伸びたカードの列は後ろのカードが下へずれるので、画面内のカードは先頭から連続した並びにならない。
     const keptKeys = await readCardKeys(page);
     expect(keptKeys).toEqual(expect.arrayContaining(keysOnShrunkScreen));
@@ -301,18 +388,20 @@ test("narrowing while scrolled keeps the recommendation being read and the cards
         window.scrollTo(0, window.scrollY + cardNodes[columnCount * 2].getBoundingClientRect().top);
         return cardNodes.findIndex((card) => card.getBoundingClientRect().bottom > 0);
     });
+    await waitForAnimationFrames(page);
     const keptCount = Math.min(wideKeys.length, scrolledPastCount + 48);
     expect(scrolledPastCount).toBeGreaterThan(0);
     expect(keptCount).toBeLessThan(wideKeys.length);
     const readingPosition = await readReadingPosition(page);
-    expect(readingPosition?.songKey).toBe(wideKeys[scrolledPastCount]);
+    if (!readingPosition) throw new Error("No card is being read");
+    expect(readingPosition.songKey).toBe(wideKeys[scrolledPastCount]);
 
     // ヘッダーが 1 段のままの幅へ狭め、ヘッダーの高さの変化で位置がずれないようにする。
     await page.setViewportSize({ width: 700, height: 851 });
     await expect(page.locator("#resultList")).toHaveAttribute("data-layout-columns", "2");
     await expect(cards).toHaveCount(keptCount);
     expect(await readCardKeys(page)).toEqual(wideKeys.slice(0, keptCount));
-    await expect.poll(() => readReadingPosition(page)).toEqual(readingPosition);
+    await expectCardTop(page, readingPosition.songKey, readingPosition.top);
     await expectCardsInsideLayout(page);
 });
 

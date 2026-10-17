@@ -26,30 +26,36 @@ export function setupResultsViewportRefresh({
     let pendingFrameId: number | null = null;
     let lastObservedWidth: number | null = null;
     let resizeObserver: ResizeObserver | null = null;
+    let pageResizeObserver: ResizeObserver | null = null;
+    // リサイズが知らされる時点では、1 列のカードの高さや一覧より上の要素が、ブラウザによってすでに変わっていることがある。
+    // そのため読んでいた位置は、スクロールやページの大きさが変わるたびに記録しておき、リサイズ後はその記録に合わせる。
+    let readingPosition: ViewportAnchor | null = null;
 
     /**
      * 現在の viewport に合わせた結果一覧の更新を行う。
      */
     function refreshForCurrentViewport(): void {
         pendingFrameId = null;
-        const readingAnchor = captureReadingPosition();
+        const recordedReadingPosition = readingPosition;
         refreshLayout();
-        if (readingAnchor) {
-            restoreViewportAnchor(readingAnchor);
+        if (recordedReadingPosition) {
+            restoreViewportAnchor(recordedReadingPosition);
             onReadingPositionRestored?.();
         }
         refreshRecommendedDisplay();
+        recordReadingPosition();
     }
 
     /**
-     * 並び直す前に、画面の上端より上へ過ぎていない最初のカードを、読んでいる位置の目印として記録する。
+     * 画面の上端より上へ過ぎていない最初のカードを、読んでいる位置の目印として記録する。
+     * スクロールやページの大きさの変化はブラウザが 1 frame に 1 回まとめて知らせるので、その場で記録する。
+     * リサイズが知らされてから並び直すまでは、リサイズ前の記録を残すため記録しない。
      * ページの先頭にいるときは、並び直した後も先頭に留まるよう記録しない。
-     * @returns 目印のカードと見えていた位置。記録しない場合は null
      */
-    function captureReadingPosition(): ViewportAnchor | null {
+    function recordReadingPosition(): void {
+        if (pendingFrameId !== null) return;
         const anchor = createViewportAnchor(findFirstSongCardNotScrolledPast(resultList));
-        if (!anchor || anchor.container.scrollTop <= 0) return null;
-        return anchor;
+        readingPosition = anchor && anchor.container.scrollTop > 0 ? anchor : null;
     }
 
     /**
@@ -67,23 +73,26 @@ export function setupResultsViewportRefresh({
     }
 
     /**
-     * observer と resize listener を解除する。
+     * observer と resize・scroll listener を解除する。
      */
     function disconnect(): void {
         if (resizeObserver) {
             resizeObserver.disconnect();
             resizeObserver = null;
         }
+        if (pageResizeObserver) {
+            pageResizeObserver.disconnect();
+            pageResizeObserver = null;
+        }
         if (typeof window !== "undefined" && typeof window.removeEventListener === "function") {
             window.removeEventListener("resize", scheduleRefresh);
+            window.removeEventListener("scroll", recordReadingPosition);
         }
-        if (
-            pendingFrameId !== null &&
-            typeof cancelAnimationFrame === "function"
-        ) {
+        if (pendingFrameId !== null && typeof cancelAnimationFrame === "function") {
             cancelAnimationFrame(pendingFrameId);
         }
         pendingFrameId = null;
+        readingPosition = null;
     }
 
     if (resultList && typeof ResizeObserver === "function") {
@@ -97,10 +106,16 @@ export function setupResultsViewportRefresh({
             scheduleRefresh();
         });
         resizeObserver.observe(resultList);
+        // スクロールせずに結果やヘッダーの高さが変わった場合も、読んでいる位置を記録し直す。
+        if (typeof document !== "undefined" && document.body) {
+            pageResizeObserver = new ResizeObserver(recordReadingPosition);
+            pageResizeObserver.observe(document.body);
+        }
     }
 
     if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
         window.addEventListener("resize", scheduleRefresh);
+        window.addEventListener("scroll", recordReadingPosition, { passive: true });
     }
 
     return disconnect;

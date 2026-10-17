@@ -102,7 +102,7 @@ test("results viewport refresh: non-recommended resize refreshes masonry layout"
     }
 });
 
-test("results viewport refresh: disconnect removes the resize listener and cancels the pending frame", () => {
+test("results viewport refresh: disconnect removes the listeners and cancels the pending frames", () => {
     const cleanup = installFakeDom();
     const frames = installFakeAnimationFrames();
     const previousResizeObserver = globalThis.ResizeObserver;
@@ -120,11 +120,13 @@ test("results viewport refresh: disconnect removes the resize listener and cance
         assert.equal(layoutCalls, 1);
 
         invokeListener(cleanup.window, "resize", {});
+        invokeListener(cleanup.window, "scroll", {});
         assert.equal(frames.pendingCount, 1);
         disconnect();
 
         assert.equal(frames.pendingCount, 0);
         assert.equal(cleanup.window._events.has("resize"), false);
+        assert.equal(cleanup.window._events.has("scroll"), false);
         assert.equal(layoutCalls, 1);
     } finally {
         setGlobalValue("ResizeObserver", previousResizeObserver);
@@ -150,7 +152,7 @@ function createResultListWithCards(bottoms: number[]) {
     return { resultList, cards };
 }
 
-test("results viewport refresh: resize keeps the first card not scrolled past at the same position", () => {
+test("results viewport refresh: resize restores the reading position recorded before the resize", () => {
     const restoreDom = installFakeDom();
     const previousResizeObserver = globalThis.ResizeObserver;
     try {
@@ -178,9 +180,13 @@ test("results viewport refresh: resize keeps the first card not scrolled past at
             }
         });
 
+        // スクロールしたときに、上端から -40 の 2 枚目を読んでいる位置として記録する。
+        invokeListener(restoreDom.window, "scroll", {});
+        // リサイズが知らされる前に、ブラウザがカードを動かした状態にする。この位置は使わない。
+        getFakeElement(cards[1])._rect = { top: 300, bottom: 400, left: 0, right: 100, width: 100, height: 100 };
         invokeListener(restoreDom.window, "resize", {});
 
-        // 位置を合わせた後の画面で、おすすめを減らすときに残すカードを数える。
+        // 記録した -40 へ戻し、位置を合わせた後の画面で、おすすめを減らすときに残すカードを数える。
         assert.deepEqual(calls, ["layout", "scroll 180", "restored", "recommendations"]);
     } finally {
         setGlobalValue("ResizeObserver", previousResizeObserver);
@@ -215,6 +221,7 @@ test("results viewport refresh: resize at the top of the page keeps the page at 
             }
         });
 
+        invokeListener(restoreDom.window, "scroll", {});
         invokeListener(restoreDom.window, "resize", {});
 
         assert.equal(layoutRefreshCount, 1);
@@ -222,6 +229,43 @@ test("results viewport refresh: resize at the top of the page keeps the page at 
         assert.equal(restoredCount, 0);
     } finally {
         setGlobalValue("ResizeObserver", previousResizeObserver);
+        restoreDom();
+    }
+});
+
+test("results viewport refresh: a scroll reported before the pending layout keeps the record from before the resize", () => {
+    const restoreDom = installFakeDom();
+    const frames = installFakeAnimationFrames();
+    const previousResizeObserver = globalThis.ResizeObserver;
+    try {
+        setGlobalValue("ResizeObserver", undefined);
+        const { resultList, cards } = createResultListWithCards([-40, 60, 160]);
+        Object.assign(getFakeElement(document.body), { scrollTop: 500 });
+        const scrollCalls: (number | undefined)[] = [];
+        Object.assign(restoreDom.window, {
+            scrollBy(options: ScrollToOptions) {
+                scrollCalls.push(options.top);
+            }
+        });
+        setupResultsViewportRefresh({
+            resultList,
+            refreshRecommendedDisplay: () => false,
+            refreshLayout() {
+                getFakeElement(cards[1])._rect = { top: 140, bottom: 240, left: 0, right: 100, width: 100, height: 100 };
+            }
+        });
+
+        invokeListener(restoreDom.window, "scroll", {});
+        invokeListener(restoreDom.window, "resize", {});
+        // リサイズ後、並び直す前に届いたスクロールでは、ブラウザが動かした位置を記録しない。
+        getFakeElement(cards[0])._rect = { top: -20, bottom: 80, left: 0, right: 100, width: 100, height: 100 };
+        invokeListener(restoreDom.window, "scroll", {});
+        frames.advanceFrame();
+
+        assert.deepEqual(scrollCalls, [180]);
+    } finally {
+        setGlobalValue("ResizeObserver", previousResizeObserver);
+        frames.cleanup();
         restoreDom();
     }
 });
