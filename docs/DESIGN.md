@@ -431,7 +431,7 @@ IndexedDB保存：
 - 日付入力はセレクト方式（ブラウザ互換性優先）
 
 ## セキュリティ
-- `index.html` のmeta CSPでscript・画像・iframe・通信の取得元を制限する
+- `public/index.html` のmeta CSPでscript・画像・iframe・通信の取得元を制限する
 - 初回描画前のテーマ初期化はインラインのままSHA-256で限定して許可する。変更時はCSPのhashも更新し、
   `tests/content-security-policy.test.mts` でhashの一致を検証する
 - 外部取得元として許可するのは、YouTube APIのloaderとwidget用path、2種類のembed host、サムネイルhost、

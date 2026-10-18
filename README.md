@@ -139,6 +139,6 @@ flowchart TD
 
 ## 開発者向け
 
-- [DEVELOPMENT.md](DEVELOPMENT.md): 環境準備、コマンド、テスト、ビルドの流れ
-- [DESIGN.md](DESIGN.md): データフロー、検索ロジック、保存形式、CI・デプロイなどの設計
-- [AGENTS.md](AGENTS.md) / [WORKFLOW.md](WORKFLOW.md): コーディング規約と作業の進め方
+- [DEVELOPMENT.md](docs/DEVELOPMENT.md): 環境準備、コマンド、テスト、ビルドの流れ
+- [DESIGN.md](docs/DESIGN.md): データフロー、検索ロジック、保存形式、CI・デプロイなどの設計
+- [AGENTS.md](AGENTS.md) / [WORKFLOW.md](docs/WORKFLOW.md): コーディング規約と作業の進め方

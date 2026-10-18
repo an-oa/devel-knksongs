@@ -109,7 +109,7 @@ feat: move settings into dedicated sidebar panel
   `app` source tree に `.mjs` が残っていないことを確認する。
 - `tsconfig.build.json` は `app/**/*.mts` だけを emit 対象にし、`allowJs: false` のまま保つ。
   既存 `.mjs` を TypeScript emit 対象へ巻き込むと、入力ファイル上書き防止で失敗しやすい。
-- `npm run build` は静的 asset と TypeScript 生成 module を `_build` へ作り、`.ts` / `.mts` source を含めない。
+- `npm run build` は `public/` の静的 asset と TypeScript 生成 module を `_build` へ作り、`.ts` / `.mts` source を含めない。
 - ブラウザ用URLはbuild時にesbuildの内容ハッシュとCSSのcache busterで決定する。
 - Pages artifact は `_build` の静的asset・browser bundle・曲JSONを `_site` へコピーする。
   `_build/app` はNode tests・scripts用に保ち、配布やURL書き換えの対象にしない。
@@ -121,7 +121,7 @@ feat: move settings into dedicated sidebar panel
 
 ## Verification
 
-- 初回または `node_modules` がない環境では、DEVELOPMENT.md の環境準備に従い
+- 初回または `node_modules` がない環境では、docs/DEVELOPMENT.md の環境準備に従い
   `npm install` を実行してから検証する。
 - JavaScript や型定義を変更したときは、静的解析として `npm run typecheck` と
   `npm run lint` を基本の確認手順として実行する。
@@ -188,12 +188,12 @@ feat: move settings into dedicated sidebar panel
 | Path | Encoding | Line Ending |
 | --- | --- | --- |
 | `AGENTS.md` | UTF-8 BOMなし | LF |
-| `DESIGN.md` | UTF-8 BOMなし | LF |
-| `DEVELOPMENT.md` | UTF-8 BOMなし | LF |
+| `docs/DESIGN.md` | UTF-8 BOMなし | LF |
+| `docs/DEVELOPMENT.md` | UTF-8 BOMなし | LF |
 | `README.md` | UTF-8 BOMなし | LF |
-| `WORKFLOW.md` | UTF-8 BOMなし | LF |
-| `index.html` | UTF-8 BOMなし | LF |
-| `styles.css` | UTF-8 BOMなし | LF |
+| `docs/WORKFLOW.md` | UTF-8 BOMなし | LF |
+| `public/index.html` | UTF-8 BOMなし | LF |
+| `public/styles.css` | UTF-8 BOMなし | LF |
 | `app/**/*.mts` / 生成 `_build/app/**/*.mjs` | UTF-8 BOMなし | LF |
 | `scripts/**/*.mts` | UTF-8 BOMなし | LF |
 | `tests/**/*.mts` / `tests/**/*.d.ts` | UTF-8 BOMなし | LF |

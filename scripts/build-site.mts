@@ -6,7 +6,7 @@ import { pathToFileURL } from "node:url";
 import { buildTypeScriptModules } from "./build-ts.mts";
 import { buildBrowserModules } from "./build-browser.mts";
 import { resolveProjectPath } from "./lib/paths.mts";
-import { DATA_ASSET_FILES, ROOT_ASSET_FILES } from "./lib/site-assets.mts";
+import { DATA_ASSET_FILES, PUBLIC_ASSET_DIR, ROOT_ASSET_FILES } from "./lib/site-assets.mts";
 
 const DEFAULT_BUILD_DIR = "_build";
 
@@ -58,7 +58,7 @@ export async function buildSite(options: { outputDir: string, cacheBuster?: stri
     await rm(outputDir, { recursive: true, force: true });
     await mkdir(join(outputDir, "data"), { recursive: true });
     await Promise.all(ROOT_ASSET_FILES.map((fileName) => (
-        copyFile(resolve(fileName), join(outputDir, fileName))
+        copyFile(resolve(PUBLIC_ASSET_DIR, fileName), join(outputDir, fileName))
     )));
     await Promise.all(DATA_ASSET_FILES.map((fileName) => (
         copyFile(resolve("data", fileName), join(outputDir, "data", fileName))
