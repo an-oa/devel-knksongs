@@ -487,7 +487,9 @@ export function createRenderController({
             entry.card.dataset.songKey = row.songKey;
             const isBookmarkActive = Boolean(data.activeBookmark);
             entry.card.draggable = false;
-            entry.card.classList.remove("dragging", "drag-over");
+            // ドラッグ中に続きを読み込んで描き直しても、移動元の半透明は保つ。ドロップ先の枠は次の dragover で付け直す。
+            entry.card.classList.toggle("dragging", isBookmarkActive && dragReorderController.isDraggingSong(rowKey));
+            entry.card.classList.remove("drag-over");
             entry.dragHandle.hidden = !isBookmarkActive;
             entry.dragHandle.draggable = isBookmarkActive;
 

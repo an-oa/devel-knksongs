@@ -822,6 +822,67 @@ test("render: drag handle is bookmark-only and reorder works in both directions 
     }
 });
 
+test("render: re-rendering during a bookmark drag keeps the dragged card semi-transparent", () => {
+    const cleanup = installFakeDom();
+    try {
+        const rowA = makeRenderRow({ songKey: "a::1", title: "A" });
+        const rowB = makeRenderRow({ songKey: "b::2", title: "B", url: "https://youtu.be/video2" });
+        const data = createRenderDataState({
+            currentResults: [rowA, rowB],
+            displayLimit: 1,
+            activeBookmark: "bm1",
+            bookmarks: {
+                bm1: {
+                    name: "test",
+                    songs: [rowA.songKey, rowB.songKey]
+                }
+            }
+        });
+        const ui = createRenderUiState({
+            el: {
+                resultList: document.createElement("div"),
+                resultTailSentinel: document.createElement("div")
+            }
+        });
+        const controller = createRenderController({
+            data,
+            ui,
+            isAllFormatsSelected: () => true,
+            callbacks: createRenderCallbacks()
+        });
+
+        controller.updateDisplay();
+        const entryA = ui.render.cardEntriesBySongKey.get(rowA.songKey);
+        assert.ok(entryA);
+        invokeListener(entryA.dragHandle, "dragstart", {
+            currentTarget: entryA.dragHandle,
+            target: entryA.dragHandle,
+            dataTransfer: createDataTransferMock(),
+            preventDefault() {}
+        });
+        assert.equal(entryA.card.classList.contains("dragging"), true);
+
+        // ドラッグ中に続きのカードを読み込むと、結果一覧が描き直される。
+        data.displayLimit = 2;
+        controller.updateDisplay();
+        const entryB = ui.render.cardEntriesBySongKey.get(rowB.songKey);
+        assert.ok(entryB);
+        assert.equal(entryA.card.classList.contains("dragging"), true);
+        assert.equal(entryB.card.classList.contains("dragging"), false);
+
+        invokeListener(entryA.dragHandle, "dragend", {
+            currentTarget: entryA.dragHandle,
+            target: entryA.dragHandle,
+            dataTransfer: createDataTransferMock(),
+            preventDefault() {}
+        });
+        controller.updateDisplay();
+        assert.equal(entryA.card.classList.contains("dragging"), false);
+    } finally {
+        cleanup();
+    }
+});
+
 test("render: drag reorder forwards reload-required save failures without changing state", () => {
     const cleanup = installFakeDom();
     try {

@@ -1019,6 +1019,18 @@ body.hide-thumbs .song-card { border-radius: 12px; }
   outline-offset: -2px;
 }
 
+/*
+ * 並べ替えのドラッグ中は、動画の上に透明な覆いを重ね、動画の上でもドラッグのイベントがカードに届くようにする。
+ * 動画は別オリジンの iframe なので、覆いがないとイベントが iframe に渡り、落とせない。
+ * WebKit は iframe に pointer-events: none を指定しても、ドラッグのイベントを iframe に渡すので、覆いで防ぐ。
+ */
+#resultList:has(.song-card.dragging) .thumb:has(iframe)::after {
+  content: "";
+  inset: 0;
+  transform: none;
+  z-index: 2;
+}
+
 .drag-handle {
   position: absolute;
   top: 6px;
