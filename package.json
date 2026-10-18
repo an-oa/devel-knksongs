@@ -35,7 +35,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
-    "@playwright/test": "^1.53.0",
+    "@playwright/test": "1.63.0",
     "@types/node": "^24.13.3",
     "esbuild": "^0.28.2",
     "eslint": "^9.39.4",
