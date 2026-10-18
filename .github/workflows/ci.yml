@@ -11,6 +11,7 @@ permissions:
   contents: read
 
 jobs:
+  # job 名の test は、main の ruleset（.github/rulesets/main.json）で必須の check にしている。変えるときは ruleset も直す。
   test:
     runs-on: ubuntu-latest
 

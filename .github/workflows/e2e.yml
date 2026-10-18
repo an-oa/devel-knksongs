@@ -2,6 +2,7 @@ name: E2E
 
 # Chromium と WebKit で E2E を実行する。
 # Deploy Pages は CI の完了だけを待つので、このワークフローの結果はデプロイと曲データの自動更新を止めない。
+# PR のマージは、main の ruleset（.github/rulesets/main.json）で e2e job の成功を必須にしている。job 名を変えるときは ruleset も直す。
 on:
   push:
     branches:

@@ -162,8 +162,18 @@ npm run render:brand-assets
 | --- | --- |
 | `update-songs-json.yml` | 1日2回 CSV から曲JSONを生成・検証し、差分があれば `main` へコミット |
 | `ci.yml` | `main` への push / PR で build・検証・型検査・lint・単体テスト |
-| `e2e.yml` | `main` への push / PR で Chromium と WebKit の E2E。deploy の条件には含めない |
+| `e2e.yml` | `main` への push / PR で Chromium と WebKit の E2E。deploy の条件には含めず、`main` へのマージの条件にする |
 | `deploy-pages.yml` | `main` の CI 成功後に GitHub Pages へ deploy し、公開を確認。失敗時は Issue で通知 |
+
+`main` へのマージには、CI の `test` と E2E の `e2e` の成功を必須にしています（`.github/rulesets/main.json`）。
+ruleset はリポジトリの設定なので、ファイルを変えても自動では反映されません。次の手順で取り込みます。
+
+1. Settings → Rules → Rulesets → New ruleset → Import a ruleset で、`.github/rulesets/main.json` を選ぶ
+2. Bypass list に、曲データ更新の GitHub App（`knksongs-song-data-updater`）を追加する。
+   App は `main` へ直接 push するので、入れないと自動更新の push が拒否される
+3. Create で保存する
+
+画面で ruleset を変えたときは、Export した JSON で `.github/rulesets/main.json` を置き換えてください。
 
 権限設計、`main` との照合、失敗通知の詳細は [DESIGN.md の CI・デプロイ](DESIGN.md#ciデプロイ) を参照してください。
 
