@@ -24,8 +24,13 @@
   - `npm run lint` は devDependencies の ESLint を使う前提です。`node_modules` がないと、
     環境側の古い ESLint が実行されることがあります。
 - E2E テスト（Playwright）を初回実行する前に、次を準備してください。
-  - `npx playwright install chromium`
+  - `npx playwright install chromium webkit`
+  - Linux では、WebKit が使うライブラリを `sudo npx playwright install-deps webkit` で入れること
   - `python3` が PATH 上で利用できること
+- Playwright は 1.63.0 に固定しています。
+  - 1.60.0 より前は、Node 24.16 でブラウザのインストールが展開の途中で止まります。
+  - 1.64 に同梱の WebKit は、`<select>` があるだけで CSP（`style-src-attr`）の違反を記録し、
+    CSP の E2E が WebKit で落ちます。1.64 以降へ上げるときは、この対応も行ってください。
 
 ## ローカルで動かす
 
@@ -113,14 +118,17 @@ flowchart LR
 | --- | --- | --- | --- |
 | 単体テスト | `tests/*.test.mts` | `tsx` 経由で `app/**/*.mts` を直接 import | ロジック、controller、DOM モックでの状態遷移 |
 | scripts のテスト | `tests/*.test.mts`（一部） | scripts 経由で `_build/app` を読む | 曲JSON・build・配布成果物の整合性 |
-| E2E | `tests/e2e/*.spec.mts` | Playwright（Chromium）で `_site` を検証 | 起動順序、保存状態、レイアウト、キーボード操作、再生 |
+| E2E | `tests/e2e/*.spec.mts` | Playwright（Chromium・WebKit）で `_site` を検証 | 起動順序、保存状態、レイアウト、キーボード操作、再生 |
 
 - `npm run test:unit` は、scripts のテストが生成 module を読むため事前に `build:ts` を実行します。
   `tsx` は型検査をしないため、`npm run typecheck` も併せて実行してください。
 - テストファイル名は対象 module に揃えています（例: `app/lib/search-query.mts` → `tests/search-query.test.mts`）。
   一覧は `ls tests/` で確認してください。
 - E2E では `_site` を `python3 -m http.server 4173` でローカル配信し、曲データと YouTube Iframe API はモックに差し替えます。
-- 現在の E2E 対象は Chromium だけです。iOS Safari は実機または手動で確認してください。
+- E2E は Chromium と WebKit で実行します。WebKit は Safari と同じエンジンですが、iOS の判定（`isIOSWebKit`）は真にならず、
+  長押しの操作も再現できません。iOS Safari は実機または手動で確認してください。
+- WebKit では、Playwright の screenshot のたびに CSP の違反（`style-src-elem`）が 1 件記録されます。
+  Playwright が撮影時に style を差し込むためです。CSP の違反が 0 件であることを確かめるテストでは、確かめる前に撮影しないでください。
 
 ### 共通helper
 

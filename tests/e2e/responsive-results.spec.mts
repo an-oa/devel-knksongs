@@ -200,7 +200,9 @@ test("search results with thumbnails keep the card being read in place when wide
     await waitForAnimationFrames(page);
     const readingPosition = await readReadingPosition(page);
     if (!readingPosition) throw new Error("No card is being read");
-    expect(readingPosition).toEqual({ songKey: "scroll-archive-25::1", top: -30 });
+    // カードの高さは小数になり、スクロール位置を整数へ丸める向きはブラウザで違うので、1px までの差は許す。
+    expect(readingPosition.songKey).toBe("scroll-archive-25::1");
+    expect(Math.abs(readingPosition.top + 30)).toBeLessThanOrEqual(1);
 
     // 読んでいた位置はリサイズ前に記録しているので、ヘッダーが 2 段から 1 段に縮んでも、画面上の位置は変わらない。
     await page.setViewportSize({ width: 1280, height: 800 });
@@ -272,6 +274,8 @@ test("recommendations return to 48 cards after widening and narrowing again at t
 });
 
 test("recommendations return to 48 cards after a 1080p screen is zoomed out and back", async ({ page }) => {
+    // 7680×4320 の画面は描画が重く、WebKit では並列実行の負荷が高いと、件数が変わるまで 5 秒を超えることがある。
+    test.slow();
     await page.setViewportSize({ width: 1920, height: 1080 });
     await installNetworkMocks(page);
     const songs = createScrollableResultSongs(300).map((song) => ({ ...song, format: "オリ曲" }));
@@ -284,10 +288,10 @@ test("recommendations return to 48 cards after a 1080p screen is zoomed out and 
 
     // 25% 表示では列数が大きく増えるので、並び直す前の配置で画面内のカードを数えると件数が戻らなくなる。
     await page.setViewportSize({ width: 7680, height: 4320 });
-    await expect.poll(() => cards.count()).toBeGreaterThan(200);
+    await expect.poll(() => cards.count(), { timeout: 20_000 }).toBeGreaterThan(200);
 
     await page.setViewportSize({ width: 1920, height: 1080 });
-    await expect(cards).toHaveCount(48);
+    await expect(cards).toHaveCount(48, { timeout: 20_000 });
     expect(await readCardKeys(page)).toEqual(initialKeys);
     await expectCardsInsideLayout(page);
 });
