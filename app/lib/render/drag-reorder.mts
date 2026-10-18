@@ -138,7 +138,18 @@ export function createBookmarkDragReorderController(input: BookmarkDragReorderCo
         }
     }
 
+    /**
+     * 指定した曲が、ハンドルから始めた並べ替えのドラッグの移動元かを返す。
+     * ドラッグ中に結果一覧を描き直しても、移動元の表示を保つために使う。
+     * @param songKey 調べる曲のキー
+     * @returns 移動元なら true
+     */
+    function isDraggingSong(songKey: string): boolean {
+        return draggedSongKey !== null && draggedSongKey === songKey;
+    }
+
     return {
+        isDraggingSong,
         onDragStart,
         onDragEnd,
         onDragEnter: acceptDropOnCard,

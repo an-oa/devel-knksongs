@@ -2,11 +2,12 @@ import { test, expect, type Locator, type Page } from "@playwright/test";
 import { installNetworkMocks } from "./support/network-mocks.mts";
 import { routeSongsJsonFixture } from "./support/songs-network.mts";
 import { createScrollableResultSongs } from "./support/song-fixtures.mts";
+import { waitForMockYoutube } from "./support/mock-youtube.mts";
 import {
+    enablePlaybackSettings,
     expectSidebarPopoverClosed,
     getBookmarkItem,
     openBookmarkPanel,
-    openSidebar,
     waitForInitialLoad
 } from "./support/ui-helpers.mts";
 
@@ -18,8 +19,9 @@ type Point = { x: number; y: number };
  * 指定した曲だけを登録したブックマークを保存し、選択して結果一覧へ戻る。
  * @param page 操作するページ
  * @param songs ブックマークに登録する曲
+ * @param options thumbnails を true にすると、先にサムネイル表示を有効にする
  */
-async function openSeededBookmark(page: Page, songs: Song[]) {
+async function openSeededBookmark(page: Page, songs: Song[], options: { thumbnails?: boolean } = {}) {
     await installNetworkMocks(page);
     await routeSongsJsonFixture(page, songs);
     await page.goto("/");
@@ -31,7 +33,7 @@ async function openSeededBookmark(page: Page, songs: Song[]) {
     }, { name: BOOKMARK_NAME, songKeys: songs.map((song) => song.bookmarkSongKey) });
     await page.reload();
     await waitForInitialLoad(page);
-    await openSidebar(page);
+    if (options.thumbnails) await enablePlaybackSettings(page);
     await openBookmarkPanel(page);
     await getBookmarkItem(page, BOOKMARK_NAME).click();
     await expect(page.locator("#resultCount")).toHaveText(`ブックマーク: ${BOOKMARK_NAME} (${songs.length} 件)`);
@@ -174,5 +176,49 @@ test("the card being dragged is not outlined while the pointer is over it", asyn
     await startHandleDrag(page, cards.nth(0), [source.center, { x: source.center.x + 3, y: source.center.y }]);
     await expect(cards.nth(0)).toHaveClass(/dragging/);
     await expect(cards.nth(0)).not.toHaveClass(/drag-over/);
+    await page.mouse.up();
+});
+
+test("dropping onto the video of a playing card moves the card and keeps the video", async ({ page }) => {
+    await openSeededBookmark(page, createScrollableResultSongs(6), { thumbnails: true });
+    const cards = page.locator("#resultList > .song-card");
+    // 再生中のカードは並べ替えで位置が変わるので、曲キーで指す。
+    const playingCard = page.locator('#resultList > .song-card[data-song-key="scroll-archive-03::1"]');
+    await playingCard.locator(".thumb").click();
+    await waitForMockYoutube(page);
+    const video = playingCard.locator("iframe");
+    await expect(video).toBeVisible();
+
+    // 動画は別オリジンの iframe なので、ドラッグ中もイベントを受け取ると、動画の上ではカードに届かなかった。
+    const videoBox = await video.boundingBox();
+    if (!videoBox) throw new Error("The video has no bounding box");
+    await startHandleDrag(page, cards.nth(0), [{ x: videoBox.x + videoBox.width / 2, y: videoBox.y + videoBox.height / 2 }]);
+    await page.mouse.up();
+
+    await expect.poll(() => readCardTitles(page)).toEqual([
+        "Scroll Song 02", "Scroll Song 03", "Scroll Song 01", "Scroll Song 04", "Scroll Song 05", "Scroll Song 06"
+    ]);
+    await expect(page.locator("#resultList iframe")).toHaveCount(1);
+    await expect(video).toBeVisible();
+});
+
+test("the dragged card stays semi-transparent while more cards load during the drag", async ({ page }) => {
+    await page.setViewportSize({ width: 393, height: 851 });
+    const songs = createScrollableResultSongs(60);
+    await openSeededBookmark(page, songs);
+    const cards = page.locator("#resultList > .song-card");
+    const initialCount = await cards.count();
+    expect(initialCount).toBeLessThan(songs.length);
+
+    const source = cards.nth(0);
+    const target = await getCardPoints(cards.nth(1));
+    await startHandleDrag(page, source, [target.center]);
+    await expect(source).toHaveClass(/dragging/);
+
+    // ブラウザがドラッグ中に画面の端で自動スクロールしたときと同じく、末尾まで送って続きを読み込ませる。
+    await page.evaluate(() => document.getElementById("resultTailSentinel")?.scrollIntoView());
+    await expect.poll(() => cards.count()).toBeGreaterThan(initialCount);
+    await expect(source).toHaveClass(/dragging/);
+    await expect(source).toHaveCSS("opacity", "0.5");
     await page.mouse.up();
 });
