@@ -54,6 +54,23 @@ test("header hides on downward scroll and returns on upward scroll", async ({ pa
     await expect(header).toHaveClass(/is-auto-hidden/);
 });
 
+test("header hides on downward scroll even when styles arrive after the app starts", async ({ page }) => {
+    // styles.css の到着を遅らせ、CSS が当たる前にアプリが初期化される状況を作る。
+    // アプリ本体は動的 import で読み込むので、WebKit では CSS を待たずに初期化され、
+    // そのとき測ったヘッダーの高さを使い続けると、実際の高さより下までスクロールしても隠れなかった。
+    await page.route("**/styles.css*", async (route) => {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        await route.continue();
+    });
+    await loadScrollableResults(page);
+
+    const header = page.locator(".header");
+    await expect(header).not.toHaveClass(/is-auto-hidden/);
+
+    await page.evaluate(() => window.scrollTo(0, 320));
+    await expect(header).toHaveClass(/is-auto-hidden/);
+});
+
 test("Tab focus reveals the hidden header before the next frame", async ({ page }) => {
     await loadScrollableResults(page);
 
