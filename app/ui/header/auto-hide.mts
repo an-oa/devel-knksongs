@@ -22,7 +22,6 @@ export function createAutoHideHeaderController(input: AutoHideHeaderControllerIn
     let lastScrollY = 0;
     let directionStartY = 0;
     let scrollDirection: ScrollDirection = 0;
-    let topVisibilityBoundary = 0;
     let isScrollUpdateScheduled = false;
     let isSetup = false;
 
@@ -90,21 +89,14 @@ export function createAutoHideHeaderController(input: AutoHideHeaderControllerIn
     }
 
     /**
-     * ヘッダーの高さを、上端付近で常に表示する範囲として測り直す。
-     * 狭い画面ではヘッダーが 2 段になるため、画面幅の変更に追従させる。
+     * 上端付近で常に表示する範囲として、今のヘッダーの高さを返す。
+     * 初期化時に一度だけ測ると、CSS が当たる前の高さを使い続けることがあるので、判定のたびに測る。
+     * 狭い画面でヘッダーが 2 段になったときの高さにも、そのまま追従する。
+     * @returns ヘッダーの高さ。ヘッダーがなければ 0
      */
-    function measureTopVisibilityBoundary(): void {
+    function getTopVisibilityBoundary(): number {
         const header = getHeader();
-        if (!header) return;
-        topVisibilityBoundary = Math.max(0, header.getBoundingClientRect().height);
-    }
-
-    /**
-     * 画面幅の変更でヘッダーの高さが変わった場合に、表示判定の範囲を更新して再判定する。
-     */
-    function handleResize(): void {
-        measureTopVisibilityBoundary();
-        scheduleScrollSync();
+        return header ? Math.max(0, header.getBoundingClientRect().height) : 0;
     }
 
     /**
@@ -113,7 +105,7 @@ export function createAutoHideHeaderController(input: AutoHideHeaderControllerIn
     function syncHeaderForScroll(): void {
         isScrollUpdateScheduled = false;
         const scrollY = getPageScrollY();
-        if (isSidebarOpen() || hasFocusVisibleHeaderElement() || scrollY <= topVisibilityBoundary) {
+        if (isSidebarOpen() || hasFocusVisibleHeaderElement() || scrollY <= getTopVisibilityBoundary()) {
             showHeaderFrom(scrollY);
             return;
         }
@@ -165,17 +157,17 @@ export function createAutoHideHeaderController(input: AutoHideHeaderControllerIn
     }
 
     /**
-     * ヘッダー高と初期位置を記録し、ページ操作の監視を開始する。
+     * 初期位置を記録し、ページ操作の監視を開始する。
+     * 画面幅の変更ではヘッダーの高さが変わることがあるので、スクロールと同じく表示を判定し直す。
      */
     function setup(): void {
         if (isSetup) return;
         const header = getHeader();
         if (!header) return;
         isSetup = true;
-        measureTopVisibilityBoundary();
         showHeaderFrom(getPageScrollY());
         window.addEventListener("scroll", scheduleScrollSync, { passive: true });
-        window.addEventListener("resize", handleResize);
+        window.addEventListener("resize", scheduleScrollSync);
         window.addEventListener("pageshow", handlePageShow);
         header.addEventListener("focusin", handleHeaderFocusIn);
         header.addEventListener("focusout", handleHeaderFocusOut);

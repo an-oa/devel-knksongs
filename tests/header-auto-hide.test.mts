@@ -5,12 +5,13 @@ import { installFakeDom, invokeListener, getFakeElement, installFakeAnimationFra
 
 /**
  * テスト用ヘッダーと controller を初期化する。
- * @param {number} [initialScrollY]
+ * @param initialScrollY 初期化時のページスクロール位置
+ * @param headerHeight 初期化時に測られるヘッダーの高さ
  */
-function setupHeaderController(initialScrollY = 0) {
+function setupHeaderController(initialScrollY = 0, headerHeight = 60) {
     const header = document.createElement("header");
     header.className = "header";
-    getFakeElement(header)._rect = { top: 0, bottom: 60, left: 0, right: 300, width: 300, height: 60 };
+    getFakeElement(header)._rect = { top: 0, bottom: headerHeight, left: 0, right: 300, width: 300, height: headerHeight };
     document.body.appendChild(header);
     const sidebar = document.createElement("aside");
     sidebar.className = "sidebar";
@@ -230,6 +231,22 @@ test("auto-hide header: resizing to a taller header keeps it visible within the 
         scrollPageTo(restoreDom.window, 123);
         assert.equal(header.classList.contains("is-auto-hidden"), false);
         scrollPageTo(restoreDom.window, 124);
+        assert.equal(header.classList.contains("is-auto-hidden"), true);
+    } finally {
+        restoreDom();
+    }
+});
+
+test("auto-hide header: uses the current header height after styles shrink it without a resize", () => {
+    const restoreDom = installFakeDom();
+    try {
+        // CSS が当たる前に初期化されると、ヘッダーの中身が縦に並び、実際よりずっと高く測られる。
+        const { header } = setupHeaderController(0, 3115);
+        getFakeElement(header)._rect = { top: 0, bottom: 60, left: 0, right: 300, width: 300, height: 60 };
+
+        scrollPageTo(restoreDom.window, 60);
+        assert.equal(header.classList.contains("is-auto-hidden"), false);
+        scrollPageTo(restoreDom.window, 663);
         assert.equal(header.classList.contains("is-auto-hidden"), true);
     } finally {
         restoreDom();
