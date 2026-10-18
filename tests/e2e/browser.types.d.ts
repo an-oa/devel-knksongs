@@ -5,4 +5,6 @@ interface Window {
   __knkLastThumbnailContextMenuPrevented?: boolean | null;
   __knkMockYoutube?: import("./support/youtube-iframe-api.mts").MockYoutubeControls;
   headerHiddenAtKeyboardFocusFrame?: boolean | null;
+  __knkCardReorderAnimations?: { songKey: string; from: string; zIndex: string }[];
+  __knkDragImages?: { songKey: string; isCard: boolean; x: number; y: number }[];
 }

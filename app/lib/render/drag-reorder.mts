@@ -1,5 +1,6 @@
 import type { StorageActionFailure, StorageActionResult } from "../../controllers/storage.mjs";
 import { isHtmlElement } from "../dom-utils.mjs";
+import { animateCardReorder, captureCardPositions } from "./card-reorder-animation.mjs";
 
 type BookmarkDragReorderDataState = {
     activeBookmark: string | null;
@@ -8,6 +9,7 @@ type BookmarkDragReorderDataState = {
 type BookmarkDragDataTransfer = {
     setData: (format: string, data: string) => void;
     getData: (format: string) => string;
+    setDragImage?: (image: Element, x: number, y: number) => void;
     effectAllowed: string;
 };
 
@@ -15,6 +17,8 @@ type BookmarkDragEvent = {
     currentTarget?: EventTarget | null;
     target?: EventTarget | null;
     relatedTarget?: EventTarget | null;
+    clientX?: number;
+    clientY?: number;
     dataTransfer: BookmarkDragDataTransfer | null;
     preventDefault: () => void;
 };
@@ -37,6 +41,21 @@ function getSongCardFromTarget(target: unknown): HTMLElement | null {
 }
 
 /**
+ * ドラッグ中にポインタに付いてくる像を、ハンドルではなくカード全体にする。
+ * 掴んだ位置がずれないよう、カードの中で押した位置を像の基準点にする。
+ * @param event ハンドルで始まった dragstart のイベント
+ * @param card 移動元のカード
+ */
+function setCardDragImage(event: BookmarkDragEvent, card: HTMLElement): void {
+    const dataTransfer = event.dataTransfer;
+    if (!dataTransfer || typeof dataTransfer.setDragImage !== "function") return;
+    const rect = card.getBoundingClientRect();
+    const x = Number.isFinite(event.clientX) ? Number(event.clientX) - rect.left : 0;
+    const y = Number.isFinite(event.clientY) ? Number(event.clientY) - rect.top : 0;
+    dataTransfer.setDragImage(card, Math.max(0, x), Math.max(0, y));
+}
+
+/**
  * ブックマーク表示中のカードドラッグ並べ替えを扱うコントローラーを作成する。
  */
 export function createBookmarkDragReorderController(input: BookmarkDragReorderControllerInput) {
@@ -51,6 +70,8 @@ export function createBookmarkDragReorderController(input: BookmarkDragReorderCo
     /**
      * ドラッグ開始時に移動元の曲キーを覚え、dataTransfer にも保存する。
      * ドロップ先の枠は、ここで覚えた並べ替えのドラッグにだけ付ける。
+     * ポインタに付いてくる像はカード全体にし、元の位置のカードは半透明にする。
+     * 像は dragstart の直後にカードから作られるので、像まで薄くならないよう、半透明は styles.css で少し遅らせる。
      * @param event ハンドルで始まった dragstart のイベント
      */
     function onDragStart(event: BookmarkDragEvent): void {
@@ -69,6 +90,7 @@ export function createBookmarkDragReorderController(input: BookmarkDragReorderCo
         }
         event.dataTransfer.setData("text/plain", songKey);
         event.dataTransfer.effectAllowed = "move";
+        setCardDragImage(event, card);
         draggedSongKey = songKey;
         card.classList.add("dragging");
     }
@@ -118,6 +140,7 @@ export function createBookmarkDragReorderController(input: BookmarkDragReorderCo
 
     /**
      * 覚えていた移動元と、ドロップ先の曲キーをブックマーク操作 API へ通知する。
+     * 並べ替えた後は、各カードを並べ替える前の位置から新しい位置へスライドさせる。
      * 並べ替えのドラッグでなければ、ドロップを受け止めるだけで何もしない。
      * @param event ドロップ先のカードで起きた drop のイベント
      */
@@ -132,10 +155,15 @@ export function createBookmarkDragReorderController(input: BookmarkDragReorderCo
 
         const targetKey = targetCard.dataset.songKey || "";
         if (!draggedKey || !targetKey || draggedKey === targetKey) return;
+        // 並べ替えると結果一覧がその場で描き直されるので、描き直す前の位置を記録しておく。
+        const resultList = targetCard.parentElement;
+        const previousPositions = captureCardPositions(resultList);
         const saveResult = moveSongInActiveBookmark(draggedKey, targetKey);
         if (saveResult.ok === false) {
             onSaveFailure(saveResult);
+            return;
         }
+        if (saveResult.changed) animateCardReorder(resultList, previousPositions, draggedKey);
     }
 
     /**

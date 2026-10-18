@@ -222,3 +222,138 @@ test("the dragged card stays semi-transparent while more cards load during the d
     await expect(source).toHaveCSS("opacity", "0.5");
     await page.mouse.up();
 });
+
+/**
+ * 結果カードの animate の呼び出しを、ページの中で記録し始める。
+ * @param page 操作するページ
+ */
+async function recordCardAnimations(page: Page) {
+    await page.evaluate(() => {
+        window.__knkCardReorderAnimations = [];
+        const animate = Element.prototype.animate;
+        Element.prototype.animate = function (this: Element, keyframes, options) {
+            if (this instanceof HTMLElement && this.classList.contains("song-card") && Array.isArray(keyframes)) {
+                window.__knkCardReorderAnimations?.push({
+                    songKey: this.dataset.songKey ?? "",
+                    from: String(keyframes[0]?.transform ?? ""),
+                    zIndex: String(keyframes[0]?.zIndex ?? "")
+                });
+            }
+            return animate.call(this, keyframes, options);
+        };
+    });
+}
+
+/**
+ * 記録した animate の呼び出しを取り出して記録を空にし、開始位置の移動量を読み取る。
+ * @param page 操作するページ
+ */
+async function takeCardAnimations(page: Page) {
+    const records = await page.evaluate(() => (window.__knkCardReorderAnimations ?? []).splice(0));
+    return records.map((record) => {
+        const match = /translate\(([^p]+)px, ([^p]+)px\)/.exec(record.from);
+        return {
+            songKey: record.songKey,
+            dx: match ? Number(match[1]) : Number.NaN,
+            dy: match ? Number(match[2]) : Number.NaN,
+            zIndex: record.zIndex
+        };
+    });
+}
+
+/**
+ * 並べ替えのスライドが終わるまで待つ。
+ * スライド中のカードは位置が動いているので、続けて操作すると、測った位置がずれる。
+ * @param page 操作するページ
+ */
+async function waitForCardSlides(page: Page) {
+    await expect.poll(() => page.evaluate(() => document.getAnimations()
+        .filter((animation) => animation.id === "card-reorder" && animation.playState === "running").length)).toBe(0);
+}
+
+test("dropping slides the cards between toward the gap in the dragged direction", async ({ page }) => {
+    await page.setViewportSize({ width: 393, height: 851 });
+    const songs = createScrollableResultSongs(6);
+    await openSeededBookmark(page, songs);
+    const cards = page.locator("#resultList > .song-card");
+    await recordCardAnimations(page);
+    const keyOf = (songNumber: number) => songs[songNumber - 1].songKey;
+
+    // 上から下へ（1 番目を 3 番目へ）：間のカードは上へ、移動元は下へスライドし、移動元だけ前面に出る。
+    await startHandleDrag(page, cards.nth(0), [(await getCardPoints(cards.nth(2))).center]);
+    await page.mouse.up();
+    await expect.poll(() => readCardTitles(page)).toEqual([
+        "Scroll Song 02", "Scroll Song 03", "Scroll Song 01", "Scroll Song 04", "Scroll Song 05", "Scroll Song 06"
+    ]);
+    const downward = await takeCardAnimations(page);
+    expect(downward.map((slide) => slide.songKey).sort()).toEqual([keyOf(1), keyOf(2), keyOf(3)].sort());
+    for (const slide of downward) expect(Math.abs(slide.dx)).toBeLessThan(1);
+    expect(downward.find((slide) => slide.songKey === keyOf(2))?.dy).toBeGreaterThan(0);
+    expect(downward.find((slide) => slide.songKey === keyOf(3))?.dy).toBeGreaterThan(0);
+    expect(downward.find((slide) => slide.songKey === keyOf(1))).toMatchObject({ zIndex: "3" });
+    expect(downward.find((slide) => slide.songKey === keyOf(1))?.dy).toBeLessThan(0);
+
+    // 下から上へ（5 番目を 2 番目へ）：間のカードは下へ、移動元は上へスライドする。
+    await waitForCardSlides(page);
+    await page.mouse.move(5, 5);
+    await startHandleDrag(page, cards.nth(4), [(await getCardPoints(cards.nth(1))).center]);
+    await page.mouse.up();
+    await expect.poll(() => readCardTitles(page)).toEqual([
+        "Scroll Song 02", "Scroll Song 05", "Scroll Song 03", "Scroll Song 01", "Scroll Song 04", "Scroll Song 06"
+    ]);
+    const upward = await takeCardAnimations(page);
+    expect(upward.map((slide) => slide.songKey).sort()).toEqual([keyOf(5), keyOf(3), keyOf(1), keyOf(4)].sort());
+    for (const songNumber of [3, 1, 4]) {
+        expect(upward.find((slide) => slide.songKey === keyOf(songNumber))?.dy).toBeLessThan(0);
+    }
+    expect(upward.find((slide) => slide.songKey === keyOf(5))).toMatchObject({ zIndex: "3" });
+    expect(upward.find((slide) => slide.songKey === keyOf(5))?.dy).toBeGreaterThan(0);
+});
+
+test("with reduced motion, dropping reorders the cards without sliding", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await openSeededBookmark(page, createScrollableResultSongs(6));
+    const cards = page.locator("#resultList > .song-card");
+    await recordCardAnimations(page);
+
+    await startHandleDrag(page, cards.nth(0), [(await getCardPoints(cards.nth(2))).center]);
+    await page.mouse.up();
+
+    await expect.poll(() => readCardTitles(page)).toEqual([
+        "Scroll Song 02", "Scroll Song 03", "Scroll Song 01", "Scroll Song 04", "Scroll Song 05", "Scroll Song 06"
+    ]);
+    expect(await takeCardAnimations(page)).toEqual([]);
+});
+
+test("the whole card follows the pointer as the drag image", async ({ page }) => {
+    const songs = createScrollableResultSongs(6);
+    await openSeededBookmark(page, songs);
+    const cards = page.locator("#resultList > .song-card");
+    await page.evaluate(() => {
+        window.__knkDragImages = [];
+        const setDragImage = DataTransfer.prototype.setDragImage;
+        DataTransfer.prototype.setDragImage = function (this: DataTransfer, image, x, y) {
+            window.__knkDragImages?.push({
+                songKey: image instanceof HTMLElement ? image.dataset.songKey ?? "" : "",
+                isCard: image instanceof HTMLElement && image.classList.contains("song-card"),
+                x,
+                y
+            });
+            setDragImage.call(this, image, x, y);
+        };
+    });
+    const sourceBox = await cards.nth(0).boundingBox();
+    if (!sourceBox) throw new Error("The source card has no bounding box");
+
+    await startHandleDrag(page, cards.nth(0), [(await getCardPoints(cards.nth(2))).center]);
+    const dragImages = await page.evaluate(() => window.__knkDragImages ?? []);
+    await page.mouse.up();
+
+    // ハンドルはカードの右上にあるので、掴んだ位置を基準点にすると、像の基準点も右上寄りになる。
+    expect(dragImages).toHaveLength(1);
+    expect(dragImages[0]).toMatchObject({ songKey: songs[0].songKey, isCard: true });
+    expect(dragImages[0].x).toBeGreaterThan(sourceBox.width / 2);
+    expect(dragImages[0].x).toBeLessThanOrEqual(sourceBox.width);
+    expect(dragImages[0].y).toBeGreaterThanOrEqual(0);
+    expect(dragImages[0].y).toBeLessThan(sourceBox.height / 2);
+});

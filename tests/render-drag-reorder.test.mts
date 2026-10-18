@@ -4,6 +4,7 @@ import { createBookmarkDragReorderController } from "../app/lib/render/drag-reor
 import { createBookmarkReorderFixture } from "./support/bookmark-reorder-fixture.mts";
 import {
     createDataTransferMock,
+    getFakeElement,
     installFakeDom,
     makeRenderRow
 } from "./test-helpers.mts";
@@ -322,6 +323,30 @@ test("render drag reorder: drag end forgets the dragged song", () => {
         controller.onDrop(createDragEvent(target.body));
         assert.deepEqual(data.currentResults.map((row) => row.songKey), ["a", "b", "c"]);
         assert.equal(calls.save, 0);
+    } finally {
+        cleanup();
+    }
+});
+
+test("render drag reorder: drag start uses the whole card as the drag image at the grabbed point", () => {
+    const cleanup = installFakeDom();
+    try {
+        const { controller } = createDragHarness();
+        const { card } = createCardWithChildren("a");
+        getFakeElement(card)._rect = { top: 50, bottom: 150, left: 100, right: 400, width: 300, height: 100 };
+        const handle = document.createElement("div");
+        card.appendChild(handle);
+        const dragImages: { image: Element; x: number; y: number }[] = [];
+        const dataTransfer = {
+            ...createDataTransferMock(),
+            setDragImage(image: Element, x: number, y: number) {
+                dragImages.push({ image, x, y });
+            }
+        };
+
+        controller.onDragStart({ currentTarget: handle, clientX: 370, clientY: 60, dataTransfer, preventDefault() {} });
+
+        assert.deepEqual(dragImages, [{ image: card, x: 270, y: 10 }]);
     } finally {
         cleanup();
     }
