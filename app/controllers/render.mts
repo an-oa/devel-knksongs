@@ -162,6 +162,7 @@ export function createRenderController({
 
         dragHandle.addEventListener("dragstart", dragReorderController.onDragStart);
         dragHandle.addEventListener("dragend", dragReorderController.onDragEnd);
+        card.addEventListener("dragenter", dragReorderController.onDragEnter);
         card.addEventListener("dragover", dragReorderController.onDragOver);
         card.addEventListener("dragleave", dragReorderController.onDragLeave);
         card.addEventListener("drop", dragReorderController.onDrop);

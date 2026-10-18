@@ -14,6 +14,7 @@ type BookmarkDragDataTransfer = {
 type BookmarkDragEvent = {
     currentTarget?: EventTarget | null;
     target?: EventTarget | null;
+    relatedTarget?: EventTarget | null;
     dataTransfer: BookmarkDragDataTransfer | null;
     preventDefault: () => void;
 };
@@ -44,10 +45,13 @@ export function createBookmarkDragReorderController(input: BookmarkDragReorderCo
         moveSongInActiveBookmark,
         onSaveFailure
     } = input;
+    /** ハンドルから始めた並べ替えのドラッグの間だけ、移動元の曲キーを持つ。 */
+    let draggedSongKey: string | null = null;
 
     /**
-     * ドラッグ開始時に対象曲キーを dataTransfer へ保存する。
-     * @param {BookmarkDragEvent} event
+     * ドラッグ開始時に移動元の曲キーを覚え、dataTransfer にも保存する。
+     * ドロップ先の枠は、ここで覚えた並べ替えのドラッグにだけ付ける。
+     * @param event ハンドルで始まった dragstart のイベント
      */
     function onDragStart(event: BookmarkDragEvent): void {
         if (!data.activeBookmark || !event.dataTransfer) {
@@ -65,14 +69,16 @@ export function createBookmarkDragReorderController(input: BookmarkDragReorderCo
         }
         event.dataTransfer.setData("text/plain", songKey);
         event.dataTransfer.effectAllowed = "move";
+        draggedSongKey = songKey;
         card.classList.add("dragging");
     }
 
     /**
-     * ドラッグ終了時の一時スタイルを解除する。
-     * @param {BookmarkDragEvent} event
+     * ドラッグ終了時に、覚えていた移動元と一時スタイルを解除する。
+     * @param event ハンドルで終わった dragend のイベント
      */
     function onDragEnd(event: BookmarkDragEvent): void {
+        draggedSongKey = null;
         const handle = event.currentTarget;
         if (!isHtmlElement(handle)) return;
         const card = getSongCardFromTarget(handle);
@@ -82,36 +88,44 @@ export function createBookmarkDragReorderController(input: BookmarkDragReorderCo
     }
 
     /**
-     * ドロップ候補カードのハイライトを更新する。
-     * @param {BookmarkDragEvent} event
+     * ブックマーク表示中のカードでは、dragenter と dragover の既定動作を止めてドロップを受け付ける。
+     * WebKit は dragenter も止めないと、カード内の別の要素へ入った直後に離したドロップを受け付けない。
+     * ハンドル以外から始めたドラッグ（タイトルのリンクや外部のファイルなど）も、これまでどおり受け止めて何もしない。
+     * 枠は、ハンドルから始めた並べ替えのドラッグで、移動元以外のカードにだけ付ける。
+     * @param event dragenter または dragover のイベント
      */
-    function onDragOver(event: BookmarkDragEvent): void {
+    function acceptDropOnCard(event: BookmarkDragEvent): void {
         if (!data.activeBookmark) return;
         event.preventDefault();
         const targetCard = getSongCardFromTarget(event.target);
         if (!isHtmlElement(targetCard)) return;
+        if (draggedSongKey === null || targetCard.dataset.songKey === draggedSongKey) return;
         targetCard.classList.add("drag-over");
     }
 
     /**
-     * ドロップ候補カードのハイライトを解除する。
-     * @param {BookmarkDragEvent} event
+     * カードの外へ出たときだけ、ドロップ先の枠を外す。
+     * カード内の子要素の境目を越えるときも dragleave が届くので、移る先が同じカードの中なら枠を保つ。
+     * @param event dragleave のイベント。relatedTarget は移る先の要素
      */
     function onDragLeave(event: BookmarkDragEvent): void {
         const targetCard = getSongCardFromTarget(event.target);
         if (!isHtmlElement(targetCard)) return;
+        const enteredElement = event.relatedTarget;
+        if (isHtmlElement(enteredElement) && targetCard.contains(enteredElement)) return;
         targetCard.classList.remove("drag-over");
     }
 
     /**
-     * 移動元・移動先の曲キーをブックマーク操作 API へ通知する。
-     * @param {BookmarkDragEvent} event
+     * 覚えていた移動元と、ドロップ先の曲キーをブックマーク操作 API へ通知する。
+     * 並べ替えのドラッグでなければ、ドロップを受け止めるだけで何もしない。
+     * @param event ドロップ先のカードで起きた drop のイベント
      */
     function onDrop(event: BookmarkDragEvent): void {
-        const bookmarkId = data.activeBookmark;
-        if (!bookmarkId || !event.dataTransfer) return;
+        if (!data.activeBookmark) return;
         event.preventDefault();
-        const draggedKey = event.dataTransfer.getData("text/plain");
+        const draggedKey = draggedSongKey;
+        draggedSongKey = null;
         const targetCard = getSongCardFromTarget(event.target);
         if (!isHtmlElement(targetCard)) return;
         targetCard.classList.remove("drag-over");
@@ -121,14 +135,14 @@ export function createBookmarkDragReorderController(input: BookmarkDragReorderCo
         const saveResult = moveSongInActiveBookmark(draggedKey, targetKey);
         if (saveResult.ok === false) {
             onSaveFailure(saveResult);
-            return;
         }
     }
 
     return {
         onDragStart,
         onDragEnd,
-        onDragOver,
+        onDragEnter: acceptDropOnCard,
+        onDragOver: acceptDropOnCard,
         onDragLeave,
         onDrop
     };

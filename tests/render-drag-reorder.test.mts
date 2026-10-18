@@ -199,3 +199,130 @@ test("render drag reorder: missing drag data leaves bookmark order unchanged", (
         cleanup();
     }
 });
+
+/** 曲キーを持つカードと、その中のタイトル・本文の要素を作る。 */
+function createCardWithChildren(songKey: string) {
+    const card = document.createElement("div");
+    card.className = "song-card";
+    card.dataset.songKey = songKey;
+    const title = document.createElement("a");
+    const body = document.createElement("div");
+    card.append(title, body);
+    document.body.appendChild(card);
+    return { card, title, body };
+}
+
+/** preventDefault が呼ばれたかを記録する drag イベントを作る。 */
+function createDragEvent(target: EventTarget, relatedTarget: EventTarget | null = null) {
+    const event = {
+        target,
+        relatedTarget,
+        dataTransfer: createDataTransferMock(),
+        prevented: false,
+        preventDefault() {
+            event.prevented = true;
+        }
+    };
+    return event;
+}
+
+/** 移動元カードのハンドルからドラッグを始める。 */
+function startDragFrom(controller: ReturnType<typeof createDragHarness>["controller"], card: HTMLElement) {
+    const handle = document.createElement("div");
+    card.appendChild(handle);
+    controller.onDragStart({
+        currentTarget: handle,
+        dataTransfer: createDataTransferMock(),
+        preventDefault() {}
+    });
+    return handle;
+}
+
+test("render drag reorder: dragenter and dragover accept the drop and outline only other cards", () => {
+    const cleanup = installFakeDom();
+    try {
+        const { controller } = createDragHarness();
+        const source = createCardWithChildren("a");
+        const target = createCardWithChildren("c");
+        startDragFrom(controller, source.card);
+
+        const enterTarget = createDragEvent(target.title);
+        controller.onDragEnter(enterTarget);
+        assert.equal(enterTarget.prevented, true);
+        assert.equal(target.card.classList.contains("drag-over"), true);
+
+        const overSource = createDragEvent(source.body);
+        controller.onDragOver(overSource);
+        assert.equal(overSource.prevented, true);
+        assert.equal(source.card.classList.contains("drag-over"), false);
+    } finally {
+        cleanup();
+    }
+});
+
+test("render drag reorder: moving between elements of the same card keeps the outline", () => {
+    const cleanup = installFakeDom();
+    try {
+        const { controller } = createDragHarness();
+        const source = createCardWithChildren("a");
+        const target = createCardWithChildren("c");
+        startDragFrom(controller, source.card);
+        controller.onDragEnter(createDragEvent(target.title));
+
+        // 子要素の境目を越えると、離れた要素に dragleave が届く。移る先が同じカードなら枠を保つ。
+        controller.onDragLeave(createDragEvent(target.title, target.body));
+        assert.equal(target.card.classList.contains("drag-over"), true);
+
+        controller.onDragLeave(createDragEvent(target.body, source.body));
+        assert.equal(target.card.classList.contains("drag-over"), false);
+
+        controller.onDragEnter(createDragEvent(target.body));
+        controller.onDragLeave(createDragEvent(target.body, null));
+        assert.equal(target.card.classList.contains("drag-over"), false);
+    } finally {
+        cleanup();
+    }
+});
+
+test("render drag reorder: drags not started from a handle are accepted without an outline or a move", () => {
+    const cleanup = installFakeDom();
+    try {
+        const { data, calls, controller } = createDragHarness();
+        createCardWithChildren("a");
+        const target = createCardWithChildren("c");
+
+        // タイトルのリンクや外部のファイルのドラッグは、ハンドルの dragstart を通らない。
+        const over = createDragEvent(target.title);
+        controller.onDragOver(over);
+        assert.equal(over.prevented, true);
+        assert.equal(target.card.classList.contains("drag-over"), false);
+
+        const drop = createDragEvent(target.title);
+        drop.dataTransfer.setData("text/plain", "a");
+        controller.onDrop(drop);
+        assert.equal(drop.prevented, true);
+        assert.deepEqual(data.currentResults.map((row) => row.songKey), ["a", "b", "c"]);
+        assert.equal(calls.save, 0);
+    } finally {
+        cleanup();
+    }
+});
+
+test("render drag reorder: drag end forgets the dragged song", () => {
+    const cleanup = installFakeDom();
+    try {
+        const { data, calls, controller } = createDragHarness();
+        const source = createCardWithChildren("a");
+        const target = createCardWithChildren("c");
+        const handle = startDragFrom(controller, source.card);
+        controller.onDragEnd({ currentTarget: handle, dataTransfer: null, preventDefault() {} });
+
+        controller.onDragOver(createDragEvent(target.body));
+        assert.equal(target.card.classList.contains("drag-over"), false);
+        controller.onDrop(createDragEvent(target.body));
+        assert.deepEqual(data.currentResults.map((row) => row.songKey), ["a", "b", "c"]);
+        assert.equal(calls.save, 0);
+    } finally {
+        cleanup();
+    }
+});

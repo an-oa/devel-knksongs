@@ -1013,8 +1013,10 @@ body.hide-thumbs .song-card { border-radius: 12px; }
   opacity: 0.5;
 }
 
+/* ドロップ先の枠もカードの枠と同じく outline で内側に描き、付け外しでカードの大きさを変えない。 */
 .song-card.drag-over {
-  border: 2px dashed var(--primary-color);
+  outline: 2px dashed var(--primary-color);
+  outline-offset: -2px;
 }
 
 .drag-handle {
