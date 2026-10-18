@@ -162,6 +162,7 @@ npm run render:brand-assets
 | --- | --- |
 | `update-songs-json.yml` | 1日2回 CSV から曲JSONを生成・検証し、差分があれば `main` へコミット |
 | `ci.yml` | `main` への push / PR で build・検証・型検査・lint・単体テスト |
+| `e2e.yml` | `main` への push / PR で Chromium と WebKit の E2E。deploy の条件には含めない |
 | `deploy-pages.yml` | `main` の CI 成功後に GitHub Pages へ deploy し、公開を確認。失敗時は Issue で通知 |
 
 権限設計、`main` との照合、失敗通知の詳細は [DESIGN.md の CI・デプロイ](DESIGN.md#ciデプロイ) を参照してください。
