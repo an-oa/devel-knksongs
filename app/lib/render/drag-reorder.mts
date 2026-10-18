@@ -5,6 +5,8 @@ import { getSongCards } from "./masonry-layout.mjs";
 
 /** 並べ替えた直後は、ポインタがこの距離だけ動くまで次の並べ替えをしない。 */
 const PREVIEW_POINTER_THRESHOLD_PX = 8;
+/** ドラッグ中にポインタに付いてくる像として使う、透明な要素の id。 */
+const BLANK_DRAG_IMAGE_ID = "blankDragImage";
 
 type BookmarkDragReorderDataState = {
     activeBookmark: string | null;
@@ -50,18 +52,24 @@ function getSongCardFromTarget(target: unknown): HTMLElement | null {
 }
 
 /**
- * ドラッグ中にポインタに付いてくる像を、ハンドルではなくカード全体にする。
- * 掴んだ位置がずれないよう、カードの中で押した位置を像の基準点にする。
+ * ドラッグ中にポインタに付いてくる像を、透明な 1px の要素にして見えなくする。
+ * 移動元のカード自身がポインタの下の枠へ移って落ちる場所を示すので、像も出すと同じカードが二重に見える。
+ * CSP の img-src で data URL の画像は読めないので、styles.css で大きさを決めた中身のない要素を初回に作り、使い回す。
  * @param event ハンドルで始まった dragstart のイベント
- * @param card 移動元のカード
  */
-function setCardDragImage(event: BookmarkDragEvent, card: HTMLElement): void {
+function hideDragImage(event: BookmarkDragEvent): void {
     const dataTransfer = event.dataTransfer;
     if (!dataTransfer || typeof dataTransfer.setDragImage !== "function") return;
-    const rect = card.getBoundingClientRect();
-    const x = Number.isFinite(event.clientX) ? Number(event.clientX) - rect.left : 0;
-    const y = Number.isFinite(event.clientY) ? Number(event.clientY) - rect.top : 0;
-    dataTransfer.setDragImage(card, Math.max(0, x), Math.max(0, y));
+    if (typeof document === "undefined" || !document.body) return;
+    let blank = document.getElementById(BLANK_DRAG_IMAGE_ID);
+    if (!blank) {
+        blank = document.createElement("div");
+        blank.setAttribute("id", BLANK_DRAG_IMAGE_ID);
+        blank.className = "blank-drag-image";
+        blank.setAttribute("aria-hidden", "true");
+        document.body.append(blank);
+    }
+    dataTransfer.setDragImage(blank, 0, 0);
 }
 
 /**
@@ -141,8 +149,7 @@ export function createBookmarkDragReorderController(input: BookmarkDragReorderCo
 
     /**
      * ドラッグ開始時に移動元の曲キーを覚え、dataTransfer にも保存する。
-     * ポインタに付いてくる像はカード全体にし、元の位置のカードは半透明にする。
-     * 像は dragstart の直後にカードから作られるので、像まで薄くならないよう、半透明は styles.css で少し遅らせる。
+     * ポインタに付いてくる像は透明にし、元の位置のカードは半透明にする。
      * @param event ハンドルで始まった dragstart のイベント
      */
     function onDragStart(event: BookmarkDragEvent): void {
@@ -161,7 +168,7 @@ export function createBookmarkDragReorderController(input: BookmarkDragReorderCo
         }
         event.dataTransfer.setData("text/plain", songKey);
         event.dataTransfer.effectAllowed = "move";
-        setCardDragImage(event, card);
+        hideDragImage(event);
         resetDragState();
         draggedSongKey = songKey;
         card.classList.add("dragging");

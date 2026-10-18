@@ -426,37 +426,36 @@ test("with reduced motion, the cards make room without sliding", async ({ page }
     expect(await takeCardAnimations(page)).toEqual([]);
 });
 
-test("the whole card follows the pointer as the drag image", async ({ page }) => {
-    const songs = createScrollableResultSongs(6);
-    await openSeededBookmark(page, songs);
+test("no copy of the card follows the pointer, so the card is not shown twice", async ({ page }) => {
+    await openSeededBookmark(page, createScrollableResultSongs(6));
     const cards = page.locator("#resultList > .song-card");
     await page.evaluate(() => {
         window.__knkDragImages = [];
         const setDragImage = DataTransfer.prototype.setDragImage;
         DataTransfer.prototype.setDragImage = function (this: DataTransfer, image, x, y) {
+            const box = image.getBoundingClientRect();
             window.__knkDragImages?.push({
-                songKey: image instanceof HTMLElement ? image.dataset.songKey ?? "" : "",
-                isCard: image instanceof HTMLElement && image.classList.contains("song-card"),
+                isInCard: image.closest(".song-card") !== null,
+                hasContent: image.childNodes.length > 0,
+                width: box.width,
+                height: box.height,
+                backgroundColor: getComputedStyle(image).backgroundColor,
                 x,
                 y
             });
             setDragImage.call(this, image, x, y);
         };
     });
-    const sourceBox = await cards.nth(0).boundingBox();
-    if (!sourceBox) throw new Error("The source card has no bounding box");
 
+    // 移動元のカード自身がポインタの下の枠へ移るので、ポインタに付いてくる像は中身のない透明な 1px の要素にする。
     await startHandleDrag(page, cards.nth(0), [(await getCardPoints(cards.nth(2))).center]);
+    await expect.poll(() => readCardTitles(page)).toEqual(FIRST_TO_THIRD_TITLES);
     const dragImages = await page.evaluate(() => window.__knkDragImages ?? []);
     await page.mouse.up();
 
-    // ハンドルはカードの右上にあるので、掴んだ位置を基準点にすると、像の基準点も右上寄りになる。
-    expect(dragImages).toHaveLength(1);
-    expect(dragImages[0]).toMatchObject({ songKey: songs[0].songKey, isCard: true });
-    expect(dragImages[0].x).toBeGreaterThan(sourceBox.width / 2);
-    expect(dragImages[0].x).toBeLessThanOrEqual(sourceBox.width);
-    expect(dragImages[0].y).toBeGreaterThanOrEqual(0);
-    expect(dragImages[0].y).toBeLessThan(sourceBox.height / 2);
+    expect(dragImages).toEqual([
+        { isInCard: false, hasContent: false, width: 1, height: 1, backgroundColor: "rgba(0, 0, 0, 0)", x: 0, y: 0 }
+    ]);
 });
 
 for (const colorScheme of ["light", "dark"] as const) {
