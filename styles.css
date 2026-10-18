@@ -1018,16 +1018,21 @@ body.hide-thumbs .song-card { border-radius: 12px; }
 
 /*
  * ドラッグ中、移動元のカードは半透明にする。並べ替えのプレビューでは、このカードが離したときに落ちる場所を示す。
- * ポインタに付いてくる像は dragstart の直後にこのカードから作られるので、像まで薄くならないよう、半透明への切り替えを少し遅らせる。
+ * ポインタに付いてくる像は透明にしている（.blank-drag-image）ので、同じカードが二重には見えない。
  */
-.song-card.dragging {
-  opacity: 0.5;
-  transition: opacity 0s linear 50ms, outline-color 0.15s ease, box-shadow 0.15s ease;
-}
+.song-card.dragging { opacity: 0.5; }
 
-/* 切り替えの時刻をずらすだけで動きではないので、動きを減らす設定でも遅らせる。 */
-@media (prefers-reduced-motion: reduce) {
-  .song-card.dragging { transition: opacity 0s linear 50ms; }
+/*
+ * 並べ替えのドラッグ中に、ポインタに付いてくる像として使う透明な 1px の要素（drag-reorder.mts が作る）。
+ * CSP の img-src で data URL の画像は読めないので、画像の代わりに中身のない要素を使う。
+ */
+.blank-drag-image {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
 }
 
 /*

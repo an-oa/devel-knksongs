@@ -4,7 +4,6 @@ import { createBookmarkDragReorderController, findCardAtPoint } from "../app/lib
 import { createBookmarkReorderFixture } from "./support/bookmark-reorder-fixture.mts";
 import {
     createDataTransferMock,
-    getFakeElement,
     installFakeDom,
     makeRenderRow
 } from "./test-helpers.mts";
@@ -382,13 +381,12 @@ test("render drag reorder: missing drag data leaves bookmark order unchanged", (
     }
 });
 
-test("render drag reorder: drag start uses the whole card as the drag image at the grabbed point", () => {
+test("render drag reorder: drag start hides the drag image so the card is not shown twice", () => {
     const cleanup = installFakeDom();
     try {
         const { controller, cards } = createDragHarness();
         const card = cards.get("a");
         assert.ok(card);
-        getFakeElement(card)._rect = { top: 50, bottom: 150, left: 100, right: 400, width: 300, height: 100 };
         const handle = document.createElement("div");
         card.appendChild(handle);
         const dragImages: { image: Element; x: number; y: number }[] = [];
@@ -398,10 +396,20 @@ test("render drag reorder: drag start uses the whole card as the drag image at t
                 dragImages.push({ image, x, y });
             }
         };
+        const dragEvent = { currentTarget: handle, clientX: 370, clientY: 60, dataTransfer, preventDefault() {} };
 
-        controller.onDragStart({ currentTarget: handle, clientX: 370, clientY: 60, dataTransfer, preventDefault() {} });
+        controller.onDragStart(dragEvent);
+        controller.onDragEnd(dragEvent);
+        controller.onDragStart(dragEvent);
 
-        assert.deepEqual(dragImages, [{ image: card, x: 270, y: 10 }]);
+        // 像はカードではなく透明な要素にし、2 回目のドラッグでも同じ要素を使い回す。
+        assert.equal(dragImages.length, 2);
+        const blank = dragImages[0].image;
+        assert.notEqual(blank, card);
+        assert.equal(dragImages[1].image, blank);
+        assert.deepEqual(dragImages.map(({ x, y }) => [x, y]), [[0, 0], [0, 0]]);
+        assert.ok(blank.classList.contains("blank-drag-image"));
+        assert.equal(document.getElementById("blankDragImage"), blank);
     } finally {
         cleanup();
     }
