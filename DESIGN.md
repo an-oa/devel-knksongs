@@ -444,7 +444,7 @@ IndexedDB保存：
 | --- | --- | --- |
 | `update-songs-json.yml` | 1日2回の定期実行 / 手動実行 | CSVから曲JSONを生成・検証し、差分があれば `main` へコミットする |
 | `ci.yml` | `main` へのpush / PR / 手動実行 | build後に曲JSON検証・型検査・emit検査・lint・単体テストを実行する |
-| `e2e.yml` | `main` へのpush / PR / 手動実行 | Chromium と WebKit で E2E を実行する。deploy の条件には含めない |
+| `e2e.yml` | `main` へのpush / PR / 手動実行 | Chromium と WebKit で E2E を実行する。deploy の条件には含めず、PR のマージの条件にする |
 | `deploy-pages.yml` | `main` のCI成功 | 検証済みcommitをGitHub Pagesへdeployし、公開を確認する |
 
 ### 曲データ更新（update-songs-json.yml）
@@ -462,8 +462,19 @@ IndexedDB保存：
 
 ### E2E（e2e.yml）
 - `npx playwright install --with-deps chromium webkit` でブラウザとOSの依存パッケージを入れ、`npm run test:e2e` を実行する
-- `deploy-pages.yml` は `CI` の完了だけを待つので、E2E の失敗は deploy と曲データの自動更新を止めない
+- `deploy-pages.yml` は `CI` の完了だけを待つので、E2E の失敗は deploy と曲データの自動更新を止めない。
+  アプリの変更は PR を通るので、E2E の成功は `main` の ruleset で PR のマージの条件にする
 - 失敗時は `test-results/` を artifact として7日間残す
+
+### main の ruleset（.github/rulesets/main.json）
+- `main` へは、`ci.yml` の `test` job と `e2e.yml` の `e2e` job が成功した commit だけを入れる。
+  GitHub Actions（integration_id 15368）が報告した check に限り、同じ名前の別の status では満たさない
+- ruleset はリポジトリの設定なので、JSON を変えても自動では反映されない。GitHub の画面で取り込み、
+  画面で変えたときは export した JSON でファイルを置き換える
+- 曲データ更新の App は `main` へ直接 push するので、bypass list に入れる。App の ID は JSON に含めていないため、
+  取り込むときに画面で App を追加する
+- 最新の `main` への追従（strict）は求めない。曲データの自動更新で `main` が1日2回進むので、追従を求めると PR の更新が頻繁に要る
+- 必須の check は job 名で参照するので、`test` / `e2e` の job 名を変えるときは ruleset も同時に直す。直さないと PR をマージできなくなる
 
 ### 公開（deploy-pages.yml）
 - workflow 全体を `queue: max` の concurrency で直列化し、成功した CI の対象を build 前、artifact 生成後、
