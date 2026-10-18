@@ -87,6 +87,17 @@ async function readCardSizes(page: Page) {
 }
 
 /**
+ * 結果カードの枠の色と影を DOM 順に返す。ホバーの表示が付いているかを比べるために使う。
+ * @param page 操作するページ
+ */
+async function readCardFrames(page: Page) {
+    return page.locator("#resultList > .song-card").evaluateAll((cards) => cards.map((card) => {
+        const style = getComputedStyle(card);
+        return { outlineColor: style.outlineColor, boxShadow: style.boxShadow };
+    }));
+}
+
+/**
  * カードの上端・下端・中央の近くの点を返す。
  * @param card 対象のカード
  */
@@ -447,3 +458,31 @@ test("the whole card follows the pointer as the drag image", async ({ page }) =>
     expect(dragImages[0].y).toBeGreaterThanOrEqual(0);
     expect(dragImages[0].y).toBeLessThan(sourceBox.height / 2);
 });
+
+for (const colorScheme of ["light", "dark"] as const) {
+    test(`while dragging, no card shows the hover frame (${colorScheme} theme)`, async ({ page }) => {
+        await page.emulateMedia({ colorScheme });
+        await openSeededBookmark(page, createScrollableResultSongs(6));
+        expect(await page.locator("html").evaluate((element) => element.classList.contains("dark-theme"))).toBe(colorScheme === "dark");
+        const cards = page.locator("#resultList > .song-card");
+        // 一覧の外へポインタを出し、どのカードも指していないときの枠を覚える。
+        await page.mouse.move(640, 20);
+        await expect.poll(async () => (await readCardFrames(page)).every((frame) => frame.boxShadow === "none")).toBe(true);
+        const [restingFrame] = await readCardFrames(page);
+
+        // ドラッグしていなければ、指したカードにはホバーの枠と影が付く。
+        await cards.nth(1).hover();
+        await expect(cards.nth(1)).not.toHaveCSS("box-shadow", "none");
+
+        // ドラッグ中は、移動元にも、よけて動いたカードにも付けない。
+        // Playwright の Chromium はドラッグ中もポインタの動きでホバーを付け替え、よけたカードに枠が残っていた（WebKit は付けない）。
+        await startHandleDrag(page, cards.nth(0), [(await getCardPoints(cards.nth(2))).center]);
+        await expect.poll(() => readCardTitles(page)).toEqual(FIRST_TO_THIRD_TITLES);
+        await expect.poll(() => readCardFrames(page)).toEqual(Array.from({ length: 6 }, () => restingFrame));
+        await page.mouse.up();
+
+        // 離した後は、また付く。
+        await cards.nth(3).hover();
+        await expect(cards.nth(3)).not.toHaveCSS("box-shadow", "none");
+    });
+}

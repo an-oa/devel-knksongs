@@ -1024,6 +1024,15 @@ body.hide-thumbs .song-card { border-radius: 12px; }
 }
 
 /*
+ * 並べ替えのドラッグ中は、どのカードにもホバーの枠と影を付けない。握っているカードは半透明の移動元でわかる。
+ * ブラウザによっては、ドラッグ中もポインタの下のカードにホバーが付き、よけて動いたカードに枠が残って見える。
+ */
+#resultList:has(.song-card.dragging) .song-card:hover {
+  outline-color: var(--border-color);
+  box-shadow: none;
+}
+
+/*
  * 並べ替えのドラッグ中は、動画の上に透明な覆いを重ね、動画の上でもドラッグのイベントが結果一覧に届くようにする。
  * 動画は別オリジンの iframe なので、覆いがないとイベントが iframe に渡り、落とせない。
  * WebKit は iframe に pointer-events: none を指定しても、ドラッグのイベントを iframe に渡すので、覆いで防ぐ。
