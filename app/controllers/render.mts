@@ -104,8 +104,12 @@ export function createRenderController({
     const dragReorderController = createBookmarkDragReorderController({
         data,
         moveSongInActiveBookmark,
-        onSaveFailure: notifyBookmarkSaveError
+        onSaveFailure: notifyBookmarkSaveError,
+        refreshDisplay: () => updateDisplay(),
+        getResultList: () => ui.el.resultList ?? null
     });
+    /** 並べ替えのドラッグを受けるように設定した一覧。描き直すたびに設定し直さないよう覚えておく。 */
+    let reorderListenerTarget: HTMLElement | null = null;
     const resultTailObservationController = createResultTailObserver({
         getSentinel: () => ui.el.resultTailSentinel,
         hasMoreResults,
@@ -162,10 +166,6 @@ export function createRenderController({
 
         dragHandle.addEventListener("dragstart", dragReorderController.onDragStart);
         dragHandle.addEventListener("dragend", dragReorderController.onDragEnd);
-        card.addEventListener("dragenter", dragReorderController.onDragEnter);
-        card.addEventListener("dragover", dragReorderController.onDragOver);
-        card.addEventListener("dragleave", dragReorderController.onDragLeave);
-        card.addEventListener("drop", dragReorderController.onDrop);
 
         rightGroup.append(tags, actionBtn);
         footer.append(leftGroup, rightGroup);
@@ -487,9 +487,8 @@ export function createRenderController({
             entry.card.dataset.songKey = row.songKey;
             const isBookmarkActive = Boolean(data.activeBookmark);
             entry.card.draggable = false;
-            // ドラッグ中に続きを読み込んで描き直しても、移動元の半透明は保つ。ドロップ先の枠は次の dragover で付け直す。
+            // ドラッグ中に並べ替えのプレビューや続きの読み込みで描き直しても、移動元の半透明は保つ。
             entry.card.classList.toggle("dragging", isBookmarkActive && dragReorderController.isDraggingSong(rowKey));
-            entry.card.classList.remove("drag-over");
             entry.dragHandle.hidden = !isBookmarkActive;
             entry.dragHandle.draggable = isBookmarkActive;
 
@@ -592,15 +591,29 @@ export function createRenderController({
 
     /**
      * 描画に必要なコンテナ・結果・モード情報をまとめる。
-     * @returns {DisplayState | null}
+     * 並べ替えのドラッグ中は、移動元を見せている位置へ移した順序で描く。保存されている順序は変えない。
+     * @returns 描画先のコンテナと表示する曲。コンテナがなければ null
      */
     function collectDisplayState(): DisplayState | null {
         const container = ui.el.resultList;
         if (!container) return null;
         return {
             container,
-            results: data.currentResults.slice(0, data.displayLimit)
+            results: dragReorderController.orderForPreview(data.currentResults.slice(0, data.displayLimit))
         };
+    }
+
+    /**
+     * 結果一覧で、並べ替えのドラッグを受けるようにする。
+     * カードの間の隙間で離しても確定できるよう、カードではなく一覧で受ける。
+     * @param container 結果カードを並べた一覧
+     */
+    function listenForReorderDrags(container: HTMLElement): void {
+        if (reorderListenerTarget === container) return;
+        reorderListenerTarget = container;
+        container.addEventListener("dragenter", dragReorderController.onDragEnter);
+        container.addEventListener("dragover", dragReorderController.onDragOver);
+        container.addEventListener("drop", dragReorderController.onDrop);
     }
 
     /**
@@ -610,6 +623,7 @@ export function createRenderController({
      */
     function renderDisplayState(displayState: DisplayState): boolean {
         const { container, results } = displayState;
+        listenForReorderDrags(container);
         if (results.length === 0) {
             renderEmptyResults(container);
             return false;

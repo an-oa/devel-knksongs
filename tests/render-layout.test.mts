@@ -92,6 +92,44 @@ function createRenderCallbacks(input: Partial<Parameters<typeof createRenderCont
     };
 }
 
+/**
+ * 結果一覧のカードに、1 列に並んだときの配置の位置を与える。
+ * 位置は DOM の順番から決まるので、並べ替えのプレビューで描き直して順番が変わると、位置も変わる。
+ * @param list 結果カードを並べた一覧
+ */
+function placeCardsInOneColumn(list: HTMLElement) {
+    for (const node of Array.from(list.children)) {
+        const card = node as HTMLElement;
+        const top = () => (card.parentElement ? Array.from(card.parentElement.children).indexOf(card) : 0) * 110;
+        Object.defineProperties(card, {
+            offsetLeft: { get: () => 0, configurable: true },
+            offsetTop: { get: top, configurable: true },
+            offsetWidth: { get: () => 300, configurable: true },
+            offsetHeight: { get: () => 100, configurable: true }
+        });
+    }
+}
+
+/**
+ * 移動元のハンドルからドラッグを始め、移動先のカードの中央の上を通って、一覧の中で離す。
+ * @param list 結果カードを並べた一覧
+ * @param source 移動元のカード
+ * @param target 移動先のカード
+ */
+function dragCardOnto(
+    list: HTMLElement,
+    source: import("../app/state.types").RenderCardEntry,
+    target: import("../app/state.types").RenderCardEntry
+) {
+    placeCardsInOneColumn(list);
+    const dataTransfer = createDataTransferMock();
+    invokeListener(source.dragHandle, "dragstart", { currentTarget: source.dragHandle, target: source.dragHandle, dataTransfer, preventDefault() {} });
+    const point = { clientX: 150, clientY: target.card.offsetTop + 50 };
+    invokeListener(list, "dragover", { target: target.card, ...point, dataTransfer, preventDefault() {} });
+    invokeListener(list, "drop", { target: target.card, ...point, dataTransfer, preventDefault() {} });
+    invokeListener(source.dragHandle, "dragend", { currentTarget: source.dragHandle, target: source.dragHandle, dataTransfer, preventDefault() {} });
+}
+
 test("render: empty results stop active playback", () => {
     const cleanup = installFakeDom();
     try {
@@ -786,34 +824,12 @@ test("render: drag handle is bookmark-only and reorder works in both directions 
         assert.equal(entryA.dragHandle.hidden, false);
         assert.equal(entryA.dragHandle.draggable, true);
 
-        const transfer1 = createDataTransferMock();
-        invokeListener(entryA.dragHandle, "dragstart", {
-            currentTarget: entryA.dragHandle,
-            target: entryA.dragHandle,
-            dataTransfer: transfer1,
-            preventDefault() {}
-        });
-        invokeListener(entryB.card, "drop", {
-            target: entryB.card,
-            dataTransfer: transfer1,
-            preventDefault() {}
-        });
+        dragCardOnto(ui.el.resultList, entryA, entryB);
         assert.deepEqual(data.currentResults.map((row) => row.songKey), [rowB.songKey, rowA.songKey]);
         assert.deepEqual(data.bookmarks.bm1.songs, [rowB.songKey, rowA.songKey]);
         assert.equal(saveCount, 1);
 
-        const transfer2 = createDataTransferMock();
-        invokeListener(entryA.dragHandle, "dragstart", {
-            currentTarget: entryA.dragHandle,
-            target: entryA.dragHandle,
-            dataTransfer: transfer2,
-            preventDefault() {}
-        });
-        invokeListener(entryB.card, "drop", {
-            target: entryB.card,
-            dataTransfer: transfer2,
-            preventDefault() {}
-        });
+        dragCardOnto(ui.el.resultList, entryA, entryB);
         assert.deepEqual(data.currentResults.map((row) => row.songKey), [rowA.songKey, rowB.songKey]);
         assert.deepEqual(data.bookmarks.bm1.songs, [rowA.songKey, rowB.songKey]);
         assert.equal(saveCount, 2);
@@ -923,18 +939,7 @@ test("render: drag reorder forwards reload-required save failures without changi
         const entryB = ui.render.cardEntriesBySongKey.get(rowB.songKey);
         assert.ok(entryB);
 
-        const transfer = createDataTransferMock();
-        invokeListener(entryA.dragHandle, "dragstart", {
-            currentTarget: entryA.dragHandle,
-            target: entryA.dragHandle,
-            dataTransfer: transfer,
-            preventDefault() {}
-        });
-        invokeListener(entryB.card, "drop", {
-            target: entryB.card,
-            dataTransfer: transfer,
-            preventDefault() {}
-        });
+        dragCardOnto(ui.el.resultList, entryA, entryB);
 
         assert.deepEqual(data.currentResults.map((row) => row.songKey), [rowA.songKey, rowB.songKey]);
         assert.deepEqual(data.bookmarks.bm1.songs, [rowA.songKey, rowB.songKey]);
@@ -997,18 +1002,7 @@ test("render: active playback card can move back left without jumping to the end
             return originalInsertBefore(node, referenceNode);
         };
 
-        const transferRight = createDataTransferMock();
-        invokeListener(entryA.dragHandle, "dragstart", {
-            currentTarget: entryA.dragHandle,
-            target: entryA.dragHandle,
-            dataTransfer: transferRight,
-            preventDefault() {}
-        });
-        invokeListener(entryB.card, "drop", {
-            target: entryB.card,
-            dataTransfer: transferRight,
-            preventDefault() {}
-        });
+        dragCardOnto(ui.el.resultList, entryA, entryB);
         assert.deepEqual(data.currentResults.map((row) => row.songKey), [
             rowB.songKey,
             rowA.songKey,
@@ -1016,18 +1010,7 @@ test("render: active playback card can move back left without jumping to the end
             rowD.songKey
         ]);
 
-        const transferLeft = createDataTransferMock();
-        invokeListener(entryA.dragHandle, "dragstart", {
-            currentTarget: entryA.dragHandle,
-            target: entryA.dragHandle,
-            dataTransfer: transferLeft,
-            preventDefault() {}
-        });
-        invokeListener(entryB.card, "drop", {
-            target: entryB.card,
-            dataTransfer: transferLeft,
-            preventDefault() {}
-        });
+        dragCardOnto(ui.el.resultList, entryA, entryB);
 
         assert.deepEqual(data.currentResults.map((row) => row.songKey), [
             rowA.songKey,
