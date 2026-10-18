@@ -8,6 +8,8 @@ type FakeEvent = {
     relatedTarget?: FakeElement | EventTarget | null;
     key?: string;
     shiftKey?: boolean;
+    clientX?: number;
+    clientY?: number;
     preventDefault?: () => void;
     stopPropagation?: () => void;
     dataTransfer?: ReturnType<typeof createDataTransferMock>;

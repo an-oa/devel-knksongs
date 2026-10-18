@@ -184,10 +184,11 @@ export function estimateMasonryVisibleCardCount(
 
 /**
  * 一覧の直下にある結果カードを DOM 順に返す。
+ * 配置の計算と、並べ替えのスライド（card-reorder-animation.mts）で、同じ数え方を使う。
  * @param container 結果カードを並べた一覧
  * @returns 結果カードの配列
  */
-function getSongCards(container: HTMLElement): HTMLElement[] {
+export function getSongCards(container: HTMLElement): HTMLElement[] {
     return Array.from(container.children).filter((node): node is HTMLElement => (
         isHtmlElement(node) &&
         (node as HTMLElement).classList.contains("song-card")

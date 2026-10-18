@@ -1016,18 +1016,31 @@ body.hide-thumbs .song-card { border-radius: 12px; }
   z-index: 5;
 }
 
+/*
+ * ドラッグ中、移動元のカードは半透明にする。並べ替えのプレビューでは、このカードが離したときに落ちる場所を示す。
+ * ポインタに付いてくる像は dragstart の直後にこのカードから作られるので、像まで薄くならないよう、半透明への切り替えを少し遅らせる。
+ */
 .song-card.dragging {
   opacity: 0.5;
+  transition: opacity 0s linear 50ms, outline-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-/* ドロップ先の枠もカードの枠と同じく outline で内側に描き、付け外しでカードの大きさを変えない。 */
-.song-card.drag-over {
-  outline: 2px dashed var(--primary-color);
-  outline-offset: -2px;
+/* 切り替えの時刻をずらすだけで動きではないので、動きを減らす設定でも遅らせる。 */
+@media (prefers-reduced-motion: reduce) {
+  .song-card.dragging { transition: opacity 0s linear 50ms; }
 }
 
 /*
- * 並べ替えのドラッグ中は、動画の上に透明な覆いを重ね、動画の上でもドラッグのイベントがカードに届くようにする。
+ * 並べ替えのドラッグ中は、どのカードにもホバーの枠と影を付けない。握っているカードは半透明の移動元でわかる。
+ * ブラウザによっては、ドラッグ中もポインタの下のカードにホバーが付き、よけて動いたカードに枠が残って見える。
+ */
+#resultList:has(.song-card.dragging) .song-card:hover {
+  outline-color: var(--border-color);
+  box-shadow: none;
+}
+
+/*
+ * 並べ替えのドラッグ中は、動画の上に透明な覆いを重ね、動画の上でもドラッグのイベントが結果一覧に届くようにする。
  * 動画は別オリジンの iframe なので、覆いがないとイベントが iframe に渡り、落とせない。
  * WebKit は iframe に pointer-events: none を指定しても、ドラッグのイベントを iframe に渡すので、覆いで防ぐ。
  */
