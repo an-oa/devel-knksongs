@@ -80,6 +80,13 @@
   --danger-hover-bg: #3e2723;
 }
 
+/*
+ * ページのスクロールバーの場所は常に確保し、スクロールバーが出ても消えても、結果一覧の幅を変えない。
+ * 幅を取るスクロールバー（Windows など）では、幅が変わると複数列のカードを並べ直して、ページの高さも変わる。
+ * ページの高さが画面とほぼ同じだと、スクロールバーの出入りと並べ直しが繰り返し、表示が振動する。
+ */
+html { scrollbar-gutter: stable; }
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
