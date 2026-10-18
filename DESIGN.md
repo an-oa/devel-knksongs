@@ -16,7 +16,8 @@
   起動moduleはデータ取得を開始してからUIをdynamic importし、同じ初期データPromiseを共有する。
 - データ取得：事前生成JSON（`data/songs.json` / `data/songs-meta.json`）を優先し、唯一のマスターである公開スプレッドシートのCSVを生成元とフォールバックに使う
 - データ生成/公開：GitHub Actions でCSVから派生JSONを生成・検証し、差分を `main` へコミットして CI を起動する。CI 成功後、検証済み commit を deploy 前後に現在の `main` と照合し、公開された `deployment.json` の commit SHA を確認する
-- CI：GitHub Actions で TypeScript emit、曲データ検証、typecheck、lint、unit test、静的 site build を実行する
+- CI：GitHub Actions で TypeScript emit、曲データ検証、typecheck、lint、unit test、静的 site build を実行する。
+  E2E は別の workflow で Chromium と WebKit を使って実行する
 - 実行時の同梱外部ライブラリ依存：なし
 - 埋め込み再生まわりでは YouTube Iframe API を動的に利用し、標準では `youtube.com`、プライバシー強化設定ON時は `youtube-nocookie.com` の埋め込みURLを使う
 - 開発時確認：TypeScript emit 同期、曲データJSON検証、TypeScript noEmit typecheck、ESLint、Node.js 標準 `node:test`、Playwright（Chromium・WebKit）の smoke を利用
@@ -429,12 +430,13 @@ IndexedDB保存：
 - GitHub Pagesの静的HTMLで設定できるmeta方式のため、report-onlyやframe-ancestorsは設定しない
 
 ## CI・デプロイ
-3つのworkflowで、曲データ更新・検証・公開を分担する。
+4つのworkflowで、曲データ更新・検証・公開を分担する。
 
 | Workflow | 起動条件 | 役割 |
 | --- | --- | --- |
 | `update-songs-json.yml` | 1日2回の定期実行 / 手動実行 | CSVから曲JSONを生成・検証し、差分があれば `main` へコミットする |
 | `ci.yml` | `main` へのpush / PR / 手動実行 | build後に曲JSON検証・型検査・emit検査・lint・単体テストを実行する |
+| `e2e.yml` | `main` へのpush / PR / 手動実行 | Chromium と WebKit で E2E を実行する。deploy の条件には含めない |
 | `deploy-pages.yml` | `main` のCI成功 | 検証済みcommitをGitHub Pagesへdeployし、公開を確認する |
 
 ### 曲データ更新（update-songs-json.yml）
@@ -449,6 +451,11 @@ IndexedDB保存：
 
 ### CI（ci.yml）
 - `npm run build` を実行後、曲JSON検証・型検査・emit検査・lint・単体テストの `:raw` コマンドを実行し、生成物を再利用する
+
+### E2E（e2e.yml）
+- `npx playwright install --with-deps chromium webkit` でブラウザとOSの依存パッケージを入れ、`npm run test:e2e` を実行する
+- `deploy-pages.yml` は `CI` の完了だけを待つので、E2E の失敗は deploy と曲データの自動更新を止めない
+- 失敗時は `test-results/` を artifact として7日間残す
 
 ### 公開（deploy-pages.yml）
 - workflow 全体を `queue: max` の concurrency で直列化し、成功した CI の対象を build 前、artifact 生成後、
