@@ -471,8 +471,8 @@ IndexedDB保存：
   GitHub Actions（integration_id 15368）が報告した check に限り、同じ名前の別の status では満たさない
 - ruleset はリポジトリの設定なので、JSON を変えても自動では反映されない。GitHub の画面で取り込み、
   画面で変えたときは export した JSON でファイルを置き換える
-- 曲データ更新の App は `main` へ直接 push するので、bypass list に入れる。App の ID は JSON に含めていないため、
-  取り込むときに画面で App を追加する
+- 曲データ更新の App（`knksongs-song-data-updater`、App ID 4599319）は `main` へ直接 push するので、bypass list に
+  Always allow で入れる。App を作り直したときは、JSON の App ID も直す
 - 最新の `main` への追従（strict）は求めない。曲データの自動更新で `main` が1日2回進むので、追従を求めると PR の更新が頻繁に要る
 - 必須の check は job 名で参照するので、`test` / `e2e` の job 名を変えるときは ruleset も同時に直す。直さないと PR をマージできなくなる
 

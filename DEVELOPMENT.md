@@ -169,8 +169,8 @@ npm run render:brand-assets
 ruleset はリポジトリの設定なので、ファイルを変えても自動では反映されません。次の手順で取り込みます。
 
 1. Settings → Rules → Rulesets → New ruleset → Import a ruleset で、`.github/rulesets/main.json` を選ぶ
-2. Bypass list に、曲データ更新の GitHub App（`knksongs-song-data-updater`）を追加する。
-   App は `main` へ直接 push するので、入れないと自動更新の push が拒否される
+2. Bypass list に、曲データ更新の GitHub App（`knksongs-song-data-updater`）が Always allow で入っていることを確かめる。
+   App は `main` へ直接 push するので、入っていないと自動更新の push が拒否される
 3. Create で保存する
 
 画面で ruleset を変えたときは、Export した JSON で `.github/rulesets/main.json` を置き換えてください。
