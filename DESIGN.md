@@ -19,7 +19,7 @@
 - CI：GitHub Actions で TypeScript emit、曲データ検証、typecheck、lint、unit test、静的 site build を実行する
 - 実行時の同梱外部ライブラリ依存：なし
 - 埋め込み再生まわりでは YouTube Iframe API を動的に利用し、標準では `youtube.com`、プライバシー強化設定ON時は `youtube-nocookie.com` の埋め込みURLを使う
-- 開発時確認：TypeScript emit 同期、曲データJSON検証、TypeScript noEmit typecheck、ESLint、Node.js 標準 `node:test`、Playwright Chromium smoke を利用
+- 開発時確認：TypeScript emit 同期、曲データJSON検証、TypeScript noEmit typecheck、ESLint、Node.js 標準 `node:test`、Playwright（Chromium・WebKit）の smoke を利用
 - 型安全性は `app/**/*.mts` の TypeScript source を中心に高め、生成 JavaScript は `_build/app`（emit）と `_build/browser`（ブラウザbundle）に置く。
   実行時に npm 等の同梱依存は持たず、配布物は HTML/CSS/JavaScript の静的 asset とする。
 
