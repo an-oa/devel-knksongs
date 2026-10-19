@@ -106,8 +106,8 @@ flowchart LR
 | コマンド | 対象 | 設定 |
 | --- | --- | --- |
 | `npm run typecheck:app:raw` | アプリ | `tsconfig.json` |
-| `npm run typecheck:scripts:raw` | Node scripts | `tsconfig.scripts.json` |
-| `npm run typecheck:tests:raw` | Node 単体テストと共通helper | `tsconfig.tests.json` |
+| `npm run typecheck:scripts:raw` | Node scripts | `scripts/tsconfig.json` |
+| `npm run typecheck:tests:raw` | Node 単体テストと共通helper | `tests/tsconfig.json` |
 | `npm run typecheck:e2e:raw` | E2E と共通helper | `tests/e2e/tsconfig.json` |
 
 - すべて `strict: true` です。scripts は Node が型を除去して実行できる構文に限定するため、

@@ -27,15 +27,15 @@
 ## テスト方針（現状）
 - 対象: 検索ロジック、日付フィルタ、ブックマーク検索、描画/再生/保存/サイドバーまわりの回帰
 - 重点ケース: ブックマーク表示時のみ有効なドラッグ並び替えと、並び順の永続化、YouTube 継続再生の失敗復旧
-- 型検査: Node単体テスト・E2Eと共通helperはすべて `.mts` で記述する。アプリは `tsconfig.json`、Node単体テストは `tsconfig.tests.json` でstrictな型チェックを行う。
+- 型検査: Node単体テスト・E2Eと共通helperはすべて `.mts` で記述する。アプリは `tsconfig.json`、Node単体テストは `tests/tsconfig.json` でstrictな型チェックを行う。
   Node scriptsは `.mts` sourceを直接参照し、scriptsと単体テストの型設定は `allowJs: false` とする。
-  scripts本体は `tsconfig.scripts.json` の `noEmit: true`・`strict: true` で、共通helperを含む `scripts/**/*.mts` 全体を検査する。
+  scripts本体は `scripts/tsconfig.json` の `noEmit: true`・`strict: true` で、共通helperを含む `scripts/**/*.mts` 全体を検査する。
   `erasableSyntaxOnly`・`verbatimModuleSyntax` でNode標準の型除去機能に対応し、Node 24.16.0でscriptsを直接実行する。
   scripts用のemitは追加せず、配布確認・通知ジョブは外部パッケージのインストールなしで動作する。
   配布失敗通知は、CLI・Issue更新手順、APIクライアント、通知状態の判定に分ける。APIクライアントは共通のページ取得ループに各応答形式の検証を渡す。
   Node直接実行のテストはscripts全体をディレクトリ構造ごとコピーし、ローカルmoduleへの分割と外部パッケージ不要の実行を両立させる。
   曲JSONの生成・検証は `#app/*` を通じ、型チェックではTSソース、実行時には生成JavaScriptを読む。
-  `package.json` の `imports` に参照先を集約し、`scripts/tsconfig.json` でエディターにも同じ検査設定を適用する。
+  `package.json` の `imports` に参照先を集約し、エディターも型検査と同じ `scripts/tsconfig.json` を使う。
   E2Eの型設定は `tests/e2e/tsconfig.json` に置き、`typecheck:e2e:raw` を全体のtypecheckへ組み込む。
   E2Eのfixture生成はアプリsourceを直接参照し、ブラウザでは `_site` の配布成果物を検証する。
   `typecheck` と各領域の型検査、TSソースに直接適用するlintは事前build不要で、生成物を更新しない。`test:unit` は、Node scriptsが生成moduleを読むため事前に `build:ts` を実行する。
