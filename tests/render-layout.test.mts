@@ -14,7 +14,6 @@ import {
 import {
     installFakeDom,
     makeRenderRow,
-    createDataTransferMock,
     invokeListener,
     getFakeElement
 } from "./test-helpers.mts";
@@ -111,7 +110,25 @@ function placeCardsInOneColumn(list: HTMLElement) {
 }
 
 /**
+ * 移動元のハンドルを押して、並べ替えのドラッグを始める。
+ * @param source 移動元のカード
+ */
+function pressDragHandle(source: import("../app/state.types").RenderCardEntry) {
+    invokeListener(source.dragHandle, "pointerdown", {
+        currentTarget: source.dragHandle,
+        target: source.dragHandle,
+        pointerId: 1,
+        isPrimary: true,
+        button: 0,
+        clientX: 290,
+        clientY: source.card.offsetTop + 10,
+        preventDefault() {}
+    });
+}
+
+/**
  * 移動元のハンドルからドラッグを始め、移動先のカードの中央の上を通って、一覧の中で離す。
+ * 一覧は画面の左上に置き、ポインタの位置は一覧の中の位置と同じにする。
  * @param list 結果カードを並べた一覧
  * @param source 移動元のカード
  * @param target 移動先のカード
@@ -122,12 +139,12 @@ function dragCardOnto(
     target: import("../app/state.types").RenderCardEntry
 ) {
     placeCardsInOneColumn(list);
-    const dataTransfer = createDataTransferMock();
-    invokeListener(source.dragHandle, "dragstart", { currentTarget: source.dragHandle, target: source.dragHandle, dataTransfer, preventDefault() {} });
-    const point = { clientX: 150, clientY: target.card.offsetTop + 50 };
-    invokeListener(list, "dragover", { target: target.card, ...point, dataTransfer, preventDefault() {} });
-    invokeListener(list, "drop", { target: target.card, ...point, dataTransfer, preventDefault() {} });
-    invokeListener(source.dragHandle, "dragend", { currentTarget: source.dragHandle, target: source.dragHandle, dataTransfer, preventDefault() {} });
+    getFakeElement(list)._rect = { top: 0, bottom: 1000, left: 0, right: 300, width: 300, height: 1000 };
+    document.elementFromPoint = () => list;
+    pressDragHandle(source);
+    const point = { target: list, pointerId: 1, clientX: 150, clientY: target.card.offsetTop + 50 };
+    invokeListener(list, "pointermove", point);
+    invokeListener(list, "pointerup", point);
 }
 
 test("render: empty results stop active playback", () => {
@@ -811,9 +828,11 @@ test("render: drag handle is bookmark-only and reorder works in both directions 
         const normalEntryA = ui.render.cardEntriesBySongKey.get(rowA.songKey);
         assert.ok(normalEntryA);
         assert.equal(normalEntryA.dragHandle.hidden, true);
-        assert.equal(normalEntryA.dragHandle.draggable, false);
         assert.equal(normalEntryA.card.draggable, false);
-        assert.equal(getFakeElement(normalEntryA.card)._events.has("dragstart"), false);
+        // 通常の検索結果では、隠れたハンドルを押しても並べ替えを始めない。
+        pressDragHandle(normalEntryA);
+        assert.equal(normalEntryA.card.classList.contains("dragging"), false);
+        assert.deepEqual([...getFakeElement(ui.el.resultList).capturedPointerIds], []);
 
         data.activeBookmark = "bm1";
         controller.updateDisplay();
@@ -822,7 +841,6 @@ test("render: drag handle is bookmark-only and reorder works in both directions 
         const entryB = ui.render.cardEntriesBySongKey.get(rowB.songKey);
         assert.ok(entryB);
         assert.equal(entryA.dragHandle.hidden, false);
-        assert.equal(entryA.dragHandle.draggable, true);
 
         dragCardOnto(ui.el.resultList, entryA, entryB);
         assert.deepEqual(data.currentResults.map((row) => row.songKey), [rowB.songKey, rowA.songKey]);
@@ -870,12 +888,7 @@ test("render: re-rendering during a bookmark drag keeps the dragged card semi-tr
         controller.updateDisplay();
         const entryA = ui.render.cardEntriesBySongKey.get(rowA.songKey);
         assert.ok(entryA);
-        invokeListener(entryA.dragHandle, "dragstart", {
-            currentTarget: entryA.dragHandle,
-            target: entryA.dragHandle,
-            dataTransfer: createDataTransferMock(),
-            preventDefault() {}
-        });
+        pressDragHandle(entryA);
         assert.equal(entryA.card.classList.contains("dragging"), true);
 
         // ドラッグ中に続きのカードを読み込むと、結果一覧が描き直される。
@@ -886,12 +899,7 @@ test("render: re-rendering during a bookmark drag keeps the dragged card semi-tr
         assert.equal(entryA.card.classList.contains("dragging"), true);
         assert.equal(entryB.card.classList.contains("dragging"), false);
 
-        invokeListener(entryA.dragHandle, "dragend", {
-            currentTarget: entryA.dragHandle,
-            target: entryA.dragHandle,
-            dataTransfer: createDataTransferMock(),
-            preventDefault() {}
-        });
+        invokeListener(ui.el.resultList, "pointerup", { target: ui.el.resultList, pointerId: 1, clientX: 150, clientY: 50 });
         controller.updateDisplay();
         assert.equal(entryA.card.classList.contains("dragging"), false);
     } finally {

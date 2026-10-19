@@ -162,10 +162,8 @@ export function createRenderController({
         dragHandle.className = "drag-handle";
         dragHandle.innerHTML = "⠿";
         dragHandle.hidden = true;
-        dragHandle.draggable = false;
 
-        dragHandle.addEventListener("dragstart", dragReorderController.onDragStart);
-        dragHandle.addEventListener("dragend", dragReorderController.onDragEnd);
+        dragHandle.addEventListener("pointerdown", dragReorderController.onHandlePointerDown);
 
         rightGroup.append(tags, actionBtn);
         footer.append(leftGroup, rightGroup);
@@ -490,7 +488,6 @@ export function createRenderController({
             // ドラッグ中に並べ替えのプレビューや続きの読み込みで描き直しても、移動元の半透明は保つ。
             entry.card.classList.toggle("dragging", isBookmarkActive && dragReorderController.isDraggingSong(rowKey));
             entry.dragHandle.hidden = !isBookmarkActive;
-            entry.dragHandle.draggable = isBookmarkActive;
 
             updateCardFromRow(entry, results[i], i);
             nextEntriesBySongKey.set(rowKey, entry);
@@ -604,16 +601,17 @@ export function createRenderController({
     }
 
     /**
-     * 結果一覧で、並べ替えのドラッグを受けるようにする。
-     * カードの間の隙間で離しても確定できるよう、カードではなく一覧で受ける。
+     * 結果一覧で、並べ替えのドラッグのポインタを受けるようにする。
+     * ドラッグの間は一覧がポインタをキャプチャするので、カードの間の隙間や一覧の外のイベントも一覧に届く。
      * @param container 結果カードを並べた一覧
      */
     function listenForReorderDrags(container: HTMLElement): void {
         if (reorderListenerTarget === container) return;
         reorderListenerTarget = container;
-        container.addEventListener("dragenter", dragReorderController.onDragEnter);
-        container.addEventListener("dragover", dragReorderController.onDragOver);
-        container.addEventListener("drop", dragReorderController.onDrop);
+        container.addEventListener("pointermove", dragReorderController.onListPointerMove);
+        container.addEventListener("pointerup", dragReorderController.onListPointerUp);
+        container.addEventListener("pointercancel", dragReorderController.onListPointerCancel);
+        container.addEventListener("lostpointercapture", dragReorderController.onListPointerCancel);
     }
 
     /**
