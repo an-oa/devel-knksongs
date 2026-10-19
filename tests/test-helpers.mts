@@ -10,9 +10,11 @@ type FakeEvent = {
     shiftKey?: boolean;
     clientX?: number;
     clientY?: number;
+    pointerId?: number;
+    isPrimary?: boolean;
+    button?: number;
     preventDefault?: () => void;
     stopPropagation?: () => void;
-    dataTransfer?: ReturnType<typeof createDataTransferMock>;
 };
 
 type FakeTimeout = {
@@ -126,6 +128,8 @@ class FakeElement extends FakeEventTarget {
     _clientHeight?: number;
     _clientWidth?: number;
     _rect?: Pick<DOMRectReadOnly, "top" | "bottom" | "left" | "right" | "width" | "height">;
+    /** キャプチャしているポインタの id。キャプチャの開始と解除をテストで確かめるために記録する。 */
+    capturedPointerIds = new Set<number>();
 
     constructor(tagName = "div") {
         super();
@@ -317,6 +321,16 @@ class FakeElement extends FakeEventTarget {
 
     /** スクロール要求の差し替え先。 */
     scrollTo(options?: ScrollToOptions) { void options; }
+
+    /** ポインタのキャプチャを記録する。 */
+    setPointerCapture(pointerId: number) {
+        this.capturedPointerIds.add(pointerId);
+    }
+
+    /** ポインタのキャプチャの記録を外す。 */
+    releasePointerCapture(pointerId: number) {
+        this.capturedPointerIds.delete(pointerId);
+    }
 
     /** 属性値を文字列として記録する。 */
     setAttribute(name: string, value: unknown) {
@@ -534,6 +548,12 @@ export function installFakeDom() {
         /** head と body から id が一致する要素を探す。 */
         getElementById(id: string) {
             return findElementById(head, id) || findElementById(body, id);
+        },
+        /** モックは配置を持たないので、位置にある要素は見つからない。位置を扱うテストでは差し替える。 */
+        elementFromPoint(x: number, y: number): FakeElement | null {
+            void x;
+            void y;
+            return null;
         }
     });
 
@@ -608,22 +628,6 @@ export function makeRenderRow(input: Pick<Song, "songKey"> & Partial<Pick<Song,
         // 描画用の曲には従来どおり再生終了時刻を指定しない。
         endSeconds: null
     });
-}
-
-/** ドラッグ操作で受け渡す文字列を記録する。 */
-export function createDataTransferMock() {
-    const store = new Map<string, string>();
-    return {
-        effectAllowed: "none",
-        /** 種別ごとのデータを文字列として記録する。 */
-        setData(type: string, value: string) {
-            store.set(String(type), String(value));
-        },
-        /** 記録済みデータ、または空文字列を返す。 */
-        getData(type: string) {
-            return store.get(String(type)) || "";
-        }
-    };
 }
 
 /** listener の存在を確認して呼び、非同期 handler の完了も待てるよう戻り値を返す。 */

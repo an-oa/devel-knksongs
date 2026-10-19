@@ -219,13 +219,12 @@ test("the cards make room for the dragged card before it is dropped", async ({ p
     await expect.poll(() => readSavedSongKeys(page)).toEqual([1, 2, 0, 3, 4, 5].map((index) => songs[index].bookmarkSongKey));
 });
 
-test("a drop right after entering another element of the target card still moves the card", async ({ page }) => {
+test("releasing right after a single move onto the target card still moves the card", async ({ page }) => {
     const songs = createScrollableResultSongs(6);
     await openSeededBookmark(page, songs);
     const cards = page.locator("#resultList > .song-card");
 
-    // 下端の要素から上端の要素へ一度に移り、その直後に離す。
-    // WebKit は、移った先の dragenter を止めていないと、このドロップを受け付けなかった。
+    // 移動先のカードの下端から上端へ一度に移り、その直後に離す。
     const target = await getCardPoints(cards.nth(2));
     await startHandleDrag(page, cards.nth(0), [target.bottom]);
     await page.mouse.move(target.top.x, target.top.y, { steps: 1 });
@@ -248,6 +247,66 @@ test("releasing outside the list puts the cards back without saving", async ({ p
     await expect.poll(() => readCardTitles(page)).toEqual(ORIGINAL_TITLES);
     expect(await readSavedSongKeys(page)).toEqual(songs.map((song) => song.bookmarkSongKey));
     await expect(page.locator("#resultList > .song-card.dragging")).toHaveCount(0);
+});
+
+test("releasing over the header after scrolling down puts the cards back without saving", async ({ page }) => {
+    await page.setViewportSize({ width: 393, height: 851 });
+    const songs = createScrollableResultSongs(60);
+    await openSeededBookmark(page, songs);
+    const header = page.locator(".header");
+    // 下へスクロールしてから少し戻し、隠れたヘッダーを出す。一覧の上端は画面の上へ出て、一覧の枠がヘッダーの下にも広がる。
+    await page.evaluate(() => window.scrollTo(0, 960));
+    await expect(header).toHaveClass(/is-auto-hidden/);
+    await page.evaluate(() => window.scrollBy(0, -20));
+    await expect(header).not.toHaveClass(/is-auto-hidden/);
+    await expect.poll(async () => (await header.boundingBox())?.y).toBe(0);
+    const headerBox = await header.boundingBox();
+    if (!headerBox) throw new Error("The header has no bounding box");
+    expect(await page.locator("#resultList").evaluate((list) => list.getBoundingClientRect().top)).toBeLessThan(0);
+    const keysBefore = await readCardKeys(page);
+    const savedBefore = await readSavedSongKeys(page);
+
+    // ヘッダーの下に見えているカードから、次のカードへ運び、ヘッダーの上で離す。
+    const cards = page.locator("#resultList > .song-card");
+    const sourceIndex = await cards.evaluateAll((elements, headerBottom) => elements.findIndex((card) => (
+        card.getBoundingClientRect().top > headerBottom + 10
+    )), headerBox.y + headerBox.height);
+    expect(sourceIndex).toBeGreaterThan(0);
+    await startHandleDrag(page, cards.nth(sourceIndex), [(await getCardPoints(cards.nth(sourceIndex + 1))).center]);
+    await expect.poll(() => readCardKeys(page)).not.toEqual(keysBefore);
+    await page.mouse.move(headerBox.x + headerBox.width / 2, headerBox.y + headerBox.height / 2, { steps: 8 });
+    await page.mouse.up();
+
+    await expect.poll(() => readCardKeys(page)).toEqual(keysBefore);
+    expect(await readSavedSongKeys(page)).toEqual(savedBefore);
+    await expect(page.locator("#resultList > .song-card.dragging")).toHaveCount(0);
+});
+
+test("scrolling with the wheel during the drag carries the card to the card now under the pointer", async ({ page }) => {
+    await page.setViewportSize({ width: 393, height: 851 });
+    const songs = createScrollableResultSongs(60);
+    await openSeededBookmark(page, songs);
+    const cards = page.locator("#resultList > .song-card");
+    const pointer = (await getCardPoints(cards.nth(2))).center;
+    await startHandleDrag(page, cards.nth(0), [pointer]);
+    await expect.poll(async () => (await readCardKeys(page)).indexOf(songs[0].songKey)).toBe(2);
+    await waitForCardSlides(page);
+
+    // ポインタを止めたまま、ホイールでスクロールする。ポインタの下に来たカードの枠へ、移動元が移る。
+    await page.mouse.wheel(0, 550);
+    await waitForScrollToSettle(page);
+    await expect.poll(() => page.evaluate(({ x, y }) => {
+        const card = document.elementFromPoint(x, y)?.closest(".song-card");
+        return card instanceof HTMLElement ? card.dataset.songKey : "";
+    }, pointer)).toBe(songs[0].songKey);
+    const shownIndex = (await readCardKeys(page)).indexOf(songs[0].songKey);
+    expect(shownIndex).toBeGreaterThan(2);
+
+    await page.mouse.up();
+    await expect.poll(async () => {
+        const savedKeys = await readSavedSongKeys(page);
+        return Array.isArray(savedKeys) ? savedKeys.indexOf(songs[0].bookmarkSongKey) : -1;
+    }).toBe(shownIndex);
 });
 
 test("releasing in the gap between cards keeps the order shown during the drag", async ({ page }) => {
@@ -333,7 +392,7 @@ test("dropping onto the video of a playing card moves the card and keeps the vid
     const video = playingCard.locator("iframe");
     await expect(video).toBeVisible();
 
-    // 動画は別オリジンの iframe なので、ドラッグ中もイベントを受け取ると、動画の上では一覧に届かなかった。
+    // 動画は別オリジンの iframe なので、動画の上のポインタのイベントが一覧に届かないと、動画の上で並べ替えられない。
     const videoBox = await video.boundingBox();
     if (!videoBox) throw new Error("The video has no bounding box");
     await startHandleDrag(page, cards.nth(0), [{ x: videoBox.x + videoBox.width / 2, y: videoBox.y + videoBox.height / 2 }]);
@@ -344,25 +403,58 @@ test("dropping onto the video of a playing card moves the card and keeps the vid
     await expect(video).toBeVisible();
 });
 
-test("the dragged card stays semi-transparent while more cards load during the drag", async ({ page }) => {
-    await page.setViewportSize({ width: 393, height: 851 });
+test("holding the card near the bottom edge scrolls the page and loads more cards while it stays semi-transparent", async ({ page }) => {
+    const viewport = { width: 393, height: 851 };
+    await page.setViewportSize(viewport);
     const songs = createScrollableResultSongs(60);
     await openSeededBookmark(page, songs);
     const cards = page.locator("#resultList > .song-card");
     const initialCount = await cards.count();
     expect(initialCount).toBeLessThan(songs.length);
+    const cardsOnFirstScreen = await cards.evaluateAll((elements) => elements.filter((card) => card.getBoundingClientRect().top < window.innerHeight).length);
 
     const source = page.locator('#resultList > .song-card[data-song-key="scroll-archive-01::1"]');
-    const target = await getCardPoints(cards.nth(1));
-    await startHandleDrag(page, cards.nth(0), [target.center]);
+    const center = (await getCardPoints(cards.nth(0))).center;
+    // 画面の下端の近くで止めると、ページが自動でスクロールし、末尾に近づくと続きを読み込む。
+    await startHandleDrag(page, cards.nth(0), [{ x: center.x, y: viewport.height - 5 }]);
     await expect(source).toHaveClass(/dragging/);
-
-    // ブラウザがドラッグ中に画面の端で自動スクロールしたときと同じく、末尾まで送って続きを読み込ませる。
-    await page.evaluate(() => document.getElementById("resultTailSentinel")?.scrollIntoView());
-    await expect.poll(() => cards.count()).toBeGreaterThan(initialCount);
+    await expect.poll(() => cards.count(), { timeout: 15_000 }).toBeGreaterThan(initialCount);
     await expect(source).toHaveClass(/dragging/);
     await expect(source).toHaveCSS("opacity", "0.5");
+
+    // 画面の中ほどへ戻すとスクロールが止まり、そこで離すと、最初の画面より先の位置へ運べている。
+    await page.mouse.move(center.x, viewport.height / 2, { steps: 4 });
+    const stoppedAt = await page.evaluate(() => window.scrollY);
+    expect(stoppedAt).toBeGreaterThan(0);
+    await page.waitForTimeout(200);
+    expect(await page.evaluate(() => window.scrollY)).toBe(stoppedAt);
     await page.mouse.up();
+
+    const readSavedIndex = async () => {
+        const savedKeys = await readSavedSongKeys(page);
+        return Array.isArray(savedKeys) ? savedKeys.indexOf(songs[0].bookmarkSongKey) : -1;
+    };
+    await expect.poll(readSavedIndex).toBeGreaterThanOrEqual(cardsOnFirstScreen);
+    expect((await readCardKeys(page)).indexOf(songs[0].songKey)).toBe(await readSavedIndex());
+    await expect(source).not.toHaveClass(/dragging/);
+});
+
+test("pressing Esc during the drag puts the cards back without saving", async ({ page }) => {
+    const songs = createScrollableResultSongs(6);
+    await openSeededBookmark(page, songs);
+    const cards = page.locator("#resultList > .song-card");
+
+    await startHandleDrag(page, cards.nth(0), [(await getCardPoints(cards.nth(2))).center]);
+    await expect.poll(() => readCardTitles(page)).toEqual(FIRST_TO_THIRD_TITLES);
+    await page.keyboard.press("Escape");
+
+    await expect.poll(() => readCardTitles(page)).toEqual(ORIGINAL_TITLES);
+    await expect(page.locator("#resultList > .song-card.dragging")).toHaveCount(0);
+    // 取り消した後は、ポインタを動かして離しても並べ替えない。
+    await page.mouse.move(5, 5, { steps: 4 });
+    await page.mouse.up();
+    expect(await readCardTitles(page)).toEqual(ORIGINAL_TITLES);
+    expect(await readSavedSongKeys(page)).toEqual(songs.map((song) => song.bookmarkSongKey));
 });
 
 test("while dragging, the cards slide aside toward the gap in the dragged direction", async ({ page }) => {
@@ -426,36 +518,79 @@ test("with reduced motion, the cards make room without sliding", async ({ page }
     expect(await takeCardAnimations(page)).toEqual([]);
 });
 
-test("no copy of the card follows the pointer, so the card is not shown twice", async ({ page }) => {
+test("dragging the handle neither starts the browser's drag nor selects text", async ({ page }) => {
     await openSeededBookmark(page, createScrollableResultSongs(6));
     const cards = page.locator("#resultList > .song-card");
     await page.evaluate(() => {
-        window.__knkDragImages = [];
-        const setDragImage = DataTransfer.prototype.setDragImage;
-        DataTransfer.prototype.setDragImage = function (this: DataTransfer, image, x, y) {
-            const box = image.getBoundingClientRect();
-            window.__knkDragImages?.push({
-                isInCard: image.closest(".song-card") !== null,
-                hasContent: image.childNodes.length > 0,
-                width: box.width,
-                height: box.height,
-                backgroundColor: getComputedStyle(image).backgroundColor,
-                x,
-                y
-            });
-            setDragImage.call(this, image, x, y);
-        };
+        window.__knkNativeDragStarts = 0;
+        document.addEventListener("dragstart", () => {
+            window.__knkNativeDragStarts = (window.__knkNativeDragStarts ?? 0) + 1;
+        }, true);
     });
 
-    // 移動元のカード自身がポインタの下の枠へ移るので、ポインタに付いてくる像は中身のない透明な 1px の要素にする。
+    // 移動元のカード自身がポインタの下の枠へ移るので、ブラウザのドラッグは使わず、カードの写しも付いてこない。
     await startHandleDrag(page, cards.nth(0), [(await getCardPoints(cards.nth(2))).center]);
     await expect.poll(() => readCardTitles(page)).toEqual(FIRST_TO_THIRD_TITLES);
-    const dragImages = await page.evaluate(() => window.__knkDragImages ?? []);
+    expect(await page.evaluate(() => window.getSelection()?.toString() ?? "")).toBe("");
     await page.mouse.up();
 
-    expect(dragImages).toEqual([
-        { isInCard: false, hasContent: false, width: 1, height: 1, backgroundColor: "rgba(0, 0, 0, 0)", x: 0, y: 0 }
-    ]);
+    expect(await page.evaluate(() => window.__knkNativeDragStarts)).toBe(0);
+    expect(await page.evaluate(() => window.getSelection()?.toString() ?? "")).toBe("");
+});
+
+test.describe("touch", () => {
+    test.use({ hasTouch: true });
+
+    /**
+     * Chromium の DevTools Protocol で、画面に触れた指を動かして離す。
+     * Playwright の touchscreen は tap しかないので、触れたまま動かす操作はこちらで送る。
+     * @param page 操作するページ
+     * @param points 触れる点から離す点まで、順にたどる点
+     * @param options holdMs を指定すると、最初の点で長押ししてから動かす
+     */
+    async function touchDrag(page: Page, points: Point[], options: { holdMs?: number } = {}) {
+        const client = await page.context().newCDPSession(page);
+        const [first, ...rest] = points;
+        await client.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [first] });
+        if (options.holdMs) await page.waitForTimeout(options.holdMs);
+        let previous = first;
+        for (const point of rest) {
+            for (let step = 1; step <= 8; step++) {
+                const x = previous.x + (point.x - previous.x) * step / 8;
+                const y = previous.y + (point.y - previous.y) * step / 8;
+                await client.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x, y }] });
+            }
+            previous = point;
+        }
+        await client.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+        await client.detach();
+    }
+
+    for (const holdMs of [0, 1000]) {
+        test(`a touch drag on the handle moves the card without scrolling the page (hold ${holdMs}ms)`, async ({ page, browserName }) => {
+            test.skip(browserName !== "chromium", "触れたまま動かす操作は Chromium の DevTools Protocol でだけ送れる");
+            await page.setViewportSize({ width: 393, height: 851 });
+            const songs = createScrollableResultSongs(6);
+            await openSeededBookmark(page, songs);
+            const cards = page.locator("#resultList > .song-card");
+            const handleBox = await cards.nth(0).locator(".drag-handle").boundingBox();
+            if (!handleBox) throw new Error("The drag handle has no bounding box");
+            const scrollYBefore = await page.evaluate(() => window.scrollY);
+
+            // 指で上へなぞるとページはふつう下へスクロールするが、ハンドルからなら並べ替えになる。
+            // 長押ししてから動かしても、メニューや文字の選択に変わらない。
+            await touchDrag(page, [
+                { x: handleBox.x + handleBox.width / 2, y: handleBox.y + handleBox.height / 2 },
+                (await getCardPoints(cards.nth(2))).center
+            ], { holdMs });
+
+            await expect.poll(() => readSavedSongKeys(page)).toEqual([1, 2, 0, 3, 4, 5].map((index) => songs[index].bookmarkSongKey));
+            expect(await readCardTitles(page)).toEqual(FIRST_TO_THIRD_TITLES);
+            expect(await page.evaluate(() => window.scrollY)).toBe(scrollYBefore);
+            expect(await page.evaluate(() => window.getSelection()?.toString() ?? "")).toBe("");
+            await expect(page.locator("#resultList > .song-card.dragging")).toHaveCount(0);
+        });
+    }
 });
 
 for (const colorScheme of ["light", "dark"] as const) {

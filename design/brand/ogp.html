@@ -6,38 +6,28 @@
 <style>
   * { box-sizing: border-box; }
   html, body { margin: 0; }
+  /*
+   * 左はライトテーマのヘッダー（白地のホルスタイン柄）、右はダークテーマのヘッダー（赤いチェック柄）に揃え、
+   * 両テーマの折衷にする。上下の帯と仕切りはダークのヘッダー下の線と同じ鐘の金色にする。
+   */
   body {
     width: 1200px;
     height: 630px;
     font-family: "Noto Sans CJK JP", "Noto Sans JP", sans-serif;
     background: #ffc928;
-    color: #1b1b1b;
+    color: #ffffff;
     position: relative;
     overflow: hidden;
   }
-  /* 赤のチェック柄はマフラーのモチーフとして上下の細い帯だけに使う。 */
-  .tartan {
-    position: absolute;
-    left: 0;
-    right: 0;
-    height: 18px;
-    background:
-      repeating-linear-gradient(90deg, rgba(0,0,0,.45) 0 6px, transparent 6px 30px),
-      repeating-linear-gradient(90deg, transparent 0 14px, rgba(255,255,255,.35) 14px 16px, transparent 16px 30px),
-      repeating-linear-gradient(0deg, rgba(0,0,0,.35) 0 4px, transparent 4px 9px),
-      #c62828;
-  }
-  .tartan.top { top: 0; }
-  .tartan.bottom { bottom: 0; }
   .panel {
     position: absolute;
-    top: 18px;
-    bottom: 18px;
+    top: 14px;
+    bottom: 14px;
     left: 0;
     width: 400px;
     background: #fff;
     overflow: hidden;
-    border-right: 6px solid #1b1b1b;
+    border-right: 6px solid #ffc928;
   }
   .panel .spots { position: absolute; inset: 0; width: 100%; height: 100%; }
   .panel .bell {
@@ -48,71 +38,69 @@
     top: 50%;
     transform: translate(-50%, -50%);
   }
+  /* styles.css のダークのヘッダーと同じチェック柄を、画像の大きさに合わせて約1.4倍にする。 */
   .wrap {
     position: absolute;
-    top: 18px;
-    bottom: 18px;
-    left: 406px;
+    top: 14px;
+    bottom: 14px;
+    left: 400px;
     right: 0;
-    padding: 64px 64px 44px 60px;
+    padding: 0 64px 0 72px;
     display: flex;
     flex-direction: column;
+    /* タイトルと検索窓は左の鐘と同じ高さを中心に置く。 */
+    justify-content: center;
+    background:
+      repeating-linear-gradient(90deg, rgba(0,0,0,.28) 0 14px, transparent 14px 64px),
+      repeating-linear-gradient(0deg, rgba(0,0,0,.22) 0 11px, transparent 11px 45px),
+      repeating-linear-gradient(90deg, transparent 0 31px, rgba(255,255,255,.14) 31px 34px, transparent 34px 64px),
+      repeating-linear-gradient(0deg, transparent 0 25px, rgba(255,201,40,.22) 25px 28px, transparent 28px 45px),
+      #a61d1d;
   }
+  /*
+   * ヘッダーの文字ロゴと同じく「鐘輝かう」を大きく金色に、「歌サーチ」を小さく添える。
+   * チェック柄の上の文字は、柄の明るい線と重なっても読めるよう影を付ける。
+   */
   .title {
     margin: 0;
-    font-size: 76px;
+    display: flex;
+    flex-direction: column;
     font-weight: 900;
-    line-height: 1.12;
-    letter-spacing: 0.01em;
   }
-  .lead {
-    margin: 22px 0 0;
-    font-size: 30px;
-    font-weight: 700;
-    color: #2b2b2b;
+  .title .main {
+    font-size: 100px;
+    line-height: 1.1;
+    letter-spacing: 0.02em;
+    color: #ffc928;
+    text-shadow: 0 2px 4px rgba(0,0,0,.85), 0 0 12px rgba(0,0,0,.5);
   }
+  .title .sub {
+    margin-top: 4px;
+    font-size: 52px;
+    line-height: 1.2;
+    letter-spacing: 0.12em;
+    text-shadow: 0 2px 6px rgba(0,0,0,.7);
+  }
+  /* 画像は読ませずに見せるものなので、タグや説明文は置かない。検索窓はサイトと同じく例文入りで見せる。 */
   .search {
-    margin-top: 36px;
+    margin-top: 40px;
     height: 78px;
-    border-radius: 14px;
+    border-radius: 999px;
     background: #fff;
-    border: 4px solid #1b1b1b;
+    box-shadow: 0 3px 10px rgba(0,0,0,.3);
     display: flex;
     align-items: center;
     gap: 16px;
-    padding: 0 24px;
+    padding: 0 30px;
     font-size: 29px;
-    color: #4b4b4b;
+    color: #6b665c;
   }
   .search svg { width: 34px; height: 34px; flex: none; }
-  .tags {
-    margin-top: 24px;
-    display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
-  }
-  .tag {
-    font-size: 24px;
-    font-weight: 700;
-    padding: 4px 16px;
-    border-radius: 8px;
-    background: #1b1b1b;
-    color: #fff;
-  }
-  .foot {
-    margin-top: auto;
-    display: flex;
-    justify-content: space-between;
-    font-size: 22px;
-    font-weight: 700;
-    color: #2b2b2b;
-  }
 </style>
 </head>
 <body>
-  <div class="tartan top"></div>
   <div class="panel">
-    <svg class="spots" viewBox="0 0 400 594" preserveAspectRatio="none"><g fill="#1b1b1b">
+    <svg class="spots" viewBox="0 0 400 602" preserveAspectRatio="none"><g fill="#1b1b1b">
       <path d="M-20 -20h170c10 34-12 58-46 66-34 9-46 40-84 36-22-2-24-40-40-102z"/>
       <path d="M300 40c30-14 80 0 110 30v120c-30 16-64 6-78-18-14-22-44-30-46-60-2-30-4-58 14-72z"/>
       <path d="M-20 400c34-18 76 0 90 30 14 30 0 70-18 104-14 26-40 60-72 80z"/>
@@ -122,24 +110,11 @@
     <img class="bell" src="../../public/bell.svg" alt="">
   </div>
   <div class="wrap">
-    <h1 class="title">鐘輝かう<br>歌サーチ</h1>
-    <p class="lead">歌った曲を、曲名・アーティスト名・読みで検索</p>
+    <h1 class="title"><span class="main">鐘輝かう</span><span class="sub">歌サーチ</span></h1>
     <div class="search">
       <svg viewBox="0 0 24 24" fill="none" stroke="#1b1b1b" stroke-width="2.6" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></svg>
       曲名・歌手・読み...
     </div>
-    <div class="tags">
-      <span class="tag">配信</span>
-      <span class="tag">歌みた</span>
-      <span class="tag">ショート</span>
-      <span class="tag">切り抜き</span>
-      <span class="tag">収録</span>
-    </div>
-    <div class="foot">
-      <span>an-oa.github.io/knksongs</span>
-      <span>非公式ファンメイド</span>
-    </div>
   </div>
-  <div class="tartan bottom"></div>
 </body>
 </html>
