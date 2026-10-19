@@ -59,6 +59,17 @@ function setListTop(list: HTMLElement, top: number) {
 }
 
 /**
+ * 画面上の位置が、要素の画面上の枠の中かを返す。
+ * @param element 調べる要素
+ * @param x 画面から見た横の位置
+ * @param y 画面から見た縦の位置
+ */
+function isInsideBox(element: HTMLElement, x: number, y: number) {
+    const rect = element.getBoundingClientRect();
+    return x >= rect.left && x < rect.left + rect.width && y >= rect.top && y < rect.top + rect.height;
+}
+
+/**
  * ドラッグの状態、結果一覧、描き直しと保存の記録を作る。
  * 結果一覧は、描画と同じく並べ替え途中の順序（orderForPreview）で並べ直す。
  * 画面の高さは偽の DOM の 720px で、上端と下端の近く（48px 以内）では端の自動スクロールが始まる。
@@ -95,6 +106,8 @@ function createDragHarness(options: {
     const list = document.createElement("div");
     document.body.appendChild(list);
     setListTop(list, 0);
+    // 位置にある要素は、一覧の枠の中なら一覧、外なら body とする。ヘッダーを重ねるテストでは差し替える。
+    document.elementFromPoint = (x, y) => (isInsideBox(list, x, y) ? list : document.body);
     const cards = new Map<string, HTMLElement>();
     for (const row of data.currentResults) {
         const card = document.createElement("div");
@@ -539,12 +552,12 @@ test("render drag reorder: holding the pointer near the bottom edge scrolls the 
         setListTop(list, 500);
         const scrolls: number[] = [];
         Object.assign(dom.window, {
-            scrollY: 0,
             scrollBy(options: ScrollToOptions) {
                 const step = options.top ?? 0;
                 scrolls.push(step);
-                Object.assign(dom.window, { scrollY: Reflect.get(dom.window, "scrollY") + step });
+                // ブラウザと同じく、ページが動いたら scroll イベントを送る。
                 setListTop(list, list.getBoundingClientRect().top - step);
+                void dom.document.dispatchListeners("scroll", {});
             }
         });
         startDragFrom(controller, cards.get("a"));
@@ -578,7 +591,6 @@ test("render drag reorder: the page stops scrolling once the pointer leaves the 
         setListTop(list, 500);
         const scrolls: number[] = [];
         Object.assign(dom.window, {
-            scrollY: 0,
             scrollBy(options: ScrollToOptions) {
                 scrolls.push(options.top ?? 0);
             }
@@ -592,6 +604,62 @@ test("render drag reorder: the page stops scrolling once the pointer leaves the 
         assert.deepEqual(scrolls, []);
         assert.equal(frames.pendingCount, 0);
         controller.onListPointerUp(pointerAt(600));
+    } finally {
+        frames.cleanup();
+        dom();
+    }
+});
+
+test("render drag reorder: scrolling the page without moving the pointer shows the dragged card under the pointer", () => {
+    const dom = installFakeDom();
+    try {
+        const { data, controller, list, cards } = createDragHarness();
+        startDragFrom(controller, cards.get("a"));
+        // b と c の間の隙間で止める。
+        controller.onListPointerMove(pointerAt(215));
+        assert.deepEqual(readListOrder(list), ["a", "b", "c"]);
+
+        // ホイールで 30px スクロールすると、止めたポインタの下に c が来る。
+        setListTop(list, -30);
+        void dom.document.dispatchListeners("scroll", {});
+        assert.deepEqual(readListOrder(list), ["b", "c", "a"]);
+
+        controller.onListPointerUp(pointerAt(215));
+        assert.deepEqual(data.bookmarks["bookmark-1"].songs, ["song-b", "song-c", "song-a"]);
+        // ドラッグが終わったら、スクロールでは並べ替えない。
+        assert.equal(dom.document._events.has("scroll"), false);
+    } finally {
+        dom();
+    }
+});
+
+test("render drag reorder: releasing over the header after scrolling down puts the cards back", () => {
+    const dom = installFakeDom();
+    const frames = installFakeAnimationFrames();
+    try {
+        const { data, calls, controller, list, cards } = createDragHarness();
+        // スクロールして、一覧の上端が画面の上へ出ている。a -150 から -50、b -40 から 60、c 70 から 170。
+        // 一覧の枠は、画面の上の 64px を覆う固定ヘッダーの下にも広がっている。
+        setListTop(list, -150);
+        const header = document.createElement("header");
+        header.className = "header";
+        getFakeElement(header)._rect = { top: 0, bottom: 64, left: 0, right: 300, width: 300, height: 64 };
+        document.body.appendChild(header);
+        document.elementFromPoint = (x, y) => {
+            if (isInsideBox(header, x, y)) return header;
+            return isInsideBox(list, x, y) ? list : document.body;
+        };
+        startDragFrom(controller, cards.get("a"));
+        controller.onListPointerMove(pointerAt(120));
+        assert.deepEqual(readListOrder(list), ["b", "c", "a"]);
+
+        // ヘッダーの上で離す。一覧の枠の中だが、一覧は見えていないので、元の順序へ戻す。
+        controller.onListPointerUp(pointerAt(30));
+
+        assert.deepEqual(readListOrder(list), ["a", "b", "c"]);
+        assert.deepEqual(data.currentResults.map((row) => row.songKey), ["a", "b", "c"]);
+        assert.equal(calls.save, 0);
+        assert.equal(frames.pendingCount, 0);
     } finally {
         frames.cleanup();
         dom();

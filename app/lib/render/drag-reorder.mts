@@ -56,16 +56,17 @@ function getPointInList(list: HTMLElement, point: ClientPoint): PointInList | nu
 }
 
 /**
- * ポインタが一覧の枠の中にあるかを返す。カードの間の隙間も一覧の中に含める。
+ * ポインタの下に、実際に結果一覧が見えているかを返す。カードの間の隙間も一覧に含める。
+ * スクロールした後は一覧の枠が固定ヘッダーの下にも広がるので、枠ではなく、その位置にある要素で確かめる。
+ * キャプチャ中のイベントの対象は、ポインタの位置にかかわらず一覧になるので、イベントの対象でも確かめられない。
  * @param list 結果カードを並べた一覧
  * @param point 画面から見たポインタの位置
- * @returns 一覧の中なら true
+ * @returns 一覧かその中の要素の上なら true。ヘッダーなど一覧に重なった要素の上や、画面の外なら false
  */
-function isPointerInList(list: HTMLElement, point: ClientPoint): boolean {
-    const pointInList = getPointInList(list, point);
-    if (!pointInList) return false;
-    const rect = list.getBoundingClientRect();
-    return pointInList.x >= 0 && pointInList.y >= 0 && pointInList.x < rect.width && pointInList.y < rect.height;
+function isPointerOverList(list: HTMLElement, point: ClientPoint): boolean {
+    if (!Number.isFinite(point.clientX) || !Number.isFinite(point.clientY)) return false;
+    const element = document.elementFromPoint(point.clientX, point.clientY);
+    return element !== null && list.contains(element);
 }
 
 /**
@@ -111,11 +112,9 @@ export function createBookmarkDragReorderController(input: BookmarkDragReorderCo
     let movedAsideSongKey: string | null = null;
     /** 直前に並べ替えたときのポインタの位置。ポインタが動くまで、次の並べ替えをしない。 */
     let lastPreviewPoint: PointInList | null = null;
-    /** 直前に受け取った、画面から見たポインタの位置。端の自動スクロールで一覧が動いたときに、プレビューをやり直す。 */
+    /** 直前に受け取った、画面から見たポインタの位置。ページがスクロールして一覧が動いたときに、プレビューをやり直す。 */
     let lastClientPoint: ClientPoint | null = null;
-    const autoScroller = createDragAutoScroller(() => {
-        if (lastClientPoint) previewAtPointer(lastClientPoint);
-    });
+    const autoScroller = createDragAutoScroller();
 
     /**
      * 並べ替えのドラッグの状態を、ドラッグしていない状態へ戻す。
@@ -131,6 +130,7 @@ export function createBookmarkDragReorderController(input: BookmarkDragReorderCo
         autoScroller.stop();
         document.removeEventListener("keydown", onDocumentKeyDown);
         document.removeEventListener("contextmenu", preventContextMenu);
+        document.removeEventListener("scroll", onDocumentScroll, true);
     }
 
     /**
@@ -171,6 +171,8 @@ export function createBookmarkDragReorderController(input: BookmarkDragReorderCo
         card.classList.add("dragging");
         document.addEventListener("keydown", onDocumentKeyDown);
         document.addEventListener("contextmenu", preventContextMenu);
+        // ページの scroll は document に、スクロールする要素の scroll は捕捉で受ける。
+        document.addEventListener("scroll", onDocumentScroll, { capture: true, passive: true });
     }
 
     /**
@@ -220,7 +222,7 @@ export function createBookmarkDragReorderController(input: BookmarkDragReorderCo
     function onListPointerUp(event: ListPointerEvent): void {
         if (event.pointerId !== dragPointerId) return;
         const list = getResultList();
-        finishDrag(list !== null && isPointerInList(list, event));
+        finishDrag(list !== null && isPointerOverList(list, event));
     }
 
     /**
@@ -231,6 +233,14 @@ export function createBookmarkDragReorderController(input: BookmarkDragReorderCo
     function onListPointerCancel(event: ListPointerEvent): void {
         if (event.pointerId !== dragPointerId) return;
         finishDrag(false);
+    }
+
+    /**
+     * ドラッグ中にページがスクロールしたら、ポインタの下のカードが変わるので、覚えている画面上の位置でプレビューをやり直す。
+     * 端の自動スクロールも、ホイールやキーボードでのスクロールも、ここで同じく扱う。
+     */
+    function onDocumentScroll(): void {
+        if (lastClientPoint) previewAtPointer(lastClientPoint);
     }
 
     /**

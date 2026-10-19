@@ -548,6 +548,12 @@ export function installFakeDom() {
         /** head と body から id が一致する要素を探す。 */
         getElementById(id: string) {
             return findElementById(head, id) || findElementById(body, id);
+        },
+        /** モックは配置を持たないので、位置にある要素は見つからない。位置を扱うテストでは差し替える。 */
+        elementFromPoint(x: number, y: number): FakeElement | null {
+            void x;
+            void y;
+            return null;
         }
     });
 

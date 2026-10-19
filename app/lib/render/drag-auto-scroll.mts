@@ -27,9 +27,9 @@ export function getAutoScrollStep(clientY: number, edges: VisibleEdges): number 
 /**
  * 並べ替えのドラッグ中、ポインタが画面の上端や下端の近くにある間、ページをフレームごとに少しずつスクロールする。
  * ポインタのイベントで運ぶと、ブラウザは端でのスクロールをしないので、運びたい先が画面の外にあるときに使う。
- * @param onScroll ページがスクロールしたときに呼ぶ。一覧の中のポインタの位置が変わるので、並べ替えのプレビューをやり直す
+ * スクロールした後のプレビューは、ホイールでのスクロールと同じく、並べ替え側が scroll イベントでやり直す。
  */
-export function createDragAutoScroller(onScroll: () => void) {
+export function createDragAutoScroller() {
     /** 端のスクロールを見ている間の、画面から見たポインタの縦の位置。見ていなければ null。 */
     let pointerY: number | null = null;
     /** 予約したアニメーションフレームの id。予約していなければ null。 */
@@ -53,9 +53,7 @@ export function createDragAutoScroller(onScroll: () => void) {
         frameId = null;
         const step = readStep();
         if (step === 0) return;
-        const scrollYBefore = window.scrollY;
         window.scrollBy({ top: step, behavior: "instant" });
-        if (window.scrollY !== scrollYBefore) onScroll();
         frameId = requestAnimationFrame(scrollFrame);
     }
 

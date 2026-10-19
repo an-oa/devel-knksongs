@@ -32,7 +32,7 @@ test("drag auto scroll: a view too short for both edge zones or a missing positi
     assert.equal(getAutoScrollStep(Number.NaN, { top: 0, bottom: 720 }), 0);
 });
 
-test("drag auto scroll: scrolls every frame near the edge and reports only frames that moved the page", () => {
+test("drag auto scroll: scrolls every frame while the pointer stays near the edge", () => {
     const dom = installFakeDom();
     const frames = installFakeAnimationFrames();
     try {
@@ -43,31 +43,29 @@ test("drag auto scroll: scrolls every frame near the edge and reports only frame
         document.body.appendChild(header);
         const scrolls: number[] = [];
         Object.assign(dom.window, {
-            scrollY: 30,
             scrollBy(options: ScrollToOptions) {
-                const step = options.top ?? 0;
-                scrolls.push(step);
-                // ページの先頭より上へはスクロールしない。
-                Object.assign(dom.window, { scrollY: Math.max(0, Reflect.get(dom.window, "scrollY") + step) });
+                scrolls.push(options.top ?? 0);
             }
         });
-        let scrolledCount = 0;
-        const scroller = createDragAutoScroller(() => { scrolledCount += 1; });
+        const scroller = createDragAutoScroller();
 
         // ヘッダーの上（端を越えたところ）にいるので、最も速く上へスクロールする。
+        // ページの先頭で動かなくても、続きを読み込むとまた動けるので、端にいる間はフレームごとに試す。
         scroller.follow(40);
         assert.equal(frames.pendingCount, 1);
         frames.advanceFrame();
         frames.advanceFrame();
-        assert.deepEqual(scrolls, [-16, -16]);
-        assert.equal(scrolledCount, 2);
-
-        // 先頭に着いて動かなくなっても、端にいる間はフレームごとに試す。動かなかったフレームは知らせない。
         frames.advanceFrame();
         assert.deepEqual(scrolls, [-16, -16, -16]);
-        assert.equal(scrolledCount, 2);
         assert.equal(frames.pendingCount, 1);
 
+        // 端の近くを離れると、次のフレームでやめる。
+        scroller.follow(300);
+        frames.advanceFrame();
+        assert.deepEqual(scrolls, [-16, -16, -16]);
+        assert.equal(frames.pendingCount, 0);
+
+        scroller.follow(40);
         scroller.stop();
         assert.equal(frames.pendingCount, 0);
     } finally {
@@ -80,7 +78,7 @@ test("drag auto scroll: following a pointer away from the edges schedules no fra
     const dom = installFakeDom();
     const frames = installFakeAnimationFrames();
     try {
-        const scroller = createDragAutoScroller(() => {});
+        const scroller = createDragAutoScroller();
         scroller.follow(300);
         assert.equal(frames.pendingCount, 0);
         // 予約していないときに止めても、何も起きない。

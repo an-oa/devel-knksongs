@@ -140,6 +140,7 @@ function dragCardOnto(
 ) {
     placeCardsInOneColumn(list);
     getFakeElement(list)._rect = { top: 0, bottom: 1000, left: 0, right: 300, width: 300, height: 1000 };
+    document.elementFromPoint = () => list;
     pressDragHandle(source);
     const point = { target: list, pointerId: 1, clientX: 150, clientY: target.card.offsetTop + 50 };
     invokeListener(list, "pointermove", point);

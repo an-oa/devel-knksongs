@@ -249,6 +249,66 @@ test("releasing outside the list puts the cards back without saving", async ({ p
     await expect(page.locator("#resultList > .song-card.dragging")).toHaveCount(0);
 });
 
+test("releasing over the header after scrolling down puts the cards back without saving", async ({ page }) => {
+    await page.setViewportSize({ width: 393, height: 851 });
+    const songs = createScrollableResultSongs(60);
+    await openSeededBookmark(page, songs);
+    const header = page.locator(".header");
+    // 下へスクロールしてから少し戻し、隠れたヘッダーを出す。一覧の上端は画面の上へ出て、一覧の枠がヘッダーの下にも広がる。
+    await page.evaluate(() => window.scrollTo(0, 960));
+    await expect(header).toHaveClass(/is-auto-hidden/);
+    await page.evaluate(() => window.scrollBy(0, -20));
+    await expect(header).not.toHaveClass(/is-auto-hidden/);
+    await expect.poll(async () => (await header.boundingBox())?.y).toBe(0);
+    const headerBox = await header.boundingBox();
+    if (!headerBox) throw new Error("The header has no bounding box");
+    expect(await page.locator("#resultList").evaluate((list) => list.getBoundingClientRect().top)).toBeLessThan(0);
+    const keysBefore = await readCardKeys(page);
+    const savedBefore = await readSavedSongKeys(page);
+
+    // ヘッダーの下に見えているカードから、次のカードへ運び、ヘッダーの上で離す。
+    const cards = page.locator("#resultList > .song-card");
+    const sourceIndex = await cards.evaluateAll((elements, headerBottom) => elements.findIndex((card) => (
+        card.getBoundingClientRect().top > headerBottom + 10
+    )), headerBox.y + headerBox.height);
+    expect(sourceIndex).toBeGreaterThan(0);
+    await startHandleDrag(page, cards.nth(sourceIndex), [(await getCardPoints(cards.nth(sourceIndex + 1))).center]);
+    await expect.poll(() => readCardKeys(page)).not.toEqual(keysBefore);
+    await page.mouse.move(headerBox.x + headerBox.width / 2, headerBox.y + headerBox.height / 2, { steps: 8 });
+    await page.mouse.up();
+
+    await expect.poll(() => readCardKeys(page)).toEqual(keysBefore);
+    expect(await readSavedSongKeys(page)).toEqual(savedBefore);
+    await expect(page.locator("#resultList > .song-card.dragging")).toHaveCount(0);
+});
+
+test("scrolling with the wheel during the drag carries the card to the card now under the pointer", async ({ page }) => {
+    await page.setViewportSize({ width: 393, height: 851 });
+    const songs = createScrollableResultSongs(60);
+    await openSeededBookmark(page, songs);
+    const cards = page.locator("#resultList > .song-card");
+    const pointer = (await getCardPoints(cards.nth(2))).center;
+    await startHandleDrag(page, cards.nth(0), [pointer]);
+    await expect.poll(async () => (await readCardKeys(page)).indexOf(songs[0].songKey)).toBe(2);
+    await waitForCardSlides(page);
+
+    // ポインタを止めたまま、ホイールでスクロールする。ポインタの下に来たカードの枠へ、移動元が移る。
+    await page.mouse.wheel(0, 550);
+    await waitForScrollToSettle(page);
+    await expect.poll(() => page.evaluate(({ x, y }) => {
+        const card = document.elementFromPoint(x, y)?.closest(".song-card");
+        return card instanceof HTMLElement ? card.dataset.songKey : "";
+    }, pointer)).toBe(songs[0].songKey);
+    const shownIndex = (await readCardKeys(page)).indexOf(songs[0].songKey);
+    expect(shownIndex).toBeGreaterThan(2);
+
+    await page.mouse.up();
+    await expect.poll(async () => {
+        const savedKeys = await readSavedSongKeys(page);
+        return Array.isArray(savedKeys) ? savedKeys.indexOf(songs[0].bookmarkSongKey) : -1;
+    }).toBe(shownIndex);
+});
+
 test("releasing in the gap between cards keeps the order shown during the drag", async ({ page }) => {
     await page.setViewportSize({ width: 393, height: 851 });
     const songs = createScrollableResultSongs(6);
