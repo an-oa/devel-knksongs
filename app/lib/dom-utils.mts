@@ -49,3 +49,13 @@ export function getHeaderHeight(): number {
     const header = document.querySelector(".header");
     return header ? header.getBoundingClientRect().height : 0;
 }
+
+/**
+ * 固定ヘッダーの下端の、画面上の位置を返す。
+ * ヘッダーが自動で隠れている間や隠れる途中は、画面の上へ出た分だけ小さくなる。
+ * @returns ヘッダーの下端。ヘッダーがないか、画面の上へ隠れているときは 0
+ */
+export function getVisibleHeaderBottom(): number {
+    const header = document.querySelector(".header");
+    return header ? Math.max(0, header.getBoundingClientRect().bottom) : 0;
+}
