@@ -90,13 +90,13 @@ feat: move settings into dedicated sidebar panel
 - `app/**/*.mts` は TypeScript source として扱い、Node scriptsは `npm run build:ts` が `_build/app/**/*.mjs` に生成した module を読む。
   曲JSONの生成・検証スクリプトでは `#app/*` を使い、package.json の imports で型チェック時は app/*.mts、実行時は _build/app/*.mjs へ解決する。
   scripts本体は scripts/**/*.mts とし、Node 24.16.0の標準の型除去機能で直接実行する。scripts用のemitやtsxは追加しない。
-  tsconfig.scripts.json の noEmit・strict・erasableSyntaxOnly・verbatimModuleSyntax で検査し、scripts/tsconfig.json が同じ設定をエディターへ提供する。生成型宣言は追加しない。
+  scripts/tsconfig.json の noEmit・strict・erasableSyntaxOnly・verbatimModuleSyntax で検査し、エディターも同じ設定を使う。生成型宣言は追加しない。
 - Node単体テストの `tests/**/*.mts` は `tsx` 経由で `app/**/*.mts` を直接 import する。
   Node scriptsのテストはscripts経由で生成moduleも読むため、`npm run test:unit` は事前に `build:ts` を実行する。
   `npm run typecheck` と各領域の型検査、`npm run lint` は事前 build なしで実行し、生成物を更新しない。
   アプリも strict で型検査し、lintは app/scripts/tests の .mts source を直接対象とする。_build の生成物はlint対象外とする。
   Node scriptsは .mts source を直接参照し、scriptsと単体テストの型設定は allowJs: false とする。
-  テスト用の型宣言は生成せず、tsconfig.tests.json で source を型チェックする。
+  テスト用の型宣言は生成せず、tests/tsconfig.json で source を型チェックする。
 - E2EのTSテストとhelperは `tests/e2e/tsconfig.json` で型チェックする。テスト専用のWindow拡張はE2E内に置く。
   曲fixture生成helperはアプリのTSソースを直接読み、ブラウザは `_site` の配布成果物を検証する。
   ブラウザ用YouTubeモックのTSソースはesbuildでJavaScriptへ変換し、APIの応答として配信する。
@@ -109,7 +109,7 @@ feat: move settings into dedicated sidebar panel
   `app` source tree に `.mjs` が残っていないことを確認する。
 - `tsconfig.build.json` は `app/**/*.mts` だけを emit 対象にし、`allowJs: false` のまま保つ。
   既存 `.mjs` を TypeScript emit 対象へ巻き込むと、入力ファイル上書き防止で失敗しやすい。
-- `npm run build` は静的 asset と TypeScript 生成 module を `_build` へ作り、`.ts` / `.mts` source を含めない。
+- `npm run build` は `public/` の静的 asset と TypeScript 生成 module を `_build` へ作り、`.ts` / `.mts` source を含めない。
 - ブラウザ用URLはbuild時にesbuildの内容ハッシュとCSSのcache busterで決定する。
 - Pages artifact は `_build` の静的asset・browser bundle・曲JSONを `_site` へコピーする。
   `_build/app` はNode tests・scripts用に保ち、配布やURL書き換えの対象にしない。
@@ -121,7 +121,7 @@ feat: move settings into dedicated sidebar panel
 
 ## Verification
 
-- 初回または `node_modules` がない環境では、DEVELOPMENT.md の環境準備に従い
+- 初回または `node_modules` がない環境では、docs/DEVELOPMENT.md の環境準備に従い
   `npm install` を実行してから検証する。
 - JavaScript や型定義を変更したときは、静的解析として `npm run typecheck` と
   `npm run lint` を基本の確認手順として実行する。
@@ -188,12 +188,12 @@ feat: move settings into dedicated sidebar panel
 | Path | Encoding | Line Ending |
 | --- | --- | --- |
 | `AGENTS.md` | UTF-8 BOMなし | LF |
-| `DESIGN.md` | UTF-8 BOMなし | LF |
-| `DEVELOPMENT.md` | UTF-8 BOMなし | LF |
+| `docs/DESIGN.md` | UTF-8 BOMなし | LF |
+| `docs/DEVELOPMENT.md` | UTF-8 BOMなし | LF |
 | `README.md` | UTF-8 BOMなし | LF |
-| `WORKFLOW.md` | UTF-8 BOMなし | LF |
-| `index.html` | UTF-8 BOMなし | LF |
-| `styles.css` | UTF-8 BOMなし | LF |
+| `docs/WORKFLOW.md` | UTF-8 BOMなし | LF |
+| `public/index.html` | UTF-8 BOMなし | LF |
+| `public/styles.css` | UTF-8 BOMなし | LF |
 | `app/**/*.mts` / 生成 `_build/app/**/*.mjs` | UTF-8 BOMなし | LF |
 | `scripts/**/*.mts` | UTF-8 BOMなし | LF |
 | `tests/**/*.mts` / `tests/**/*.d.ts` | UTF-8 BOMなし | LF |

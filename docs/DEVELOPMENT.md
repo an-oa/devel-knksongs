@@ -1,7 +1,7 @@
 # 開発ガイド
 
 鐘輝かう 歌サーチを開発するための手順です。
-利用者向けの説明は [README.md](README.md)、設計の詳細は [DESIGN.md](DESIGN.md) を参照してください。
+利用者向けの説明は [README.md](../README.md)、設計の詳細は [DESIGN.md](DESIGN.md) を参照してください。
 
 ## 目次
 
@@ -62,18 +62,20 @@ build 済みの生成物を再利用したい場合は、対象ソースの変�
 | `npm run test:unit` | Node 単体テスト | `build:ts` | `npm run test:unit:raw` |
 | `npm run test:e2e` | Playwright E2E | `build:pages-artifact`（内部で `build`） | なし |
 
-変更内容ごとの確認手順は [AGENTS.md の Verification](AGENTS.md#verification) にまとめています。
+変更内容ごとの確認手順は [AGENTS.md の Verification](../AGENTS.md#verification) にまとめています。
 
 ## ディレクトリ構成とビルドの流れ
 
 | パス | 内容 |
 | --- | --- |
+| `public/` | `index.html`・`styles.css`・アイコン・OGP 画像。build で site のルートへコピーする |
 | `app/` | アプリの TypeScript source（`.mts`）。`.mjs` は置かない |
 | `scripts/` | build・曲JSON生成・配布確認などの Node scripts（`.mts` を Node で直接実行） |
 | `tests/` | Node 単体テスト。`tests/e2e/` は Playwright E2E |
 | `types/` | 複数 module で共有するドメイン型の ambient 宣言 |
 | `data/` | CSV から生成した `songs.json` / `songs-meta.json` |
 | `design/brand/` | OGP 画像・アイコンの描画元 HTML |
+| `docs/` | 開発ガイド・設計書・作業の進め方 |
 | `_build/` | build 生成物（Git 管理外） |
 | `_site/` | Pages 配布用 artifact（Git 管理外） |
 
@@ -87,7 +89,7 @@ flowchart LR
 ```
 
 - `_build/app` は Node scripts とテスト用です。配布物には含めません。
-- `npm run build` は静的 asset と bundle を `_build` へ作り、`.ts` / `.mts` source は含めません。
+- `npm run build` は `public/` の静的 asset と bundle を `_build` へ作り、`.ts` / `.mts` source は含めません。
   ブラウザ用 bundle は起動処理・UI・共有処理に分割し、`modulepreload` を HTML に生成します。
 - CSS / JavaScript の URL は build 時に内容ハッシュで決まります。曲JSONだけの変更では URL は変わりません。
   明示的にバージョンを変える場合は `DEPLOY_CACHE_BUSTER` 環境変数か `npm run build -- --cache-buster <version>` を使います。
@@ -104,8 +106,8 @@ flowchart LR
 | コマンド | 対象 | 設定 |
 | --- | --- | --- |
 | `npm run typecheck:app:raw` | アプリ | `tsconfig.json` |
-| `npm run typecheck:scripts:raw` | Node scripts | `tsconfig.scripts.json` |
-| `npm run typecheck:tests:raw` | Node 単体テストと共通helper | `tsconfig.tests.json` |
+| `npm run typecheck:scripts:raw` | Node scripts | `scripts/tsconfig.json` |
+| `npm run typecheck:tests:raw` | Node 単体テストと共通helper | `tests/tsconfig.json` |
 | `npm run typecheck:e2e:raw` | E2E と共通helper | `tests/e2e/tsconfig.json` |
 
 - すべて `strict: true` です。scripts は Node が型を除去して実行できる構文に限定するため、
@@ -146,7 +148,7 @@ flowchart LR
 
 ## ブランド画像の生成
 
-`ogp.png`・`apple-touch-icon.png`・`favicon-32.png` は、`design/brand/` の描画元と `favicon.svg` から生成します。
+`public/` の `ogp.png`・`apple-touch-icon.png`・`favicon-32.png` は、`design/brand/` の描画元と `public/favicon.svg` から生成します。
 
 ```sh
 npm run render:brand-assets
@@ -154,7 +156,7 @@ npm run render:brand-assets
 
 - 描画には Playwright の Chromium と OS の日本語フォント（Noto Sans CJK JP）を使います。
   フォントが異なる環境では文字の見た目が変わります。
-- `favicon.svg` は直接編集します。
+- `public/favicon.svg` は直接編集します。
 
 ## CI・デプロイ
 
@@ -181,4 +183,4 @@ ruleset はリポジトリの設定なので、ファイルを変えても自動
 
 - [DESIGN.md](DESIGN.md): 設計書（データフロー、検索ロジック、永続化、CI・デプロイ）
 - [WORKFLOW.md](WORKFLOW.md): 作業の進め方
-- [AGENTS.md](AGENTS.md): コーディング規約、コミット形式、検証手順
+- [AGENTS.md](../AGENTS.md): コーディング規約、コミット形式、検証手順

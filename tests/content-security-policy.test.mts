@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 
 test("CSP permits the initial theme script with its exact hash", async () => {
-    const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+    const html = await readFile(new URL("../public/index.html", import.meta.url), "utf8");
     const policy = html.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/)?.[1];
     assert.ok(policy);
     assert.ok(html.indexOf('http-equiv="Content-Security-Policy"') < html.indexOf("<script>"));

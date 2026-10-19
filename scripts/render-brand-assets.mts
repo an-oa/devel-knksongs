@@ -5,6 +5,7 @@ import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { chromium, type Browser } from "@playwright/test";
 import { resolveProjectPath } from "./lib/paths.mts";
+import { PUBLIC_ASSET_DIR } from "./lib/site-assets.mts";
 
 const BRAND_SOURCE_DIR = "design/brand";
 
@@ -19,7 +20,7 @@ const FAVICON_PNG = { fileName: "favicon-32.png", source: "favicon.svg", size: 3
  * CLI 引数から出力先 directory を読む。
  */
 export function parseArgs(args: string[]): { outputDir: string } {
-    const options = { outputDir: "." };
+    const options = { outputDir: PUBLIC_ASSET_DIR };
     for (let i = 0; i < args.length; i++) {
         const arg = args[i];
         const next = args[i + 1];
@@ -53,7 +54,7 @@ async function renderHtml(browser: Browser, source: string, outputPath: string, 
  */
 async function renderFaviconPng(browser: Browser, outputPath: string): Promise<void> {
     const { size } = FAVICON_PNG;
-    const svg = await readFile(resolve(FAVICON_PNG.source));
+    const svg = await readFile(resolve(PUBLIC_ASSET_DIR, FAVICON_PNG.source));
     const page = await browser.newPage({ viewport: { width: size, height: size }, deviceScaleFactor: 1 });
     try {
         const src = `data:image/svg+xml;base64,${svg.toString("base64")}`;
