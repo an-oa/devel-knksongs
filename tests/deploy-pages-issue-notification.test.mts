@@ -59,6 +59,8 @@ const BASE_CONTEXT = {
     }
 };
 
+const NOTIFICATION_BOT = { login: "github-actions[bot]" };
+
 const CURRENT_DEPLOYMENT_METHODS = {
     async getNewestSupersedingWorkflowRun() { return null; },
     async getBranchSha() {
@@ -245,10 +247,22 @@ test("deploy issue report: records the run marker, attempt, and all job results"
 });
 
 test("deploy issue comments: treat another attempt of the same run as already recorded", () => {
-    const comments = [{ body: createRunMarker("recovery", "12345", "1") }];
+    const comments = [{ body: createRunMarker("recovery", "12345", "1"), user: NOTIFICATION_BOT }];
 
     assert.equal(hasRunNotification("", comments, "recovery", "12345"), true);
     assert.equal(hasRunNotification("", comments, "recovery", "67890"), false);
+});
+
+test("deploy issue comments: ignore run markers posted by anyone but the notification bot", () => {
+    const body = createRunMarker("failure", "12345", "1");
+    const comments = [
+        { body, user: { login: "someone" } },
+        { body, user: null },
+        { body }
+    ];
+
+    assert.equal(hasRunNotification("", comments, "failure", "12345"), false);
+    assert.equal(hasRunNotification(body, comments, "failure", "12345"), true);
 });
 
 test("deploy issue ordering: compares new runs before attempts of the same run", () => {
@@ -501,7 +515,7 @@ test("deploy issue API client: uses the expected Issue paths, methods, and paylo
             ]);
         }
         if (request.method === "GET" && request.path.endsWith("/comments")) {
-            return Response.json([{ body: "existing comment" }]);
+            return Response.json([{ body: "existing comment", user: NOTIFICATION_BOT }]);
         }
         return Response.json({}, { status: request.method === "POST" ? 201 : 200 });
     };
@@ -519,7 +533,9 @@ test("deploy issue API client: uses the expected Issue paths, methods, and paylo
     ]);
     await client.createIssue("failure report", "an-oa");
     await client.addAssignee(7, "an-oa");
-    assert.deepEqual(await client.listComments(7), [{ body: "existing comment" }]);
+    assert.deepEqual(await client.listComments(7), [
+        { body: "existing comment", user: NOTIFICATION_BOT }
+    ]);
     await client.commentIssue(7, "recovery report");
     await client.closeIssue(7);
 
@@ -693,6 +709,42 @@ test("deploy issue update: updates every matching issue when duplicates exist", 
     assert.deepEqual(commented.map(([issueNumber]) => issueNumber), [7, 8]);
 });
 
+test("deploy issue update: still comments when a third party posted the run marker first", async () => {
+    const issue = {
+        number: 12,
+        body: DEPLOYMENT_FAILURE_MARKER,
+        labels: [{ name: DEPLOYMENT_FAILURE_LABEL }]
+    };
+    const commented: number[] = [];
+    const client = {
+        ...CURRENT_DEPLOYMENT_METHODS,
+        async ensureLabel() {},
+        async listOpenIssues() { return [issue]; },
+        async createIssue() { throw new Error("must not create"); },
+        async addAssignee() {},
+        async listComments() {
+            return [{
+                body: createRunMarker("failure", BASE_CONTEXT.runId, "1"),
+                user: { login: "someone" }
+            }];
+        },
+        async commentIssue(issueNumber: number) { commented.push(issueNumber); },
+        async closeIssue() { throw new Error("must not close"); }
+    };
+
+    const state = await updateDeploymentFailureIssue(
+        {
+            ...BASE_CONTEXT,
+            results: { ...BASE_CONTEXT.results, deploy: "failure" }
+        },
+        client,
+        { now: () => new Date("2026-08-28T01:02:03Z") }
+    );
+
+    assert.equal(state, "failure");
+    assert.deepEqual(commented, [12]);
+});
+
 test("deploy issue creation: locates an issue created before a transient response failure", async () => {
     let issues: ManagedIssue[] = [];
     let createCalls = 0;
@@ -749,7 +801,7 @@ test("deploy issue recovery: retries close and avoids duplicate comments across 
         async listOpenIssues() { return [issue]; },
         async createIssue() { throw new Error("must not create"); },
         async addAssignee() { throw new Error("must not assign"); },
-        async listComments() { return [{ body: recoveryMarker }]; },
+        async listComments() { return [{ body: recoveryMarker, user: NOTIFICATION_BOT }]; },
         async commentIssue() { commentCalls++; },
         async closeIssue() {
             closeCalls++;

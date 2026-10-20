@@ -494,6 +494,8 @@ IndexedDB保存：
 ### 配布失敗通知
 - `Deploy Pages` のいずれかの job が失敗または cancel されると、`deploy-pages-failure` label と機械判定用markerを持つ公開 Issue を作成して repository owner へ assign する
 - 同じ障害の未解決 Issue があれば新規作成せず、対象 commit、run URL、各 job の結果、検知時刻をコメントとして追記する
+- 同じ run の通知済み判定は、Issue 本文と `github-actions[bot]` のコメントにある run 単位のmarkerだけで行い、
+  第三者のコメントに含まれるmarkerでは追記や復旧コメントを省略しない
 - その後に Pages deployと公開確認が成功した場合だけ復旧コメントを付けて Issue を閉じ、古い対象の skip では閉じない
 - Issue 更新前に、failureまたはrecoveryの通知を完了した新しい workflow run の有無と現在の `main` SHA を再確認する。
   queued、notify未完了のcancelled、failure/recoveryを生じないskip構成の run だけでは古い通知を抑止しない

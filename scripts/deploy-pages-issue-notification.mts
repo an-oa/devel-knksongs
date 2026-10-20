@@ -2,7 +2,7 @@
 
 import { pathToFileURL } from "node:url";
 import { createGitHubIssueClient } from "./lib/deploy-pages-issue-client.mts";
-import type { ManagedIssue } from "./lib/deploy-pages-issue-client.mts";
+import type { IssueComment, ManagedIssue } from "./lib/deploy-pages-issue-client.mts";
 import {
     DEPLOYMENT_FAILURE_LABEL,
     DEPLOYMENT_FAILURE_MARKER,
@@ -19,6 +19,8 @@ type RetryOptions = {
 
 const DEFAULT_RETRY_ATTEMPTS = 3;
 const DEFAULT_RETRY_DELAY_MS = 2_000;
+// workflowのGITHUB_TOKENで投稿したコメントの投稿者。tokenを切り替える場合は合わせて更新する。
+const NOTIFICATION_COMMENT_AUTHOR = "github-actions[bot]";
 
 /**
  * 指定時間が経過するまで待機する。
@@ -174,16 +176,20 @@ export function selectManagedIssues(issues: ManagedIssue[]): ManagedIssue[] {
 }
 
 /**
- * Issue本文またはコメントに同じworkflow runの通知markerがあるか判定する。
+ * Issue本文または通知botのコメントに同じworkflow runの通知markerがあるか判定する。
+ * 公開Issueには第三者もコメントできるため、marker文字列だけでは通知済みとみなさない。
  */
 export function hasRunNotification(
     issueBody: string | null | undefined,
-    comments: Array<{ body?: string | null }>,
+    comments: IssueComment[],
     kind: "failure" | "recovery",
     runId: string
 ): boolean {
     const markerPrefix = createRunMarkerPrefix(kind, runId);
-    return [issueBody || "", ...comments.map((comment) => comment.body || "")]
+    const notificationBodies = comments
+        .filter((comment) => comment.user?.login === NOTIFICATION_COMMENT_AUTHOR)
+        .map((comment) => comment.body || "");
+    return [issueBody || "", ...notificationBodies]
         .some((body) => body.includes(markerPrefix));
 }
 
