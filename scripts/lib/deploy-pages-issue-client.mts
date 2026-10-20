@@ -8,6 +8,8 @@ import {
 import type { WorkflowRunOrder } from "./deploy-pages-issue-state.mts";
 
 export type ManagedIssue = { number: number, body?: string | null, labels?: Array<string | { name?: string }> };
+// 投稿者は削除済みアカウントではnullになる。
+export type IssueComment = { body?: string | null, user?: { login?: string } | null };
 
 type WorkflowRunSummary = WorkflowRunOrder & { runId: string, status: string };
 
@@ -72,7 +74,7 @@ export function createGitHubIssueClient(options: {
     listOpenIssues: () => Promise<ManagedIssue[]>,
     createIssue: (body: string, assignee: string) => Promise<void>,
     addAssignee: (issueNumber: number, assignee: string) => Promise<void>,
-    listComments: (issueNumber: number) => Promise<Array<{ body?: string | null }>>,
+    listComments: (issueNumber: number) => Promise<IssueComment[]>,
     commentIssue: (issueNumber: number, body: string) => Promise<void>,
     closeIssue: (issueNumber: number) => Promise<void>
 } {
@@ -303,7 +305,7 @@ export function createGitHubIssueClient(options: {
 
         async listComments(issueNumber) {
             // コメント要素の形はGitHub Issue Comments APIの契約に従う。
-            return listAll(`repos/${repositoryPath}/issues/${issueNumber}/comments?per_page=100`) as Promise<Array<{ body?: string | null }>>;
+            return listAll(`repos/${repositoryPath}/issues/${issueNumber}/comments?per_page=100`) as Promise<IssueComment[]>;
         },
 
         async commentIssue(issueNumber, body) {
