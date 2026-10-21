@@ -19,7 +19,7 @@
 
 ## 環境準備
 
-- Node.js は CI と同じ 24.16.0 を使用してください。
+- Node.js は CI と同じ 24.22.1 を使用してください。
 - 初回または `node_modules` がない環境では、検証コマンドの前に `npm install` を実行してください。
   - `npm run lint` は devDependencies の ESLint を使う前提です。`node_modules` がないと、
     環境側の古い ESLint が実行されることがあります。

@@ -89,7 +89,7 @@ feat: move settings into dedicated sidebar panel
 
 - `app/**/*.mts` は TypeScript source として扱い、Node scriptsは `npm run build:ts` が `_build/app/**/*.mjs` に生成した module を読む。
   曲JSONの生成・検証スクリプトでは `#app/*` を使い、package.json の imports で型チェック時は app/*.mts、実行時は _build/app/*.mjs へ解決する。
-  scripts本体は scripts/**/*.mts とし、Node 24.16.0の標準の型除去機能で直接実行する。scripts用のemitやtsxは追加しない。
+  scripts本体は scripts/**/*.mts とし、Node 24.22.1の標準の型除去機能で直接実行する。scripts用のemitやtsxは追加しない。
   scripts/tsconfig.json の noEmit・strict・erasableSyntaxOnly・verbatimModuleSyntax で検査し、エディターも同じ設定を使う。生成型宣言は追加しない。
 - Node単体テストの `tests/**/*.mts` は `tsx` 経由で `app/**/*.mts` を直接 import する。
   Node scriptsのテストはscripts経由で生成moduleも読むため、`npm run test:unit` は事前に `build:ts` を実行する。
