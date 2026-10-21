@@ -26,6 +26,7 @@ import { createYoutubeController, extractYoutubeInfo } from "./controllers/youtu
 import { createBookmarkPersistenceController } from "./controllers/bookmark-persistence.mjs";
 import { createStorageController } from "./controllers/storage.mjs";
 import { createBookmarkUiController } from "./ui/bookmark/ui.mjs";
+import { createBookmarkTransferController } from "./ui/bookmark/transfer.mjs";
 import { isIOSWebKit } from "./lib/dom-utils.mjs";
 import { scrollResultListToTop } from "./lib/results-scroll.mjs";
 import {
@@ -184,9 +185,6 @@ function createBookmarkUiCallbacks({
         onDeleteBookmark: (bookmarkId) => storageController.deleteBookmark(bookmarkId),
         onRenameBookmark: (bookmarkId, newName) => storageController.renameBookmark(bookmarkId, newName),
         onRemoveSongFromBookmark: (bookmarkId, songKey) => storageController.removeSongFromBookmark(bookmarkId, songKey),
-        onExportBookmarks: () => storageController.exportBookmarksAsJsonText(),
-        onPreviewBookmarkImport: (text) => storageController.previewBookmarkImport(text),
-        onImportBookmarksText: (text) => storageController.replaceAllBookmarksFromJsonText(text),
         onRequestCloseSidebar: () => getSidebarController().closeSidebarMenu()
     };
 }
@@ -382,7 +380,7 @@ function createAppControllers() {
     });
 
     /**
-     * ブックマークパネルの表示、追加・削除・インポートなどのユーザー操作を扱う controller。
+     * ブックマークパネルの表示、一覧の選択・作成・名前の変更・削除などのユーザー操作を扱う controller。
      * 永続化の実処理は storageController へ委譲する。
      */
     bookmarkUiController = createBookmarkUiController({
@@ -392,6 +390,22 @@ function createAppControllers() {
             storageController,
             getSidebarController: () => sidebarController
         })
+    });
+
+    /**
+     * ブックマークパネルのエクスポート・インポートを扱う controller。
+     * 書き出す・取り込むブックマークをダイアログで選ばせ、保存の実処理は storageController へ委譲する。
+     */
+    const bookmarkTransferController = createBookmarkTransferController({
+        data: appDataState,
+        ui: appUiState,
+        callbacks: {
+            onExportBookmarks: (bookmarkIds) => storageController.exportBookmarksAsJsonText(bookmarkIds),
+            onPreviewBookmarkImport: (text) => storageController.previewBookmarkImport(text),
+            onImportSelectedBookmarks: (text, bookmarkIds) =>
+                storageController.importSelectedBookmarksFromJsonText(text, bookmarkIds),
+            onReplaceAllBookmarks: (text) => storageController.replaceAllBookmarksFromJsonText(text)
+        }
     });
 
     /**
@@ -473,6 +487,7 @@ function createAppControllers() {
         storageController,
         autoHideHeaderController,
         sidebarController,
+        bookmarkTransferController,
         resultSummaryController,
         uiSyncController,
         searchUiActions,
@@ -490,6 +505,7 @@ const {
     storageController,
     autoHideHeaderController,
     sidebarController,
+    bookmarkTransferController,
     resultSummaryController,
     uiSyncController,
     searchUiActions,
@@ -511,6 +527,7 @@ async function initUI(): Promise<void> {
     });
     autoHideHeaderController.setup();
     sidebarController.setupUIHandlers();
+    bookmarkTransferController.setupTransferHandlers();
     searchUiActions.setupSearchFormHandlers();
     dateFilterController.setupDateSelectHandlers({ isIOSWebKit });
     resultSummaryController.setup();
