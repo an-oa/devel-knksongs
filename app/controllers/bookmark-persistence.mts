@@ -157,6 +157,15 @@ export function createBookmarkPersistenceController({
     }
 
     /**
+     * 通常の保存と同じ再検査を書き込みなしで行い、保存を妨げる状態を返す。
+     * インポートで追加・上書きを選ぶ前に、確認後の失敗を避けるため判定する。
+     * 保存時にも同じ検査を行うので、ここでの結果は別タブの変更に対する保証にはしない。
+     */
+    function findBookmarkSaveBlocker(): BookmarkSaveFailure | null {
+        return inspectCurrentStorageBeforeWrite();
+    }
+
+    /**
      * 利用者が置換を確認したインポート内容を保存し、未対応の将来形式を明示的に置き換える。
      * @param bookmarks 確認済みのインポート内容
      */
@@ -273,6 +282,7 @@ export function createBookmarkPersistenceController({
     return {
         loadBookmarksFromStorage,
         saveBookmarks,
+        findBookmarkSaveBlocker,
         replaceBookmarksFromConfirmedImport,
         migrateLegacyBookmarkSongRefs
     };

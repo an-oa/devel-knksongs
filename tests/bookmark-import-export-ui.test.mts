@@ -46,6 +46,30 @@ test("bookmark import export ui: maps import results to user-facing messages", (
         }),
         "「Set List」は最大120曲までです。"
     );
+    assert.equal(
+        getBookmarkImportErrorMessage({ ok: false, reason: "songs_not_ready" }),
+        "曲データの読み込みが終わってから、もう一度お試しください。"
+    );
+    assert.equal(
+        getBookmarkImportErrorMessage({ ok: false, reason: "import_exceeds_bookmark_count", limit: 20, available: 3 }),
+        "ブックマークは最大20件です。追加できるのはあと3件です。"
+    );
+    assert.equal(
+        getBookmarkImportErrorMessage({ ok: false, reason: "import_exceeds_bookmark_count", limit: 20, available: 0 }),
+        "ブックマークは最大20件です。追加するには、不要なブックマークを削除してください。"
+    );
+    assert.equal(
+        getBookmarkImportErrorMessage({ ok: false, reason: "import_exceeds_total_size", limit: 1_000_000 }),
+        "インポート後のブックマーク全体が1 MBを超えるため、インポートできません。選ぶブックマークを減らしてください。"
+    );
+    assert.equal(
+        getBookmarkImportErrorMessage({ ok: false, reason: "unsupported_storage_version", version: 4 }),
+        "このアプリより新しい形式のブックマークが保存されているため、追加・上書きはできません。"
+    );
+    assert.equal(
+        getBookmarkImportErrorMessage({ ok: false, reason: "storage_reload_required" }),
+        "別のタブでブックマークが更新された可能性があります。画面を再読み込みしてから、もう一度お試しください。"
+    );
 });
 
 test("bookmark import export ui: builds replacement confirmation text", () => {

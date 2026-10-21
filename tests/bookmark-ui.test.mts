@@ -966,12 +966,12 @@ for (const { result, saveMessage, importMessage } of [
     {
         result: { ok: false, reason: "storage_reload_required" },
         saveMessage: "別のタブでブックマークが更新された可能性があります。画面を再読み込みしてから、もう一度お試しください。",
-        importMessage: "ブックマークファイルを読み込めませんでした。"
+        importMessage: "別のタブでブックマークが更新された可能性があります。画面を再読み込みしてから、もう一度お試しください。"
     },
     {
         result: { ok: false, reason: "unsupported_storage_version", version: 4 },
         saveMessage: "このアプリより新しい形式のブックマークが保存されているため、変更できません。",
-        importMessage: "ブックマークファイルを読み込めませんでした。"
+        importMessage: "このアプリより新しい形式のブックマークが保存されているため、追加・上書きはできません。"
     }
 ] as const) {
     test(`bookmark ui: ${result.reason} add result keeps the panel open without a success toast`, () => {

@@ -185,8 +185,8 @@ function createBookmarkUiCallbacks({
         onRenameBookmark: (bookmarkId, newName) => storageController.renameBookmark(bookmarkId, newName),
         onRemoveSongFromBookmark: (bookmarkId, songKey) => storageController.removeSongFromBookmark(bookmarkId, songKey),
         onExportBookmarks: () => storageController.exportBookmarksAsJsonText(),
-        onPreviewBookmarkImport: (text) => storageController.parseBookmarkImportText(text),
-        onImportBookmarksText: (text) => storageController.importBookmarksFromJsonText(text),
+        onPreviewBookmarkImport: (text) => storageController.previewBookmarkImport(text),
+        onImportBookmarksText: (text) => storageController.replaceAllBookmarksFromJsonText(text),
         onRequestCloseSidebar: () => getSidebarController().closeSidebarMenu()
     };
 }

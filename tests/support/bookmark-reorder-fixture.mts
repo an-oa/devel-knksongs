@@ -19,6 +19,7 @@ export function createBookmarkReorderFixture({ data, saveBookmarks, updateDispla
         bookmarkPersistenceController: {
             loadBookmarksFromStorage: () => ({ supported: true }),
             saveBookmarks: (bookmarks = data.bookmarks) => saveBookmarks(bookmarks),
+            findBookmarkSaveBlocker: () => null,
             replaceBookmarksFromConfirmedImport: saveBookmarks
         },
         constants: {

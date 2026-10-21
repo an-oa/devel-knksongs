@@ -82,13 +82,38 @@ export function readFileText(file: { text?: () => Promise<string> } | Blob): Pro
 }
 
 /**
+ * 追加でブックマーク数の上限を超えるときの表示メッセージを返す。
+ * @param limit ブックマーク数の上限
+ * @param available あと追加できる件数
+ */
+export function buildBookmarkImportCountLimitMessage(limit: number, available: number): string {
+    return available > 0
+        ? `ブックマークは最大${limit}件です。追加できるのはあと${available}件です。`
+        : `ブックマークは最大${limit}件です。追加するには、不要なブックマークを削除してください。`;
+}
+
+/**
  * インポート失敗時の理由に応じた表示メッセージを返す。
- * @param result
- * @returns {string}
+ * @param result 解析・検証・保存のいずれかの失敗
  */
 export function getBookmarkImportErrorMessage(result: StorageActionFailure): string {
     if (result.reason === "max_import_file_size") {
         return `インポートできるファイルは最大${result.limit / 1_000_000} MBです。`;
+    }
+    if (result.reason === "songs_not_ready") {
+        return "曲データの読み込みが終わってから、もう一度お試しください。";
+    }
+    if (result.reason === "import_exceeds_bookmark_count") {
+        return buildBookmarkImportCountLimitMessage(result.limit, result.available);
+    }
+    if (result.reason === "import_exceeds_total_size") {
+        return `インポート後のブックマーク全体が${result.limit / 1_000_000} MBを超えるため、インポートできません。選ぶブックマークを減らしてください。`;
+    }
+    if (result.reason === "unsupported_storage_version") {
+        return "このアプリより新しい形式のブックマークが保存されているため、追加・上書きはできません。";
+    }
+    if (result.reason === "storage_reload_required") {
+        return "別のタブでブックマークが更新された可能性があります。画面を再読み込みしてから、もう一度お試しください。";
     }
     if (result.reason === "invalid_json") {
         return "JSONとして読み込めないファイルです。";
