@@ -1,7 +1,10 @@
 import {
+    buildBookmarkImportPreviewEntries,
     exportBookmarksAsJsonText as buildBookmarkExportJsonText,
+    mergeImportedBookmarks,
     parseBookmarkImportText as parseBookmarkImportJsonText
 } from "../lib/storage/bookmark-transfer.mjs";
+import type { BookmarkImportPreviewEntry } from "../lib/storage/bookmark-transfer.mjs";
 import {
     buildStoredSearchStatePayload,
     parseStoredSearchStatePayload
@@ -61,11 +64,30 @@ type StorageCallbacks = {
 export type StorageActionFailure =
     | BookmarkSaveFailure
     | Extract<ReturnType<typeof parseBookmarkImportJsonText>, { ok: false }>
+    | Extract<ReturnType<typeof mergeImportedBookmarks>, { ok: false }>
     | { ok: false; reason: "invalid_name_type" | "empty_name" | "bookmark_not_found" | "song_not_found" | "duplicate_song" }
-    | { ok: false; reason: "max_songs_per_bookmark"; limit: number };
+    | { ok: false; reason: "max_songs_per_bookmark"; limit: number }
+    | { ok: false; reason: "songs_not_ready" };
 
 /** 各操作に必要な成功時の値と、理由付きの失敗を区別する。 */
 export type StorageActionResult<Success extends { ok: true } = { ok: true }> = Success | StorageActionFailure;
+
+/** インポート確認画面に出すファイルの内容と、手元の状態。 */
+export type BookmarkImportPreview = {
+    ok: true;
+    /** ファイル内のブックマークを作成日時順に並べ、手元との関係を添えたもの。 */
+    entries: BookmarkImportPreviewEntry[];
+    /** ファイル内のブックマーク数。 */
+    bookmarkCount: number;
+    /** ファイル内の曲数の合計。 */
+    songCount: number;
+    /** 手元のブックマーク数。 */
+    currentBookmarkCount: number;
+    /** 手元に置けるブックマーク数の上限。 */
+    maxBookmarkCount: number;
+    /** 追加・上書きを妨げる保存データの状態。全体の置換はこの状態でも行える。 */
+    mergeBlocker: BookmarkSaveFailure | null;
+};
 
 type StorageControllerInput = {
     data: StorageDataState;
@@ -74,6 +96,7 @@ type StorageControllerInput = {
     bookmarkPersistenceController: {
         loadBookmarksFromStorage: () => BookmarkLoadResult;
         saveBookmarks: (bookmarks?: Record<string, BookmarkRecord>) => BookmarkSaveResult;
+        findBookmarkSaveBlocker: () => BookmarkSaveFailure | null;
         replaceBookmarksFromConfirmedImport: (
             bookmarks: Record<string, BookmarkRecord>
         ) => BookmarkSaveResult;
@@ -107,6 +130,7 @@ export function createStorageController({
     const {
         loadBookmarksFromStorage,
         saveBookmarks,
+        findBookmarkSaveBlocker,
         replaceBookmarksFromConfirmedImport
     } = bookmarkPersistenceController;
     const {
@@ -171,10 +195,13 @@ export function createStorageController({
     }
 
     /**
-     * インポート候補の JSON 文字列を解析し、全置き換え可能なブックマーク情報に整える。
-     * @param {unknown} text
+     * インポート候補の JSON 文字列を解析し、検証と曲参照の移行を済ませたブックマーク情報に整える。
+     * 確認画面・選択取り込み・全体の置換が共通で通る入口なので、
+     * 旧形式の曲参照を移行できる曲データの読み込み後だけ受け付ける。
+     * @param text ファイルから読み込んだ文字列
      */
     function parseBookmarkImportText(text: unknown) {
+        if (!searchUiState.dataReady) return { ok: false, reason: "songs_not_ready" } as const;
         return parseBookmarkImportJsonText(text, {
             songRows: data.allSongsRaw,
             storageVersion: BOOKMARK_STORAGE_VERSION,
@@ -185,17 +212,42 @@ export function createStorageController({
     }
 
     /**
-     * 現在のブックマークを JSON エクスポート用文字列へ変換する。
+     * インポート確認画面に出す候補を、手元のブックマークと照合して返す。
+     * @param text ファイルから読み込んだ文字列
      */
-    function exportBookmarksAsJsonText() {
-        return buildBookmarkExportJsonText(data.bookmarks, BOOKMARK_STORAGE_VERSION);
+    function previewBookmarkImport(text: unknown): StorageActionResult<BookmarkImportPreview> {
+        const parsed = parseBookmarkImportText(text);
+        if (parsed.ok === false) return parsed;
+        return {
+            ok: true,
+            entries: buildBookmarkImportPreviewEntries(data.bookmarks, parsed.bookmarks),
+            bookmarkCount: parsed.bookmarkCount,
+            songCount: parsed.songCount,
+            currentBookmarkCount: Object.keys(data.bookmarks).length,
+            maxBookmarkCount: MAX_BOOKMARK_COUNT,
+            mergeBlocker: findBookmarkSaveBlocker()
+        };
     }
 
     /**
-     * JSON 文字列からブックマークを全置き換えでインポートする。
-     * @param {unknown} text
+     * 指定したブックマークを JSON エクスポート用文字列へ変換する。省略時はすべてを対象にする。
+     * @param bookmarkIds 書き出すブックマークの ID。渡した順にファイルへ並べる。
      */
-    function importBookmarksFromJsonText(text: unknown): StorageActionResult<{ ok: true; bookmarkCount: number; songCount: number }> {
+    function exportBookmarksAsJsonText(bookmarkIds?: readonly string[]) {
+        const bookmarks = bookmarkIds
+            ? Object.fromEntries(bookmarkIds
+                .filter((bookmarkId) => Object.hasOwn(data.bookmarks, bookmarkId))
+                .map((bookmarkId) => [bookmarkId, data.bookmarks[bookmarkId]] as const))
+            : data.bookmarks;
+        return buildBookmarkExportJsonText(bookmarks, BOOKMARK_STORAGE_VERSION);
+    }
+
+    /**
+     * 今あるブックマークをすべて削除し、JSON 文字列の内容で置換する。
+     * 利用者の確認後に呼ぶ前提で、未対応の新しい形式の保存データも置換する。
+     * @param text ファイルから読み込んだ文字列
+     */
+    function replaceAllBookmarksFromJsonText(text: unknown): StorageActionResult<{ ok: true; bookmarkCount: number; songCount: number }> {
         const parsed = parseBookmarkImportText(text);
         if (parsed.ok === false) return parsed;
 
@@ -205,6 +257,44 @@ export function createStorageController({
             ok: true,
             bookmarkCount: parsed.bookmarkCount,
             songCount: parsed.songCount
+        };
+    }
+
+    /**
+     * JSON 文字列から選んだブックマークだけを取り込む。同じ ID は上書きし、新しい ID は追加する。
+     * 全体の置換と違い、新しい形式の保存データや別タブの変更を通常の保存と同じ検査で守る。
+     * @param text ファイルから読み込んだ文字列
+     * @param bookmarkIds 取り込むファイル内のブックマーク ID
+     */
+    function importSelectedBookmarksFromJsonText(
+        text: unknown,
+        bookmarkIds: readonly string[]
+    ): StorageActionResult<{ ok: true; addedCount: number; updatedCount: number }> {
+        const parsed = parseBookmarkImportText(text);
+        if (parsed.ok === false) return parsed;
+        const merged = mergeImportedBookmarks({
+            current: data.bookmarks,
+            imported: parsed.bookmarks,
+            selectedIds: bookmarkIds,
+            storageVersion: BOOKMARK_STORAGE_VERSION,
+            maxBookmarkCount: MAX_BOOKMARK_COUNT
+        });
+        if (merged.ok === false) return merged;
+        if (merged.addedIds.length === 0 && merged.updatedIds.length === 0) {
+            return { ok: true, addedCount: 0, updatedCount: 0 };
+        }
+
+        const activeBookmarkId = data.activeBookmark;
+        const saveResult = commitBookmarkChange(merged.bookmarks, {
+            affectedBookmarkId: activeBookmarkId && merged.updatedIds.includes(activeBookmarkId)
+                ? activeBookmarkId
+                : undefined
+        });
+        if (saveResult.ok === false) return saveResult;
+        return {
+            ok: true,
+            addedCount: merged.addedIds.length,
+            updatedCount: merged.updatedIds.length
         };
     }
 
@@ -499,8 +589,9 @@ export function createStorageController({
     return {
         restorePersistedState,
         exportBookmarksAsJsonText,
-        parseBookmarkImportText,
-        importBookmarksFromJsonText,
+        previewBookmarkImport,
+        replaceAllBookmarksFromJsonText,
+        importSelectedBookmarksFromJsonText,
         addSongToBookmark,
         createBookmark,
         createBookmarkAndAdd,

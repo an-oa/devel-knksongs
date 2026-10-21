@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { installNetworkMocks } from "./support/network-mocks.mts";
 import {
@@ -22,6 +22,49 @@ test.beforeEach(async ({ page }) => {
     await page.reload();
     await waitForInitialLoad(page);
 });
+
+/** テストで保存しておくブックマーク。曲参照は曲データにない文字列でもそのまま残る。 */
+type StoredBookmarkFixture = Record<string, { name: string; songs: string[]; createdAt: number }>;
+
+/**
+ * 保存済みのブックマークを入れて読み込み直し、初期表示を待つ。
+ * @param page 操作するページ
+ * @param bookmarks 保存しておくブックマーク
+ */
+async function seedBookmarks(page: Page, bookmarks: StoredBookmarkFixture) {
+    await page.evaluate((payload) => {
+        localStorage.setItem("bookmarksV1", JSON.stringify(payload));
+    }, { version: 3, bookmarks });
+    await page.reload();
+    await waitForInitialLoad(page);
+}
+
+/**
+ * localStorage に保存されたブックマークの payload を返す。
+ * @param page 操作するページ
+ */
+async function readStoredBookmarks(page: Page): Promise<unknown> {
+    return JSON.parse(await page.evaluate(() => localStorage.getItem("bookmarksV1")) ?? "null");
+}
+
+/**
+ * エクスポートのダイアログで決定し、ダウンロードされたファイルを読む。
+ * 保存先を選ぶ画面はテストから操作できないため、ダウンロードでの保存に切り替える。
+ * @param page 操作するページ
+ * @param options すでにダイアログを開いている場合は dialogOpen を true にする
+ */
+async function exportBookmarksByDownload(page: Page, options?: { dialogOpen?: boolean }) {
+    await page.evaluate(() => Object.defineProperty(window, "showSaveFilePicker", { value: undefined, configurable: true }));
+    if (!options?.dialogOpen) await page.locator("#bookmark-panel-export-btn").click();
+    const downloaded = page.waitForEvent("download");
+    await page.getByRole("dialog", { name: "ブックマークのエクスポート" })
+        .getByRole("button", { name: "エクスポート", exact: true })
+        .click();
+    const path = await (await downloaded).path();
+    if (!path) throw new Error("Bookmark download path is unavailable");
+    const content = await readFile(path);
+    return { path, byteLength: content.byteLength, text: content.toString("utf8") };
+}
 
 test("bookmark notification toast opens, closes, and auto-dismisses", async ({ page }) => {
     const bookmarkName = "Toast Check";
@@ -224,19 +267,266 @@ test("bookmarks at the file size limit can be exported and imported again", asyn
     expect(buffer.byteLength).toBe(MAX_BOOKMARK_IMPORT_BYTES);
     page.on("dialog", (dialog) => dialog.accept());
     await page.locator("#bookmark-panel-import-input").setInputFiles({ name: "boundary.json", mimeType: "application/json", buffer });
+    const importDialog = page.getByRole("dialog", { name: "ブックマークのインポート" });
+    await importDialog.getByRole("button", { name: "インポート", exact: true }).click();
     await expect(getBookmarkItem(page, "Boundary Favorites")).toBeVisible();
     await expect(page.locator("#bookmark-panel-error")).toBeHidden();
-    await page.evaluate(() => Object.defineProperty(window, "showSaveFilePicker", { value: undefined, configurable: true }));
-    const downloaded = page.waitForEvent("download");
-    await page.locator("#bookmark-panel-export-btn").click();
-    const path = await (await downloaded).path();
-    if (!path) throw new Error("Bookmark download path is unavailable");
-    const exported = await readFile(path);
+    const exported = await exportBookmarksByDownload(page);
     expect(exported.byteLength).toBeLessThanOrEqual(MAX_BOOKMARK_IMPORT_BYTES);
-    expect(JSON.parse(exported.toString("utf8"))).toEqual(payload);
+    expect(JSON.parse(exported.text)).toEqual(payload);
 
-    await page.locator("#bookmark-panel-import-input").setInputFiles(path);
+    await page.locator("#bookmark-panel-import-input").setInputFiles(exported.path);
+    // 中身が同じなので追加・上書きの対象はなく、ブックマーク全体の置換で読み込み直す。
+    await expect(importDialog.getByRole("checkbox", { name: /Boundary Favorites/ })).toBeDisabled();
+    await importDialog.getByRole("button", { name: "取り込み方を選ぶ" }).click();
+    await importDialog.getByRole("menuitemradio", { name: /ブックマーク全体を置換/ }).click();
+    await importDialog.getByRole("button", { name: "置換", exact: true }).click();
+    await expect(importDialog).toBeHidden();
     await expect(page.locator("#bookmark-panel-import-input")).toHaveValue("");
     await expect(page.locator("#bookmark-panel-error")).toBeHidden();
-    expect(JSON.parse(await page.evaluate(() => localStorage.getItem("bookmarksV1")) ?? "null")).toEqual(payload);
+    expect(await readStoredBookmarks(page)).toEqual(payload);
+});
+
+test("exporting writes only the bookmarks chosen in the dialog", async ({ page }) => {
+    await seedBookmarks(page, {
+        p_1: { name: "Morning Set", songs: ["ref-a", "ref-b"], createdAt: 1 },
+        p_2: { name: "Night Set", songs: ["ref-c"], createdAt: 2 }
+    });
+    await openBookmarkPanel(page);
+    await page.locator("#bookmark-panel-export-btn").click();
+
+    const dialog = page.getByRole("dialog", { name: "ブックマークのエクスポート" });
+    await expect(dialog.locator("#bookmark-transfer-select-all")).toBeFocused();
+    await expect(dialog.locator("#bookmark-transfer-status")).toHaveText("2件を選択中");
+    await dialog.getByRole("checkbox", { name: /Morning Set/ }).uncheck();
+    await expect(dialog.locator("#bookmark-transfer-status")).toHaveText("1件を選択中");
+    const exported = await exportBookmarksByDownload(page, { dialogOpen: true });
+
+    expect(JSON.parse(exported.text)).toEqual({
+        version: 3,
+        bookmarks: { p_2: { name: "Night Set", songs: ["ref-c"], createdAt: 2 } }
+    });
+    await expect(dialog).toBeHidden();
+    await expect(page.locator("#bookmark-panel-export-btn")).toBeFocused();
+});
+
+test("Escape closes only the bookmark transfer dialog", async ({ page }) => {
+    await seedBookmarks(page, { p_1: { name: "Morning Set", songs: ["ref-a"], createdAt: 1 } });
+    await openBookmarkPanel(page);
+    await page.locator("#bookmark-panel-export-btn").click();
+    const dialog = page.getByRole("dialog", { name: "ブックマークのエクスポート" });
+    await expect(dialog).toBeVisible();
+    // フォーカスできない見出しを押した後も、Esc はダイアログだけを閉じる。
+    await dialog.locator("#bookmark-transfer-title").click();
+
+    await page.keyboard.press("Escape");
+
+    await expect(dialog).toBeHidden();
+    await expect(page.locator("#bookmark-sidebar-panel")).toBeVisible();
+    await expect(page.locator("#bookmark-panel-export-btn")).toBeFocused();
+});
+
+test("importing chosen bookmarks adds new IDs and overwrites the same ID after showing the difference", async ({ page }) => {
+    await seedBookmarks(page, {
+        p_1: { name: "Shared Set", songs: ["ref-a", "ref-b"], createdAt: 1 },
+        p_2: { name: "Kept Set", songs: ["ref-c"], createdAt: 2 }
+    });
+    await openBookmarkPanel(page);
+    const alerts: string[] = [];
+    page.on("dialog", async (dialog) => {
+        alerts.push(dialog.message());
+        await dialog.accept();
+    });
+    const file = {
+        version: 3,
+        bookmarks: {
+            p_1: { name: "Shared Set", songs: ["ref-b", "ref-d", "ref-e"], createdAt: 1 },
+            p_2: { name: "Kept Set", songs: ["ref-c"], createdAt: 2 },
+            p_3: { name: "Friend Set", songs: ["ref-f"], createdAt: 3 }
+        }
+    };
+    await page.locator("#bookmark-panel-import-input").setInputFiles({
+        name: "friend.json",
+        mimeType: "application/json",
+        buffer: Buffer.from(JSON.stringify(file))
+    });
+
+    const dialog = page.getByRole("dialog", { name: "ブックマークのインポート" });
+    const sharedOption = dialog.locator(".bookmark-transfer-option").filter({ hasText: "Shared Set" });
+    await expect(sharedOption).toContainText("上書き");
+    await expect(sharedOption).toContainText("3曲（2曲追加、1曲削除）");
+    await expect(dialog.getByRole("checkbox", { name: /Kept Set/ })).toBeDisabled();
+    await expect(dialog.getByRole("checkbox", { name: /Friend Set/ })).toBeChecked();
+    await expect(dialog.locator("#bookmark-transfer-status")).toHaveText("1件を追加・1件を上書き");
+    await dialog.getByRole("button", { name: "インポート", exact: true }).click();
+
+    await expect(dialog).toBeHidden();
+    await expect.poll(() => alerts).toEqual(["ブックマークを1件追加し、1件上書きしました。"]);
+    await expect(getBookmarkItem(page, "Friend Set")).toBeVisible();
+    expect(await readStoredBookmarks(page)).toEqual(file);
+});
+
+test("the import menu switches to replacing every bookmark and back to the previous selection", async ({ page }) => {
+    await seedBookmarks(page, {
+        p_1: { name: "Shared Set", songs: ["ref-a", "ref-b"], createdAt: 1 },
+        p_2: { name: "Kept Set", songs: ["ref-c"], createdAt: 2 }
+    });
+    await openBookmarkPanel(page);
+    await page.locator("#bookmark-panel-import-input").setInputFiles({
+        name: "friend.json",
+        mimeType: "application/json",
+        buffer: Buffer.from(JSON.stringify({
+            version: 3,
+            bookmarks: {
+                p_1: { name: "Shared Set", songs: ["ref-b", "ref-d"], createdAt: 1 },
+                p_3: { name: "Friend Set", songs: ["ref-f"], createdAt: 3 }
+            }
+        }))
+    });
+    const dialog = page.getByRole("dialog", { name: "ブックマークのインポート" });
+    const friendCheckbox = dialog.getByRole("checkbox", { name: /Friend Set/ });
+    const friendOption = dialog.locator(".bookmark-transfer-option").filter({ hasText: "Friend Set" });
+    const sharedCheckbox = dialog.getByRole("checkbox", { name: /Shared Set/ });
+    const submitButton = dialog.locator("#bookmark-transfer-submit");
+    const menuButton = dialog.getByRole("button", { name: "取り込み方を選ぶ" });
+    const menu = dialog.getByRole("menu");
+    await friendCheckbox.uncheck();
+    await expect(dialog.locator("#bookmark-transfer-status")).toHaveText("1件を上書き");
+
+    // キーボードでメニューを開くと、選んでいる取り込み方へフォーカスが移る。
+    await menuButton.focus();
+    await page.keyboard.press("ArrowDown");
+    await expect(menu).toBeVisible();
+    await expect(dialog.getByRole("menuitemradio", { name: /選んだブックマークを取り込む/ })).toBeFocused();
+    await page.keyboard.press("ArrowDown");
+    await expect(dialog.getByRole("menuitemradio", { name: /ブックマーク全体を置換/ })).toBeFocused();
+    await page.keyboard.press("Enter");
+
+    await expect(menu).toBeHidden();
+    await expect(submitButton).toHaveText("置換");
+    await expect(submitButton).toBeFocused();
+    await expect(dialog.locator(".bookmark-transfer-submit-group")).toHaveClass(/bookmark-transfer-submit-group-caution/);
+    await expect(dialog.locator("#bookmark-transfer-status")).toHaveText("今ある2件を削除し、ファイルの2件で置換します。");
+    await expect(friendCheckbox).toBeChecked();
+    await expect(friendCheckbox).toBeDisabled();
+    await expect(sharedCheckbox).toBeDisabled();
+    await expect(friendOption).toHaveClass(/bookmark-transfer-option-disabled/);
+
+    // メニューを開いている間の Esc は、メニューだけを閉じる。
+    await menuButton.click();
+    await expect(menu).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(menu).toBeHidden();
+    await expect(dialog).toBeVisible();
+    await expect(menuButton).toBeFocused();
+
+    await menuButton.click();
+    await dialog.getByRole("menuitemradio", { name: /選んだブックマークを取り込む/ }).click();
+    await expect(submitButton).toHaveText("インポート");
+    await expect(dialog.locator(".bookmark-transfer-submit-group")).not.toHaveClass(/bookmark-transfer-submit-group-caution/);
+    await expect(friendCheckbox).not.toBeChecked();
+    await expect(friendCheckbox).toBeEnabled();
+    await expect(friendOption).not.toHaveClass(/bookmark-transfer-option-disabled/);
+    await expect(sharedCheckbox).toBeChecked();
+    await expect(dialog.locator("#bookmark-transfer-status")).toHaveText("1件を上書き");
+
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(page.locator("#bookmark-sidebar-panel")).toBeVisible();
+});
+
+/** 失敗と辞退のテストで、手元にある1件。 */
+const KEPT_BOOKMARKS = { p_1: { name: "Kept Set", songs: ["ref-a"], createdAt: 1 } };
+
+/** 失敗と辞退のテストで読み込む、新しいブックマーク1件のファイル。 */
+const FRIEND_FILE = { version: 3, bookmarks: { p_2: { name: "Friend Set", songs: ["ref-f"], createdAt: 2 } } };
+
+test("a failed import keeps the dialog open so the same choice can be retried", async ({ page }) => {
+    await seedBookmarks(page, KEPT_BOOKMARKS);
+    await openBookmarkPanel(page);
+    const alerts: string[] = [];
+    page.on("dialog", async (nativeDialog) => {
+        alerts.push(nativeDialog.message());
+        await nativeDialog.accept();
+    });
+    await page.locator("#bookmark-panel-import-input").setInputFiles({
+        name: "friend.json",
+        mimeType: "application/json",
+        buffer: Buffer.from(JSON.stringify(FRIEND_FILE))
+    });
+    const dialog = page.getByRole("dialog", { name: "ブックマークのインポート" });
+    const submitButton = dialog.getByRole("button", { name: "インポート", exact: true });
+    await expect(submitButton).toBeEnabled();
+    // ブックマークの保存を1回だけ失敗させる。
+    await page.evaluate(() => {
+        const originalSetItem = Storage.prototype.setItem;
+        let failNextBookmarkSave = true;
+        Storage.prototype.setItem = function (key: string, value: string) {
+            if (failNextBookmarkSave && key === "bookmarksV1") {
+                failNextBookmarkSave = false;
+                throw new DOMException("The quota has been exceeded.", "QuotaExceededError");
+            }
+            return originalSetItem.call(this, key, value);
+        };
+    });
+
+    await submitButton.click();
+
+    await expect(dialog.locator("#bookmark-transfer-status")).toHaveText("インポートしたブックマークを保存できませんでした。");
+    await expect(dialog.getByRole("checkbox", { name: /Friend Set/ })).toBeChecked();
+    await expect(submitButton).toBeEnabled();
+    expect(await readStoredBookmarks(page)).toEqual({ version: 3, bookmarks: KEPT_BOOKMARKS });
+
+    await submitButton.click();
+
+    await expect(dialog).toBeHidden();
+    await expect.poll(() => alerts).toEqual(["ブックマークを1件追加しました。"]);
+    expect(await readStoredBookmarks(page)).toEqual({
+        version: 3,
+        bookmarks: { ...KEPT_BOOKMARKS, ...FRIEND_FILE.bookmarks }
+    });
+});
+
+test("declining the replace confirmation keeps the dialog open to continue", async ({ page }) => {
+    await seedBookmarks(page, KEPT_BOOKMARKS);
+    await openBookmarkPanel(page);
+    await page.locator("#bookmark-panel-import-input").setInputFiles({
+        name: "friend.json",
+        mimeType: "application/json",
+        buffer: Buffer.from(JSON.stringify(FRIEND_FILE))
+    });
+    const dialog = page.getByRole("dialog", { name: "ブックマークのインポート" });
+    const menuButton = dialog.getByRole("button", { name: "取り込み方を選ぶ" });
+    await menuButton.click();
+    await dialog.getByRole("menuitemradio", { name: /ブックマーク全体を置換/ }).click();
+    const confirms: string[] = [];
+    page.once("dialog", async (nativeDialog) => {
+        confirms.push(nativeDialog.message());
+        await nativeDialog.dismiss();
+    });
+
+    await dialog.getByRole("button", { name: "置換", exact: true }).click();
+
+    await expect.poll(() => confirms).toEqual([[
+        "現在のブックマークをすべて削除し、ファイルの内容で置換します。",
+        "削除するブックマーク：1件",
+        "置換後のブックマーク：1件（1曲）",
+        "よろしいですか？"
+    ].join("\n")]);
+    await expect(dialog).toBeVisible();
+    await expect(dialog.locator("#bookmark-transfer-submit")).toHaveText("置換");
+    await expect(dialog.locator("#bookmark-transfer-status")).toHaveText("今ある1件を削除し、ファイルの1件で置換します。");
+    expect(await readStoredBookmarks(page)).toEqual({ version: 3, bookmarks: KEPT_BOOKMARKS });
+
+    // 取り込み方を戻せば、続けて選んだブックマークを取り込める。
+    page.on("dialog", (nativeDialog) => nativeDialog.accept());
+    await menuButton.click();
+    await dialog.getByRole("menuitemradio", { name: /選んだブックマークを取り込む/ }).click();
+    await dialog.getByRole("button", { name: "インポート", exact: true }).click();
+
+    await expect(dialog).toBeHidden();
+    expect(await readStoredBookmarks(page)).toEqual({
+        version: 3,
+        bookmarks: { ...KEPT_BOOKMARKS, ...FRIEND_FILE.bookmarks }
+    });
 });

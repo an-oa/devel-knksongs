@@ -14,13 +14,16 @@ function setupStorageController({
     activeBookmark,
     maxBookmarkCount,
     maxSongsPerBookmark,
-    maxBookmarkNameLength
+    maxBookmarkNameLength,
+    dataReady
 }: {
     bookmarks?: Record<string, BookmarkRecord>;
     activeBookmark?: string | null;
     maxBookmarkCount?: number;
     maxSongsPerBookmark?: number;
     maxBookmarkNameLength?: number;
+    /** 曲データの読み込みが終わっているか。省略時は読み込み済みとする。 */
+    dataReady?: boolean;
 }) {
     let renderCount = 0;
     let scheduleCount = 0;
@@ -37,7 +40,7 @@ function setupStorageController({
             userTouchedQuery: false,
             userTouchedFilters: false,
             hasRestoredSearchState: false,
-            dataReady: true
+            dataReady: dataReady ?? true
         },
         date: {
             bounds: null,
@@ -196,7 +199,7 @@ test("restorePersistedState: future bookmark payload remains untouched and unsup
     }
 });
 
-test("importBookmarksFromJsonText: confirmed import replaces a future payload", () => {
+test("replaceAllBookmarksFromJsonText: confirmed import replaces a future payload", () => {
     const restoreDom = installFakeDom();
     const prevLocalStorage = globalThis.localStorage;
     globalThis.localStorage = createFakeLocalStorage();
@@ -221,7 +224,7 @@ test("importBookmarksFromJsonText: confirmed import replaces a future payload", 
         globalThis.localStorage.setItem("bookmarksTest", futurePayloadText);
         controller.restorePersistedState();
 
-        const result = controller.importBookmarksFromJsonText(JSON.stringify({
+        const result = controller.replaceAllBookmarksFromJsonText(JSON.stringify({
             version: 3,
             bookmarks: {
                 imported: {
@@ -899,7 +902,7 @@ test("migrateLegacyBookmarkSongRefs: retries unresolved legacy refs after songs 
     }
 });
 
-test("importBookmarksFromJsonText: replaces current bookmarks and clears missing active bookmark", () => {
+test("replaceAllBookmarksFromJsonText: replaces current bookmarks and clears missing active bookmark", () => {
     const prevLocalStorage = globalThis.localStorage;
     globalThis.localStorage = createFakeLocalStorage();
     try {
@@ -919,7 +922,7 @@ test("importBookmarksFromJsonText: replaces current bookmarks and clears missing
             })
         ];
 
-        const result = controller.importBookmarksFromJsonText(JSON.stringify({
+        const result = controller.replaceAllBookmarksFromJsonText(JSON.stringify({
             version: 1,
             bookmarks: {
                 imported: {
@@ -956,7 +959,7 @@ test("importBookmarksFromJsonText: replaces current bookmarks and clears missing
     }
 });
 
-test("importBookmarksFromJsonText: rejects bookmark names over the configured limit", () => {
+test("replaceAllBookmarksFromJsonText: rejects bookmark names over the configured limit", () => {
     const prevLocalStorage = globalThis.localStorage;
     globalThis.localStorage = createFakeLocalStorage();
     try {
@@ -970,7 +973,7 @@ test("importBookmarksFromJsonText: rejects bookmark names over the configured li
             maxBookmarkNameLength: 64
         });
 
-        const result = controller.importBookmarksFromJsonText(JSON.stringify({
+        const result = controller.replaceAllBookmarksFromJsonText(JSON.stringify({
             version: 2,
             bookmarks: {
                 imported: {
@@ -1429,4 +1432,242 @@ test("renameBookmark: inactive bookmark rename triggers render only", () => {
     } finally {
         globalThis.localStorage = prevLocalStorage;
     }
+});
+
+test("bookmark imports wait for song data before reading the file", () => {
+    const prevLocalStorage = globalThis.localStorage;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        const { controller, data, getRenderCount } = setupStorageController({ bookmarks: {}, dataReady: false });
+        const importText = JSON.stringify({
+            version: 3,
+            bookmarks: { p_1: { name: "Set", songs: ["a"], createdAt: 1 } }
+        });
+        const notReady = { ok: false, reason: "songs_not_ready" };
+
+        assert.deepEqual(controller.previewBookmarkImport(importText), notReady);
+        assert.deepEqual(controller.importSelectedBookmarksFromJsonText(importText, ["p_1"]), notReady);
+        assert.deepEqual(controller.replaceAllBookmarksFromJsonText(importText), notReady);
+        assert.deepEqual(data.bookmarks, {});
+        assert.equal(globalThis.localStorage.getItem("bookmarksTest"), null);
+        assert.equal(getRenderCount(), 0);
+    } finally {
+        globalThis.localStorage = prevLocalStorage;
+    }
+});
+
+test("previewBookmarkImport: matches import candidates with current bookmarks by ID", () => {
+    const prevLocalStorage = globalThis.localStorage;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        const { controller } = setupStorageController({
+            bookmarks: {
+                p_1: { name: "Shared", songs: ["a", "b"], createdAt: 1 },
+                p_2: { name: "Same", songs: ["c"], createdAt: 2 }
+            },
+            maxBookmarkCount: 20
+        });
+
+        const preview = controller.previewBookmarkImport(JSON.stringify({
+            version: 3,
+            bookmarks: {
+                p_1: { name: "Shared", songs: ["b", "d"], createdAt: 1 },
+                p_2: { name: "Same", songs: ["c"], createdAt: 2 },
+                p_3: { name: "Shared", songs: ["e"], createdAt: 3 }
+            }
+        }));
+
+        assert.equal(preview.ok, true);
+        if (!preview.ok) return;
+        assert.deepEqual(preview.entries.map(({ id, status, hasSameNameBookmark }) => ({ id, status, hasSameNameBookmark })), [
+            { id: "p_1", status: "update", hasSameNameBookmark: false },
+            { id: "p_2", status: "unchanged", hasSameNameBookmark: false },
+            { id: "p_3", status: "new", hasSameNameBookmark: true }
+        ]);
+        assert.deepEqual(preview.entries[0].changes, {
+            addedSongCount: 1,
+            removedSongCount: 1,
+            orderChanged: false,
+            previousName: null
+        });
+        assert.equal(preview.bookmarkCount, 3);
+        assert.equal(preview.songCount, 4);
+        assert.equal(preview.currentBookmarkCount, 2);
+        assert.equal(preview.maxBookmarkCount, 20);
+        assert.equal(preview.mergeBlocker, null);
+    } finally {
+        globalThis.localStorage = prevLocalStorage;
+    }
+});
+
+test("previewBookmarkImport: reports stored data that blocks merging before confirmation", () => {
+    const restoreDom = installFakeDom();
+    const prevLocalStorage = globalThis.localStorage;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        const importText = JSON.stringify({
+            version: 3,
+            bookmarks: { p_1: { name: "Set", songs: ["a"], createdAt: 1 } }
+        });
+        const { controller } = setupStorageController({ bookmarks: {} });
+        globalThis.localStorage.setItem("bookmarksTest", JSON.stringify({ version: 4, bookmarks: {} }));
+        controller.restorePersistedState();
+
+        const futurePreview = controller.previewBookmarkImport(importText);
+        assert.equal(futurePreview.ok, true);
+        assert.deepEqual(futurePreview.ok && futurePreview.mergeBlocker, {
+            ok: false,
+            reason: "unsupported_storage_version",
+            version: 4
+        });
+
+        globalThis.localStorage.setItem("bookmarksTest", JSON.stringify({ version: 3, bookmarks: {} }));
+        controller.restorePersistedState();
+        globalThis.localStorage.setItem("bookmarksTest", JSON.stringify({
+            version: 3,
+            bookmarks: { external: { name: "External", songs: [], createdAt: 2 } }
+        }));
+
+        const reloadPreview = controller.previewBookmarkImport(importText);
+        assert.equal(reloadPreview.ok, true);
+        assert.deepEqual(reloadPreview.ok && reloadPreview.mergeBlocker, {
+            ok: false,
+            reason: "storage_reload_required"
+        });
+    } finally {
+        globalThis.localStorage = prevLocalStorage;
+        restoreDom();
+    }
+});
+
+test("importSelectedBookmarksFromJsonText: adds new IDs and overwrites the same ID while keeping the rest", () => {
+    const prevLocalStorage = globalThis.localStorage;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        const { controller, data, getRenderCount, getScheduleCount } = setupStorageController({
+            bookmarks: {
+                p_1: { name: "Shared", songs: ["a", "b"], createdAt: 1 },
+                p_2: { name: "Kept", songs: ["c"], createdAt: 2 }
+            },
+            activeBookmark: "p_1",
+            maxBookmarkCount: 20
+        });
+
+        const result = controller.importSelectedBookmarksFromJsonText(JSON.stringify({
+            version: 3,
+            bookmarks: {
+                p_1: { name: "Shared 2", songs: ["b", "d"], createdAt: 10 },
+                p_2: { name: "Kept", songs: ["c", "e"], createdAt: 2 },
+                p_3: { name: "Friend", songs: ["f"], createdAt: 3 }
+            }
+        }), ["p_1", "p_3"]);
+
+        assert.deepEqual(result, { ok: true, addedCount: 1, updatedCount: 1 });
+        assert.deepEqual<Record<string, BookmarkRecord>>(data.bookmarks, {
+            p_1: { name: "Shared 2", songs: ["b", "d"], createdAt: 1 },
+            p_2: { name: "Kept", songs: ["c"], createdAt: 2 },
+            p_3: { name: "Friend", songs: ["f"], createdAt: 3 }
+        });
+        assert.equal(data.activeBookmark, "p_1");
+        assert.equal(getRenderCount(), 1);
+        assert.equal(getScheduleCount(), 1);
+        assert.deepEqual(JSON.parse(readStoredText(globalThis.localStorage, "bookmarksTest")), {
+            version: 3,
+            bookmarks: data.bookmarks
+        });
+    } finally {
+        globalThis.localStorage = prevLocalStorage;
+    }
+});
+
+test("importSelectedBookmarksFromJsonText: does not search again when the active bookmark is untouched", () => {
+    const prevLocalStorage = globalThis.localStorage;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        const { controller, getRenderCount, getScheduleCount } = setupStorageController({
+            bookmarks: { p_1: { name: "Active", songs: ["a"], createdAt: 1 } },
+            activeBookmark: "p_1"
+        });
+
+        const result = controller.importSelectedBookmarksFromJsonText(JSON.stringify({
+            version: 3,
+            bookmarks: { p_2: { name: "Added", songs: ["b"], createdAt: 2 } }
+        }), ["p_2"]);
+
+        assert.deepEqual(result, { ok: true, addedCount: 1, updatedCount: 0 });
+        assert.equal(getRenderCount(), 1);
+        assert.equal(getScheduleCount(), 0);
+    } finally {
+        globalThis.localStorage = prevLocalStorage;
+    }
+});
+
+test("importSelectedBookmarksFromJsonText: keeps a future payload instead of merging into it", () => {
+    const restoreDom = installFakeDom();
+    const prevLocalStorage = globalThis.localStorage;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        const futurePayloadText = JSON.stringify({
+            version: 4,
+            bookmarks: { future: { name: "Future", songs: ["x"], createdAt: 1, futureField: true } }
+        });
+        const { controller, data, getRenderCount } = setupStorageController({ bookmarks: {} });
+        globalThis.localStorage.setItem("bookmarksTest", futurePayloadText);
+        controller.restorePersistedState();
+
+        const result = controller.importSelectedBookmarksFromJsonText(JSON.stringify({
+            version: 3,
+            bookmarks: { p_1: { name: "Imported", songs: ["a"], createdAt: 2 } }
+        }), ["p_1"]);
+
+        assert.deepEqual(result, { ok: false, reason: "unsupported_storage_version", version: 4 });
+        assert.deepEqual(data.bookmarks, {});
+        assert.equal(globalThis.localStorage.getItem("bookmarksTest"), futurePayloadText);
+        assert.equal(getRenderCount(), 1);
+    } finally {
+        globalThis.localStorage = prevLocalStorage;
+        restoreDom();
+    }
+});
+
+test("importSelectedBookmarksFromJsonText: rejects additions over the bookmark limit without saving", () => {
+    const prevLocalStorage = globalThis.localStorage;
+    globalThis.localStorage = createFakeLocalStorage();
+    try {
+        const bookmarks = {
+            p_1: { name: "One", songs: ["a"], createdAt: 1 },
+            p_2: { name: "Two", songs: ["b"], createdAt: 2 }
+        };
+        const { controller, data, getRenderCount } = setupStorageController({ bookmarks, maxBookmarkCount: 2 });
+
+        const result = controller.importSelectedBookmarksFromJsonText(JSON.stringify({
+            version: 3,
+            bookmarks: { p_3: { name: "Three", songs: ["c"], createdAt: 3 } }
+        }), ["p_3"]);
+
+        assert.deepEqual(result, { ok: false, reason: "import_exceeds_bookmark_count", limit: 2, available: 0 });
+        assert.deepEqual<Record<string, BookmarkRecord>>(data.bookmarks, bookmarks);
+        assert.equal(globalThis.localStorage.getItem("bookmarksTest"), null);
+        assert.equal(getRenderCount(), 0);
+    } finally {
+        globalThis.localStorage = prevLocalStorage;
+    }
+});
+
+test("exportBookmarksAsJsonText: writes only the requested bookmarks in the given order", () => {
+    const { controller } = setupStorageController({
+        bookmarks: {
+            p_1: { name: "One", songs: ["a"], createdAt: 1 },
+            p_2: { name: "Two", songs: ["b", "c"], createdAt: 2 }
+        }
+    });
+
+    const result = controller.exportBookmarksAsJsonText(["p_2", "missing"]);
+
+    assert.equal(result.bookmarkCount, 1);
+    assert.equal(result.songCount, 2);
+    assert.deepEqual(JSON.parse(result.text), {
+        version: 3,
+        bookmarks: { p_2: { name: "Two", songs: ["b", "c"], createdAt: 2 } }
+    });
 });
