@@ -30,7 +30,7 @@
 - 型検査: Node単体テスト・E2Eと共通helperはすべて `.mts` で記述する。アプリは `tsconfig.json`、Node単体テストは `tests/tsconfig.json` でstrictな型チェックを行う。
   Node scriptsは `.mts` sourceを直接参照し、scriptsと単体テストの型設定は `allowJs: false` とする。
   scripts本体は `scripts/tsconfig.json` の `noEmit: true`・`strict: true` で、共通helperを含む `scripts/**/*.mts` 全体を検査する。
-  `erasableSyntaxOnly`・`verbatimModuleSyntax` でNode標準の型除去機能に対応し、Node 24.16.0でscriptsを直接実行する。
+  `erasableSyntaxOnly`・`verbatimModuleSyntax` でNode標準の型除去機能に対応し、Node 24.22.1でscriptsを直接実行する。
   scripts用のemitは追加せず、配布確認・通知ジョブは外部パッケージのインストールなしで動作する。
   配布失敗通知は、CLI・Issue更新手順、APIクライアント、通知状態の判定に分ける。APIクライアントは共通のページ取得ループに各応答形式の検証を渡す。
   Node直接実行のテストはscripts全体をディレクトリ構造ごとコピーし、ローカルmoduleへの分割と外部パッケージ不要の実行を両立させる。
