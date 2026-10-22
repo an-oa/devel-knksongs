@@ -74,7 +74,7 @@ build 済みの生成物を再利用したい場合は、対象ソースの変�
 | `tests/` | Node 単体テスト。`tests/e2e/` は Playwright E2E |
 | `types/` | 複数 module で共有するドメイン型の ambient 宣言 |
 | `data/` | CSV から生成した `songs.json` / `songs-meta.json` |
-| `design/brand/` | OGP 画像・アイコンの描画元 HTML |
+| `design/brand/` | OGP 画像・アイコンの描画元 HTML と、その中で使う詳細版のゴーグル SVG |
 | `docs/` | 開発ガイド・設計書・作業の進め方 |
 | `_build/` | build 生成物（Git 管理外） |
 | `_site/` | Pages 配布用 artifact（Git 管理外） |
@@ -148,15 +148,25 @@ flowchart LR
 
 ## ブランド画像の生成
 
+ブランドのゴーグルの SVG は `scripts/build-brand-svg.mts` で組み立てます。
+平らな正面図を頭に巻いた形へ変換して書き出すため、SVG は直接編集せず、スクリプトを直して作り直します。
+
+| 出力 | 用途 |
+| --- | --- |
+| `public/goggles.svg` | ヘッダーのロゴと検索結果0件の表示（細部を省いた版。ロゴ枠に合わせて 4:3） |
+| `public/favicon.svg` | ファビコン（白い角丸の地とホルスタイン柄の斑点つき） |
+| `design/brand/goggles.svg` | OGP 画像とホーム画面アイコンの描画元で使う詳細版 |
+
 `public/` の `ogp.png`・`apple-touch-icon.png`・`favicon-32.png` は、`design/brand/` の描画元と `public/favicon.svg` から生成します。
+ゴーグルを変えたときは、SVG を書き出してから PNG を作り直します。
 
 ```sh
+npm run build:brand-svg
 npm run render:brand-assets
 ```
 
 - 描画には Playwright の Chromium と OS の日本語フォント（Noto Sans CJK JP）を使います。
   フォントが異なる環境では文字の見た目が変わります。
-- `public/favicon.svg` は直接編集します。
 
 ## CI・デプロイ
 
