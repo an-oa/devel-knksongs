@@ -285,9 +285,9 @@ export function createRenderController({
 
     /**
      * 空結果表示用の要素を生成する。
-     * 0件のときは鐘のアイコンと、条件を見直すための案内を添える。
-     * @param {EmptyStateDescriptor} descriptor
-     * @returns {HTMLLIElement}
+     * 0件のときはゴーグルのアイコンと、条件を見直すための案内を添える。
+     * @param descriptor 表示する空結果の種別と文言
+     * @returns 結果一覧に置く空結果の項目
      */
     function createEmptyStateElement(descriptor: EmptyStateDescriptor) {
         const empty = document.createElement("li");
@@ -298,7 +298,7 @@ export function createRenderController({
         }
         const icon = document.createElement("img");
         icon.className = "result-empty-state-icon";
-        icon.src = "bell.svg";
+        icon.src = "goggles.svg";
         icon.alt = "";
         const title = document.createElement("p");
         title.className = "result-empty-state-title";

@@ -195,9 +195,10 @@ body.hide-thumbs .thumb {
   white-space: nowrap;
 }
 
+/* ゴーグルは横長なので、ロゴの枠も 4:3 にして大きく見せる。 */
 .header-logo {
   display: block;
-  width: 36px;
+  width: 48px;
   height: 36px;
   flex: none;
 }
@@ -321,7 +322,7 @@ body.hide-thumbs .thumb {
     grid-row: 2;
   }
   .header-search { max-width: none; }
-  .header-logo { width: 32px; height: 32px; }
+  .header-logo { width: 43px; height: 32px; }
   .header-wordmark-main { font-size: 19px; }
   .header-spots-compact {
     display: block;
