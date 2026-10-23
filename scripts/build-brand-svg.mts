@@ -201,19 +201,32 @@ const CUSHION = "M50 39.5 C42 35.4 22 33 13 35.6 C7 37.6 5.5 50 6.5 57 C7.5 65 1
 /** 横の蝶番の板。 */
 const BRACKET = "M1.8 45 C4.5 44.2 8 44.6 10 45.6 C10.7 48.5 10.7 52.5 10 55.4 C8 56.4 4.5 56.8 1.8 56 C1.1 52.5 1.1 48.5 1.8 45 Z";
 const HINGE_KNUCKLE = roundedRect(8.8, 46.6, 3.8, 7.8, 1.9);
-/** 鼻の上で反る上のブリッジと、中央の蝶番。 */
-const BRIDGE = "M38.6 36.3 C43.5 34.5 56.5 34.5 61.4 36.3 C62.6 36.8 62.6 39.6 61.4 40.1 C56.5 38.5 43.5 38.5 38.6 40.1 C37.4 39.6 37.4 36.8 38.6 36.3 Z";
+/**
+ * 鼻の上で反る上のブリッジと、中央の蝶番。左右の枠をつなぐ金具。
+ * 棒はレンズの角に掛からないよう、蝶番の横から先までを元の半分の長さで止める。
+ */
+const BRIDGE = "M43 35.35 C47.23 34.82 52.77 34.82 57 35.35 C58.2 35.85 58.2 38.76 57 39.26 C52.77 38.78 47.23 38.78 43 39.26 C41.8 38.76 41.8 35.85 43 35.35 Z";
 const BRIDGE_HINGE = roundedRect(46.8, 33.6, 6.4, 6.8, 2.4);
 /** レンズ上の窓の映り込み（両目とも同じ向き）。dx で右目へずらす。 */
 const glare = (dx: number) => `M${31 + dx} 37 C${26.5 + dx} 46 ${23 + dx} 60 ${20.5 + dx} 76 L${26.5 + dx} 76 C${28.5 + dx} 60 ${32 + dx} 46 ${37 + dx} 37 Z`;
 const glareThin = (dx: number) => `M${39 + dx} 37 C${35 + dx} 46 ${31.5 + dx} 60 ${29 + dx} 76 L${31 + dx} 76 C${33.5 + dx} 60 ${37 + dx} 46 ${41 + dx} 37 Z`;
-const HIGHLIGHT = "M41.5 41.4 C33 40.1 23 40.1 18.4 41.2 C15.7 42 15.2 44.6 15.1 48.5";
+/*
+ * レンズは外側寄りの継ぎ目で折れた2枚のガラス（Mk VIII 型）。継ぎ目より外側のガラスは横を向く。
+ * 正面のガラスの光沢は継ぎ目の手前で角を回って止め、外側のガラスは正面より暗くする。
+ */
+/** 継ぎ目より外側のガラス（左目）。 */
+const OUTER_PANE = "M0 30 L20.7 30 L20.7 40.5 C20.1 47 20.1 56 20.9 63.6 L20.9 80 L0 80 Z";
+/** 継ぎ目より内側の正面のガラス（左目）。映り込みはこの中だけに描く。 */
+const FRONT_PANE = "M20.7 30 L60 30 L60 80 L20.9 80 L20.9 63.6 C20.1 56 20.1 47 20.7 40.5 Z";
+/** 上の縁の光沢。正面のガラスの上辺を通り、継ぎ目の手前で下へ折れる。 */
+const HIGHLIGHT = "M41.5 41.4 C34 40.3 27.5 40.2 24.2 40.6 C23 40.8 22.6 41.6 22.6 43 C22.6 44 22.6 45 22.6 46";
 const HIGHLIGHT_DOT = "M38 41.6 C37 41.4 36 41.3 35 41.2";
-const BOUNCE = "M18.4 62.6 C24 64.4 32.5 64.2 37.4 62";
+/** 下の縁の照り返し。正面のガラスの下辺を通り、継ぎ目の手前で上へ折れる。 */
+const BOUNCE = "M37.4 62 C32.5 63.5 27.5 64 24.2 63.8 C23 63.7 22.6 63 22.6 61.8 C22.6 60.8 22.6 60 22.6 59.2";
 const PANE_SEAM_LIGHT = "M20.2 40.6 C19.6 47 19.6 56 20.4 63.6";
 const PANE_SEAM_DARK = "M21 40.5 C20.4 47 20.4 56 21.2 63.5";
 const CUSHION_LINE = "M9.2 60.5 C10.5 66.5 17 71.6 27 72 C33.5 72.3 38.5 71 41.4 68.6";
-const BRIDGE_LINES = [[42.6, 36, 39], [44.7, 35.6, 38.7], [55.3, 35.6, 38.7], [57.4, 36, 39]] as const;
+const BRIDGE_LINES = [[44.7, 35.8, 38.5], [45.9, 35.7, 38.4], [54.1, 35.7, 38.4], [55.3, 35.8, 38.5]] as const;
 
 /** 細部の量と線の太さ。detailed は OGP・ホーム画面用、simple はファビコンとサイト内の小さな表示用。 */
 const LEVELS = {
@@ -300,7 +313,8 @@ function goggles(level: Level): string {
     const useLens = (side: "L" | "R", attrs: string) => `<use href="#lens${side}" ${attrs}/>`;
     const useBoth = (attrs: string) => useLens("L", attrs) + useLens("R", attrs);
     let out = `<defs>${gradientDefs(level)}<path id="lensL" d="${lensL}"/><path id="lensR" d="${lensR}"/>`
-        + `<clipPath id="clipL"><use href="#lensL"/></clipPath><clipPath id="clipR"><use href="#lensR"/></clipPath></defs>`;
+        + `<clipPath id="clipL"><use href="#lensL"/></clipPath><clipPath id="clipR"><use href="#lensR"/></clipPath>`
+        + `<clipPath id="frontL"><path d="${warpPath(FRONT_PANE)}"/></clipPath><clipPath id="frontR"><path d="${warpPath(FRONT_PANE, true)}"/></clipPath></defs>`;
     out += strap(v.ink);
     out += path(CUSHION, `fill="url(#leather)" stroke="${INK}" stroke-width="${v.cushionInk}" stroke-linejoin="round"`);
     out += path(CUSHION, `fill="url(#shadeLR)"`);
@@ -312,9 +326,12 @@ function goggles(level: Level): string {
     out += useLens("L", `fill="url(#shadeL)"`) + useLens("R", `fill="url(#shadeR)"`);
     for (const [side, dx] of [["L", 0], ["R", 34]] as const) {
         let inside = useLens(side, `fill="none" stroke="#9a5a00" stroke-width="${v.edgeBand}" opacity=".45"`);
-        if (detailed) inside += path(ellipse(30, 46.5, 12, 5.2), `fill="url(#sky)"`, side === "R");
-        inside += path(glare(dx), `fill="#fff" opacity="${detailed ? ".42" : ".5"}"`);
-        if (detailed) inside += path(glareThin(dx), `fill="#fff" opacity=".38"`);
+        // 横を向いた外側のガラスは、正面より一段暗い琥珀色にする。
+        inside += path(OUTER_PANE, `fill="#7a4300" opacity=".24"`, side === "R");
+        let front = detailed ? path(ellipse(30, 46.5, 12, 5.2), `fill="url(#sky)"`, side === "R") : "";
+        front += path(glare(dx), `fill="#fff" opacity="${detailed ? ".42" : ".5"}"`);
+        if (detailed) front += path(glareThin(dx), `fill="#fff" opacity=".38"`);
+        inside += `<g clip-path="url(#front${side})">${front}</g>`;
         out += `<g clip-path="url(#clip${side})">${inside}</g>`;
     }
     if (detailed) {
