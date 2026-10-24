@@ -24,4 +24,7 @@ type Song = {
   artistNorm: string;
   titleYomiNorm: string;
   artistYomiNorm: string;
+  titleEnNorm: string;
+  artistEnNorm: string;
+  artistSortNorm: string;
 };

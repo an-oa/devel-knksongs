@@ -125,6 +125,8 @@ export function parseCsvToSongs(csvText: string): Song[] {
     const idx = (n: string) => idxMap[n];
     const endTimeIndex = header.includes("終了時刻") ? idx("終了時刻") : -1;
     const streamRoleIndex = header.includes("配信上の立場") ? idx("配信上の立場") : -1;
+    // 英名列は検索だけに使う任意列。列がないCSVでは空文字として扱う
+    const optionalText = (r: string[], name: string) => header.includes(name) ? r[idx(name)] || "" : "";
     const candidates: CsvSongCandidate[] = [];
     for (let i = 0; i < body.length; i++) {
         const r = body[i];
@@ -167,7 +169,10 @@ export function parseCsvToSongs(csvText: string): Song[] {
             titleNorm: normalizeForSearch(title),
             artistNorm: normalizeForSearch(artist),
             titleYomiNorm: normalizeForSearch(titleYomi),
-            artistYomiNorm: normalizeForSearch(artistYomi)
+            artistYomiNorm: normalizeForSearch(artistYomi),
+            titleEnNorm: normalizeForSearch(optionalText(r, "Song Title")),
+            artistEnNorm: normalizeForSearch(optionalText(r, "Artist Name")),
+            artistSortNorm: normalizeForSearch(optionalText(r, "Artist Sort Name"))
         };
         candidates.push({ song, csvRowNumber: i + 2 });
     }

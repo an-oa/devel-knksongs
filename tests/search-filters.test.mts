@@ -226,6 +226,83 @@ test("filterSongsByCriteria: matches normalized phrase whitespace and escaped qu
     assert.deepEqual(quoteHit.map((row) => row.titleNorm), ['don’t say "lazy"']);
 });
 
+test("filterSongsByCriteria: English title, English artist, and artist sort name are searchable", () => {
+    const rows = [
+        makeRow({
+            title: "残酷な天使のテーゼ",
+            artist: "高橋洋子",
+            titleEn: "A Cruel Angel’s Thesis",
+            artistEn: "Yoko Takahashi",
+            artistSort: "Takahashi, Yoko"
+        }),
+        makeRow({
+            title: "メルト",
+            artist: "ryo(supercell) feat. 初音ミク",
+            titleEn: "Melt",
+            artistEn: "ryo(supercell) feat. Miku Hatsune",
+            artistSort: "ryo(supercell) feat. Hatsune, Miku"
+        }),
+        makeRow({ title: "マジLOVE1000%", artist: "ST☆RISH", artistSort: "STARISH" })
+    ];
+    const search = (queryRaw: string) => filterSongsForTest(
+        rows,
+        { ...BASE_SEARCH_STATE, queryRaw },
+        new Set(["配信"])
+    ).map((row) => row.title);
+
+    assert.deepEqual(search("cruel angel"), ["残酷な天使のテーゼ"]);
+    assert.deepEqual(search("yoko takahashi"), ["残酷な天使のテーゼ"]);
+    assert.deepEqual(search('"miku hatsune"'), ["メルト"]);
+    assert.deepEqual(search('"hatsune miku"'), ["メルト"], "the sort name keeps the surname-first order");
+    assert.deepEqual(search("starish"), ["マジLOVE1000%"]);
+});
+
+test("filterSongsByCriteria: keywords match regardless of symbols and spaces", () => {
+    const rows = [
+        makeRow({ title: "READY STEADY GO", artist: "L’Arc〜en〜Ciel" }),
+        makeRow({ title: "けせら・せら", artist: "A" }),
+        makeRow({ title: "ルカルカ★ナイトフィーバー", artist: "B", titleEn: "Luka Luka★Night Fever" })
+    ];
+    const search = (queryRaw: string) => filterSongsForTest(
+        rows,
+        { ...BASE_SEARCH_STATE, queryRaw },
+        new Set(["配信"])
+    ).map((row) => row.title);
+
+    assert.deepEqual(search("larc"), ["READY STEADY GO"]);
+    assert.deepEqual(search("けせらせら"), ["けせら・せら"]);
+    assert.deepEqual(search('"luka luka night"'), ["ルカルカ★ナイトフィーバー"]);
+    assert.deepEqual(search("ルカルカナイト"), ["ルカルカ★ナイトフィーバー"]);
+});
+
+test("filterSongsByCriteria: symbol-only keywords still match the symbols literally", () => {
+    const rows = [
+        makeRow({ title: "ルカルカ★ナイトフィーバー", artist: "A" }),
+        makeRow({ title: "READY STEADY GO", artist: "B" })
+    ];
+    const hit = filterSongsForTest(
+        rows,
+        { ...BASE_SEARCH_STATE, queryRaw: "★" },
+        new Set(["配信"])
+    );
+
+    assert.deepEqual(hit.map((row) => row.title), ["ルカルカ★ナイトフィーバー"]);
+});
+
+test("filterSongsByCriteria: emoji keywords do not match other emoji through invisible selectors", () => {
+    const rows = [
+        makeRow({ title: "Love❤️", artist: "A" }),
+        makeRow({ title: "Sun☀️", artist: "B" })
+    ];
+    const hit = filterSongsForTest(
+        rows,
+        { ...BASE_SEARCH_STATE, queryRaw: "❤️" },
+        new Set(["配信"])
+    );
+
+    assert.deepEqual(hit.map((row) => row.title), ["Love❤️"]);
+});
+
 test("filterSongsByCriteria: consumes the supplied parse result without parsing queryRaw again", () => {
     const parsedQuery = parseSearchQuery("target");
     const rows = [makeRow({ title: "Target" })];

@@ -1,7 +1,7 @@
 import { findFirstSongIdentityIssue, type SongIdentityIssue } from "./song-identity.mjs";
 import { validateYoutubeUrl } from "./youtube-url.mjs";
 
-export const SONGS_JSON_SCHEMA_VERSION = 3;
+export const SONGS_JSON_SCHEMA_VERSION = 4;
 
 export type SongsJsonArtifactMetadata = {
     schemaVersion: typeof SONGS_JSON_SCHEMA_VERSION;
@@ -44,7 +44,10 @@ const SONG_FIELD_KINDS = {
     titleNorm: "string",
     artistNorm: "string",
     titleYomiNorm: "string",
-    artistYomiNorm: "string"
+    artistYomiNorm: "string",
+    titleEnNorm: "string",
+    artistEnNorm: "string",
+    artistSortNorm: "string"
 } as const satisfies Record<keyof Song, SongFieldKind>;
 
 const VIDEO_ORIENTATIONS = new Set<VideoOrientation>(["", "vertical", "landscape"]);

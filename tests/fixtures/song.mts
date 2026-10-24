@@ -27,6 +27,9 @@ export function createSongFixture(overrides: Partial<Song> = {}): Song {
         artistNorm: "kanaria feat. gumi",
         titleYomiNorm: "キング",
         artistYomiNorm: "カナリアフィーチャリンググミ",
+        titleEnNorm: "king",
+        artistEnNorm: "kanaria feat. gumi",
+        artistSortNorm: "kanaria feat. gumi",
         ...overrides
     };
 }

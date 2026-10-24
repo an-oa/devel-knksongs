@@ -1,10 +1,27 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { normalizeForSearch } from "../app/lib/search-normalization.mts";
+import { compactForSearch, normalizeForSearch } from "../app/lib/search-normalization.mts";
 import { isValidEmptySearchQuery, parseSearchQuery } from "../app/lib/search-query.mts";
 
 test("normalizeForSearch: normalizes compatible characters and repeated whitespace", () => {
     assert.equal(normalizeForSearch("  Ｆｏｏ　 \t BAR  "), "foo bar");
+});
+
+test("compactForSearch: removes punctuation, symbols, and spaces but keeps kana marks", () => {
+    assert.equal(compactForSearch(normalizeForSearch("L’Arc〜en〜Ciel")), "larcenciel");
+    assert.equal(compactForSearch(normalizeForSearch("Hatsune, Miku")), "hatsunemiku");
+    assert.equal(compactForSearch(normalizeForSearch("ST☆RISH")), "strish");
+    assert.equal(compactForSearch(normalizeForSearch("けせら・せら")), "ケセラセラ");
+    assert.equal(compactForSearch(normalizeForSearch("ルカルカ★ナイトフィーバー")), "ルカルカナイトフィーバー");
+    assert.equal(compactForSearch(normalizeForSearch("佐々木")), "佐々木");
+    assert.equal(compactForSearch(normalizeForSearch("★☆")), "");
+});
+
+test("compactForSearch: removes invisible emoji joiners and selectors with the symbols", () => {
+    for (const emoji of ["❤️", "☀️", "👨‍👩‍👧", "🏳️‍🌈"]) {
+        assert.equal(compactForSearch(normalizeForSearch(emoji)), "", emoji);
+    }
+    assert.equal(compactForSearch(normalizeForSearch("1️⃣")), "1");
 });
 
 test("parseSearchQuery: ignores empty quoted phrases", () => {
