@@ -2,7 +2,10 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<!-- ogp.png（1200x630）の描画元。npm run render:brand-assets で書き出す。 -->
+<!--
+  ogp.png（1200x630）の描画元。npm run render:brand-assets で書き出す。
+  ?lang=en で開いたときは文字を英語に差し替え、英語の OGP 用の ogp-en.png として書き出す。
+-->
 <style>
   * { box-sizing: border-box; }
   html, body { margin: 0; }
@@ -97,6 +100,9 @@
     color: #6b665c;
   }
   .search svg { width: 34px; height: 34px; flex: none; }
+  /* 英語は欧文に合わせて字間だけ詰め、文字の大きさは日本語と同じにする。 */
+  html[lang="en"] .title .main { letter-spacing: 0.01em; }
+  html[lang="en"] .title .sub { letter-spacing: 0.06em; }
 </style>
 </head>
 <body>
@@ -114,8 +120,17 @@
     <h1 class="title"><span class="main">鐘輝かう</span><span class="sub">歌サーチ</span></h1>
     <div class="search">
       <svg viewBox="0 0 24 24" fill="none" stroke="#1b1b1b" stroke-width="2.6" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></svg>
-      曲名・歌手・読み...
+      <span class="search-placeholder">曲名・歌手・読み...</span>
     </div>
   </div>
+  <script>
+    // 英語の文字は app/lib/ui-text.mts のロゴと検索窓の文言と同じにする。
+    if (new URLSearchParams(location.search).get("lang") === "en") {
+      document.documentElement.lang = "en";
+      document.querySelector(".title .main").textContent = "Kaneki Caw";
+      document.querySelector(".title .sub").textContent = "Song Search";
+      document.querySelector(".search-placeholder").textContent = "Song or artist...";
+    }
+  </script>
 </body>
 </html>

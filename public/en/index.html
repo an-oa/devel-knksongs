@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <!--
+    英語で共有したときの OGP 用のページ。SNS は JavaScript を動かさずにこのページの OGP を読み、
+    開いた人は埋め込みスクリプトでサイト本体へ英語の指定付きで移動する。アプリ本体は置かない。
+  -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-6SgM6XHvxzRPSNe75f1tGolvkNKLuuw9EPGlytuFunQ='; base-uri 'none'; form-action 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- 中身のない移動用のページなので、検索結果には載せない。 -->
+  <meta name="robots" content="noindex">
+  <title>Kaneki Caw Song Search</title>
+
+  <!-- OGP -->
+  <meta property="og:site_name" content="Kaneki Caw Song Search" />
+  <meta property="og:title" content="Kaneki Caw Song Search" />
+  <meta property="og:description" content="Search by song title or artist name. Filter by singing streams, covers, shorts, clips, and pre-recorded videos, by collab role, relay, harmony, and date range." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://an-oa.github.io/knksongs/en/" />
+  <meta property="og:locale" content="en_US" />
+  <meta property="og:image" content="https://an-oa.github.io/knksongs/ogp-en.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="Kaneki Caw Song Search. An unofficial fan site for searching songs by title or artist." />
+
+  <!-- X (Twitter) -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Kaneki Caw Song Search" />
+  <meta name="twitter:description" content="Search by song title or artist name. Filter by singing streams, covers, shorts, clips, and pre-recorded videos, by collab role, relay, harmony, and date range." />
+  <meta name="twitter:image" content="https://an-oa.github.io/knksongs/ogp-en.png" />
+
+  <script>
+    location.replace("../?lang=en");
+  </script>
+</head>
+<body>
+  <p><a href="../?lang=en">Open Kaneki Caw Song Search</a></p>
+</body>
+</html>

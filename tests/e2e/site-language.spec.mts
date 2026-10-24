@@ -120,6 +120,19 @@ test.describe("header layout", () => {
 test.describe("language in the URL", () => {
     test.use({ locale: "ja-JP" });
 
+    test("the English OGP page sends visitors to the site in English", async ({ page }) => {
+        await installNetworkMocks(page);
+        await routeSongsJsonFixture(page, createEnglishNamedSongs());
+        await page.goto("/");
+        await page.evaluate(() => localStorage.clear());
+        await page.goto("/en/");
+        await page.waitForURL((url) => url.pathname === "/" && url.search === "");
+        await waitForInitialLoad(page);
+
+        await expect(page.locator("html")).toHaveAttribute("lang", "en");
+        await expect(page.locator(".header-wordmark-main")).toHaveText("Kaneki Caw");
+    });
+
     test("?lang=en opens the site in English, saves the choice, and drops the query", async ({ page }) => {
         await installNetworkMocks(page);
         await routeSongsJsonFixture(page, createEnglishNamedSongs());

@@ -5,7 +5,7 @@ export type SiteLanguage = "ja" | "en";
 // あちらは module を import できないため、キー名や判定を変えるときは両方を揃える。
 export const SITE_LANGUAGE_STORAGE_KEY = "siteLanguage";
 
-/** URL で言語を指定する query のキー。指定された言語は保存し、URL からは消す。 */
+/** URL で言語を指定する query のキー。指定された言語は保存し、URL からは消す。英語の OGP 用の /en/ は ?lang=en で移動してくる。 */
 export const SITE_LANGUAGE_QUERY_KEY = "lang";
 
 /**
