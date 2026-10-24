@@ -29,6 +29,8 @@ export function createScrollableResultSongs(count: number): Song[] {
             artist,
             titleYomi: title,
             artistYomi: artist,
+            titleEn: title,
+            artistEn: artist,
             url: `https://www.youtube.com/watch?v=${videoId}&t=${songNumber}s`,
             endSeconds: null,
             titleNorm: title.toLowerCase(),

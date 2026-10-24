@@ -125,7 +125,7 @@ export function parseCsvToSongs(csvText: string): Song[] {
     const idx = (n: string) => idxMap[n];
     const endTimeIndex = header.includes("終了時刻") ? idx("終了時刻") : -1;
     const streamRoleIndex = header.includes("配信上の立場") ? idx("配信上の立場") : -1;
-    // 英名列は検索だけに使う任意列。列がないCSVでは空文字として扱う
+    // 英名列は任意列。列がないCSVでは空文字として扱う
     const optionalText = (r: string[], name: string) => header.includes(name) ? r[idx(name)] || "" : "";
     const candidates: CsvSongCandidate[] = [];
     for (let i = 0; i < body.length; i++) {
@@ -143,6 +143,8 @@ export function parseCsvToSongs(csvText: string): Song[] {
         const artist = r[idx("アーティスト名")];
         const titleYomi = r[idx("キョクメイ")];
         const artistYomi = r[idx("アーティストメイ")];
+        const titleEn = optionalText(r, "Song Title");
+        const artistEn = optionalText(r, "Artist Name");
         const archiveOrder = parseArchiveOrder(r[idx("##")]);
         const { videoId } = extractYoutubeInfo(url);
         const legacySongKey = buildLegacySongKey({ archiveId, archiveOrder, url });
@@ -164,14 +166,16 @@ export function parseCsvToSongs(csvText: string): Song[] {
             artist,
             titleYomi,
             artistYomi,
+            titleEn,
+            artistEn,
             url,
             endSeconds: endTimeIndex >= 0 ? parseEndTimeSeconds(r[endTimeIndex], i + 2) : null,
             titleNorm: normalizeForSearch(title),
             artistNorm: normalizeForSearch(artist),
             titleYomiNorm: normalizeForSearch(titleYomi),
             artistYomiNorm: normalizeForSearch(artistYomi),
-            titleEnNorm: normalizeForSearch(optionalText(r, "Song Title")),
-            artistEnNorm: normalizeForSearch(optionalText(r, "Artist Name")),
+            titleEnNorm: normalizeForSearch(titleEn),
+            artistEnNorm: normalizeForSearch(artistEn),
             artistSortNorm: normalizeForSearch(optionalText(r, "Artist Sort Name"))
         };
         candidates.push({ song, csvRowNumber: i + 2 });

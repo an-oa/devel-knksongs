@@ -18,6 +18,8 @@ type Song = {
   artist: string;
   titleYomi: string;
   artistYomi: string;
+  titleEn: string;
+  artistEn: string;
   url: string;
   endSeconds: number | null;
   titleNorm: string;

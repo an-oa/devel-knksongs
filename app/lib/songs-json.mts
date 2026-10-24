@@ -1,7 +1,7 @@
 import { findFirstSongIdentityIssue, type SongIdentityIssue } from "./song-identity.mjs";
 import { validateYoutubeUrl } from "./youtube-url.mjs";
 
-export const SONGS_JSON_SCHEMA_VERSION = 4;
+export const SONGS_JSON_SCHEMA_VERSION = 5;
 
 export type SongsJsonArtifactMetadata = {
     schemaVersion: typeof SONGS_JSON_SCHEMA_VERSION;
@@ -39,6 +39,8 @@ const SONG_FIELD_KINDS = {
     artist: "string",
     titleYomi: "string",
     artistYomi: "string",
+    titleEn: "string",
+    artistEn: "string",
     url: "string",
     endSeconds: "nullable-number",
     titleNorm: "string",
