@@ -164,11 +164,13 @@ flowchart TD
   JSONからCSVへ戻す経路は持たない
 - CSVのURLは `app/config.mts` の `PUBLIC_CSV_URL` で指定する。曲JSON生成とブラウザのCSVフォールバックの両方が参照する
 - CSVの `配信上の立場` は `streamRole` としてJSONへ保持する
-- CSVの `Song Title` / `Artist Name` / `Artist Sort Name` は検索専用の任意列とし、正規化した値だけを
-  `titleEnNorm` / `artistEnNorm` / `artistSortNorm` としてJSONへ保持する。列がないCSVでは空文字にする。
+- CSVの `Song Title` / `Artist Name` / `Artist Sort Name` は任意列とし、列がないCSVでは空文字にする。
+  `Song Title` / `Artist Name` は英語表記の表示用に、シートの値をそのまま `titleEn` / `artistEn` としてJSONへ保持する。
+  英訳とローマ字の混在や空白の付け方も、公式に近い情報源から入力したシートの内容に従い、変換しない。
+  3列とも正規化した値を `titleEnNorm` / `artistEnNorm` / `artistSortNorm` として検索に使う。
   `Artist Sort Name` は MusicBrainz の sort name に倣い、人名を「姓, 名」、文字の代わりの記号を文字に直した値とする
 - `songs.json` / `songs-meta.json` は、現在表示・再生可能な曲を配信する派生成果物とする
-- 両JSONはschema Version 4として、同じ `contentHash` とUTC ISO 8601形式の `generatedAt` を持つ。
+- 両JSONはschema Version 5として、同じ `contentHash` とUTC ISO 8601形式の `generatedAt` を持つ。
   `generatedAt` はcontentHashが変わった場合だけ更新し、同じ内容の定期生成では引き継ぐ
 - 実行時は現行schemaだけを受け付け、不正・旧schemaのキャッシュは未キャッシュと同じ取得経路へ進む。公開JSON採用時は上書きし、採用失敗時だけ非同期で削除する
 - 公開対象でもURLが空の行は、現在再生できない曲の履歴としてCSVへ残し、エラーにせず派生JSONから除外する。
@@ -192,9 +194,10 @@ flowchart TD
 - date / dateKey / archiveId / archiveOrder
 - videoId / songKey / bookmarkSongKey / legacySongKey / format / streamRole / videoOrientation / isRelay / isHarmony
 - title / artist / titleYomi / artistYomi
+- titleEn / artistEn（英語表記。シートの値をそのまま持つ）
 - endSeconds
 - titleNorm / artistNorm / titleYomiNorm / artistYomiNorm
-- titleEnNorm / artistEnNorm / artistSortNorm（英名は表示しないため正規化済みの値だけを持つ）
+- titleEnNorm / artistEnNorm / artistSortNorm（並び替え用の英名は表示しないため、正規化済みの値だけを持つ）
 - url
 
 ### 曲参照キーの役割分担

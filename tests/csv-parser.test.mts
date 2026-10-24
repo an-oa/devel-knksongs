@@ -41,13 +41,15 @@ test("csv: missing 配信上の立場 column keeps legacy csv cache parseable", 
     assert.equal(songs[0].videoOrientation, "vertical");
 });
 
-test("csv: English name columns are normalized for search", () => {
+test("csv: English name columns keep display values and are normalized for search", () => {
     const csv = [
         "#,配信日,配信上の立場,画面の向き,公開範囲,形態,歌枠リレー？,ハモリあり？,##,曲名,アーティスト名,キョクメイ,アーティストメイ,Song Title,Artist Name,Artist Sort Name,URL,終了時刻,メモ",
         "1,2026/03/11,,縦,全体,配信,,,1,Lemon,米津玄師,レモン,ヨネヅケンシ,Lemon,Ｋｅｎｓｈｉ  Yonezu,\"Yonezu, Kenshi\",https://www.youtube.com/watch?v=abc123def45&t=10s,0:09:41,"
     ].join("\n");
     const songs = parseCsvToSongs(csv);
     assert.equal(songs.length, 1);
+    assert.equal(songs[0].titleEn, "Lemon");
+    assert.equal(songs[0].artistEn, "Ｋｅｎｓｈｉ  Yonezu", "display values keep the sheet text as is");
     assert.equal(songs[0].titleEnNorm, "lemon");
     assert.equal(songs[0].artistEnNorm, "kenshi yonezu");
     assert.equal(songs[0].artistSortNorm, "yonezu, kenshi");
@@ -60,6 +62,8 @@ test("csv: missing English name columns keep older csv parseable", () => {
     ].join("\n");
     const songs = parseCsvToSongs(csv);
     assert.equal(songs.length, 1);
+    assert.equal(songs[0].titleEn, "");
+    assert.equal(songs[0].artistEn, "");
     assert.equal(songs[0].titleEnNorm, "");
     assert.equal(songs[0].artistEnNorm, "");
     assert.equal(songs[0].artistSortNorm, "");

@@ -701,6 +701,8 @@ test("bookmark: observes result tail and increases by RESULT_DISPLAY_BATCH_SIZE 
             artistNorm: "",
             titleYomiNorm: "",
             artistYomiNorm: "",
+            titleEn: "",
+            artistEn: "",
             titleEnNorm: "",
             artistEnNorm: "",
             artistSortNorm: ""
