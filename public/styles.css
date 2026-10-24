@@ -167,7 +167,7 @@ body.hide-thumbs .thumb {
     var(--header-bg);
 }
 
-/* ライトのホルスタイン柄。文字・検索窓・ボタンに掛からない余白だけに置く。 */
+/* ライトのホルスタイン柄。文字と検索窓には掛けない。ボタンは塗りつぶしてあるので、ボタンの下には潜ってよい。 */
 .header-spots {
   position: absolute;
   fill: #1b1b1b;
@@ -180,10 +180,15 @@ body.hide-thumbs .thumb {
   width: 170px;
   height: 64px;
 }
-.header-spots-wide-left { right: calc(50% + 260px + 16px); }
+/* 左の斑点は絵の右端20pxが空白なので8px、右の斑点は16px空けると、検索窓との間隔がほぼ揃う。 */
+.header-spots-wide-left { right: calc(50% + 260px + 8px); }
 .header-spots-wide-right { left: calc(50% + 260px + 16px); }
-/* 検索窓の左右に斑点を置く余白がない幅では表示しない。 */
-@container header-search (max-width: 900px) {
+/*
+ * 左の斑点の黒い部分(絵の x=20〜150)がロゴの文字から8px以上離れない幅では表示しない。
+ * 文字は領域の左端から20px(列の間隔)外にあるので、(幅 - 520) / 2 - 8 - 150 >= -20 + 8 から幅812px以上で表示する。
+ * 右の斑点はボタンの下に潜ってよいので、右側の余白は条件にしない。
+ */
+@container header-search (max-width: 811px) {
   .header-spots-wide { display: none; }
 }
 
@@ -285,7 +290,44 @@ body.hide-thumbs .thumb {
 .header-search input[type="text"][aria-invalid="true"] { border-color: #b3261e; }
 .header-search input[type="text"]:disabled { cursor: progress; }
 
-.header-right { position: relative; display: flex; justify-content: flex-end; }
+.header-right { position: relative; display: flex; justify-content: flex-end; gap: 8px; }
+/* 斑点が下に潜るよう、ボタンを斑点より手前に描く。狭い画面では .header-right が箱を持たないため、ボタン自身に指定する。 */
+.language-btn,
+.menu-trigger-btn { position: relative; }
+
+/* 曲名・アーティスト名の表記の切り替え。検索窓と同じく、どちらのテーマでも白地にして文字色をテーマに依存させない。 */
+.language-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 14px 0 12px;
+  border: 2px solid var(--accent-fill-border);
+  border-radius: 999px;
+  background: #ffffff;
+  color: #1b1b1b;
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.language-btn:hover { background: #f6f3eb; }
+
+/* 両方の文言を同じ位置に重ね、ボタンの幅を長いほうに揃える。見せるのはボタンの lang と同じ言語の文言だけ。 */
+.language-btn-labels { display: grid; place-items: center; }
+.language-btn-label { grid-area: 1 / 1; }
+.language-btn[lang="en"] .language-btn-label[lang="ja"],
+.language-btn[lang="ja"] .language-btn-label[lang="en"] { visibility: hidden; }
+
+.language-btn-icon {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
 
 .menu-trigger-btn {
   display: inline-flex;
@@ -317,11 +359,23 @@ body.hide-thumbs .thumb {
   .header {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-rows: 56px auto;
+    column-gap: 8px;
     height: auto;
     padding: 0 14px 12px;
   }
+  /* 1段目のロゴとボタンの間は斑点の余白に使うため、言語ボタンは2段目の検索窓の右に置く。 */
   .header-search-area {
-    grid-column: 1 / -1;
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .header-right { display: contents; }
+  .menu-trigger-btn {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+  }
+  .language-btn {
+    grid-column: 2;
     grid-row: 2;
   }
   .header-search { max-width: none; }

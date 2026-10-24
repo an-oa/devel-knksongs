@@ -1,3 +1,4 @@
+import { getSongDisplayTitle } from "../../lib/song-display-name.mjs";
 import { resolveSongRef } from "../../lib/song-lookup.mjs";
 import type { AppDataState, AppUiState } from "../../state.types";
 
@@ -41,7 +42,7 @@ export function createBookmarkNotificationController({
     timeoutMs = BOOKMARK_NOTIFICATION_TIMEOUT_MS
 }: {
     data: Pick<AppDataState, "allSongsRaw">;
-    ui: Pick<AppUiState, "lookup"> & {
+    ui: Pick<AppUiState, "lookup" | "songName"> & {
         el: Pick<AppUiState["el"], "bookmarkNotificationRegion">;
     };
     timeoutMs?: number;
@@ -116,13 +117,13 @@ export function createBookmarkNotificationController({
     }
 
     /**
-     * ブックマーク保存用の曲参照から通知に表示する曲名を返す。
-     * @param {string | null | undefined} songRef
-     * @returns {string}
+     * ブックマーク保存用の曲参照から、通知に表示する曲名を設定中の表記で返す。
+     * @param songRef ブックマーク保存用の曲参照
+     * @returns 通知に表示する曲名
      */
     function getSongTitleForNotification(songRef: string | null | undefined): string {
         const song = resolveSongRef(lookupUi, data.allSongsRaw, songRef);
-        const title = song && typeof song.title === "string" ? song.title.trim() : "";
+        const title = song ? getSongDisplayTitle(song, ui.songName.language).text.trim() : "";
         return title || "曲名不明";
     }
 

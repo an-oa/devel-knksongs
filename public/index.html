@@ -276,6 +276,16 @@
         </svg>
       </div>
       <div class="header-right">
+        <!-- 曲名・アーティスト名の表記の切り替え。日本語を読めない人にも見つけられるよう、切り替え先の言語で書く。
+             ボタンの lang・aria-label は起動時に表示中の表記から設定し直し、lang と同じ言語の文言だけを見せる。
+             両方の文言を重ねて置き、ボタンの幅を長いほうに揃えて、切り替えても検索窓や斑点が動かないようにする。 -->
+        <button id="song-name-language-btn" class="language-btn" type="button" lang="en" aria-label="Show song and artist names in English" title="Show song and artist names in English">
+          <svg class="language-btn-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.4 2.5 3.6 5.5 3.6 9s-1.2 6.5-3.6 9c-2.4-2.5-3.6-5.5-3.6-9s1.2-6.5 3.6-9z"/></svg>
+          <span class="language-btn-labels" aria-hidden="true">
+            <span class="language-btn-label" lang="en">English</span>
+            <span class="language-btn-label" lang="ja">日本語</span>
+          </span>
+        </button>
         <button id="open-sidebar" class="menu-trigger-btn" aria-label="絞り込み・設定を開く" aria-expanded="false" aria-controls="sidebar">
           <svg class="menu-trigger-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
           <span>絞り込み</span>

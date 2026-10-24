@@ -8,6 +8,7 @@ type UiSyncControllerInput = {
     syncSearchUI: (options?: UiSyncOptions) => void;
     applyThemeFromStorage: () => void;
     applyPlaybackSettingsFromStorage: () => void;
+    applySongNamesFromStorage: () => void;
 };
 
 /**
@@ -18,7 +19,8 @@ export function createUiSyncController(input: UiSyncControllerInput) {
         uiSyncPasses,
         syncSearchUI,
         applyThemeFromStorage,
-        applyPlaybackSettingsFromStorage
+        applyPlaybackSettingsFromStorage,
+        applySongNamesFromStorage
     } = input;
 
     /**
@@ -74,11 +76,12 @@ export function createUiSyncController(input: UiSyncControllerInput) {
     }
 
     /**
-     * テーマとサムネイル表示の UI 状態を同期する。
+     * テーマ・サムネイル表示・曲名の表記の UI 状態を同期する。
      */
     function syncVisualUI(): void {
         applyThemeFromStorage();
         applyPlaybackSettingsFromStorage();
+        applySongNamesFromStorage();
     }
 
     /**

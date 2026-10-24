@@ -7,6 +7,7 @@ import type { StorageActionFailure, StorageActionResult } from "./storage.mjs";
 import { applyMasonryLayout } from "../lib/render/masonry-layout.mjs";
 import { createResultTailObserver } from "../lib/render/result-tail-observer.mjs";
 import { getBookmarkSongRef } from "../lib/song-identity.mjs";
+import { getSongDisplayArtist, getSongDisplayTitle, type SongDisplayName } from "../lib/song-display-name.mjs";
 import {
     createYoutubePlaybackStartResult,
     YOUTUBE_PLAYBACK_START_STATUS
@@ -19,7 +20,8 @@ import type {
     PlaybackUiRuntimeState,
     RenderCardEntry,
     RenderUiRuntimeState,
-    SearchUiRuntimeState
+    SearchUiRuntimeState,
+    SongNameUiRuntimeState
 } from "../state.types";
 
 const DEFAULT_RESULT_DISPLAY_BATCH_SIZE = 48;
@@ -34,6 +36,7 @@ type RenderUiState = {
     search: Pick<SearchUiRuntimeState, "dataReady" | "selectedFormats">;
     playback: Pick<PlaybackUiRuntimeState, "activeThumb">;
     render: RenderUiRuntimeState;
+    songName: SongNameUiRuntimeState;
 };
 
 type ActiveCardRenderState = {
@@ -176,19 +179,21 @@ export function createRenderController({
 
     /**
      * 曲データをカード要素へ反映し、アクションボタンの挙動を設定する。
-     * @param {RenderCardEntry} entry
-     * @param {Song} row
-     * @param {number} resultIndex
+     * 曲名とアーティスト名は、設定中の表記で表示する。
+     * @param entry 反映先のカード要素
+     * @param row 表示する曲
+     * @param resultIndex 結果一覧での位置
      */
     function updateCardFromRow(entry: RenderCardEntry, row: Song, resultIndex: number) {
         const bookmarkSongRef = getBookmarkSongRef(row);
         const yt = buildYoutubeTarget(row);
         const titleId = `result-title-${resultIndex + 1}`;
+        const language = ui.songName.language;
         entry.titleHeading.setAttribute("id", titleId);
         entry.content.setAttribute("aria-labelledby", titleId);
         updateThumbnail(entry.thumbDiv, yt);
-        updateTitleLink(entry.titleEl, row);
-        entry.artistEl.textContent = row.artist || "不明";
+        updateTitleLink(entry.titleEl, row, getSongDisplayTitle(row, language));
+        applyDisplayName(entry.artistEl, getSongDisplayArtist(row, language), "不明");
         entry.dateEl.textContent = row.date;
         updateFooterTags(entry.tagsEl, row);
 
@@ -231,12 +236,28 @@ export function createRenderController({
     }
 
     /**
-     * タイトル表示とリンク属性を更新する。
-     * @param {HTMLAnchorElement} titleEl
-     * @param {Song} row
+     * 名前を要素へ表示し、英語表記のときだけ言語タグを付ける。
+     * @param el 表示先の要素
+     * @param name 表示する名前と言語タグ
+     * @param fallback 名前が空のときの表示
      */
-    function updateTitleLink(titleEl: HTMLAnchorElement, row: Song) {
-        titleEl.textContent = row.title || "無題";
+    function applyDisplayName(el: HTMLElement, name: SongDisplayName, fallback: string) {
+        el.textContent = name.text || fallback;
+        if (name.lang) {
+            el.setAttribute("lang", name.lang);
+        } else {
+            el.removeAttribute("lang");
+        }
+    }
+
+    /**
+     * タイトル表示とリンク属性を更新する。
+     * @param titleEl 曲名のリンク要素
+     * @param row 表示する曲
+     * @param title 設定中の表記で選んだ曲名
+     */
+    function updateTitleLink(titleEl: HTMLAnchorElement, row: Song, title: SongDisplayName) {
+        applyDisplayName(titleEl, title, "無題");
         if (row.url) {
             titleEl.classList.add("title-link");
             titleEl.setAttribute("href", row.url);

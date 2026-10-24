@@ -1,14 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createBookmarkNotificationController } from "../app/ui/bookmark/notifications.mts";
+import type { SongNameLanguage } from "../app/lib/song-display-name.mts";
 import { createSongFixture } from "./fixtures/song.mts";
 import { installFakeDom, installFakeTimeouts, invokeListener } from "./test-helpers.mts";
 
 /**
  * 通知テスト用の UI 状態を作る。
- * @returns {object}
+ * @param language 曲名の表記
+ * @returns 通知の表示先と曲参照用のマップを持つ UI 状態
  */
-function createNotificationUiState() {
+function createNotificationUiState(language: SongNameLanguage = "ja") {
     const bookmarkNotificationRegion = document.createElement("div");
     document.body.appendChild(bookmarkNotificationRegion);
     return {
@@ -19,6 +21,9 @@ function createNotificationUiState() {
             songMapByBookmarkKey: new Map<string, Song>(),
             songMapByKey: new Map<string, Song>(),
             songLookupSourceRef: null
+        },
+        songName: {
+            language
         }
     };
 }
@@ -33,7 +38,8 @@ function createNotificationDataState() {
             createSongFixture({
                 songKey: "song-z",
                 bookmarkSongKey: "bookmark-song-z",
-                title: "透明な朝"
+                title: "透明な朝",
+                titleEn: "Clear Morning"
             })
         ],
         currentResults: [],
@@ -69,6 +75,28 @@ test("bookmark notifications: replaces toast and clears the previous timer", () 
         assert.equal(timers[0].unrefCalled, true);
         assert.equal(timers[1].delay, 1200);
         assert.deepEqual(timers.filter((timer) => timer.cleared), [timers[0]]);
+    } finally {
+        fakeTimeouts.cleanup();
+        restoreDom();
+    }
+});
+
+test("bookmark notifications: saved song titles follow the English name setting", () => {
+    const restoreDom = installFakeDom();
+    const fakeTimeouts = installFakeTimeouts();
+
+    try {
+        const ui = createNotificationUiState("en");
+        const controller = createBookmarkNotificationController({
+            data: createNotificationDataState(),
+            ui
+        });
+
+        controller.notifySongSavedToBookmark("Morning", "bookmark-song-z");
+
+        const message = ui.el.bookmarkNotificationRegion.querySelector(".bookmark-toast-message");
+        assert.ok(message);
+        assert.equal(message.textContent, "ブックマーク「Morning」に「Clear Morning」を保存しました。");
     } finally {
         fakeTimeouts.cleanup();
         restoreDom();

@@ -44,6 +44,7 @@ function createRenderUiState<Elements extends {
     dataReady?: boolean;
     activeThumb?: HTMLElement | null;
     cardEntriesBySongKey?: Map<string, import("../app/state.types").RenderCardEntry>;
+    songNameLanguage?: import("../app/lib/song-display-name.mts").SongNameLanguage;
 }) {
     return {
         el: input.el,
@@ -65,6 +66,9 @@ function createRenderUiState<Elements extends {
         },
         render: {
             cardEntriesBySongKey: input.cardEntriesBySongKey ?? new Map<string, import("../app/state.types").RenderCardEntry>()
+        },
+        songName: {
+            language: input.songNameLanguage ?? "ja"
         },
         lookup: {
             songMapByBookmarkKey: new Map(),
@@ -303,6 +307,61 @@ test("render: result cards and empty state use list semantics", () => {
 
         assert.equal(ui.el.resultList.children[0].tagName, "LI");
         assert.equal(ui.el.resultList.children[0].classList.contains("result-empty-state"), true);
+    } finally {
+        cleanup();
+    }
+});
+
+test("render: cards show English names with a language tag when the setting is English", () => {
+    const cleanup = installFakeDom();
+    try {
+        const data = createRenderDataState({
+            currentResults: [
+                makeRenderRow({
+                    songKey: "song:en",
+                    title: "アイネクライネ",
+                    artist: "米津玄師",
+                    titleEn: "Eine Kleine",
+                    artistEn: "Kenshi Yonezu"
+                }),
+                makeRenderRow({ songKey: "song:ja-only", title: "日本語だけの曲", artist: "歌手" })
+            ],
+            displayLimit: 48,
+            activeBookmark: null
+        });
+        const ui = createRenderUiState({
+            el: {
+                resultList: document.createElement("ol"),
+                resultTailSentinel: document.createElement("div")
+            },
+            songNameLanguage: "en"
+        });
+        const controller = createRenderController({
+            data,
+            ui,
+            isAllFormatsSelected: () => true,
+            callbacks: createRenderCallbacks()
+        });
+
+        controller.updateDisplay();
+
+        const [englishCard, japaneseOnlyCard] = Array.from(ui.el.resultList.children);
+        const englishTitle = englishCard.querySelector(".title");
+        const englishArtist = englishCard.querySelector(".artist");
+        assert.equal(englishTitle?.textContent, "Eine Kleine");
+        assert.equal(englishTitle?.getAttribute("lang"), "en");
+        assert.equal(englishArtist?.textContent, "Kenshi Yonezu");
+        assert.equal(englishArtist?.getAttribute("lang"), "en");
+        assert.equal(japaneseOnlyCard.querySelector(".title")?.textContent, "日本語だけの曲");
+        assert.equal(japaneseOnlyCard.querySelector(".title")?.hasAttribute("lang"), false);
+
+        ui.songName.language = "ja";
+        controller.updateDisplay();
+
+        assert.equal(englishTitle?.textContent, "アイネクライネ", "the reused card switches back to Japanese");
+        assert.equal(englishTitle?.hasAttribute("lang"), false);
+        assert.equal(englishArtist?.textContent, "米津玄師");
+        assert.equal(englishArtist?.hasAttribute("lang"), false);
     } finally {
         cleanup();
     }

@@ -42,6 +42,7 @@ import {
     setupTheme
 } from "./ui/core/elements.mjs";
 import { createUiSyncController } from "./ui/core/sync.mjs";
+import { applySongNameLanguageFromStorage, setupSongNames } from "./ui/core/song-names.mjs";
 import { createDataLoader } from "./ui/core/data.mjs";
 import { createDateFilterController } from "./ui/date/filter.mjs";
 import { createSearchUiActions } from "./ui/core/search-actions.mjs";
@@ -468,7 +469,11 @@ function createAppControllers() {
         uiSyncPasses: UI_SYNC_PASSES,
         syncSearchUI: searchUiActions.syncSearchUI,
         applyThemeFromStorage: () => applyThemeFromStorage({ ui: appUiState }),
-        applyPlaybackSettingsFromStorage: () => playbackSettingsController.applyPlaybackSettingsFromStorage()
+        applyPlaybackSettingsFromStorage: () => playbackSettingsController.applyPlaybackSettingsFromStorage(),
+        applySongNamesFromStorage: () => {
+            // 別タブで表記を変えた場合だけ、表示中のカードを描き直す
+            if (applySongNameLanguageFromStorage({ ui: appUiState })) renderController.updateDisplay();
+        }
     });
 
     wireYoutubePlaybackHooks({
@@ -533,6 +538,7 @@ async function initUI(): Promise<void> {
     resultSummaryController.setup();
     storageController.restorePersistedState();
     setupTheme({ ui: appUiState });
+    setupSongNames({ ui: appUiState, updateDisplay: () => renderController.updateDisplay() });
     playbackSettingsController.setupPlaybackSettings();
     exposePlaybackSettingsConsoleApi();
     uiSyncController.setupSyncEvents();
