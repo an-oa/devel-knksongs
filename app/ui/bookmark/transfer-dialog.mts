@@ -59,6 +59,10 @@ export type BookmarkTransferDialogRequest<T> = {
     notice?: string;
     options: BookmarkTransferDialogOption[];
     submitLabel: string;
+    /** 一括選択のチェックボックスの文言。 */
+    selectAllLabel: string;
+    /** 取り消しボタンの文言。 */
+    cancelLabel: string;
     /** 選んだ項目の ID から、決定ボタンの状態と文言を決める。 */
     describeSelection: (selectedIds: string[]) => BookmarkTransferSelectionState;
     /** 決定ボタンで選んだ項目を処理する。成功するとダイアログを閉じ、値を open の結果として返す。 */
@@ -86,6 +90,8 @@ type DialogParts = {
     description: HTMLElement;
     notice: HTMLElement;
     selectAll: HTMLInputElement;
+    /** 一括選択の文言。開くたびに、表示中の言語の文言を入れる。 */
+    selectAllText: HTMLElement;
     list: HTMLElement;
     status: HTMLElement;
     cancelBtn: HTMLButtonElement;
@@ -183,7 +189,6 @@ export function createBookmarkTransferDialogController() {
         const selectAll = createPart("input", "bookmark-transfer-select-all", "");
         selectAll.type = "checkbox";
         const selectAllText = document.createElement("span");
-        selectAllText.textContent = "すべて選択";
         const selectAllLabel = createPart("label", "", "bookmark-transfer-select-all checkbox-item");
         selectAllLabel.append(selectAll, selectAllText);
 
@@ -194,7 +199,6 @@ export function createBookmarkTransferDialogController() {
         status.setAttribute("aria-live", "polite");
         const cancelBtn = createPart("button", "bookmark-transfer-cancel", "bookmark-transfer-cancel");
         cancelBtn.type = "button";
-        cancelBtn.textContent = "キャンセル";
 
         const submitBtn = createPart("button", "bookmark-transfer-submit", "bookmark-transfer-submit");
         submitBtn.type = "button";
@@ -256,6 +260,7 @@ export function createBookmarkTransferDialogController() {
             description,
             notice,
             selectAll,
+            selectAllText,
             list,
             status,
             cancelBtn,
@@ -554,6 +559,8 @@ export function createBookmarkTransferDialogController() {
         const current = parts;
 
         current.title.textContent = request.title;
+        current.selectAllText.textContent = request.selectAllLabel;
+        current.cancelBtn.textContent = request.cancelLabel;
         current.notice.textContent = request.notice ?? "";
         current.notice.hidden = !request.notice;
         const allItemsAction = request.allItemsAction;

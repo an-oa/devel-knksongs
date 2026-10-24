@@ -611,13 +611,16 @@ export function setGlobalValue(name: PropertyKey, value: unknown) {
 
 /** 描画用の既定値を保ち、共有 fixture で完全な Song を作る。 */
 export function makeRenderRow(input: Pick<Song, "songKey"> & Partial<Pick<Song,
-    "bookmarkSongKey" | "title" | "artist" | "date" | "format" | "streamRole" | "videoOrientation" | "url"
+    "bookmarkSongKey" | "title" | "artist" | "titleEn" | "artistEn" | "date" | "format" | "streamRole" | "videoOrientation" | "url"
 >>): Song {
     return createSongFixture({
         songKey: input.songKey,
         bookmarkSongKey: input.bookmarkSongKey ?? input.songKey,
         title: input.title || "title",
         artist: input.artist || "artist",
+        // 英語表記は指定した曲だけに持たせ、未指定は英語表記のない曲として扱う。
+        titleEn: input.titleEn ?? "",
+        artistEn: input.artistEn ?? "",
         date: input.date || "2024-01-01",
         format: input.format || "配信",
         streamRole: input.streamRole ?? "",

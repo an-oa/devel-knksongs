@@ -70,6 +70,9 @@ function createBookmarkUiState() {
             songMapByKey: new Map<string, Song>(),
             songLookupSourceRef: null
         },
+        language: {
+            current: "ja" as const
+        },
         bookmarkPanel
     };
 }

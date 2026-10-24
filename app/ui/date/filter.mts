@@ -5,7 +5,8 @@ import {
     normalizePartialDateParts
 } from "../../lib/partial-date.mjs";
 import type { PartialDateValue } from "../../lib/partial-date.mjs";
-import type { AppUiElements, DateUiRuntimeState } from "../../state.types";
+import type { AppUiElements, DateUiRuntimeState, SiteLanguageUiRuntimeState } from "../../state.types";
+import { getUiText } from "../../lib/ui-text.mjs";
 
 /** 日付範囲の開始側と終了側。日付の入力・保存・条件表示で共通に使う。 */
 export type DateSelectKind = "from" | "to";
@@ -37,6 +38,8 @@ type DateFilterUiElements = Pick<
 type DateFilterUiState = {
     el: DateFilterUiElements;
     date: DateUiRuntimeState;
+    /** 日付の選択欄の先頭(未選択)に出す文言の言語。 */
+    language: SiteLanguageUiRuntimeState;
 };
 
 /**
@@ -47,6 +50,32 @@ export function createDateFilterController({ ui, onDateSelectionChange }: {
     onDateSelectionChange?: () => void;
 }) {
     const dateUi = ui.date;
+
+    /**
+     * 日付の選択欄の先頭(未選択)に出す文言を、サイトの言語で返す。
+     * @returns 年・月・日の未選択の文言
+     */
+    function getDateSelectText() {
+        return getUiText(ui.language.current).dateSelect;
+    }
+
+    /**
+     * 描画済みの日付の選択欄の、先頭(未選択)の文言を今の言語で書き直す。選択中の値は変えない。
+     */
+    function refreshDateSelectPlaceholders(): void {
+        const text = getDateSelectText();
+        ([
+            [ui.el.dateFromYear, text.year],
+            [ui.el.dateToYear, text.year],
+            [ui.el.dateFromMonth, text.month],
+            [ui.el.dateToMonth, text.month],
+            [ui.el.dateFromDay, text.day],
+            [ui.el.dateToDay, text.day]
+        ] as const).forEach(([select, placeholder]) => {
+            const empty = select?.querySelector('option[value=""]');
+            if (empty) empty.textContent = placeholder;
+        });
+    }
 
     /**
      * 開始/終了いずれかの日付選択があるか判定する。
@@ -243,12 +272,12 @@ export function createDateFilterController({ ui, onDateSelectionChange }: {
         for (let y = minParts.year; y <= maxParts.year; y++) {
             years.push(String(y));
         }
-        buildSelectOptions(ui.el.dateFromYear, years, "年");
-        buildSelectOptions(ui.el.dateToYear, years, "年");
-        buildSelectOptions(ui.el.dateFromMonth, [], "月");
-        buildSelectOptions(ui.el.dateToMonth, [], "月");
-        buildSelectOptions(ui.el.dateFromDay, [], "日");
-        buildSelectOptions(ui.el.dateToDay, [], "日");
+        buildSelectOptions(ui.el.dateFromYear, years, getDateSelectText().year);
+        buildSelectOptions(ui.el.dateToYear, years, getDateSelectText().year);
+        buildSelectOptions(ui.el.dateFromMonth, [], getDateSelectText().month);
+        buildSelectOptions(ui.el.dateToMonth, [], getDateSelectText().month);
+        buildSelectOptions(ui.el.dateFromDay, [], getDateSelectText().day);
+        buildSelectOptions(ui.el.dateToDay, [], getDateSelectText().day);
         syncDateSelectOptions();
         applyPendingDateValues();
     }
@@ -341,21 +370,21 @@ export function createDateFilterController({ ui, onDateSelectionChange }: {
             const minParts = dateKeyToParts(bounds.minKey);
             const maxParts = dateKeyToParts(bounds.maxKey);
             const years = buildNumberRange(minParts.year, maxParts.year).map((y) => String(y));
-            buildSelectOptions(yearSelect, years, "年");
+            buildSelectOptions(yearSelect, years, getDateSelectText().year);
             const selectedYear = yearSelect.value;
             const minMonth = selectedYear === String(minParts.year) ? minParts.month : 1;
             const maxMonth = selectedYear === String(maxParts.year) ? maxParts.month : 12;
             const months = selectedYear ? buildNumberRange(minMonth, maxMonth).map((m) => String(m).padStart(2, "0")) : [];
-            buildSelectOptions(monthSelect, months, "月");
+            buildSelectOptions(monthSelect, months, getDateSelectText().month);
             const monthVal = monthSelect.value;
             if (!selectedYear || !monthVal) {
-                buildSelectOptions(daySelect, [], "日");
+                buildSelectOptions(daySelect, [], getDateSelectText().day);
                 return;
             }
             const monthNum = Number(monthVal);
             const availableDays = getAvailableDays(selectedYear, monthVal);
             if (availableDays.length === 0) {
-                buildSelectOptions(daySelect, [], "日");
+                buildSelectOptions(daySelect, [], getDateSelectText().day);
                 return;
             }
             let minDay = availableDays[0];
@@ -365,7 +394,7 @@ export function createDateFilterController({ ui, onDateSelectionChange }: {
             const days = availableDays
                 .filter((d) => d >= minDay && d <= maxDay)
                 .map((d) => String(d).padStart(2, "0"));
-            buildSelectOptions(daySelect, days, "日");
+            buildSelectOptions(daySelect, days, getDateSelectText().day);
         });
     }
 
@@ -554,6 +583,7 @@ export function createDateFilterController({ ui, onDateSelectionChange }: {
 
     return {
         hasDateSelection,
+        refreshDateSelectPlaceholders,
         getDateSelectValue,
         applyDateSelectValue,
         resetDateSelects,

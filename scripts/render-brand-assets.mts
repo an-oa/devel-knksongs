@@ -12,6 +12,8 @@ const BRAND_SOURCE_DIR = "design/brand";
 /** 書き出すブランド画像と、その描画元・画像サイズ。 */
 const BRAND_ASSETS = [
     { fileName: "ogp.png", source: "ogp.html", width: 1200, height: 630 },
+    // 英語の OGP 用。同じ描画元を ?lang=en で開き、文字だけを英語にする。
+    { fileName: "ogp-en.png", source: "ogp.html", query: "?lang=en", width: 1200, height: 630 },
     { fileName: "apple-touch-icon.png", source: "apple-touch-icon.html", width: 180, height: 180 }
 ] as const;
 const FAVICON_PNG = { fileName: "favicon-32.png", source: "favicon.svg", size: 32 } as const;
@@ -37,11 +39,19 @@ export function parseArgs(args: string[]): { outputDir: string } {
 
 /**
  * design/brand の HTML を Chromium で描画し、指定サイズの PNG として保存する。
+ * query は描画元に渡す URL の query で、同じ描画元から文字だけ違う画像を作るときに使う。
  */
-async function renderHtml(browser: Browser, source: string, outputPath: string, width: number, height: number): Promise<void> {
+async function renderHtml(
+    browser: Browser,
+    source: string,
+    outputPath: string,
+    width: number,
+    height: number,
+    query = ""
+): Promise<void> {
     const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
     try {
-        await page.goto(pathToFileURL(resolve(BRAND_SOURCE_DIR, source)).href);
+        await page.goto(`${pathToFileURL(resolve(BRAND_SOURCE_DIR, source)).href}${query}`);
         await page.evaluate(() => document.fonts.ready);
         await page.screenshot({ path: outputPath });
     } finally {
@@ -83,7 +93,7 @@ export async function renderBrandAssets(options: { outputDir: string }): Promise
         const written: string[] = [];
         for (const asset of BRAND_ASSETS) {
             const outputPath = join(outputDir, asset.fileName);
-            await renderHtml(browser, asset.source, outputPath, asset.width, asset.height);
+            await renderHtml(browser, asset.source, outputPath, asset.width, asset.height, "query" in asset ? asset.query : "");
             written.push(outputPath);
         }
         const faviconPath = join(outputDir, FAVICON_PNG.fileName);

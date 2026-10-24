@@ -7,6 +7,9 @@ import type { StorageActionFailure, StorageActionResult } from "./storage.mjs";
 import { applyMasonryLayout } from "../lib/render/masonry-layout.mjs";
 import { createResultTailObserver } from "../lib/render/result-tail-observer.mjs";
 import { getBookmarkSongRef } from "../lib/song-identity.mjs";
+import { getSongDisplayArtist, getSongDisplayTitle, type SongDisplayName } from "../lib/song-display-name.mjs";
+import type { SiteLanguage } from "../lib/site-language.mjs";
+import { getUiText, type UiText } from "../lib/ui-text.mjs";
 import {
     createYoutubePlaybackStartResult,
     YOUTUBE_PLAYBACK_START_STATUS
@@ -19,7 +22,8 @@ import type {
     PlaybackUiRuntimeState,
     RenderCardEntry,
     RenderUiRuntimeState,
-    SearchUiRuntimeState
+    SearchUiRuntimeState,
+    SiteLanguageUiRuntimeState
 } from "../state.types";
 
 const DEFAULT_RESULT_DISPLAY_BATCH_SIZE = 48;
@@ -34,6 +38,7 @@ type RenderUiState = {
     search: Pick<SearchUiRuntimeState, "dataReady" | "selectedFormats">;
     playback: Pick<PlaybackUiRuntimeState, "activeThumb">;
     render: RenderUiRuntimeState;
+    language: SiteLanguageUiRuntimeState;
 };
 
 type ActiveCardRenderState = {
@@ -176,9 +181,10 @@ export function createRenderController({
 
     /**
      * 曲データをカード要素へ反映し、アクションボタンの挙動を設定する。
-     * @param {RenderCardEntry} entry
-     * @param {Song} row
-     * @param {number} resultIndex
+     * 曲名などの文言は updateCardText で、今の言語で書く。
+     * @param entry 反映先のカード要素
+     * @param row 表示する曲
+     * @param resultIndex 結果一覧での位置
      */
     function updateCardFromRow(entry: RenderCardEntry, row: Song, resultIndex: number) {
         const bookmarkSongRef = getBookmarkSongRef(row);
@@ -187,31 +193,41 @@ export function createRenderController({
         entry.titleHeading.setAttribute("id", titleId);
         entry.content.setAttribute("aria-labelledby", titleId);
         updateThumbnail(entry.thumbDiv, yt);
-        updateTitleLink(entry.titleEl, row);
-        entry.artistEl.textContent = row.artist || "不明";
-        entry.dateEl.textContent = row.date;
-        updateFooterTags(entry.tagsEl, row);
+        updateTitleLinkTarget(entry.titleEl, row);
 
-        const isBookmarkActive = !!data.activeBookmark;
         const btn = entry.actionBtn;
-
-        if (isBookmarkActive) {
+        if (data.activeBookmark) {
             btn.textContent = "×";
             btn.className = "remove-from-bookmark-btn";
-            btn.setAttribute("aria-label", "ブックマークから削除");
-            btn.setAttribute("title", "ブックマークから削除");
             btn.onclick = () => {
                 removeSongFromActiveBookmark(bookmarkSongRef);
             };
         } else {
             btn.textContent = "+";
             btn.className = "add-to-bookmark-btn";
-            btn.setAttribute("aria-label", "ブックマークに追加");
-            btn.setAttribute("title", "ブックマークに追加");
             btn.onclick = () => {
                 openBookmarkModal(bookmarkSongRef);
             };
         }
+        updateCardText(entry, row);
+    }
+
+    /**
+     * カードの文言(曲名・アーティスト名・日付・タグ・ボタンの説明)を、今の言語で書く。
+     * サムネイルやクリックの処理は触らないので、言語の切り替えではこれだけを呼べばよい。
+     * @param entry 反映先のカード要素
+     * @param row 表示する曲
+     */
+    function updateCardText(entry: RenderCardEntry, row: Song) {
+        const language = ui.language.current;
+        const text = getUiText(language);
+        applyDisplayName(entry.titleEl, getSongDisplayTitle(row, language), text.card.untitled, language);
+        applyDisplayName(entry.artistEl, getSongDisplayArtist(row, language), text.card.unknownArtist, language);
+        entry.dateEl.textContent = text.card.date(row);
+        updateFooterTags(entry.tagsEl, row, text);
+        const actionLabel = data.activeBookmark ? text.card.removeFromBookmark : text.card.addToBookmark;
+        entry.actionBtn.setAttribute("aria-label", actionLabel);
+        entry.actionBtn.setAttribute("title", actionLabel);
     }
 
     /**
@@ -231,12 +247,28 @@ export function createRenderController({
     }
 
     /**
-     * タイトル表示とリンク属性を更新する。
-     * @param {HTMLAnchorElement} titleEl
-     * @param {Song} row
+     * 名前を要素へ表示し、名前の言語がページの言語と違うときだけ言語タグを付ける。
+     * 英語のページで英名のない曲は日本語名を出すので、その名前に lang="ja" を付ける。
+     * @param el 表示先の要素
+     * @param name 表示する名前とその言語
+     * @param fallback 名前が空のときの表示。ページの言語で書く
+     * @param pageLanguage ページの言語
      */
-    function updateTitleLink(titleEl: HTMLAnchorElement, row: Song) {
-        titleEl.textContent = row.title || "無題";
+    function applyDisplayName(el: HTMLElement, name: SongDisplayName, fallback: string, pageLanguage: SiteLanguage) {
+        el.textContent = name.text || fallback;
+        if (name.text && name.lang !== pageLanguage) {
+            el.setAttribute("lang", name.lang);
+        } else {
+            el.removeAttribute("lang");
+        }
+    }
+
+    /**
+     * 曲名のリンク先を更新する。曲名の文字は updateCardText で書く。
+     * @param titleEl 曲名のリンク要素
+     * @param row 表示する曲
+     */
+    function updateTitleLinkTarget(titleEl: HTMLAnchorElement, row: Song) {
         if (row.url) {
             titleEl.classList.add("title-link");
             titleEl.setAttribute("href", row.url);
@@ -252,33 +284,34 @@ export function createRenderController({
 
     /**
      * 形式・コラボ・リレー・ハモリのタグ表示を更新する。
-     * @param {Element} tags
-     * @param {{ format?: string, streamRole?: string, isRelay?: boolean, isHarmony?: boolean }} row
+     * @param tags タグを並べる要素
+     * @param row 表示する曲
+     * @param text サイトの言語の文言
      */
-    function updateFooterTags(tags: Element, row: Song) {
+    function updateFooterTags(tags: Element, row: Song, text: UiText) {
         tags.replaceChildren();
         if (row.format) {
             const fmt = document.createElement("span");
             fmt.className = "tag";
-            fmt.textContent = row.format;
+            fmt.textContent = text.formatTag(row.format);
             tags.appendChild(fmt);
         }
         if (hasStreamRole(row.streamRole)) {
             const collab = document.createElement("span");
             collab.className = "tag tag-collab";
-            collab.textContent = "コラボ";
+            collab.textContent = text.tags.collab;
             tags.appendChild(collab);
         }
         if (row.isRelay) {
             const relay = document.createElement("span");
             relay.className = "tag tag-relay";
-            relay.textContent = "リレー";
+            relay.textContent = text.tags.relay;
             tags.appendChild(relay);
         }
         if (row.isHarmony) {
             const harmony = document.createElement("span");
             harmony.className = "tag tag-harmony";
-            harmony.textContent = "ハモリ";
+            harmony.textContent = text.tags.harmony;
             tags.appendChild(harmony);
         }
     }
@@ -305,23 +338,24 @@ export function createRenderController({
         title.textContent = descriptor.message;
         const hint = document.createElement("p");
         hint.className = "result-empty-state-hint";
-        hint.textContent = "キーワードを減らすか、絞り込みを解除してみてください。";
+        hint.textContent = getUiText(ui.language.current).results.emptyHint;
         empty.append(icon, title, hint);
         return empty;
     }
 
     /**
-     * 現在状態に応じた空結果メッセージ種別を決定する。
-     * @returns {EmptyStateDescriptor}
+     * 現在状態に応じた空結果メッセージ種別を、サイトの言語の文言で決定する。
+     * @returns 空結果の種別と文言
      */
     function getEmptyStateDescriptor(): EmptyStateDescriptor {
+        const results = getUiText(ui.language.current).results;
         if (!searchUiState.dataReady) {
-            return { kind: "loading", message: "読み込み中..." };
+            return { kind: "loading", message: results.loading };
         }
         if (!isAllFormatsSelected() && searchUiState.selectedFormats.size === 0) {
-            return { kind: "error", message: "動画の種類を選択してください" };
+            return { kind: "error", message: results.selectFormats };
         }
-        return { kind: "empty", message: "見つかりませんでした" };
+        return { kind: "empty", message: results.notFound };
     }
 
     /**
@@ -642,10 +676,30 @@ export function createRenderController({
         resultTailObservationController.observe();
     }
 
+    /**
+     * 表示中のカードと空の結果の文言を、今の言語で書き直す。言語の切り替えで使う。
+     * サムネイルや再生・クリックの処理には触らず、文字の長さで高さが変わるので配置だけを計算し直す。
+     */
+    function refreshText() {
+        const container = ui.el.resultList;
+        if (!container) return;
+        // 空の結果は renderEmptyResults が一覧の唯一の子として置くので、同じく一覧ごと置き換える。
+        if (container.querySelector(".result-empty-state")) {
+            container.replaceChildren(createEmptyStateElement(getEmptyStateDescriptor()));
+            return;
+        }
+        for (const row of data.currentResults.slice(0, data.displayLimit)) {
+            const entry = renderUi.cardEntriesBySongKey.get(row.songKey);
+            if (entry) updateCardText(entry, row);
+        }
+        refreshLayout();
+    }
+
     return {
         playSongByKey,
         scrollSongIntoView,
         updateDisplay,
+        refreshText,
         refreshLayout
     };
 }

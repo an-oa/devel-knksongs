@@ -34,7 +34,7 @@ test("search query validation: exposes errors on completion and clears them duri
     const { searchBox, attributes } = createSearchInputMock("since:2024-02-30");
     const errorElement = { hidden: true, textContent: "" };
 
-    assert.equal(validateSearchQueryInput(searchBox, errorElement), false);
+    assert.equal(validateSearchQueryInput(searchBox, errorElement, undefined, "ja"), false);
     assert.match(searchBox.validationMessage, /YYYY/);
     assert.match(searchBox.validationMessage, /二重引用符/);
     assert.equal(attributes.get("aria-invalid"), "true");
@@ -63,14 +63,14 @@ test("search query validation: keeps an existing error until input becomes valid
 
 test("search query validation: reports an unclosed quoted phrase", () => {
     assert.match(
-        getSearchQueryValidationMessage(parseSearchQuery('"Song until:2026')),
+        getSearchQueryValidationMessage(parseSearchQuery('"Song until:2026'), "ja"),
         /閉じられていません/
     );
 });
 
 test("search query validation: explains contradictory operator bounds", () => {
     assert.match(
-        getSearchQueryValidationMessage(parseSearchQuery("since:2024-02-01 until:2024-01-31")),
+        getSearchQueryValidationMessage(parseSearchQuery("since:2024-02-01 until:2024-01-31"), "ja"),
         /since の日付は until の日付以前/
     );
 });
@@ -87,7 +87,7 @@ test("search query validation: reports every issue type and deduplicates repeate
         ]
     );
 
-    const message = getSearchQueryValidationMessage(parsedQuery);
+    const message = getSearchQueryValidationMessage(parsedQuery, "ja");
     assert.equal(message.match(/日付演算子は/g)?.length, 1);
     assert.match(message, /二重引用符が閉じられていません/);
     assert.match(message, /since の日付は until の日付以前/);

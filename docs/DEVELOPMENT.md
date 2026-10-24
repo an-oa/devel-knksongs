@@ -68,7 +68,7 @@ build 済みの生成物を再利用したい場合は、対象ソースの変�
 
 | パス | 内容 |
 | --- | --- |
-| `public/` | `index.html`・`styles.css`・アイコン・OGP 画像。build で site のルートへコピーする |
+| `public/` | `index.html`・`styles.css`・アイコン・OGP 画像と、英語で共有するときの OGP 用の `en/index.html`。build で site のルートへコピーする |
 | `app/` | アプリの TypeScript source（`.mts`）。`.mjs` は置かない |
 | `scripts/` | build・曲JSON生成・配布確認などの Node scripts（`.mts` を Node で直接実行） |
 | `tests/` | Node 単体テスト。`tests/e2e/` は Playwright E2E |
@@ -157,7 +157,8 @@ flowchart LR
 | `public/favicon.svg` | ファビコン（白い角丸の地とホルスタイン柄の斑点つき） |
 | `design/brand/goggles.svg` | OGP 画像とホーム画面アイコンの描画元で使う詳細版 |
 
-`public/` の `ogp.png`・`apple-touch-icon.png`・`favicon-32.png` は、`design/brand/` の描画元と `public/favicon.svg` から生成します。
+`public/` の `ogp.png`・`ogp-en.png`・`apple-touch-icon.png`・`favicon-32.png` は、`design/brand/` の描画元と `public/favicon.svg` から生成します。
+`ogp-en.png` は `design/brand/ogp.html` を `?lang=en` で開き、文字だけを英語にして書き出します。
 ゴーグルを変えたときは、SVG を書き出してから PNG を作り直します。
 
 ```sh

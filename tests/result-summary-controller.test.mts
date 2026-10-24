@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createResultSummaryController } from "../app/ui/result-summary/controller.mts";
 import type { SearchBooleanFilterKey } from "../app/lib/search-boolean-filters.mts";
+import type { SiteLanguage } from "../app/lib/site-language.mts";
 import { installFakeDom } from "./test-helpers.mts";
 
 type SummaryState = {
@@ -17,9 +18,10 @@ const ALL_FORMATS = ["配信", "歌みた", "ショート"];
 
 /**
  * 概要行 controller と、解除操作で状態を更新して即時に再描画する検索側の代役を作る。
- * @param {Partial<SummaryState>} initial
+ * @param initial 初期の検索条件
+ * @param language サイトの言語
  */
-function createHarness(initial: Partial<SummaryState> = {}) {
+function createHarness(initial: Partial<SummaryState> = {}, language: SiteLanguage = "ja") {
     const state: SummaryState = {
         query: "",
         dateFrom: "",
@@ -41,8 +43,9 @@ function createHarness(initial: Partial<SummaryState> = {}) {
         update();
         controller.render();
     };
+    const ui = { el, language: { current: language } };
     const controller = createResultSummaryController({
-        ui: { el },
+        ui,
         conditions: {
             getQuery: () => state.query,
             getDateValue: (kind) => (kind === "from" ? state.dateFrom : state.dateTo),
@@ -70,7 +73,7 @@ function createHarness(initial: Partial<SummaryState> = {}) {
     /** チップの表示名だけを返す。 */
     const getChipLabels = () => Array.from(el.resultConditions.querySelectorAll(".result-condition-chip-label"))
         .map((label) => label.textContent);
-    return { state, el, calls, controller, getChips, getChipLabels };
+    return { state, el, ui, calls, controller, getChips, getChipLabels };
 }
 
 test("result summary: shows active conditions as chips in search order", () => {
@@ -96,6 +99,44 @@ test("result summary: shows active conditions as chips in search order", () => {
         assert.equal(getChips()[0].title, "「ミク」");
         assert.equal(getChips()[0].getAttribute("aria-label"), "「ミク」の条件を解除");
         assert.equal(el.resultClearAll.hidden, false);
+    } finally {
+        cleanup();
+    }
+});
+
+test("result summary: English chips use English words and dates, and follow a language switch", () => {
+    const cleanup = installFakeDom();
+    try {
+        const { ui, controller, getChips, getChipLabels } = createHarness({
+            query: " ミク ",
+            dateFrom: "2025-03",
+            dateTo: "2026-10-08",
+            selectedFormats: ["配信", "歌みた"],
+            flags: new Set(["collabHostOnly", "harmonyOnly"])
+        }, "en");
+        controller.render();
+
+        assert.deepEqual(getChipLabels(), [
+            "“ミク”",
+            "From Mar 2025",
+            "Until Oct 8, 2026",
+            "Types: Singing Stream, Originals & Covers",
+            "Collab (host)",
+            "With harmony"
+        ]);
+        assert.equal(getChips()[0].getAttribute("aria-label"), "Remove filter: “ミク”");
+
+        ui.language.current = "ja";
+        controller.render();
+
+        assert.deepEqual(getChipLabels(), [
+            "「ミク」",
+            "2025/03〜",
+            "〜2026/10/08",
+            "種類: 配信・オリ曲/歌みた",
+            "コラボ(ホスト)",
+            "ハモリあり"
+        ]);
     } finally {
         cleanup();
     }

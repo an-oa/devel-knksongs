@@ -11,6 +11,9 @@ export default defineConfig({
     reporter: "list",
     use: {
         baseURL: "http://127.0.0.1:4173",
+        // サイトの言語はブラウザの言語で初期値が変わる。既存のテストは日本語の画面を前提にするため、日本語のブラウザとして動かす。
+        // 言語ごとの初期表記は tests/e2e/site-language.spec.mts で locale を指定して検証する。
+        locale: "ja-JP",
         headless: true,
         trace: "on-first-retry",
         screenshot: "only-on-failure",

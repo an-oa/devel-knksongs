@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { copyFile, cp, mkdir, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { resolveProjectPath } from "./lib/paths.mts";
 import {
@@ -93,9 +93,11 @@ export function resolvePagesArtifactSiteDir(siteDir: string, rootDir: string = p
 async function copySiteAssets(outputDir: string, siteDir: string): Promise<void> {
     await rm(outputDir, { recursive: true, force: true });
     await mkdir(join(outputDir, "data"), { recursive: true });
-    await Promise.all(ROOT_ASSET_FILES.map((fileName) => (
-        copyFile(join(siteDir, fileName), join(outputDir, fileName))
-    )));
+    await Promise.all(ROOT_ASSET_FILES.map(async (fileName) => {
+        // en/index.html のようにフォルダの中に置くファイルもあるので、先にフォルダを作る
+        await mkdir(dirname(join(outputDir, fileName)), { recursive: true });
+        await copyFile(join(siteDir, fileName), join(outputDir, fileName));
+    }));
     await cp(join(siteDir, "browser"), join(outputDir, "browser"), { recursive: true });
     await Promise.all(DATA_ASSET_FILES.map((fileName) => (
         copyFile(join(siteDir, "data", fileName), join(outputDir, "data", fileName))

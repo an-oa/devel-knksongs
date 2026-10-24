@@ -68,6 +68,9 @@ export const appState: AppState = {
         render: {
             cardEntriesBySongKey: new Map()
         },
+        language: {
+            current: "ja"
+        },
         settingsPanel: {
             returnFocusEl: null
         },

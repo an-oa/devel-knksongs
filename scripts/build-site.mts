@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { copyFile, mkdir, rm } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { buildTypeScriptModules } from "./build-ts.mts";
 import { buildBrowserModules } from "./build-browser.mts";
@@ -57,9 +57,11 @@ export async function buildSite(options: { outputDir: string, cacheBuster?: stri
     const outputDir = resolveSiteBuildOutputDir(options.outputDir);
     await rm(outputDir, { recursive: true, force: true });
     await mkdir(join(outputDir, "data"), { recursive: true });
-    await Promise.all(ROOT_ASSET_FILES.map((fileName) => (
-        copyFile(resolve(PUBLIC_ASSET_DIR, fileName), join(outputDir, fileName))
-    )));
+    await Promise.all(ROOT_ASSET_FILES.map(async (fileName) => {
+        // en/index.html のようにフォルダの中に置くファイルもあるので、先にフォルダを作る
+        await mkdir(dirname(join(outputDir, fileName)), { recursive: true });
+        await copyFile(resolve(PUBLIC_ASSET_DIR, fileName), join(outputDir, fileName));
+    }));
     await Promise.all(DATA_ASSET_FILES.map((fileName) => (
         copyFile(resolve("data", fileName), join(outputDir, "data", fileName))
     )));

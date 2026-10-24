@@ -2,6 +2,8 @@ import type { BookmarkSaveFailure } from "../../controllers/bookmark-persistence
 import type { BookmarkImportPreview, StorageActionFailure } from "../../controllers/storage.mjs";
 import type { BookmarkImportPreviewEntry } from "../../lib/storage/bookmark-transfer.mjs";
 import type { BookmarkTransferDialogOption, BookmarkTransferSelectionState } from "./transfer-dialog.mjs";
+import type { SiteLanguage } from "../../lib/site-language.mjs";
+import { getBookmarkText } from "./text.mjs";
 
 /**
  * 数値を 2 桁表記へ整える。
@@ -88,122 +90,117 @@ export function readFileText(file: { text?: () => Promise<string> } | Blob): Pro
  * 追加でブックマーク数の上限を超えるときの表示メッセージを返す。
  * @param limit ブックマーク数の上限
  * @param available あと追加できる件数
+ * @param language 文言の言語
  */
-export function buildBookmarkImportCountLimitMessage(limit: number, available: number): string {
-    return available > 0
-        ? `ブックマークは最大${limit}件です。追加できるのはあと${available}件です。`
-        : `ブックマークは最大${limit}件です。追加するには、不要なブックマークを削除してください。`;
+export function buildBookmarkImportCountLimitMessage(limit: number, available: number, language: SiteLanguage): string {
+    return getBookmarkText(language).importCountLimit(limit, available);
+}
+
+/**
+ * 有限の上限値だけを返す。上限が分からないときは null にし、上限を書かない文言を選ぶ。
+ * @param limit 上限値
+ * @returns 有限の上限値、または null
+ */
+function toFiniteLimit(limit: number): number | null {
+    return Number.isFinite(limit) ? limit : null;
 }
 
 /**
  * インポート失敗時の理由に応じた表示メッセージを返す。
  * @param result 解析・検証・保存のいずれかの失敗
+ * @param language 文言の言語
  */
-export function getBookmarkImportErrorMessage(result: StorageActionFailure): string {
+export function getBookmarkImportErrorMessage(result: StorageActionFailure, language: SiteLanguage): string {
+    const text = getBookmarkText(language);
     if (result.reason === "max_import_file_size") {
-        return `インポートできるファイルは最大${result.limit / 1_000_000} MBです。`;
+        return text.maxImportFileSize(result.limit / 1_000_000);
     }
     if (result.reason === "songs_not_ready") {
-        return "曲データの読み込みが終わってから、もう一度お試しください。";
+        return text.songsNotReady;
     }
     if (result.reason === "import_exceeds_bookmark_count") {
-        return buildBookmarkImportCountLimitMessage(result.limit, result.available);
+        return buildBookmarkImportCountLimitMessage(result.limit, result.available, language);
     }
     if (result.reason === "import_exceeds_total_size") {
-        return `インポート後のブックマーク全体が${result.limit / 1_000_000} MBを超えるため、インポートできません。選ぶブックマークを減らしてください。`;
+        return text.importExceedsTotalSize(result.limit / 1_000_000);
     }
     if (result.reason === "unsupported_storage_version") {
-        return "このアプリより新しい形式のブックマークが保存されているため、追加・上書きはできません。";
+        return text.importNewerStorage;
     }
     if (result.reason === "storage_reload_required") {
-        return "別のタブでブックマークが更新された可能性があります。画面を再読み込みしてから、もう一度お試しください。";
+        return text.reloadRequired;
     }
     if (result.reason === "invalid_json") {
-        return "JSONとして読み込めないファイルです。";
+        return text.invalidJson;
     }
     if (result.reason === "invalid_bookmark_file" || result.reason === "invalid_text") {
-        return "ブックマークの形式ではないファイルです。";
+        return text.invalidBookmarkFile;
     }
     if (result.reason === "unsupported_version") {
-        return "このアプリより新しい形式のブックマークファイルは読み込めません。";
+        return text.unsupportedVersion;
     }
     if (result.reason === "storage_write_failed") {
-        return "インポートしたブックマークを保存できませんでした。";
+        return text.importSaveFailed;
     }
     if (result.reason === "max_bookmark_count") {
-        const limit = Number.isFinite(result.limit) ? result.limit : null;
-        return limit === null
-            ? "インポートできるブックマーク数の上限を超えています。"
-            : `インポートできるブックマークは最大${limit}件です。`;
+        return text.importMaxBookmarkCount(toFiniteLimit(result.limit));
     }
     if (result.reason === "max_bookmark_name_length") {
-        const limit = Number.isFinite(result.limit) ? result.limit : null;
-        return limit === null
-            ? "インポートできるブックマーク名の文字数上限を超えています。"
-            : `ブックマーク名は最大${limit}文字までです。`;
+        return text.importMaxNameLength(toFiniteLimit(result.limit));
     }
     if (result.reason === "max_songs_per_bookmark") {
-        const limit = Number.isFinite(result.limit) ? result.limit : null;
-        const name = "bookmarkName" in result && result.bookmarkName
-            ? `「${result.bookmarkName}」は`
-            : "1つのブックマークに";
-        return limit === null
-            ? `${name}登録できる曲数の上限を超えています。`
-            : `${name}最大${limit}曲までです。`;
+        const bookmarkName = "bookmarkName" in result && result.bookmarkName ? result.bookmarkName : null;
+        return text.importMaxSongs(bookmarkName, toFiniteLimit(result.limit));
     }
-    return "ブックマークファイルを読み込めませんでした。";
+    return text.readFailed;
 }
 
 /**
  * ブックマーク全体を置換する前の確認メッセージを作る。消える件数も示す。
  * @param preview ファイル内と手元の件数
+ * @param language 文言の言語
  */
 export function buildBookmarkImportConfirmMessage(
-    preview: Pick<BookmarkImportPreview, "bookmarkCount" | "songCount" | "currentBookmarkCount">
+    preview: Pick<BookmarkImportPreview, "bookmarkCount" | "songCount" | "currentBookmarkCount">,
+    language: SiteLanguage
 ): string {
     const bookmarkCount = Number.isFinite(preview.bookmarkCount) ? preview.bookmarkCount : 0;
     const songCount = Number.isFinite(preview.songCount) ? preview.songCount : 0;
     const currentBookmarkCount = Number.isFinite(preview.currentBookmarkCount) ? preview.currentBookmarkCount : 0;
-    return [
-        "現在のブックマークをすべて削除し、ファイルの内容で置換します。",
-        ...(currentBookmarkCount > 0 ? [`削除するブックマーク：${currentBookmarkCount}件`] : []),
-        `置換後のブックマーク：${bookmarkCount}件（${songCount}曲）`,
-        "よろしいですか？"
-    ].join("\n");
+    return getBookmarkText(language).replaceConfirm(currentBookmarkCount, bookmarkCount, songCount);
 }
 
 /**
  * ブックマーク全体の置換を選んでいる間、決定ボタンの上に出す結果の説明を作る。
  * @param preview ファイル内と手元の件数
+ * @param language 文言の言語
  */
 export function buildBookmarkReplaceMessage(
-    preview: Pick<BookmarkImportPreview, "bookmarkCount" | "currentBookmarkCount">
+    preview: Pick<BookmarkImportPreview, "bookmarkCount" | "currentBookmarkCount">,
+    language: SiteLanguage
 ): string {
-    return preview.currentBookmarkCount > 0
-        ? `今ある${preview.currentBookmarkCount}件を削除し、ファイルの${preview.bookmarkCount}件で置換します。`
-        : `ファイルの${preview.bookmarkCount}件で置換します。`;
+    return getBookmarkText(language).replaceMessage(preview.currentBookmarkCount, preview.bookmarkCount);
 }
 
 /**
  * ブックマーク全体を置換した結果のメッセージを作る。
  * @param bookmarkCount 置換後のブックマーク数
+ * @param language 文言の言語
  */
-export function buildBookmarkReplaceResultMessage(bookmarkCount: number): string {
-    return `ブックマークを、ファイルの${bookmarkCount}件で置換しました。`;
+export function buildBookmarkReplaceResultMessage(bookmarkCount: number, language: SiteLanguage): string {
+    return getBookmarkText(language).replaceResult(bookmarkCount);
 }
 
 /**
  * 追加・上書きを妨げる保存データの状態を、インポート確認画面の注意として返す。
  * @param blocker 保存前の検査で見つかった状態
+ * @param language 文言の言語
  */
-export function getBookmarkMergeBlockerMessage(blocker: BookmarkSaveFailure): string {
-    if (blocker.reason === "unsupported_storage_version") {
-        return "このアプリより新しい形式のブックマークが保存されているため、追加・上書きはできません。「インポート」の ▼ から「ブックマーク全体を置換」を選ぶと、ファイルの内容で置換できます。";
-    }
-    if (blocker.reason === "storage_reload_required") {
-        return "別のタブでブックマークが更新された可能性があります。追加・上書きするには、画面を再読み込みしてから、もう一度お試しください。";
-    }
-    return "ブックマークを保存できない状態のため、追加・上書きはできません。ブラウザのストレージ設定をご確認ください。";
+export function getBookmarkMergeBlockerMessage(blocker: BookmarkSaveFailure, language: SiteLanguage): string {
+    const text = getBookmarkText(language);
+    if (blocker.reason === "unsupported_storage_version") return text.mergeBlockedByNewerStorage;
+    if (blocker.reason === "storage_reload_required") return text.mergeBlockedByReload;
+    return text.mergeBlockedBySaveFailure;
 }
 
 /**
@@ -211,11 +208,14 @@ export function getBookmarkMergeBlockerMessage(blocker: BookmarkSaveFailure): st
  * 中身が同じものと、追加・上書きできない状態のときは選べなくする。
  * @param entry 手元と照合したファイル内のブックマーク
  * @param mergeBlocked 追加・上書きを妨げる状態があるかどうか
+ * @param language 文言の言語
  */
 export function buildBookmarkImportOption(
     entry: BookmarkImportPreviewEntry,
-    mergeBlocked: boolean
+    mergeBlocked: boolean,
+    language: SiteLanguage
 ): BookmarkTransferDialogOption {
+    const text = getBookmarkText(language);
     const disabled = mergeBlocked || entry.status === "unchanged";
     const option = {
         id: entry.id,
@@ -226,31 +226,31 @@ export function buildBookmarkImportOption(
     if (entry.status === "new") {
         return {
             ...option,
-            badge: "新規",
+            badge: text.badgeNew,
             details: [
-                `${entry.songCount}曲`,
-                ...(entry.hasSameNameBookmark ? ["同じ名前のブックマークがあります"] : [])
+                text.songCount(entry.songCount),
+                ...(entry.hasSameNameBookmark ? [text.sameNameExists] : [])
             ]
         };
     }
     if (entry.status === "unchanged") {
-        return { ...option, badge: "変更なし", details: [`${entry.songCount}曲`] };
+        return { ...option, badge: text.badgeUnchanged, details: [text.songCount(entry.songCount)] };
     }
     const { addedSongCount, removedSongCount, orderChanged, previousName } = entry.changes;
     const songChanges = [
-        ...(addedSongCount > 0 ? [`${addedSongCount}曲追加`] : []),
-        ...(removedSongCount > 0 ? [`${removedSongCount}曲削除`] : []),
-        ...(orderChanged ? ["並び順の変更"] : [])
+        ...(addedSongCount > 0 ? [text.songsAdded(addedSongCount)] : []),
+        ...(removedSongCount > 0 ? [text.songsRemoved(removedSongCount)] : []),
+        ...(orderChanged ? [text.orderChanged] : [])
     ];
     return {
         ...option,
-        badge: "上書き",
+        badge: text.badgeOverwrite,
         badgeIsCaution: true,
         details: [
             songChanges.length > 0
-                ? `${entry.songCount}曲（${songChanges.join("、")}）`
-                : `${entry.songCount}曲`,
-            ...(previousName !== null ? [`名前が「${previousName}」から変わります`] : [])
+                ? text.songCountWithChanges(entry.songCount, songChanges)
+                : text.songCount(entry.songCount),
+            ...(previousName !== null ? [text.renamedFrom(previousName)] : [])
         ]
     };
 }
@@ -259,32 +259,32 @@ export function buildBookmarkImportOption(
  * 選んだインポート候補の件数から、決定ボタンの状態と文言を決める。追加後の件数の上限も確かめる。
  * @param preview 手元と照合したファイルの内容
  * @param selectedIds 選んだファイル内のブックマーク ID
+ * @param language 文言の言語
  */
 export function buildBookmarkImportSelectionState(
     preview: Pick<BookmarkImportPreview, "entries" | "currentBookmarkCount" | "maxBookmarkCount" | "mergeBlocker">,
-    selectedIds: readonly string[]
+    selectedIds: readonly string[],
+    language: SiteLanguage
 ): BookmarkTransferSelectionState {
     if (preview.mergeBlocker) return { message: "", isError: false, canSubmit: false };
+    const text = getBookmarkText(language);
     const selected = new Set(selectedIds);
     const selectedEntries = preview.entries.filter((entry) => selected.has(entry.id));
     const addedCount = selectedEntries.filter((entry) => entry.status === "new").length;
     const updatedCount = selectedEntries.filter((entry) => entry.status === "update").length;
     if (addedCount + updatedCount === 0) {
-        return { message: "インポートするブックマークを選んでください。", isError: false, canSubmit: false };
+        return { message: text.importSelectPrompt, isError: false, canSubmit: false };
     }
     const available = Math.max(0, preview.maxBookmarkCount - preview.currentBookmarkCount);
     if (addedCount > available) {
         return {
-            message: buildBookmarkImportCountLimitMessage(preview.maxBookmarkCount, available),
+            message: buildBookmarkImportCountLimitMessage(preview.maxBookmarkCount, available, language),
             isError: true,
             canSubmit: false
         };
     }
     return {
-        message: [
-            ...(addedCount > 0 ? [`${addedCount}件を追加`] : []),
-            ...(updatedCount > 0 ? [`${updatedCount}件を上書き`] : [])
-        ].join("・"),
+        message: text.importSelectionSummary(addedCount, updatedCount),
         isError: false,
         canSubmit: true
     };
@@ -293,23 +293,26 @@ export function buildBookmarkImportSelectionState(
 /**
  * 選んだブックマークの件数から、エクスポートの決定ボタンの状態と文言を決める。
  * @param selectedIds 選んだブックマーク ID
+ * @param language 文言の言語
  */
-export function buildBookmarkExportSelectionState(selectedIds: readonly string[]): BookmarkTransferSelectionState {
+export function buildBookmarkExportSelectionState(
+    selectedIds: readonly string[],
+    language: SiteLanguage
+): BookmarkTransferSelectionState {
+    const text = getBookmarkText(language);
     return selectedIds.length > 0
-        ? { message: `${selectedIds.length}件を選択中`, isError: false, canSubmit: true }
-        : { message: "エクスポートするブックマークを選んでください。", isError: false, canSubmit: false };
+        ? { message: text.exportSelected(selectedIds.length), isError: false, canSubmit: true }
+        : { message: text.exportSelectPrompt, isError: false, canSubmit: false };
 }
 
 /**
  * 選んで取り込んだ結果を、追加と上書きの件数で伝えるメッセージにする。
  * @param result 追加・上書きした件数
+ * @param language 文言の言語
  */
-export function buildBookmarkImportResultMessage(result: { addedCount: number; updatedCount: number }): string {
-    const { addedCount, updatedCount } = result;
-    if (addedCount > 0 && updatedCount > 0) {
-        return `ブックマークを${addedCount}件追加し、${updatedCount}件上書きしました。`;
-    }
-    if (addedCount > 0) return `ブックマークを${addedCount}件追加しました。`;
-    if (updatedCount > 0) return `ブックマークを${updatedCount}件上書きしました。`;
-    return "ブックマークに変更はありませんでした。";
+export function buildBookmarkImportResultMessage(
+    result: { addedCount: number; updatedCount: number },
+    language: SiteLanguage
+): string {
+    return getBookmarkText(language).importResult(result.addedCount, result.updatedCount);
 }

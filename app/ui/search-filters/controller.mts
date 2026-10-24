@@ -4,11 +4,13 @@ import {
     resetSearchBooleanFilters
 } from "../../lib/search-boolean-filters.mjs";
 import type { SearchBooleanFilterElements } from "../../lib/search-boolean-filters.mjs";
-import { renderSearchFormatOptions, syncSearchFormatCheckboxes } from "./formats.mjs";
+import { renderSearchFormatOptions, syncSearchFormatCheckboxes, updateSearchFormatLabels } from "./formats.mjs";
 import type { SearchFormatOptionsList } from "./formats.mjs";
+import { getUiText } from "../../lib/ui-text.mjs";
 import type {
     DateUiRuntimeState,
-    SearchUiRuntimeState
+    SearchUiRuntimeState,
+    SiteLanguageUiRuntimeState
 } from "../../state.types";
 
 type SearchFiltersSearchState = Pick<SearchUiRuntimeState, "selectedFormats" | "userTouchedFilters"> &
@@ -20,6 +22,8 @@ type SearchFiltersUiState = {
     el: { formatsList?: SearchFormatOptionsList | null } & SearchBooleanFilterElements;
     search: SearchFiltersSearchState;
     date?: SearchFiltersDateState | null;
+    /** 形態の選択肢の名前に使う言語。 */
+    language: SiteLanguageUiRuntimeState;
 };
 
 type SearchFilterChangeOptions = {
@@ -62,16 +66,33 @@ export function createSearchFiltersController({ ui, defaultFormats = [] }: Searc
     }
 
     /**
+     * 形態の値から、サイトの言語で選択肢に出す名前を返す。
+     * @param format 形態の値
+     * @returns 選択肢に出す名前
+     */
+    function getFormatLabel(format: string): string {
+        return getUiText(ui.language.current).formatFilter(format);
+    }
+
+    /**
      * 検索条件 UI の選択肢を描画する。
-     * @param {{ onFormatChange?: (event: Event) => void } | undefined} options
+     * @param options 形態の選択が変わったときの処理
      */
     function renderFilterOptions(options?: SearchFormatChangeOptions): void {
         renderSearchFormatOptions({
             selectedFormats: getSelectedFormats(),
             formatsList: ui.el.formatsList,
             defaultFormats,
+            getLabel: getFormatLabel,
             onChange: options && options.onFormatChange
         });
+    }
+
+    /**
+     * 形態の選択肢の名前を、今の言語で書き直す。
+     */
+    function refreshFormatLabels(): void {
+        updateSearchFormatLabels(ui.el.formatsList, getFormatLabel);
     }
 
     /**
@@ -191,6 +212,7 @@ export function createSearchFiltersController({ ui, defaultFormats = [] }: Searc
     return {
         setupFilterOptions,
         renderFilterOptions,
+        refreshFormatLabels,
         getSelectedFormatValues,
         setSelectedFormatsToDefault,
         applySelectedFormats,

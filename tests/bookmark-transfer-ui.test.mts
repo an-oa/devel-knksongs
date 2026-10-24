@@ -4,6 +4,7 @@ import { createBookmarkTransferController } from "../app/ui/bookmark/transfer.mt
 import type { BookmarkTransferCallbacks } from "../app/ui/bookmark/transfer.mts";
 import type { BookmarkTransferDialogRequest } from "../app/ui/bookmark/transfer-dialog.mts";
 import type { AppDataState } from "../app/state.types";
+import type { SiteLanguage } from "../app/lib/site-language.mts";
 import { installFakeDom, invokeListener } from "./test-helpers.mts";
 
 /** 偽のダイアログで行う操作。submit は選んだ ID で決定し、allItems は ▼ で全体を対象にして決定し、cancel は取り消す。 */
@@ -42,6 +43,8 @@ function createTransferHarness(options: {
     onImportSelectedBookmarksResult?: ReturnType<BookmarkTransferCallbacks["onImportSelectedBookmarks"]>;
     /** 偽のダイアログでの操作。省略時は既定のチェック状態のまま決定する。 */
     transferDialogChoice?: TransferDialogChoice;
+    /** サイトの言語。省略時は日本語。 */
+    language?: SiteLanguage;
 } = {}) {
     const bookmarkPanelExportBtn = document.createElement("button");
     const bookmarkPanelImportBtn = document.createElement("button");
@@ -50,7 +53,8 @@ function createTransferHarness(options: {
     bookmarkPanelImportInput.type = "file";
     bookmarkPanelError.hidden = true;
     const ui = {
-        el: { bookmarkPanelExportBtn, bookmarkPanelImportBtn, bookmarkPanelImportInput, bookmarkPanelError }
+        el: { bookmarkPanelExportBtn, bookmarkPanelImportBtn, bookmarkPanelImportInput, bookmarkPanelError },
+        language: { current: options.language ?? "ja" }
     };
     const data: Pick<AppDataState, "bookmarks"> = {
         bookmarks: options.bookmarks || {
@@ -195,6 +199,53 @@ test("bookmark transfer ui: export dialog lists bookmarks in creation order and 
         assert.equal(calls.savedFiles[0].mimeType, "application/json");
         assert.equal(ui.el.bookmarkPanelError.hidden, true);
     } finally {
+        restoreDom();
+    }
+});
+
+test("bookmark transfer ui: English export dialog uses English labels and counts", async () => {
+    const restoreDom = installFakeDom();
+    try {
+        const { ui, calls, controller } = createTransferHarness({ language: "en", transferDialogChoice: { action: "cancel" } });
+        controller.setupTransferHandlers();
+
+        await invokeListener(ui.el.bookmarkPanelExportBtn, "click", {});
+
+        const [request] = calls.transferDialogRequests;
+        assert.equal(request.title, "Export bookmarks");
+        assert.equal(request.submitLabel, "Export");
+        assert.equal(request.selectAllLabel, "Select all");
+        assert.equal(request.cancelLabel, "Cancel");
+        assert.deepEqual(request.options.map((option) => option.details), [["1 song"], ["2 songs"]]);
+        assert.equal(request.describeSelection([]).message, "Choose the bookmarks to export.");
+        assert.equal(request.describeSelection(["bookmark-1"]).message, "1 selected");
+    } finally {
+        restoreDom();
+    }
+});
+
+test("bookmark transfer ui: English import dialog uses English labels, badges, and results", async () => {
+    const restoreDom = installFakeDom();
+    const dialogs = captureNativeDialogs();
+    try {
+        const { ui, calls, controller } = createTransferHarness({ language: "en" });
+        controller.setupTransferHandlers();
+
+        selectImportFile(ui.el.bookmarkPanelImportInput, "{}");
+        await invokeListener(ui.el.bookmarkPanelImportInput, "change", {});
+
+        const [request] = calls.transferDialogRequests;
+        assert.equal(request.title, "Import bookmarks");
+        assert.equal(request.submitLabel, "Import");
+        assert.deepEqual(request.options[0].badge, "New");
+        assert.deepEqual(request.options[0].details, ["2 songs"]);
+        assert.equal(request.allItemsAction?.menuLabel, "Choose how to import");
+        assert.equal(request.allItemsAction?.allItemsItem.label, "Replace all bookmarks");
+        assert.equal(request.allItemsAction?.message, "Deletes your 2 current bookmarks and replaces them with the 1 in the file.");
+        assert.equal(request.describeSelection(["imported-1"]).message, "Add 1");
+        assert.deepEqual(dialogs.alerts, ["Added 1 bookmark."]);
+    } finally {
+        dialogs.restore();
         restoreDom();
     }
 });

@@ -1,4 +1,5 @@
 import { createLayoutRefreshScheduler } from "../lib/layout-anchor.mjs";
+import { getUiText } from "../lib/ui-text.mjs";
 import { canUseDom, isHtmlElement } from "../lib/dom-utils.mjs";
 import { debugPlayback, tracePlayback } from "../lib/playback-debug.mjs";
 import {
@@ -92,7 +93,8 @@ type YoutubePlaybackOptions = {
 };
 
 type YoutubeControllerInput = {
-    ui: Pick<AppUiState, "playback">;
+    /** language は閉じるボタンの説明の言語。 */
+    ui: Pick<AppUiState, "playback" | "language">;
     youtube: AppYoutubeRuntimeState;
     constants: YoutubeConstants;
 };
@@ -109,6 +111,7 @@ type YoutubeController = {
     ) => Promise<YoutubePlaybackStartResult>;
     updateThumbnail: (thumbDiv: HTMLElement, yt: YoutubeTarget) => void;
     restoreActivePlayback: () => void;
+    refreshCloseButtonLabel: () => void;
 };
 
 /**
@@ -453,6 +456,21 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
     }
 
     /**
+     * 埋め込み再生の閉じるボタンの説明を、サイトの言語で返す。
+     * @returns 閉じるボタンの説明
+     */
+    function getCloseButtonLabel(): string {
+        return getUiText(ui.language.current).card.backToThumbnail;
+    }
+
+    /**
+     * 作成済みの閉じるボタンの説明を、今の言語で書き直す。ボタンは共有して使い回すので、言語の切り替え時に呼ぶ。
+     */
+    function refreshCloseButtonLabel(): void {
+        youtube.sharedPlayback?.closeButton?.setAttribute("aria-label", getCloseButtonLabel());
+    }
+
+    /**
      * 共有再生に使う閉じるボタンを生成する。
      */
     function createSharedPlaybackCloseButton() {
@@ -460,7 +478,7 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
         const close = document.createElement("button");
         close.type = "button";
         close.className = "thumb-close-btn";
-        close.setAttribute("aria-label", "サムネイルに戻す");
+        close.setAttribute("aria-label", getCloseButtonLabel());
         close.innerHTML = "&times;";
         close.addEventListener("click", (event) => {
             event.stopPropagation();
@@ -922,6 +940,7 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
     }
 
     return {
+        refreshCloseButtonLabel,
         setLayoutHook,
         setPlaybackEndedHook,
         setPlaybackStartFailedHook,

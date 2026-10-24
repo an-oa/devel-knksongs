@@ -1,5 +1,6 @@
 import type { YoutubeSharedPlaybackState } from "./lib/youtube/shared-playback.mjs";
 import type { RecommendedSearchCache } from "./lib/search-recommendation.mjs";
+import type { SiteLanguage } from "./lib/site-language.mjs";
 
 /**
  * コメント粒度の方針:
@@ -66,6 +67,7 @@ export type AppUiElements = Partial<{
   clearDateFromBtn: HTMLButtonElement | null;
   clearDateToBtn: HTMLButtonElement | null;
   themeToggle: HTMLInputElement | null;
+  languageBtn: HTMLButtonElement | null;
   thumbToggle: HTMLInputElement | null;
   youtubeNoCookieToggle: HTMLInputElement | null;
   playArchiveToEndToggle: HTMLInputElement | null;
@@ -188,6 +190,12 @@ export type RenderUiRuntimeState = {
   cardEntriesBySongKey: Map<string, RenderCardEntry>;
 };
 
+/** 画面の文言と、曲名・アーティスト名の表記に使う言語。 */
+export type SiteLanguageUiRuntimeState = {
+  /** 現在表示している言語。保存値またはブラウザの言語から復元し、言語ボタンで切り替える。 */
+  current: SiteLanguage;
+};
+
 /** 設定パネルを閉じた後のフォーカス復帰先。 */
 export type SettingsPanelUiRuntimeState = {
   /** パネルを閉じた後にフォーカスを戻す要素。 */
@@ -224,6 +232,8 @@ export type AppUiState = {
   lookup: LookupUiRuntimeState;
   /** 検索結果描画用の DOM キャッシュ。 */
   render: RenderUiRuntimeState;
+  /** 画面の文言と、曲名・アーティスト名の表記に使う言語。 */
+  language: SiteLanguageUiRuntimeState;
   /** 設定パネルの状態。 */
   settingsPanel: SettingsPanelUiRuntimeState;
   /** ブックマークパネルの状態。 */

@@ -1,6 +1,7 @@
-import { getFormatFilterLabel } from "../../lib/format-filter.mjs";
+import { isHtmlElement } from "../../lib/dom-utils.mjs";
 
 const FORMAT_CHECKBOX_SELECTOR = 'input[type="checkbox"]';
+const FORMAT_LABEL_SELECTOR = ".format-filter-label";
 
 type SearchFormatCheckbox = {
     value: string;
@@ -20,6 +21,8 @@ type SearchFormatOptionsInput = {
     selectedFormats: Set<string>;
     formatsList?: SearchFormatOptionsList | null;
     defaultFormats: string[];
+    /** 形態の値から、選択肢に出す名前を返す。 */
+    getLabel: (format: string) => string;
     onChange?: (event: Event) => void;
 };
 
@@ -30,19 +33,16 @@ type SearchFormatSyncInput = {
 
 /**
  * フォーマットフィルタのチェックボックス UI を構築する。
- * @param {{
- *   selectedFormats: Set<string>,
- *   formatsList?: HTMLElement | null,
- *   defaultFormats: string[],
- *   onChange?: (event: Event) => void
- * }} input
- * @returns {boolean}
+ * 選択肢の名前は、言語を切り替えたときに updateSearchFormatLabels で書き直せるよう span に入れる。
+ * @param input 選択状態・描画先・既定の形態・選択肢の名前・変更時の処理
+ * @returns 選択肢を描画した場合は true
  */
 export function renderSearchFormatOptions(input: SearchFormatOptionsInput): boolean {
     const {
         selectedFormats,
         formatsList,
         defaultFormats,
+        getLabel,
         onChange
     } = input;
     if (!formatsList || (formatsList.childElementCount ?? 0) > 0) return false;
@@ -67,7 +67,11 @@ export function renderSearchFormatOptions(input: SearchFormatOptionsInput): bool
             else selectedFormats.delete(checkbox.value);
             if (typeof onChange === "function") onChange(event);
         });
-        label.append(checkbox, ` ${getFormatFilterLabel(format)}`);
+        const name = document.createElement("span");
+        name.className = "format-filter-label";
+        name.setAttribute("data-format", format);
+        name.textContent = getLabel(format);
+        label.append(checkbox, " ", name);
         appendChild.call(formatsList, label);
     });
     syncSearchFormatCheckboxes({ selectedFormats, formatsList });
@@ -87,5 +91,22 @@ export function syncSearchFormatCheckboxes(input: SearchFormatSyncInput): void {
     const formatCheckboxes = Array.from(formatsList.querySelectorAll(FORMAT_CHECKBOX_SELECTOR)) as SearchFormatCheckbox[];
     formatCheckboxes.forEach((checkbox) => {
         checkbox.checked = selectedFormats.has(checkbox.value);
+    });
+}
+
+/**
+ * 描画済みの形態の選択肢の名前を書き直す。言語を切り替えたときに使い、選択状態は変えない。
+ * @param formatsList 形態の選択肢を並べた要素
+ * @param getLabel 形態の値から、選択肢に出す名前を返す関数
+ */
+export function updateSearchFormatLabels(
+    formatsList: SearchFormatCheckboxList | null | undefined,
+    getLabel: (format: string) => string
+): void {
+    if (!formatsList) return;
+    Array.from(formatsList.querySelectorAll(FORMAT_LABEL_SELECTOR)).forEach((name) => {
+        if (!isHtmlElement(name)) return;
+        const format = name.getAttribute("data-format");
+        if (format !== null) name.textContent = getLabel(format);
     });
 }

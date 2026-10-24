@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createSearchFiltersController } from "../app/ui/search-filters/controller.mts";
 import { installFakeDom, invokeListener } from "./test-helpers.mts";
+import type { SiteLanguage } from "../app/lib/site-language.mts";
 
 /** 選択状態を持つ形式チェックボックスのモックを作る。 */
 function createFormatCheckbox(value: string, checked = false) {
@@ -36,7 +37,8 @@ function createSearchFiltersUiState() {
         date: {
             pendingValues: { from: "2024-01-01", to: "2024-12-31" }
         },
-        formatCheckboxes
+        formatCheckboxes,
+        language: { current: "ja" as SiteLanguage }
     };
 }
 
@@ -134,7 +136,8 @@ test("createSearchFiltersController: sets up format filter options", () => {
             },
             date: {
                 pendingValues: null
-            }
+            },
+            language: { current: "ja" as SiteLanguage }
         };
         const controller = createSearchFiltersController({
             ui,

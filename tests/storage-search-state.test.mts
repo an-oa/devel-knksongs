@@ -5,6 +5,7 @@ import { createStorageController } from "../app/controllers/storage.mts";
 import { createSearchFiltersController } from "../app/ui/search-filters/controller.mts";
 import { createFakeLocalStorage, readStoredText } from "./fixtures/local-storage.mts";
 import type { BookmarkRecord } from "../app/state.types";
+import type { SiteLanguage } from "../app/lib/site-language.mts";
 import { installFakeDom } from "./test-helpers.mts";
 
 /**
@@ -87,7 +88,8 @@ function createActiveBookmarkRestoreHarness(bookmarks: Record<string, BookmarkRe
         date: {
             bounds: null,
             pendingValues: options.pendingValues ?? null
-        }
+        },
+        language: { current: "ja" as SiteLanguage }
     };
     const controller = createStorageControllerForTest({
         data,
@@ -145,7 +147,8 @@ test("restorePersistedState: main branch payload restores into sliced ui state",
             date: {
                 bounds: { minKey: 20240210, maxKey: 20240305 },
                 pendingValues: null
-            }
+            },
+            language: { current: "ja" as SiteLanguage }
         };
         const controller = createStorageControllerForTest({
             data,
@@ -219,7 +222,8 @@ test("saveSearchState: writes current schema version", () => {
             date: {
                 bounds: null,
                 pendingValues: null
-            }
+            },
+            language: { current: "ja" as SiteLanguage }
         };
         const controller = createStorageControllerForTest({
             data: {
@@ -489,7 +493,8 @@ test("restorePersistedState: legacy all-format state includes recording in new d
             date: {
                 bounds: null,
                 pendingValues: null
-            }
+            },
+            language: { current: "ja" as SiteLanguage }
         };
         const controller = createStorageControllerForTest({
             data: {
@@ -564,7 +569,8 @@ test("restorePersistedState: current payload keeps recording unchecked when user
             date: {
                 bounds: null,
                 pendingValues: null
-            }
+            },
+            language: { current: "ja" as SiteLanguage }
         };
         const controller = createStorageControllerForTest({
             data: {
@@ -642,7 +648,8 @@ test("restorePersistedState: invalid saved formats fall back to defaults and syn
             date: {
                 bounds: null,
                 pendingValues: null
-            }
+            },
+            language: { current: "ja" as SiteLanguage }
         };
         const controller = createStorageControllerForTest({
             data: {

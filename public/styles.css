@@ -120,6 +120,31 @@ input, button { font-family: inherit; }
   white-space: nowrap !important;
 }
 
+/*
+ * 英語で開いたときは、index.html の日本語の文言を置き換え終わるまで中身を隠し、上部に読み込み中のバーを出す。
+ * 印(i18n-pending)は index.html の埋め込みスクリプトが付け、アプリが文言を置き換えた後に外す。
+ */
+:root.i18n-pending body > * { visibility: hidden; }
+:root.i18n-pending::after {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 40%;
+  height: 4px;
+  background: var(--accent-fill);
+  border-radius: 0 2px 2px 0;
+  z-index: 10000;
+  animation: i18n-pending-bar 1.1s ease-in-out infinite;
+}
+@keyframes i18n-pending-bar {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(250%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root.i18n-pending::after { width: 100%; animation: none; opacity: 0.6; }
+}
+
 /* サムネイル非表示設定 */
 body.hide-thumbs .thumb {
   display: none;
@@ -167,7 +192,7 @@ body.hide-thumbs .thumb {
     var(--header-bg);
 }
 
-/* ライトのホルスタイン柄。文字・検索窓・ボタンに掛からない余白だけに置く。 */
+/* ライトのホルスタイン柄。文字と検索窓には掛けない。ボタンは塗りつぶしてあるので、ボタンの下には潜ってよい。 */
 .header-spots {
   position: absolute;
   fill: #1b1b1b;
@@ -175,16 +200,26 @@ body.hide-thumbs .thumb {
 }
 :root.dark-theme .header-spots { display: none; }
 .header-spots-compact { display: none; }
+/* 広い画面の斑点は、置き場所を確保できる幅(下の container query)でだけ表示する。 */
 .header-spots-wide {
+  display: none;
   top: 0;
   width: 170px;
   height: 64px;
 }
-.header-spots-wide-left { right: calc(50% + 260px + 16px); }
-.header-spots-wide-right { left: calc(50% + 260px + 16px); }
-/* 検索窓の左右に斑点を置く余白がない幅では表示しない。 */
-@container header-search (max-width: 900px) {
-  .header-spots-wide { display: none; }
+/*
+ * 斑点は検索窓の両脇に置く。左の斑点は絵の右端20pxが空白なので8px、右の斑点は16px空けると、検索窓との間隔がほぼ揃う。
+ * 左の斑点の黒い部分(絵の x=20〜150)は、ロゴの文字から8px以上離す。文字は領域の左端から20px(列の間隔)外にあるので、
+ * 検索窓の左端を領域の左端から 8 + 150 - 20 + 8 = 146px 以上離せばよい。そこで検索窓を中央に置いたまま、
+ * 両側に146pxずつ残して最大520pxまで広げる。右の斑点はボタンの下に潜ってよいので、右側の余白は条件にしない。
+ * 検索窓を440px(= 732 - 146 * 2)より狭めないと斑点を置けない幅では、斑点を出さずに検索窓を広げる。
+ * 幅は小数にもなるので、表示と配置は同じ条件の中だけで行い、条件の外は既定の非表示のままにする。
+ * ロゴは両方の言語の幅を重ねて揃えてあるので、言語を切り替えても検索窓・斑点の位置と表示は変わらない。
+ */
+@container header-search (min-width: 732px) {
+  .header-spots-wide { display: block; }
+  .header-spots-wide-left { right: calc(50% + min(260px, 50cqw - 146px) + 8px); }
+  .header-spots-wide-right { left: calc(50% + min(260px, 50cqw - 146px) + 16px); }
 }
 
 .header-title {
@@ -206,7 +241,10 @@ body.hide-thumbs .thumb {
   flex: none;
 }
 
-.header-wordmark {
+/* 重ねた文字ロゴは左に揃える。.i18n-stack の中央揃えより後に効くよう、両方のクラスで指定する。 */
+.header-wordmark.i18n-stack { justify-items: start; }
+
+.header-wordmark-text {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -225,6 +263,13 @@ body.hide-thumbs .thumb {
   font-weight: 700;
   letter-spacing: 0.12em;
 }
+
+/*
+ * 英語のロゴは文字の大きさを日本語と同じにし、欧文に合わせて字間だけ詰める。
+ * 日本語のページでも、重ねて隠した英語のロゴの幅で見出しの幅が決まるので、ページの言語ではなくロゴの言語で指定する。
+ */
+.header-wordmark-text[lang="en"] .header-wordmark-main { letter-spacing: 0.01em; }
+.header-wordmark-text[lang="en"] .header-wordmark-sub { letter-spacing: 0.06em; }
 
 /* チェック柄の上の文字は、柄の明るい線と重なっても読めるよう影を付ける。 */
 :root.dark-theme .header-wordmark-main {
@@ -249,6 +294,10 @@ body.hide-thumbs .thumb {
   position: relative;
   width: 100%;
   max-width: 520px;
+}
+/* 斑点を置く幅では、検索窓の両側に斑点の余白を146pxずつ残す。理由は .header-spots-wide の説明を参照。 */
+@container header-search (min-width: 732px) {
+  .header-search { max-width: min(520px, 100cqw - 292px); }
 }
 
 .header-search-icon {
@@ -285,7 +334,50 @@ body.hide-thumbs .thumb {
 .header-search input[type="text"][aria-invalid="true"] { border-color: #b3261e; }
 .header-search input[type="text"]:disabled { cursor: progress; }
 
-.header-right { position: relative; display: flex; justify-content: flex-end; }
+.header-right { position: relative; display: flex; justify-content: flex-end; gap: 8px; }
+
+/* 言語を切り替えても幅が変わらないよう、両方の言語の文言を同じ位置に重ね、ページの言語の方だけを見せる。 */
+.i18n-stack { display: inline-grid; place-items: center; }
+.i18n-stack > * { grid-area: 1 / 1; }
+:root:not([lang="en"]) .i18n-stack > [lang="en"],
+:root[lang="en"] .i18n-stack > [lang="ja"] { visibility: hidden; }
+/* 斑点が下に潜るよう、ボタンを斑点より手前に描く。狭い画面では .header-right が箱を持たないため、ボタン自身に指定する。 */
+.language-btn,
+.menu-trigger-btn { position: relative; }
+
+/* 曲名・アーティスト名の表記の切り替え。検索窓と同じく、どちらのテーマでも白地にして文字色をテーマに依存させない。 */
+.language-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 14px 0 12px;
+  border: 2px solid var(--accent-fill-border);
+  border-radius: 999px;
+  background: #ffffff;
+  color: #1b1b1b;
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.language-btn:hover { background: #f6f3eb; }
+
+/* 両方の文言を同じ位置に重ね、ボタンの幅を長いほうに揃える。見せるのはボタンの lang と同じ言語の文言だけ。 */
+.language-btn-labels { display: grid; place-items: center; }
+.language-btn-label { grid-area: 1 / 1; }
+.language-btn[lang="en"] .language-btn-label[lang="ja"],
+.language-btn[lang="ja"] .language-btn-label[lang="en"] { visibility: hidden; }
+
+.language-btn-icon {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
 
 .menu-trigger-btn {
   display: inline-flex;
@@ -317,20 +409,38 @@ body.hide-thumbs .thumb {
   .header {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-rows: 56px auto;
+    column-gap: 8px;
     height: auto;
     padding: 0 14px 12px;
   }
+  /* 1段目のロゴとボタンの間は斑点の余白に使うため、言語ボタンは2段目の検索窓の右に置く。 */
   .header-search-area {
-    grid-column: 1 / -1;
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .header-right { display: contents; }
+  .menu-trigger-btn {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+  }
+  .language-btn {
+    grid-column: 2;
     grid-row: 2;
   }
   .header-search { max-width: none; }
+  /* 斑点をロゴの文字の右端を基準に置くため、見出しを列いっぱいに広げず文字の幅にする。 */
+  .header-title { justify-self: start; }
   .header-logo { width: 43px; height: 32px; }
   .header-wordmark-main { font-size: 19px; }
+  /*
+   * ロゴの文字の右端から4px空けて置く。見出しは1段目(56px)の上下中央にあるので、
+   * 見出しの中央から28px上が、ヘッダーの上端になる。
+   */
   .header-spots-compact {
     display: block;
-    top: 0;
-    left: 150px;
+    top: calc(50% - 28px);
+    left: calc(100% + 4px);
     width: 108px;
     height: 56px;
   }
@@ -979,6 +1089,8 @@ input[type="text"][aria-invalid="true"] {
   font-size: 13px;
   white-space: nowrap;
 }
+/* 英語の形態名(Originals & Covers など)は列の幅に収まらないので、折り返して枠からはみ出さないようにする。 */
+:root[lang="en"] #formatsList .checkbox-item { white-space: normal; }
 .checkbox-item { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; margin-bottom: 8px; }
 
 .checkbox-item input[type="checkbox"] {

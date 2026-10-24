@@ -44,6 +44,7 @@ function createRenderUiState<Elements extends {
     dataReady?: boolean;
     activeThumb?: HTMLElement | null;
     cardEntriesBySongKey?: Map<string, import("../app/state.types").RenderCardEntry>;
+    language?: import("../app/lib/site-language.mts").SiteLanguage;
 }) {
     return {
         el: input.el,
@@ -65,6 +66,9 @@ function createRenderUiState<Elements extends {
         },
         render: {
             cardEntriesBySongKey: input.cardEntriesBySongKey ?? new Map<string, import("../app/state.types").RenderCardEntry>()
+        },
+        language: {
+            current: input.language ?? "ja"
         },
         lookup: {
             songMapByBookmarkKey: new Map(),
@@ -303,6 +307,146 @@ test("render: result cards and empty state use list semantics", () => {
 
         assert.equal(ui.el.resultList.children[0].tagName, "LI");
         assert.equal(ui.el.resultList.children[0].classList.contains("result-empty-state"), true);
+    } finally {
+        cleanup();
+    }
+});
+
+test("render: English cards show English names, tags, dates, and labels, and tag Japanese fallbacks", () => {
+    const cleanup = installFakeDom();
+    try {
+        const data = createRenderDataState({
+            currentResults: [
+                makeRenderRow({
+                    songKey: "song:en",
+                    title: "アイネクライネ",
+                    artist: "米津玄師",
+                    titleEn: "Eine Kleine",
+                    artistEn: "Kenshi Yonezu"
+                }),
+                makeRenderRow({ songKey: "song:ja-only", title: "日本語だけの曲", artist: "歌手" })
+            ],
+            displayLimit: 48,
+            activeBookmark: null
+        });
+        const ui = createRenderUiState({
+            el: {
+                resultList: document.createElement("ol"),
+                resultTailSentinel: document.createElement("div")
+            },
+            language: "en"
+        });
+        const controller = createRenderController({
+            data,
+            ui,
+            isAllFormatsSelected: () => true,
+            callbacks: createRenderCallbacks()
+        });
+
+        controller.updateDisplay();
+
+        const [englishCard, japaneseOnlyCard] = Array.from(ui.el.resultList.children);
+        const englishTitle = englishCard.querySelector(".title");
+        const englishArtist = englishCard.querySelector(".artist");
+        assert.equal(englishTitle?.textContent, "Eine Kleine");
+        assert.equal(englishTitle?.hasAttribute("lang"), false, "English names match the English page");
+        assert.equal(englishArtist?.textContent, "Kenshi Yonezu");
+        assert.equal(englishArtist?.hasAttribute("lang"), false);
+        assert.equal(japaneseOnlyCard.querySelector(".title")?.textContent, "日本語だけの曲");
+        assert.equal(japaneseOnlyCard.querySelector(".title")?.getAttribute("lang"), "ja", "Japanese fallbacks are tagged on the English page");
+        assert.equal(englishCard.querySelector(".tag")?.textContent, "Singing Stream");
+        assert.equal(englishCard.querySelector(".footer-left")?.children[0]?.textContent, "Mar 11, 2026", "the date comes from dateKey");
+        assert.equal(englishCard.querySelector(".add-to-bookmark-btn")?.getAttribute("aria-label"), "Add to bookmark");
+
+        ui.language.current = "ja";
+        controller.refreshText();
+
+        assert.equal(englishTitle?.textContent, "アイネクライネ", "the reused card switches back to Japanese");
+        assert.equal(englishTitle?.hasAttribute("lang"), false);
+        assert.equal(englishArtist?.textContent, "米津玄師");
+        assert.equal(englishArtist?.hasAttribute("lang"), false);
+        assert.equal(englishCard.querySelector(".tag")?.textContent, "配信");
+        assert.equal(englishCard.querySelector(".add-to-bookmark-btn")?.getAttribute("aria-label"), "ブックマークに追加");
+    } finally {
+        cleanup();
+    }
+});
+
+test("render: refreshText rewrites only the text of the shown cards", () => {
+    const cleanup = installFakeDom();
+    try {
+        const data = createRenderDataState({
+            currentResults: [
+                makeRenderRow({ songKey: "song:en", title: "アイネクライネ", artist: "米津玄師", titleEn: "Eine Kleine", artistEn: "Kenshi Yonezu" })
+            ],
+            displayLimit: 48,
+            activeBookmark: null
+        });
+        const ui = createRenderUiState({
+            el: {
+                resultList: document.createElement("ol"),
+                resultTailSentinel: document.createElement("div")
+            }
+        });
+        let thumbnailUpdateCount = 0;
+        const controller = createRenderController({
+            data,
+            ui,
+            isAllFormatsSelected: () => true,
+            callbacks: createRenderCallbacks({ updateThumbnail: () => { thumbnailUpdateCount += 1; } })
+        });
+
+        controller.updateDisplay();
+        const card = ui.el.resultList.children[0];
+        const actionButton = card.querySelector<HTMLButtonElement>(".add-to-bookmark-btn");
+        const actionHandler = actionButton?.onclick;
+        const thumbnailUpdatesBeforeSwitch = thumbnailUpdateCount;
+
+        ui.language.current = "en";
+        controller.refreshText();
+
+        assert.equal(ui.el.resultList.children[0], card, "the card element is kept");
+        assert.equal(card.querySelector(".title")?.textContent, "Eine Kleine");
+        assert.equal(card.querySelector(".artist")?.textContent, "Kenshi Yonezu");
+        assert.equal(card.querySelector(".tag")?.textContent, "Singing Stream");
+        assert.equal(actionButton?.getAttribute("aria-label"), "Add to bookmark");
+        assert.equal(thumbnailUpdateCount, thumbnailUpdatesBeforeSwitch, "the thumbnail is not updated again");
+        assert.equal(actionButton?.onclick, actionHandler, "the button handler is not set up again");
+    } finally {
+        cleanup();
+    }
+});
+
+test("render: refreshText rewrites the empty state in the current language", () => {
+    const cleanup = installFakeDom();
+    try {
+        const data = createRenderDataState({ currentResults: [], displayLimit: 48, activeBookmark: null });
+        const ui = createRenderUiState({
+            el: {
+                resultList: document.createElement("ol"),
+                resultTailSentinel: document.createElement("div")
+            }
+        });
+        const controller = createRenderController({
+            data,
+            ui,
+            isAllFormatsSelected: () => true,
+            callbacks: createRenderCallbacks()
+        });
+
+        controller.updateDisplay();
+        assert.equal(ui.el.resultList.querySelector(".result-empty-state-title")?.textContent, "見つかりませんでした");
+
+        ui.language.current = "en";
+        controller.refreshText();
+
+        assert.equal(ui.el.resultList.children.length, 1);
+        assert.equal(ui.el.resultList.children[0].classList.contains("result-empty-state"), true);
+        assert.equal(ui.el.resultList.querySelector(".result-empty-state-title")?.textContent, "No songs found");
+        assert.equal(
+            ui.el.resultList.querySelector(".result-empty-state-hint")?.textContent,
+            "Try fewer keywords or clear some filters."
+        );
     } finally {
         cleanup();
     }
@@ -762,6 +906,7 @@ test("bookmark: observes result tail and increases by RESULT_DISPLAY_BATCH_SIZE 
             },
             callbacks: {
                 updateDisplay: () => renderController.updateDisplay(),
+                showResultCount: () => {},
                 scrollResultsPaneToTop: () => {}
             }
         });

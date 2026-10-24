@@ -1,4 +1,5 @@
 import test from "node:test";
+import type { SiteLanguage } from "../app/lib/site-language.mts";
 import type { AppDataState, SearchUiRuntimeState, DateUiRuntimeState, LookupUiRuntimeState } from "../app/state.types";
 import assert from "node:assert/strict";
 import { createSearchFiltersController } from "../app/ui/search-filters/controller.mts";
@@ -7,6 +8,7 @@ import { normalizeForSearch } from "../app/lib/search-normalization.mts";
 import { createSearchController } from "../app/controllers/search.mts";
 import { createSearchCoordinator } from "../app/controllers/search-coordinator.mts";
 import { createDateFilterController } from "../app/ui/date/filter.mts";
+import { createResultCountController } from "../app/ui/result-summary/count.mts";
 
 const makeRow = createSearchSongFixtureFactory();
 
@@ -144,7 +146,8 @@ test("createSearchController: limits initial DOM work without reducing recommend
 
 type SearchTestUiElements = Parameters<typeof createSearchController>[0]["ui"]["el"] &
     Parameters<typeof createDateFilterController>[0]["ui"]["el"] &
-    Parameters<typeof createSearchFiltersController>[0]["ui"]["el"];
+    Parameters<typeof createSearchFiltersController>[0]["ui"]["el"] &
+    Parameters<typeof createResultCountController>[0]["ui"]["el"];
 
 /** 検索コントローラー検証用の UI 状態を作る。 */
 function createSearchUiState<Elements extends SearchTestUiElements>(input: {
@@ -164,20 +167,27 @@ function createSearchUiState<Elements extends SearchTestUiElements>(input: {
     const lookup: LookupUiRuntimeState = {
         songMapByBookmarkKey: new Map(), songMapByKey: new Map(), songLookupSourceRef: null
     };
-    return { el: input.el, search, date, lookup };
+    const language = { current: "ja" as SiteLanguage };
+    return { el: input.el, search, date, lookup, language };
 }
 
-/** 検索条件 UI controller を注入して検索 controller を作る。 */
+/** 検索条件 UI controller と件数表示の controller を注入して検索 controller を作る。 */
 function createSearchControllerForTest(input: {
     data: AppDataState;
     ui: ReturnType<typeof createSearchUiState>;
     constants: Parameters<typeof createSearchController>[0]["constants"];
     defaultFormats: string[];
-    callbacks: Parameters<typeof createSearchController>[0]["callbacks"];
+    callbacks: Omit<Parameters<typeof createSearchController>[0]["callbacks"], "showResultCount">;
 }) {
-    const { defaultFormats, ...searchInput } = input;
+    const { defaultFormats, callbacks, ...searchInput } = input;
+    // 件数表示は、本番と同じく件数表示の controller が今の言語の文言で書く。
+    const resultCountController = createResultCountController({ ui: input.ui });
     return createSearchController({
         ...searchInput,
+        callbacks: {
+            ...callbacks,
+            showResultCount: (summary) => resultCountController.show({ kind: "results", summary })
+        },
         searchFiltersController: createSearchFiltersController({
             ui: input.ui,
             defaultFormats

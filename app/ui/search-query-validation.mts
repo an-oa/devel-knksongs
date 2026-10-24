@@ -1,5 +1,7 @@
 import { hasSearchQueryIssues, parseSearchQuery } from "../lib/search-query.mjs";
 import type { ParsedSearchQuery, SearchQueryIssue } from "../lib/search-query.mjs";
+import type { SiteLanguage } from "../lib/site-language.mjs";
+import { getUiText } from "../lib/ui-text.mjs";
 
 type SearchQueryValidationInput = {
     value: string;
@@ -18,17 +20,18 @@ type SearchQueryValidationMessageElement = {
  * 検索クエリの問題を利用者向けのエラーメッセージへ変換する。
  * issueの追加時に文言の対応漏れを型検査で検出するため、網羅的に分岐する。
  * @param issue 検索クエリの問題
+ * @param language サイトの言語
  * @returns 利用者向けエラーメッセージ
  */
-function getSearchQueryIssueMessage(issue: SearchQueryIssue): string {
+function getSearchQueryIssueMessage(issue: SearchQueryIssue, language: SiteLanguage): string {
+    const messages = getUiText(language).searchErrors;
     switch (issue.code) {
         case "invalid-date-operator":
-            return "日付演算子は YYYY、YYYY-MM、YYYY-MM-DD 形式の実在する日付で入力してください。" +
-                "文字列として検索する場合は二重引用符で囲んでください。";
+            return messages.invalidDateOperator;
         case "unterminated-quote":
-            return "二重引用符が閉じられていません。";
+            return messages.unterminatedQuote;
         case "contradictory-date-range":
-            return "since の日付は until の日付以前にしてください。";
+            return messages.contradictoryDateRange;
     }
     return assertUnreachableSearchQueryIssue(issue);
 }
@@ -46,9 +49,10 @@ function assertUnreachableSearchQueryIssue(issue: never): never {
  * 同種の無効な日付演算子が複数あっても説明文は1回だけ表示する。
  * 境界条件を単体テストするためexportしている。
  * @param parsedQuery 解析済み検索語
+ * @param language サイトの言語
  * @returns 表示用エラーメッセージ
  */
-export function getSearchQueryValidationMessage(parsedQuery: ParsedSearchQuery): string {
+export function getSearchQueryValidationMessage(parsedQuery: ParsedSearchQuery, language: SiteLanguage): string {
     const displayedCodes = new Set<SearchQueryIssue["code"]>();
     return parsedQuery.issues
         .filter((issue) => {
@@ -56,7 +60,7 @@ export function getSearchQueryValidationMessage(parsedQuery: ParsedSearchQuery):
             displayedCodes.add(issue.code);
             return true;
         })
-        .map(getSearchQueryIssueMessage)
+        .map((issue) => getSearchQueryIssueMessage(issue, language))
         .join(" ");
 }
 
@@ -81,15 +85,17 @@ export function clearSearchQueryValidation(
 
 /**
  * 検索入力の操作完了時に日付演算子を検証し、視覚表示と ARIA 状態を同期する。
- * @param {SearchQueryValidationInput | null | undefined} searchBox
- * @param {SearchQueryValidationMessageElement | null | undefined} errorElement
+ * @param searchBox 検索入力
+ * @param errorElement エラーを表示する要素
  * @param parsedQuery 同じ検索処理内で共有する解析済み検索語
- * @returns {boolean}
+ * @param language エラーの文言の言語
+ * @returns 検索語に問題がなければ true
  */
 export function validateSearchQueryInput(
     searchBox: SearchQueryValidationInput | null | undefined,
     errorElement: SearchQueryValidationMessageElement | null | undefined,
-    parsedQuery?: ParsedSearchQuery
+    parsedQuery: ParsedSearchQuery | undefined,
+    language: SiteLanguage
 ): boolean {
     if (!searchBox) return true;
     const effectiveParsedQuery = parsedQuery ?? parseSearchQuery(searchBox.value);
@@ -98,7 +104,7 @@ export function validateSearchQueryInput(
         return true;
     }
 
-    const message = getSearchQueryValidationMessage(effectiveParsedQuery);
+    const message = getSearchQueryValidationMessage(effectiveParsedQuery, language);
     if (searchBox.validationMessage !== message) searchBox.setCustomValidity?.(message);
     searchBox.setAttribute?.("aria-invalid", "true");
     if (errorElement) {

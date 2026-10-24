@@ -42,6 +42,10 @@ import {
     setupTheme
 } from "./ui/core/elements.mjs";
 import { createUiSyncController } from "./ui/core/sync.mjs";
+import { createSiteLanguageController } from "./ui/core/site-language.mjs";
+import type { SiteLanguage } from "./lib/site-language.mjs";
+import { createResultCountController } from "./ui/result-summary/count.mjs";
+import { applyStaticUiText } from "./ui/core/static-text.mjs";
 import { createDataLoader } from "./ui/core/data.mjs";
 import { createDateFilterController } from "./ui/date/filter.mjs";
 import { createSearchUiActions } from "./ui/core/search-actions.mjs";
@@ -59,6 +63,7 @@ import type {
 type SearchCallbacksInput = {
     getRenderController: () => ReturnType<typeof createRenderController>;
     getResultSummaryController: () => ReturnType<typeof createResultSummaryController>;
+    resultCountController: ReturnType<typeof createResultCountController>;
     ui: AppUiState;
 };
 
@@ -99,10 +104,12 @@ const youtubeRuntimeState: AppYoutubeRuntimeState = appState.youtube;
 function createSearchCallbacks({
     getRenderController,
     getResultSummaryController,
+    resultCountController,
     ui
 }: SearchCallbacksInput): Parameters<typeof createSearchController>[0]["callbacks"] {
     return {
         updateDisplay: () => getRenderController().updateDisplay(),
+        showResultCount: (summary) => resultCountController.show({ kind: "results", summary }),
         onResultsApplied: () => getResultSummaryController().render(),
         scrollResultsPaneToTop: () => scrollResultListToTop(ui.el.resultList),
         getInitialDisplayCount: (defaultCount) => estimateInitialResultDisplayCount(ui.el.resultList, {
@@ -242,6 +249,11 @@ function createAppControllers() {
     });
 
     /**
+     * 結果一覧の上の件数表示を書く controller。読み込みと検索は状態を渡すだけにし、文言はここで今の言語にする。
+     */
+    const resultCountController = createResultCountController({ ui: appUiState });
+
+    /**
      * 検索 UI から条件を読み取り、表示対象の曲配列を appDataState.currentResults へ反映する controller。
      * 描画更新は renderController へ委譲し、結果リストのスクロール位置もここで揃える。
      */
@@ -258,6 +270,7 @@ function createAppControllers() {
         callbacks: createSearchCallbacks({
             getRenderController: () => renderController,
             getResultSummaryController: () => resultSummaryController,
+            resultCountController,
             ui: appUiState
         })
     });
@@ -342,7 +355,8 @@ function createAppControllers() {
         dataSource: { loadInitialSnapshot: () => initialSongsSnapshot },
         callbacks: {
             applyDateInputRange: (songs) => dateFilterController.applyDateInputRange(songs),
-            clampDateInputsToBounds: (minKey, maxKey) => dateFilterController.clampDateInputsToBounds(minKey, maxKey)
+            clampDateInputsToBounds: (minKey, maxKey) => dateFilterController.clampDateInputsToBounds(minKey, maxKey),
+            showResultCount: (state) => resultCountController.show(state)
         }
     });
 
@@ -462,13 +476,50 @@ function createAppControllers() {
     });
 
     /**
+     * 描画済みの文言を今の言語で描き直す。検索はやり直さないので、結果やおすすめの選曲は変わらない。
+     */
+    function refreshLanguageDependentText(): void {
+        renderController.refreshText();
+        resultSummaryController.render();
+        searchFiltersController.refreshFormatLabels();
+        dateFilterController.refreshDateSelectPlaceholders();
+        searchUiActions.refreshQueryValidationMessage();
+        youtubeController.refreshCloseButtonLabel();
+        bookmarkUiController?.renderBookmarks();
+    }
+
+    /**
+     * index.html の固定の文言と件数表示を、指定した言語で書く。件数表示は描画済みの状態から作り直す。
+     * @param language サイトの言語
+     */
+    function applyLanguageText(language: SiteLanguage): void {
+        applyStaticUiText(document, language);
+        resultCountController.render();
+    }
+
+    /**
+     * サイトの言語の決定・保存・言語ボタンを扱う controller。
+     */
+    const siteLanguageController = createSiteLanguageController({
+        ui: appUiState,
+        applyStaticText: applyLanguageText,
+        refreshDynamicText: refreshLanguageDependentText
+    });
+
+    /**
      * bfcache 復帰やフォーカス復帰時に、保存済み設定と検索 UI を再同期する controller。
      */
     const uiSyncController = createUiSyncController({
         uiSyncPasses: UI_SYNC_PASSES,
         syncSearchUI: searchUiActions.syncSearchUI,
         applyThemeFromStorage: () => applyThemeFromStorage({ ui: appUiState }),
-        applyPlaybackSettingsFromStorage: () => playbackSettingsController.applyPlaybackSettingsFromStorage()
+        applyPlaybackSettingsFromStorage: () => playbackSettingsController.applyPlaybackSettingsFromStorage(),
+        applySiteLanguageFromStorage: () => {
+            // 別タブで言語を変えた場合だけ、文言を置き換えて描き直す
+            if (!siteLanguageController.syncFromStorage()) return;
+            applyLanguageText(appUiState.language.current);
+            refreshLanguageDependentText();
+        }
     });
 
     wireYoutubePlaybackHooks({
@@ -478,6 +529,7 @@ function createAppControllers() {
     });
 
     return {
+        siteLanguageController,
         searchFiltersController,
         dateFilterController,
         searchController,
@@ -497,6 +549,7 @@ function createAppControllers() {
 }
 
 const {
+    siteLanguageController,
     searchFiltersController,
     dateFilterController,
     searchCoordinator,
@@ -521,6 +574,8 @@ let resultsViewportRefreshCleanup: (() => void) | null = null;
 async function initUI(): Promise<void> {
     appUiState.el = collectUiElements();
     if (isIOSWebKit()) document.documentElement.classList.add("ios");
+    // 以降の初期化で作る選択肢や文言が最初から今の言語になるよう、言語を先に決める
+    siteLanguageController.setup();
 
     searchFiltersController.setupFilterOptions({
         onFilterChange: searchUiActions.markFilterTouched
