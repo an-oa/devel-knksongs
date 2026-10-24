@@ -1,66 +1,45 @@
-/** 曲名・アーティスト名の表示に使う表記。 */
-export type SongNameLanguage = "ja" | "en";
+import type { SiteLanguage } from "./site-language.mjs";
 
-/** 表示する名前と、英語表記を表示している場合の言語タグ。 */
+/** 表示する名前と、その名前の言語。 */
 export type SongDisplayName = {
     text: string;
-    lang: "en" | null;
+    lang: SiteLanguage;
 };
 
-export const SONG_NAME_LANGUAGE_STORAGE_KEY = "songNameLanguage";
-
 /**
- * 曲名・アーティスト名の表記を決める。保存値があればそれに従い、未保存や不明な値のときは
- * ブラウザの優先言語が日本語なら日本語表記、それ以外なら英語表記とする。
- * 優先言語が分からないときは、サイトの言語に合わせて日本語表記とする。
- * @param stored 保存されている値
- * @param preferredLanguages ブラウザの優先言語(優先度の高い順)
- * @returns 曲名・アーティスト名の表記
- */
-export function resolveSongNameLanguage(
-    stored: string | null,
-    preferredLanguages: readonly string[]
-): SongNameLanguage {
-    if (stored === "en" || stored === "ja") return stored;
-    const primary = preferredLanguages.find((tag) => tag.trim() !== "");
-    if (!primary) return "ja";
-    return primary.trim().toLowerCase().startsWith("ja") ? "ja" : "en";
-}
-
-/**
- * 表記に応じて日本語名または英語名を選ぶ。英語名が空の曲は日本語名を表示する。
+ * サイトの言語に応じて日本語名または英語名を選ぶ。英語名が空の曲は日本語名を表示する。
  * @param japanese 日本語名
  * @param english 英語名
- * @param language 曲名・アーティスト名の表記
- * @returns 表示する名前と言語タグ
+ * @param language サイトの言語
+ * @returns 表示する名前とその言語
  */
-function pickDisplayName(japanese: string, english: string, language: SongNameLanguage): SongDisplayName {
+function pickDisplayName(japanese: string, english: string, language: SiteLanguage): SongDisplayName {
     if (language === "en" && english.trim() !== "") return { text: english, lang: "en" };
-    return { text: japanese, lang: null };
+    return { text: japanese, lang: "ja" };
 }
 
 /**
- * 表記に応じた曲名を返す。
+ * サイトの言語に応じた曲名を返す。
  * @param song 曲
- * @param language 曲名・アーティスト名の表記
- * @returns 表示する曲名と言語タグ
+ * @param language サイトの言語
+ * @returns 表示する曲名とその言語
  */
 export function getSongDisplayTitle(
     song: Pick<Song, "title" | "titleEn">,
-    language: SongNameLanguage
+    language: SiteLanguage
 ): SongDisplayName {
     return pickDisplayName(song.title, song.titleEn, language);
 }
 
 /**
- * 表記に応じたアーティスト名を返す。
+ * サイトの言語に応じたアーティスト名を返す。
  * @param song 曲
- * @param language 曲名・アーティスト名の表記
- * @returns 表示するアーティスト名と言語タグ
+ * @param language サイトの言語
+ * @returns 表示するアーティスト名とその言語
  */
 export function getSongDisplayArtist(
     song: Pick<Song, "artist" | "artistEn">,
-    language: SongNameLanguage
+    language: SiteLanguage
 ): SongDisplayName {
     return pickDisplayName(song.artist, song.artistEn, language);
 }

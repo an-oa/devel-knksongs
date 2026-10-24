@@ -1,4 +1,4 @@
-import type { SearchUiRuntimeState } from "../../state.types";
+import type { SearchUiRuntimeState, SiteLanguageUiRuntimeState } from "../../state.types";
 import { isHtmlElement } from "../../lib/dom-utils.mjs";
 import { getSearchBooleanFilterElements } from "../../lib/search-boolean-filters.mjs";
 import type { SearchBooleanFilterElements, SearchBooleanFilterKey } from "../../lib/search-boolean-filters.mjs";
@@ -43,7 +43,9 @@ type SearchUiActionsInput = {
         searchBox?: Parameters<typeof clearSearchQueryValidation>[0];
         searchBoxError?: Parameters<typeof clearSearchQueryValidation>[1];
         clearBtn?: Pick<HTMLButtonElement, "addEventListener"> | null;
-    } & SearchBooleanFilterElements };
+    } & SearchBooleanFilterElements;
+    /** 検索語のエラーの文言に使う言語。省略時は日本語にする。 */
+    language?: SiteLanguageUiRuntimeState; };
     search: Pick<SearchUiRuntimeState, "dataReady" | "userTouchedQuery" | "userTouchedFilters">;
     searchFiltersController: SearchActionsSearchFiltersController;
     dateFilterController: SearchActionsDateFilterController;
@@ -227,13 +229,22 @@ export function createSearchUiActions({
                 markQueryTouched();
             });
             searchBox.addEventListener("blur", () => {
-                validateSearchQueryInput(ui.el.searchBox, ui.el.searchBoxError);
+                validateSearchQueryInput(ui.el.searchBox, ui.el.searchBoxError, undefined, ui.language?.current);
             });
         }
         ui.el.clearBtn?.addEventListener("click", clearSearch);
     }
 
+    /**
+     * 表示中の検索語のエラーを、今の言語の文言で書き直す。エラーを表示していなければ何もしない。
+     */
+    function refreshQueryValidationMessage(): void {
+        if (ui.el.searchBoxError?.hidden !== false) return;
+        validateSearchQueryInput(ui.el.searchBox, ui.el.searchBoxError, undefined, ui.language?.current);
+    }
+
     return {
+        refreshQueryValidationMessage,
         clearSearch,
         clearSearchQuery,
         clearDateFilter,

@@ -43,7 +43,7 @@ export type BookmarkUiCallbacks = {
 
 type BookmarkUiControllerInput = {
     data: Pick<AppDataState, "allSongsRaw" | "bookmarks" | "activeBookmark">;
-    ui: Pick<AppUiState, "el" | "lookup" | "bookmarkPanel" | "songName">;
+    ui: Pick<AppUiState, "el" | "lookup" | "bookmarkPanel" | "language">;
     callbacks: BookmarkUiCallbacks;
 };
 

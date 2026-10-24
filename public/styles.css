@@ -291,6 +291,12 @@ body.hide-thumbs .thumb {
 .header-search input[type="text"]:disabled { cursor: progress; }
 
 .header-right { position: relative; display: flex; justify-content: flex-end; gap: 8px; }
+
+/* 言語を切り替えても幅が変わらないよう、両方の言語の文言を同じ位置に重ね、ページの言語の方だけを見せる。 */
+.i18n-stack { display: inline-grid; place-items: center; }
+.i18n-stack > * { grid-area: 1 / 1; }
+:root:not([lang="en"]) .i18n-stack > [lang="en"],
+:root[lang="en"] .i18n-stack > [lang="ja"] { visibility: hidden; }
 /* 斑点が下に潜るよう、ボタンを斑点より手前に描く。狭い画面では .header-right が箱を持たないため、ボタン自身に指定する。 */
 .language-btn,
 .menu-trigger-btn { position: relative; }
@@ -1033,6 +1039,8 @@ input[type="text"][aria-invalid="true"] {
   font-size: 13px;
   white-space: nowrap;
 }
+/* 英語の形態名(Originals & Covers など)は列の幅に収まらないので、折り返して枠からはみ出さないようにする。 */
+:root[lang="en"] #formatsList .checkbox-item { white-space: normal; }
 .checkbox-item { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; margin-bottom: 8px; }
 
 .checkbox-item input[type="checkbox"] {

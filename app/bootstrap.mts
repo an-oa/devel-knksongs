@@ -42,7 +42,8 @@ import {
     setupTheme
 } from "./ui/core/elements.mjs";
 import { createUiSyncController } from "./ui/core/sync.mjs";
-import { applySongNameLanguageFromStorage, setupSongNames } from "./ui/core/song-names.mjs";
+import { applySiteLanguageFromStorage, setupSiteLanguage } from "./ui/core/site-language.mjs";
+import { applyStaticUiText } from "./ui/core/static-text.mjs";
 import { createDataLoader } from "./ui/core/data.mjs";
 import { createDateFilterController } from "./ui/date/filter.mjs";
 import { createSearchUiActions } from "./ui/core/search-actions.mjs";
@@ -463,6 +464,19 @@ function createAppControllers() {
     });
 
     /**
+     * 描画済みの文言を今の言語で描き直す。検索はやり直さないので、結果やおすすめの選曲は変わらない。
+     */
+    function refreshLanguageDependentText(): void {
+        renderController.updateDisplay();
+        searchController.refreshResultCount();
+        resultSummaryController.render();
+        searchFiltersController.refreshFormatLabels();
+        dateFilterController.refreshDateSelectPlaceholders();
+        searchUiActions.refreshQueryValidationMessage();
+        youtubeController.refreshCloseButtonLabel();
+    }
+
+    /**
      * bfcache 復帰やフォーカス復帰時に、保存済み設定と検索 UI を再同期する controller。
      */
     const uiSyncController = createUiSyncController({
@@ -470,9 +484,11 @@ function createAppControllers() {
         syncSearchUI: searchUiActions.syncSearchUI,
         applyThemeFromStorage: () => applyThemeFromStorage({ ui: appUiState }),
         applyPlaybackSettingsFromStorage: () => playbackSettingsController.applyPlaybackSettingsFromStorage(),
-        applySongNamesFromStorage: () => {
-            // 別タブで表記を変えた場合だけ、表示中のカードを描き直す
-            if (applySongNameLanguageFromStorage({ ui: appUiState })) renderController.updateDisplay();
+        applySiteLanguageFromStorage: () => {
+            // 別タブで言語を変えた場合だけ、文言を置き換えて描き直す
+            if (!applySiteLanguageFromStorage({ ui: appUiState })) return;
+            applyStaticUiText(document, appUiState.language.current);
+            refreshLanguageDependentText();
         }
     });
 
@@ -483,6 +499,7 @@ function createAppControllers() {
     });
 
     return {
+        refreshLanguageDependentText,
         searchFiltersController,
         dateFilterController,
         searchController,
@@ -502,6 +519,7 @@ function createAppControllers() {
 }
 
 const {
+    refreshLanguageDependentText,
     searchFiltersController,
     dateFilterController,
     searchCoordinator,
@@ -526,6 +544,12 @@ let resultsViewportRefreshCleanup: (() => void) | null = null;
 async function initUI(): Promise<void> {
     appUiState.el = collectUiElements();
     if (isIOSWebKit()) document.documentElement.classList.add("ios");
+    // 以降の初期化で作る選択肢や文言が最初から今の言語になるよう、言語を先に決める
+    setupSiteLanguage({
+        ui: appUiState,
+        applyStaticText: (language) => applyStaticUiText(document, language),
+        refreshDynamicText: refreshLanguageDependentText
+    });
 
     searchFiltersController.setupFilterOptions({
         onFilterChange: searchUiActions.markFilterTouched
@@ -538,7 +562,6 @@ async function initUI(): Promise<void> {
     resultSummaryController.setup();
     storageController.restorePersistedState();
     setupTheme({ ui: appUiState });
-    setupSongNames({ ui: appUiState, updateDisplay: () => renderController.updateDisplay() });
     playbackSettingsController.setupPlaybackSettings();
     exposePlaybackSettingsConsoleApi();
     uiSyncController.setupSyncEvents();

@@ -42,7 +42,7 @@ export function createBookmarkNotificationController({
     timeoutMs = BOOKMARK_NOTIFICATION_TIMEOUT_MS
 }: {
     data: Pick<AppDataState, "allSongsRaw">;
-    ui: Pick<AppUiState, "lookup" | "songName"> & {
+    ui: Pick<AppUiState, "lookup" | "language"> & {
         el: Pick<AppUiState["el"], "bookmarkNotificationRegion">;
     };
     timeoutMs?: number;
@@ -123,7 +123,7 @@ export function createBookmarkNotificationController({
      */
     function getSongTitleForNotification(songRef: string | null | undefined): string {
         const song = resolveSongRef(lookupUi, data.allSongsRaw, songRef);
-        const title = song ? getSongDisplayTitle(song, ui.songName.language).text.trim() : "";
+        const title = song ? getSongDisplayTitle(song, ui.language.current).text.trim() : "";
         return title || "曲名不明";
     }
 

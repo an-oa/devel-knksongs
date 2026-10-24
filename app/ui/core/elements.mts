@@ -60,7 +60,7 @@ export function collectUiElements(): AppUiElements {
         clearDateFromBtn: getButtonElementById("clearDateFromBtn"),
         clearDateToBtn: getButtonElementById("clearDateToBtn"),
         themeToggle: getInputElementById("theme-toggle"),
-        songNameLanguageBtn: getButtonElementById("song-name-language-btn"),
+        languageBtn: getButtonElementById("site-language-btn"),
         thumbToggle: getInputElementById("thumbnail-toggle"),
         youtubeNoCookieToggle: getInputElementById("youtube-nocookie-toggle"),
         playArchiveToEndToggle: getInputElementById("play-archive-to-end-toggle"),

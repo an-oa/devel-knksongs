@@ -1,5 +1,6 @@
 import type { AppDataState, AppUiState } from "../../state.types";
 import type { SongsSnapshot } from "../../lib/songs-data-source.mjs";
+import { getUiText } from "../../lib/ui-text.mjs";
 
 export type InitialDataLoadResult =
     | { loaded: false }
@@ -9,6 +10,8 @@ type DataLoaderInput = {
     data: Pick<AppDataState, "allSongsRaw">;
     ui: {
         el: Pick<AppUiState["el"], "resultCount" | "searchBox">;
+        /** 読み込み中とエラーの表示の言語。省略時は日本語にする。 */
+        language?: AppUiState["language"];
         search: Pick<AppUiState["search"], "recommendedCache" | "dataReady" | "hasRestoredSearchState">;
         date: Pick<AppUiState["date"], "pendingValues">;
     };
@@ -56,10 +59,11 @@ export function createDataLoader(input: DataLoaderInput) {
 
     /** 初期データの取得・検証完了後に、曲データと検索UIを有効にする。 */
     async function loadInitialData(): Promise<InitialDataLoadResult> {
-        if (ui.el.resultCount) ui.el.resultCount.innerText = "データを読み込み中...";
+        const results = getUiText(ui.language?.current ?? "ja").results;
+        if (ui.el.resultCount) ui.el.resultCount.innerText = results.loadingData;
         const snapshot = await dataSource.loadInitialSnapshot();
         if (!snapshot) {
-            if (ui.el.resultCount) ui.el.resultCount.innerText = "読込エラー";
+            if (ui.el.resultCount) ui.el.resultCount.innerText = results.loadError;
             return { loaded: false };
         }
         const shouldResetConditions = !searchUiState.dataReady &&

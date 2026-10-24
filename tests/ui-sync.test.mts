@@ -11,7 +11,7 @@ function createUiSyncSpies() {
         syncSearchUI: 0,
         applyThemeFromStorage: 0,
         applyPlaybackSettingsFromStorage: 0,
-        applySongNamesFromStorage: 0
+        applySiteLanguageFromStorage: 0
     };
 
     return {
@@ -27,8 +27,8 @@ function createUiSyncSpies() {
             applyPlaybackSettingsFromStorage() {
                 calls.applyPlaybackSettingsFromStorage += 1;
             },
-            applySongNamesFromStorage() {
-                calls.applySongNamesFromStorage += 1;
+            applySiteLanguageFromStorage() {
+                calls.applySiteLanguageFromStorage += 1;
             }
         }
     };
@@ -47,27 +47,27 @@ test("ui sync: scheduleSyncUiState runs multiple passes and respects visual/sear
         controller.scheduleSyncUiState({ search: false });
         assert.equal(calls.applyThemeFromStorage, 1);
         assert.equal(calls.applyPlaybackSettingsFromStorage, 1);
-        assert.equal(calls.applySongNamesFromStorage, 1);
+        assert.equal(calls.applySiteLanguageFromStorage, 1);
         assert.equal(calls.syncSearchUI, 0);
         assert.equal(frames.pendingCount, 1);
 
         frames.advanceFrame();
         assert.equal(calls.applyThemeFromStorage, 2);
         assert.equal(calls.applyPlaybackSettingsFromStorage, 2);
-        assert.equal(calls.applySongNamesFromStorage, 2);
+        assert.equal(calls.applySiteLanguageFromStorage, 2);
         assert.equal(calls.syncSearchUI, 0);
 
         controller.scheduleSyncUiState({ visual: false });
         assert.equal(calls.applyThemeFromStorage, 2);
         assert.equal(calls.applyPlaybackSettingsFromStorage, 2);
-        assert.equal(calls.applySongNamesFromStorage, 2);
+        assert.equal(calls.applySiteLanguageFromStorage, 2);
         assert.equal(calls.syncSearchUI, 1);
         assert.equal(frames.pendingCount, 1);
 
         frames.advanceFrame();
         assert.equal(calls.applyThemeFromStorage, 2);
         assert.equal(calls.applyPlaybackSettingsFromStorage, 2);
-        assert.equal(calls.applySongNamesFromStorage, 2);
+        assert.equal(calls.applySiteLanguageFromStorage, 2);
         assert.equal(calls.syncSearchUI, 2);
     } finally {
         frames.cleanup();
@@ -89,7 +89,7 @@ test("ui sync: scheduleDelayedVisualSync waits 200ms by default and skips search
         scheduled[0].cb();
         assert.equal(calls.applyThemeFromStorage, 1);
         assert.equal(calls.applyPlaybackSettingsFromStorage, 1);
-        assert.equal(calls.applySongNamesFromStorage, 1);
+        assert.equal(calls.applySiteLanguageFromStorage, 1);
         assert.equal(calls.syncSearchUI, 0);
     } finally {
         fakeTimeouts.cleanup();
@@ -110,27 +110,27 @@ test("ui sync: visibilitychange only syncs when visible and pageshow adds delaye
         invokeListener(restoreDom.document, "visibilitychange", {});
         assert.equal(calls.applyThemeFromStorage, 0);
         assert.equal(calls.applyPlaybackSettingsFromStorage, 0);
-        assert.equal(calls.applySongNamesFromStorage, 0);
+        assert.equal(calls.applySiteLanguageFromStorage, 0);
         assert.equal(calls.syncSearchUI, 0);
 
         restoreDom.document.visibilityState = "visible";
         invokeListener(restoreDom.document, "visibilitychange", {});
         assert.equal(calls.applyThemeFromStorage, 1);
         assert.equal(calls.applyPlaybackSettingsFromStorage, 1);
-        assert.equal(calls.applySongNamesFromStorage, 1);
+        assert.equal(calls.applySiteLanguageFromStorage, 1);
         assert.equal(calls.syncSearchUI, 1);
 
         invokeListener(restoreDom.window, "pageshow", {});
         assert.equal(calls.applyThemeFromStorage, 2);
         assert.equal(calls.applyPlaybackSettingsFromStorage, 2);
-        assert.equal(calls.applySongNamesFromStorage, 2);
+        assert.equal(calls.applySiteLanguageFromStorage, 2);
         assert.equal(calls.syncSearchUI, 2);
         assert.deepEqual(scheduled.map((entry) => entry.delay), [200]);
 
         scheduled[0].cb();
         assert.equal(calls.applyThemeFromStorage, 3);
         assert.equal(calls.applyPlaybackSettingsFromStorage, 3);
-        assert.equal(calls.applySongNamesFromStorage, 3);
+        assert.equal(calls.applySiteLanguageFromStorage, 3);
         assert.equal(calls.syncSearchUI, 2);
     } finally {
         fakeTimeouts.cleanup();

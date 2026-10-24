@@ -44,7 +44,7 @@ function createRenderUiState<Elements extends {
     dataReady?: boolean;
     activeThumb?: HTMLElement | null;
     cardEntriesBySongKey?: Map<string, import("../app/state.types").RenderCardEntry>;
-    songNameLanguage?: import("../app/lib/song-display-name.mts").SongNameLanguage;
+    language?: import("../app/lib/site-language.mts").SiteLanguage;
 }) {
     return {
         el: input.el,
@@ -67,8 +67,8 @@ function createRenderUiState<Elements extends {
         render: {
             cardEntriesBySongKey: input.cardEntriesBySongKey ?? new Map<string, import("../app/state.types").RenderCardEntry>()
         },
-        songName: {
-            language: input.songNameLanguage ?? "ja"
+        language: {
+            current: input.language ?? "ja"
         },
         lookup: {
             songMapByBookmarkKey: new Map(),
@@ -312,7 +312,7 @@ test("render: result cards and empty state use list semantics", () => {
     }
 });
 
-test("render: cards show English names with a language tag when the setting is English", () => {
+test("render: English cards show English names, tags, dates, and labels, and tag Japanese fallbacks", () => {
     const cleanup = installFakeDom();
     try {
         const data = createRenderDataState({
@@ -334,7 +334,7 @@ test("render: cards show English names with a language tag when the setting is E
                 resultList: document.createElement("ol"),
                 resultTailSentinel: document.createElement("div")
             },
-            songNameLanguage: "en"
+            language: "en"
         });
         const controller = createRenderController({
             data,
@@ -349,19 +349,24 @@ test("render: cards show English names with a language tag when the setting is E
         const englishTitle = englishCard.querySelector(".title");
         const englishArtist = englishCard.querySelector(".artist");
         assert.equal(englishTitle?.textContent, "Eine Kleine");
-        assert.equal(englishTitle?.getAttribute("lang"), "en");
+        assert.equal(englishTitle?.hasAttribute("lang"), false, "English names match the English page");
         assert.equal(englishArtist?.textContent, "Kenshi Yonezu");
-        assert.equal(englishArtist?.getAttribute("lang"), "en");
+        assert.equal(englishArtist?.hasAttribute("lang"), false);
         assert.equal(japaneseOnlyCard.querySelector(".title")?.textContent, "日本語だけの曲");
-        assert.equal(japaneseOnlyCard.querySelector(".title")?.hasAttribute("lang"), false);
+        assert.equal(japaneseOnlyCard.querySelector(".title")?.getAttribute("lang"), "ja", "Japanese fallbacks are tagged on the English page");
+        assert.equal(englishCard.querySelector(".tag")?.textContent, "Singing Stream");
+        assert.equal(englishCard.querySelector(".footer-left")?.children[0]?.textContent, "Mar 11, 2026", "the date comes from dateKey");
+        assert.equal(englishCard.querySelector(".add-to-bookmark-btn")?.getAttribute("aria-label"), "Add to bookmark");
 
-        ui.songName.language = "ja";
+        ui.language.current = "ja";
         controller.updateDisplay();
 
         assert.equal(englishTitle?.textContent, "アイネクライネ", "the reused card switches back to Japanese");
         assert.equal(englishTitle?.hasAttribute("lang"), false);
         assert.equal(englishArtist?.textContent, "米津玄師");
         assert.equal(englishArtist?.hasAttribute("lang"), false);
+        assert.equal(englishCard.querySelector(".tag")?.textContent, "配信");
+        assert.equal(englishCard.querySelector(".add-to-bookmark-btn")?.getAttribute("aria-label"), "ブックマークに追加");
     } finally {
         cleanup();
     }

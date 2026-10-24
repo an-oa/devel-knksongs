@@ -1,16 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createBookmarkNotificationController } from "../app/ui/bookmark/notifications.mts";
-import type { SongNameLanguage } from "../app/lib/song-display-name.mts";
+import type { SiteLanguage } from "../app/lib/site-language.mts";
 import { createSongFixture } from "./fixtures/song.mts";
 import { installFakeDom, installFakeTimeouts, invokeListener } from "./test-helpers.mts";
 
 /**
  * 通知テスト用の UI 状態を作る。
- * @param language 曲名の表記
+ * @param language サイトの言語
  * @returns 通知の表示先と曲参照用のマップを持つ UI 状態
  */
-function createNotificationUiState(language: SongNameLanguage = "ja") {
+function createNotificationUiState(language: SiteLanguage = "ja") {
     const bookmarkNotificationRegion = document.createElement("div");
     document.body.appendChild(bookmarkNotificationRegion);
     return {
@@ -22,8 +22,8 @@ function createNotificationUiState(language: SongNameLanguage = "ja") {
             songMapByKey: new Map<string, Song>(),
             songLookupSourceRef: null
         },
-        songName: {
-            language
+        language: {
+            current: language
         }
     };
 }

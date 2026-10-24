@@ -1,4 +1,5 @@
 import test from "node:test";
+import type { SiteLanguage } from "../app/lib/site-language.mts";
 import type { AppDataState, SearchUiRuntimeState, DateUiRuntimeState, LookupUiRuntimeState } from "../app/state.types";
 import assert from "node:assert/strict";
 import { createSearchFiltersController } from "../app/ui/search-filters/controller.mts";
@@ -164,7 +165,8 @@ function createSearchUiState<Elements extends SearchTestUiElements>(input: {
     const lookup: LookupUiRuntimeState = {
         songMapByBookmarkKey: new Map(), songMapByKey: new Map(), songLookupSourceRef: null
     };
-    return { el: input.el, search, date, lookup };
+    const language = { current: "ja" as SiteLanguage };
+    return { el: input.el, search, date, lookup, language };
 }
 
 /** 検索条件 UI controller を注入して検索 controller を作る。 */

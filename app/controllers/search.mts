@@ -9,8 +9,14 @@ import {
 import type { SearchBooleanFilterElements } from "../lib/search-boolean-filters.mjs";
 import { resolveSongRefs } from "../lib/song-lookup.mjs";
 import { validateSearchQueryInput } from "../ui/search-query-validation.mjs";
+import { getUiText, type ResultCountSummary } from "../lib/ui-text.mjs";
 
-import type { AppDataState, SearchUiRuntimeState, LookupUiRuntimeState } from "../state.types";
+import type {
+    AppDataState,
+    SearchUiRuntimeState,
+    LookupUiRuntimeState,
+    SiteLanguageUiRuntimeState
+} from "../state.types";
 import type { createDateFilterController } from "../ui/date/filter.mjs";
 
 type SearchControllerInput = {
@@ -23,6 +29,7 @@ type SearchControllerInput = {
         } & SearchBooleanFilterElements;
         search: Pick<SearchUiRuntimeState, "selectedFormats" | "recommendedCache">;
         lookup: LookupUiRuntimeState;
+        language: SiteLanguageUiRuntimeState;
     };
     searchFiltersController: {
         areAllFormatsSelected: () => boolean;
@@ -56,7 +63,8 @@ type SearchOutcome = {
     mode: "recommended" | "search" | "bookmark";
     results: Song[];
     displayLimit: number;
-    label: string;
+    /** 結果一覧の上の件数表示。言語を切り替えたときに作り直すため、文言ではなく内容で持つ。 */
+    summary: ResultCountSummary;
 };
 
 /**
@@ -92,7 +100,7 @@ export function createSearchController({
      */
     function search(): void {
         const searchInput = collectSearchInput();
-        validateSearchQueryInput(ui.el.searchBox, ui.el.searchBoxError, searchInput.parsedQuery);
+        validateSearchQueryInput(ui.el.searchBox, ui.el.searchBoxError, searchInput.parsedQuery, ui.language.current);
         const outcome = resolveSearchResults(searchInput.searchState, searchInput.parsedQuery);
         applySearchOutcome(outcome);
         scrollResultsPaneToTop();
@@ -111,6 +119,21 @@ export function createSearchController({
     }
 
     /**
+     * 結果一覧の上の件数表示を、サイトの言語の文言で書く。
+     * @param summary 件数表示の内容
+     */
+    function renderResultCount(summary: ResultCountSummary): void {
+        if (ui.el.resultCount) ui.el.resultCount.innerText = getUiText(ui.language.current).results.count(summary);
+    }
+
+    /**
+     * 確定済みの検索結果の件数表示を、今の言語で書き直す。検索をやり直さないので、おすすめの選曲は変わらない。
+     */
+    function refreshResultCount(): void {
+        if (committedOutcome) renderResultCount(committedOutcome.summary);
+    }
+
+    /**
      * 検索結果を state と UI へ反映する。
      * @param {SearchOutcome} outcome
      */
@@ -118,7 +141,7 @@ export function createSearchController({
         data.currentResults = outcome.results;
         data.displayLimit = outcome.displayLimit;
         committedOutcome = outcome;
-        if (ui.el.resultCount) ui.el.resultCount.innerText = outcome.label;
+        renderResultCount(outcome.summary);
         updateDisplay();
         callbacks.onResultsApplied?.();
     }
@@ -172,7 +195,7 @@ export function createSearchController({
                 );
                 return buildIncrementalSearchOutcome(
                     results,
-                    `ブックマーク: ${bookmark.name} (${results.length} 件)`,
+                    { kind: "bookmark", name: bookmark.name, count: results.length },
                     "bookmark"
                 );
             }
@@ -188,26 +211,26 @@ export function createSearchController({
             searchUiState.selectedFormats,
             parsedQuery
         );
-        return buildIncrementalSearchOutcome(results, `${results.length} 件がヒット`);
+        return buildIncrementalSearchOutcome(results, { kind: "search", count: results.length });
     }
 
     /**
      * 段階表示用の件数上限を含む検索結果オブジェクトを作る。
-     * @param {Song[]} results
-     * @param {string} label
+     * @param results 表示する曲
+     * @param summary 件数表示の内容
      * @param mode 確定する検索モード
-     * @returns {SearchOutcome}
+     * @returns 検索結果
      */
     function buildIncrementalSearchOutcome(
         results: Song[],
-        label: string,
+        summary: ResultCountSummary,
         mode: "search" | "bookmark" = "search"
     ): SearchOutcome {
         return {
             mode,
             results,
             displayLimit: Math.min(results.length, getInitialDisplayLimit(RESULT_DISPLAY_BATCH_SIZE)),
-            label
+            summary
         };
     }
 
@@ -249,7 +272,7 @@ export function createSearchController({
                 retainedDisplayLimit,
                 getInitialDisplayLimit(recommendedCount)
             )),
-            label: "おすすめを表示中"
+            summary: { kind: "recommended" }
         };
     }
 
@@ -297,6 +320,7 @@ export function createSearchController({
     return {
         search,
         refreshRecommendedDisplay,
+        refreshResultCount,
         getSearchState,
         isRecommendedMode,
         areAllFormatsSelected: searchFiltersController.areAllFormatsSelected

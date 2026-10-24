@@ -1,7 +1,7 @@
-import { getFormatFilterLabel } from "../../lib/format-filter.mjs";
 import { SEARCH_BOOLEAN_FILTER_KEYS } from "../../lib/search-boolean-filters.mjs";
 import type { SearchBooleanFilterKey } from "../../lib/search-boolean-filters.mjs";
-import type { AppUiElements } from "../../state.types";
+import { getUiText } from "../../lib/ui-text.mjs";
+import type { AppUiElements, SiteLanguageUiRuntimeState } from "../../state.types";
 import type { DateSelectKind } from "../date/filter.mjs";
 
 /** 概要行に表示する適用中の条件 1 件。 */
@@ -15,6 +15,7 @@ type ResultConditionChip = {
 type ResultSummaryControllerInput = {
     ui: {
         el: Pick<AppUiElements, "searchBox" | "resultConditions" | "resultClearAll">;
+        language: SiteLanguageUiRuntimeState;
     };
     /** 現在の検索条件を読み取る。概要行は入力要素を直接変更しない。 */
     conditions: {
@@ -36,23 +37,6 @@ type ResultSummaryControllerInput = {
     };
 };
 
-/** サイドバーの表記に合わせた真偽値フィルターのチップ名。 */
-const BOOLEAN_FILTER_LABELS: Record<SearchBooleanFilterKey, string> = {
-    collabHostOnly: "コラボ(ホスト)",
-    collabGuestOnly: "コラボ(ゲスト)",
-    relayOnly: "歌枠リレー",
-    harmonyOnly: "ハモリあり"
-};
-
-/**
- * 部分日付の入力値を、概要行で読みやすい区切りへ変換する。
- * @param {string} value YYYY / YYYY-MM / YYYY-MM-DD 形式の値
- * @returns {string}
- */
-function formatDateChipValue(value: string): string {
-    return value.replaceAll("-", "/");
-}
-
 /**
  * 結果一覧の上に、適用中の検索条件をチップで表示し、個別・一括で解除できるようにする。
  * 解除は検索を即時に確定するため、解除後のフォーカス移動も同じ操作の中で完結させる。
@@ -65,36 +49,36 @@ export function createResultSummaryController({ ui, conditions, actions }: Resul
     let renderedChips: ResultConditionChip[] = [];
 
     /**
-     * 現在の検索条件から、概要行に並べる条件チップを集める。
-     * @returns {ResultConditionChip[]}
+     * 現在の検索条件から、概要行に並べる条件チップをサイトの言語の文言で集める。
+     * @returns 概要行に並べる条件チップ
      */
     function collectConditionChips(): ResultConditionChip[] {
         const chips: ResultConditionChip[] = [];
+        const text = getUiText(ui.language.current);
         const query = conditions.getQuery().trim();
         if (query) {
-            chips.push({ key: "query", label: `「${query}」`, remove: actions.clearSearchQuery });
+            chips.push({ key: "query", label: text.chips.query(query), remove: actions.clearSearchQuery });
         }
         (["from", "to"] as const).forEach((kind) => {
             const value = conditions.getDateValue(kind);
             if (!value) return;
-            const date = formatDateChipValue(value);
             chips.push({
                 key: `date-${kind}`,
-                label: kind === "from" ? `${date}〜` : `〜${date}`,
+                label: kind === "from" ? text.chips.dateFrom(value) : text.chips.dateTo(value),
                 remove: () => actions.clearDateFilter(kind)
             });
         });
         if (!conditions.areAllFormatsSelected()) {
-            const selectedLabels = conditions.getSelectedFormats().map(getFormatFilterLabel);
+            const selectedLabels = conditions.getSelectedFormats().map(text.formatFilter);
             chips.push({
                 key: "formats",
-                label: `種類: ${selectedLabels.length > 0 ? selectedLabels.join("・") : "なし"}`,
+                label: text.chips.formats(selectedLabels),
                 remove: actions.resetFormatFilters
             });
         }
         SEARCH_BOOLEAN_FILTER_KEYS.forEach((key) => {
             if (!conditions.isBooleanFilterEnabled(key)) return;
-            chips.push({ key, label: BOOLEAN_FILTER_LABELS[key], remove: () => actions.clearBooleanFilter(key) });
+            chips.push({ key, label: text.booleanFilters[key], remove: () => actions.clearBooleanFilter(key) });
         });
         return chips;
     }
@@ -135,8 +119,8 @@ export function createResultSummaryController({ ui, conditions, actions }: Resul
 
     /**
      * チップの表示名と読み上げ名を更新する。長い表示名は CSS で省略するため title に全文を残す。
-     * @param {HTMLLIElement} item
-     * @param {ResultConditionChip} chip
+     * @param item チップの要素
+     * @param chip 表示する条件
      */
     function updateChipItem(item: HTMLLIElement, chip: ResultConditionChip): void {
         const button = getChipButton(item);
@@ -144,7 +128,7 @@ export function createResultSummaryController({ ui, conditions, actions }: Resul
         if (!button || !label) return;
         label.textContent = chip.label;
         button.title = chip.label;
-        button.setAttribute("aria-label", `${chip.label}の条件を解除`);
+        button.setAttribute("aria-label", getUiText(ui.language.current).chips.remove(chip.label));
     }
 
     /**

@@ -3,7 +3,7 @@ import { normalizeForSearch } from "../../app/lib/search-normalization.mts";
 import { installNetworkMocks } from "./support/network-mocks.mts";
 import { routeSongsJsonFixture } from "./support/songs-network.mts";
 import { createScrollableResultSongs } from "./support/song-fixtures.mts";
-import { waitForInitialLoad } from "./support/ui-helpers.mts";
+import { openSidebar, waitForInitialLoad } from "./support/ui-helpers.mts";
 
 /**
  * 曲名・アーティスト名を差し替え、検索に使う正規化済みの値も同じ名前から作り直す。
@@ -50,7 +50,7 @@ async function openWithEnglishNamedSongs(page: Page, query: string) {
 
 /** 言語ボタンで見えている文言。ボタンには両方の文言を重ねてあり、切り替え先の言語だけが見える。 */
 function getVisibleLanguageLabel(page: Page) {
-    return page.locator("#song-name-language-btn .language-btn-label:visible");
+    return page.locator("#site-language-btn .language-btn-label:visible");
 }
 
 /** 英語表記のある曲のカードの曲名。表記が変わっても同じカードを指す。 */
@@ -61,25 +61,33 @@ function getEnglishCardTitle(page: Page) {
 test.describe("Japanese browsers", () => {
     test.use({ locale: "ja-JP" });
 
-    test("start with Japanese names and switch to English from the header", async ({ page }) => {
+    test("start in Japanese and switch the site to English from the header", async ({ page }) => {
         await openWithEnglishNamedSongs(page, "表記テスト");
-        const languageButton = page.locator("#song-name-language-btn");
+        const languageButton = page.locator("#site-language-btn");
         const englishCardTitle = getEnglishCardTitle(page);
+        const japaneseOnlyTitle = page.locator("#resultList .song-card .title").filter({ hasText: "日本語だけ" });
 
+        await expect(page.locator("html")).toHaveAttribute("lang", "ja");
         await expect(englishCardTitle).toHaveText("表記テスト アイネクライネ");
+        await expect(page.locator("#resultCount")).toHaveText("2 件がヒット");
+        await expect(page.locator("#open-sidebar")).toContainText("絞り込み");
         await expect(getVisibleLanguageLabel(page)).toHaveText("English");
         await expect(languageButton).toHaveAttribute("lang", "en");
 
         await languageButton.click();
 
+        await expect(page.locator("html")).toHaveAttribute("lang", "en");
         await expect(englishCardTitle).toHaveText("Eine Kleine");
-        await expect(englishCardTitle).toHaveAttribute("lang", "en");
-        await expect(page.locator("#resultList .song-card .artist").filter({ hasText: "Kenshi Yonezu" })).toHaveAttribute("lang", "en");
-        await expect(page.locator("#resultList .song-card .title").filter({ hasText: "日本語だけ" })).toHaveText("表記テスト 日本語だけ");
+        await expect(englishCardTitle).not.toHaveAttribute("lang", /.*/);
+        await expect(japaneseOnlyTitle).toHaveText("表記テスト 日本語だけ");
+        await expect(japaneseOnlyTitle).toHaveAttribute("lang", "ja");
+        await expect(page.locator("#resultCount")).toHaveText("2 results");
+        await expect(page.locator("#open-sidebar")).toContainText("Filters");
+        await expect(page.locator("#searchBox")).toHaveAttribute("placeholder", "Song or artist...");
         await expect(getVisibleLanguageLabel(page)).toHaveText("日本語");
         await expect(languageButton).toHaveAttribute("lang", "ja");
         await expect
-            .poll(() => page.evaluate(() => localStorage.getItem("songNameLanguage")))
+            .poll(() => page.evaluate(() => localStorage.getItem("siteLanguage")))
             .toBe("en");
 
         await page.reload();
@@ -96,7 +104,7 @@ test.describe("header layout", () => {
     test("switching the language keeps the search box and the spots in place", async ({ page }) => {
         await openWithEnglishNamedSongs(page, "表記テスト");
         const readLayout = () => page.evaluate(() => [
-            "#song-name-language-btn",
+            "#site-language-btn",
             "#searchBox",
             ".header-spots-wide-left",
             ".header-spots-wide-right"
@@ -106,7 +114,7 @@ test.describe("header layout", () => {
         }));
         const before = await readLayout();
 
-        await page.locator("#song-name-language-btn").click();
+        await page.locator("#site-language-btn").click();
         await expect(getVisibleLanguageLabel(page)).toHaveText("日本語");
 
         expect(await readLayout()).toEqual(before);
@@ -116,17 +124,26 @@ test.describe("header layout", () => {
 test.describe("English browsers", () => {
     test.use({ locale: "en-US" });
 
-    test("start with English names without any setting", async ({ page }) => {
+    test("start in English without any setting", async ({ page }) => {
         await openWithEnglishNamedSongs(page, "Eine Kleine");
 
+        await expect(page.locator("html")).toHaveAttribute("lang", "en");
         await expect(getEnglishCardTitle(page)).toHaveText("Eine Kleine");
+        await expect(page.locator("#resultCount")).toHaveText("1 result");
+        await expect(page.locator("#resultList .song-card .tag").first()).toHaveText("Singing Stream");
         await expect(getVisibleLanguageLabel(page)).toHaveText("日本語");
+
+        await openSidebar(page);
+        await expect(page.locator("#sidebar-title")).toHaveText("Filters & Settings");
+        await expect(page.locator("#formatsList")).toContainText("Originals & Covers");
+        await expect(page.locator("#dateFromYear option[value='']")).toHaveText("YYYY");
+        await expect(page.locator("label[for='relayOnly']")).toContainText("Relay stream");
     });
 
     test("show the language button next to the search box on narrow screens", async ({ page }) => {
         await page.setViewportSize({ width: 360, height: 740 });
         await openWithEnglishNamedSongs(page, "Eine Kleine");
-        const languageButton = page.locator("#song-name-language-btn");
+        const languageButton = page.locator("#site-language-btn");
 
         await expect(languageButton).toBeVisible();
         const buttonBox = await languageButton.boundingBox();
