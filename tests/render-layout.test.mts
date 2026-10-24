@@ -826,6 +826,7 @@ test("bookmark: observes result tail and increases by RESULT_DISPLAY_BATCH_SIZE 
             },
             callbacks: {
                 updateDisplay: () => renderController.updateDisplay(),
+                showResultCount: () => {},
                 scrollResultsPaneToTop: () => {}
             }
         });

@@ -55,7 +55,6 @@ type StaticText = {
     openSidebar: string;
     filters: string;
     searchResults: string;
-    connecting: string;
     activeFilters: string;
     clearAll: string;
     footerUnofficial: string;
@@ -90,6 +89,7 @@ export type UiText = {
     };
     results: {
         count: (summary: ResultCountSummary) => string;
+        connecting: string;
         loadingData: string;
         loadError: string;
         loading: string;
@@ -208,7 +208,6 @@ const JAPANESE_TEXT: UiText = {
         openSidebar: "絞り込み・設定を開く",
         filters: "絞り込み",
         searchResults: "検索結果",
-        connecting: "接続中...",
         activeFilters: "適用中の条件",
         clearAll: "すべてクリア",
         footerUnofficial: "本サイトは非公式のファンメイドです。掲載している動画・楽曲等の著作権は各権利者に帰属します。",
@@ -237,6 +236,7 @@ const JAPANESE_TEXT: UiText = {
             if (summary.kind === "bookmark") return `ブックマーク: ${summary.name} (${summary.count} 件)`;
             return `${summary.count} 件がヒット`;
         },
+        connecting: "接続中...",
         loadingData: "データを読み込み中...",
         loadError: "読込エラー",
         loading: "読み込み中...",
@@ -312,7 +312,6 @@ const ENGLISH_TEXT: UiText = {
         openSidebar: "Open filters and settings",
         filters: "Filters",
         searchResults: "Search results",
-        connecting: "Connecting...",
         activeFilters: "Active filters",
         clearAll: "Clear all",
         footerUnofficial: "This is an unofficial fan site. Copyrights of the videos and songs belong to their respective owners.",
@@ -341,6 +340,7 @@ const ENGLISH_TEXT: UiText = {
             if (summary.kind === "bookmark") return `Bookmark: ${summary.name} (${summary.count})`;
             return summary.count === 1 ? "1 result" : `${summary.count} results`;
         },
+        connecting: "Connecting...",
         loadingData: "Loading data...",
         loadError: "Failed to load",
         loading: "Loading...",

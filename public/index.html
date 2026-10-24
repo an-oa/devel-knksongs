@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <!-- テーマと言語の初期化だけを SHA-256 で許可し、YouTube API の script は必要な path に限定する。 -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-7foxyc25DvizjlB4fQ3IWkXvbkMGKt4EZ2xCn8/rbFo=' https://www.youtube.com/iframe_api https://www.youtube.com/s/player/; script-src-attr 'none'; style-src 'self'; img-src 'self' https://i.ytimg.com; connect-src 'self' https://docs.google.com https://*.googleusercontent.com; frame-src https://www.youtube.com/embed/ https://www.youtube-nocookie.com/embed/; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-dVbQd0MMdvnWvuB2DHfgdemsr4Cg2QL1JvqSzHdCE5c=' https://www.youtube.com/iframe_api https://www.youtube.com/s/player/; script-src-attr 'none'; style-src 'self'; img-src 'self' https://i.ytimg.com; connect-src 'self' https://docs.google.com https://*.googleusercontent.com; frame-src https://www.youtube.com/embed/ https://www.youtube-nocookie.com/embed/; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title data-i18n="siteTitle">鐘輝かう 歌サーチ</title>
 
@@ -49,32 +49,38 @@
           root.classList.add('dark-theme');
         }
       } catch (e) {}
-      // 言語は ?lang、保存値、ブラウザの優先言語の順に決める。app/lib/site-language.mts と同じ判定にする。
+      // 言語は ?lang、保存値、ブラウザの優先言語の順に決める。app/lib/site-language.mts の resolveSiteLanguage と同じ判定にし、
+      // tests/inline-language-script.test.mts で結果が一致することを確かめる。読めない候補は飛ばして次の候補へ進む。
       // 英語のときは、日本語の文言を置き換え終わるまで中身を隠す。アプリが外すが、失敗しても4秒後には表示する。
+      var language = null;
       try {
         var param = new URLSearchParams(location.search).get('lang');
-        var language = param === 'en' || param === 'ja' ? param : null;
-        if (!language) {
+        if (param === 'en' || param === 'ja') language = param;
+      } catch (e) {}
+      if (!language) {
+        try {
           var stored = localStorage.getItem('siteLanguage');
-          language = stored === 'en' || stored === 'ja' ? stored : null;
-        }
-        if (!language) {
+          if (stored === 'en' || stored === 'ja') language = stored;
+        } catch (e) {}
+      }
+      if (!language) {
+        language = 'ja';
+        try {
           var preferred = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || ''];
-          var primary = '';
           for (var i = 0; i < preferred.length; i++) {
-            if (String(preferred[i]).trim()) {
-              primary = String(preferred[i]).trim().toLowerCase();
+            var tag = String(preferred[i]).trim().toLowerCase();
+            if (tag) {
+              language = tag.indexOf('ja') === 0 ? 'ja' : 'en';
               break;
             }
           }
-          language = !primary || primary.indexOf('ja') === 0 ? 'ja' : 'en';
-        }
-        if (language === 'en') {
-          root.lang = 'en';
-          root.classList.add('i18n-pending');
-          setTimeout(function () { root.classList.remove('i18n-pending'); }, 4000);
-        }
-      } catch (e) {}
+        } catch (e) {}
+      }
+      if (language === 'en') {
+        root.lang = 'en';
+        root.classList.add('i18n-pending');
+        setTimeout(function () { root.classList.remove('i18n-pending'); }, 4000);
+      }
     })();
   </script>
   <link rel="stylesheet" href="styles.css">
@@ -328,7 +334,7 @@
     <section class="container" aria-labelledby="result-list-title">
       <h2 id="result-list-title" class="visually-hidden" data-i18n="searchResults">検索結果</h2>
       <div class="result-summary">
-        <p id="resultCount" class="result-summary-count" data-i18n="connecting">接続中...</p>
+        <p id="resultCount" class="result-summary-count">接続中...</p>
         <ul id="resultConditions" class="result-conditions" aria-label="適用中の条件" data-i18n-aria-label="activeFilters"></ul>
         <button id="resultClearAll" class="result-clear-all" type="button" data-i18n="clearAll" hidden>すべてクリア</button>
       </div>

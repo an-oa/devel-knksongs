@@ -9,7 +9,7 @@ import {
 import type { SearchBooleanFilterElements } from "../lib/search-boolean-filters.mjs";
 import { resolveSongRefs } from "../lib/song-lookup.mjs";
 import { validateSearchQueryInput } from "../ui/search-query-validation.mjs";
-import { getUiText, type ResultCountSummary } from "../lib/ui-text.mjs";
+import type { ResultCountSummary } from "../lib/ui-text.mjs";
 
 import type {
     AppDataState,
@@ -25,7 +25,6 @@ type SearchControllerInput = {
         el: {
             searchBox?: Parameters<typeof validateSearchQueryInput>[0];
             searchBoxError?: Parameters<typeof validateSearchQueryInput>[1];
-            resultCount?: Pick<HTMLElement, "innerText"> | null;
         } & SearchBooleanFilterElements;
         search: Pick<SearchUiRuntimeState, "selectedFormats" | "recommendedCache">;
         lookup: LookupUiRuntimeState;
@@ -42,6 +41,8 @@ type SearchControllerInput = {
     };
     callbacks: {
         updateDisplay: () => void;
+        /** 結果一覧の上の件数表示に、確定した検索結果の件数を出す。 */
+        showResultCount: (summary: ResultCountSummary) => void;
         scrollResultsPaneToTop: () => void;
         getRecommendedDisplayCount?: () => number;
         /** 画面の上端より上へ過ぎた結果カードの数を返す。おすすめを減らすときに残す範囲を決める。 */
@@ -119,29 +120,14 @@ export function createSearchController({
     }
 
     /**
-     * 結果一覧の上の件数表示を、サイトの言語の文言で書く。
-     * @param summary 件数表示の内容
-     */
-    function renderResultCount(summary: ResultCountSummary): void {
-        if (ui.el.resultCount) ui.el.resultCount.innerText = getUiText(ui.language.current).results.count(summary);
-    }
-
-    /**
-     * 確定済みの検索結果の件数表示を、今の言語で書き直す。検索をやり直さないので、おすすめの選曲は変わらない。
-     */
-    function refreshResultCount(): void {
-        if (committedOutcome) renderResultCount(committedOutcome.summary);
-    }
-
-    /**
      * 検索結果を state と UI へ反映する。
-     * @param {SearchOutcome} outcome
+     * @param outcome 確定した検索結果
      */
     function applySearchOutcome(outcome: SearchOutcome): void {
         data.currentResults = outcome.results;
         data.displayLimit = outcome.displayLimit;
         committedOutcome = outcome;
-        renderResultCount(outcome.summary);
+        callbacks.showResultCount(outcome.summary);
         updateDisplay();
         callbacks.onResultsApplied?.();
     }
@@ -320,7 +306,6 @@ export function createSearchController({
     return {
         search,
         refreshRecommendedDisplay,
-        refreshResultCount,
         getSearchState,
         isRecommendedMode,
         areAllFormatsSelected: searchFiltersController.areAllFormatsSelected
