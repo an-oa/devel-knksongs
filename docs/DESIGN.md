@@ -48,7 +48,7 @@
 テストの配置・実行コマンド・環境準備は、[DEVELOPMENT.md](DEVELOPMENT.md)で管理する。
 
 ## 主要機能
-- 検索（曲名/アーティスト名/読み、複数キーワード）
+- 検索（曲名/アーティスト名/読み/英名、複数キーワード）
 - 絞り込み（形態/コラボ種別/リレー/ハモリ/日付範囲）
 - ブックマーク（作成/名称変更/削除/曲の追加・削除/選択/表示中の曲順並び替え）
 - おすすめ表示（条件未指定時）
@@ -164,8 +164,11 @@ flowchart TD
   JSONからCSVへ戻す経路は持たない
 - CSVのURLは `app/config.mts` の `PUBLIC_CSV_URL` で指定する。曲JSON生成とブラウザのCSVフォールバックの両方が参照する
 - CSVの `配信上の立場` は `streamRole` としてJSONへ保持する
+- CSVの `Song Title` / `Artist Name` / `Artist Sort Name` は検索専用の任意列とし、正規化した値だけを
+  `titleEnNorm` / `artistEnNorm` / `artistSortNorm` としてJSONへ保持する。列がないCSVでは空文字にする。
+  `Artist Sort Name` は MusicBrainz の sort name に倣い、人名を「姓, 名」、文字の代わりの記号を文字に直した値とする
 - `songs.json` / `songs-meta.json` は、現在表示・再生可能な曲を配信する派生成果物とする
-- 両JSONはschema Version 3として、同じ `contentHash` とUTC ISO 8601形式の `generatedAt` を持つ。
+- 両JSONはschema Version 4として、同じ `contentHash` とUTC ISO 8601形式の `generatedAt` を持つ。
   `generatedAt` はcontentHashが変わった場合だけ更新し、同じ内容の定期生成では引き継ぐ
 - 実行時は現行schemaだけを受け付け、不正・旧schemaのキャッシュは未キャッシュと同じ取得経路へ進む。公開JSON採用時は上書きし、採用失敗時だけ非同期で削除する
 - 公開対象でもURLが空の行は、現在再生できない曲の履歴としてCSVへ残し、エラーにせず派生JSONから除外する。
@@ -191,6 +194,7 @@ flowchart TD
 - title / artist / titleYomi / artistYomi
 - endSeconds
 - titleNorm / artistNorm / titleYomiNorm / artistYomiNorm
+- titleEnNorm / artistEnNorm / artistSortNorm（英名は表示しないため正規化済みの値だけを持つ）
 - url
 
 ### 曲参照キーの役割分担
@@ -202,6 +206,11 @@ flowchart TD
 
 ## 検索・絞り込みロジック
 - 検索語：NFKC・読み・大小文字・連続空白を正規化したAND検索。曲データ側にも同じ空白正規化を適用する。
+  各語は曲名・アーティスト名・読み・英名（`Song Title` / `Artist Name` / `Artist Sort Name`）のいずれかに部分一致すればよい
+- 語と曲データの比較では、構文解析後の語と曲データの両方から句読点・記号・空白を除く。
+  絵文字に付く異体字セレクタ・ゼロ幅接合子・囲み記号も記号の一部として除き、不可視文字だけで別の絵文字に一致させない。
+  `larc` は `L’Arc〜en〜Ciel`、`hatsune miku` は `Hatsune, Miku` に一致する。記号を除くと空になる語（`★` など）は、
+  記号を残した正規化済みの値と比べる。おすすめの同一曲判定は記号を残した正規化済みの値のまま行う
   空白区切りの語に加え、二重引用符で囲んだ範囲を1つの検索フレーズとして扱う
 - 引用符は検索要素の境界とし、空白がなくても引用部分と非引用部分を分割する。
   `foo""bar` は `foo` と `bar`、`foo"bar baz"qux` は `foo`、`bar baz`、`qux` としてAND検索する。

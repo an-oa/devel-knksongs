@@ -700,7 +700,10 @@ test("bookmark: observes result tail and increases by RESULT_DISPLAY_BATCH_SIZE 
             titleNorm: "",
             artistNorm: "",
             titleYomiNorm: "",
-            artistYomiNorm: ""
+            artistYomiNorm: "",
+            titleEnNorm: "",
+            artistEnNorm: "",
+            artistSortNorm: ""
         }));
         const data = createRenderDataState({
             allSongsRaw: rows,

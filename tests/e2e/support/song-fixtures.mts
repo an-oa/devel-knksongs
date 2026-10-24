@@ -34,7 +34,10 @@ export function createScrollableResultSongs(count: number): Song[] {
             titleNorm: title.toLowerCase(),
             artistNorm: artist.toLowerCase(),
             titleYomiNorm: title.toLowerCase(),
-            artistYomiNorm: artist.toLowerCase()
+            artistYomiNorm: artist.toLowerCase(),
+            titleEnNorm: title.toLowerCase(),
+            artistEnNorm: artist.toLowerCase(),
+            artistSortNorm: artist.toLowerCase()
         };
     });
 }
