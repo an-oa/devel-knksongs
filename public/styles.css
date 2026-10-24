@@ -200,21 +200,26 @@ body.hide-thumbs .thumb {
 }
 :root.dark-theme .header-spots { display: none; }
 .header-spots-compact { display: none; }
+/* 広い画面の斑点は、置き場所を確保できる幅(下の container query)でだけ表示する。 */
 .header-spots-wide {
+  display: none;
   top: 0;
   width: 170px;
   height: 64px;
 }
-/* 左の斑点は絵の右端20pxが空白なので8px、右の斑点は16px空けると、検索窓との間隔がほぼ揃う。 */
-.header-spots-wide-left { right: calc(50% + 260px + 8px); }
-.header-spots-wide-right { left: calc(50% + 260px + 16px); }
 /*
- * 左の斑点の黒い部分(絵の x=20〜150)がロゴの文字から8px以上離れない幅では表示しない。
- * 文字は領域の左端から20px(列の間隔)外にあるので、(幅 - 520) / 2 - 8 - 150 >= -20 + 8 から幅812px以上で表示する。
- * 右の斑点はボタンの下に潜ってよいので、右側の余白は条件にしない。
+ * 斑点は検索窓の両脇に置く。左の斑点は絵の右端20pxが空白なので8px、右の斑点は16px空けると、検索窓との間隔がほぼ揃う。
+ * 左の斑点の黒い部分(絵の x=20〜150)は、ロゴの文字から8px以上離す。文字は領域の左端から20px(列の間隔)外にあるので、
+ * 検索窓の左端を領域の左端から 8 + 150 - 20 + 8 = 146px 以上離せばよい。そこで検索窓を中央に置いたまま、
+ * 両側に146pxずつ残して最大520pxまで広げる。右の斑点はボタンの下に潜ってよいので、右側の余白は条件にしない。
+ * 検索窓を440px(= 732 - 146 * 2)より狭めないと斑点を置けない幅では、斑点を出さずに検索窓を広げる。
+ * 幅は小数にもなるので、表示と配置は同じ条件の中だけで行い、条件の外は既定の非表示のままにする。
+ * ロゴは両方の言語の幅を重ねて揃えてあるので、言語を切り替えても検索窓・斑点の位置と表示は変わらない。
  */
-@container header-search (max-width: 811px) {
-  .header-spots-wide { display: none; }
+@container header-search (min-width: 732px) {
+  .header-spots-wide { display: block; }
+  .header-spots-wide-left { right: calc(50% + min(260px, 50cqw - 146px) + 8px); }
+  .header-spots-wide-right { left: calc(50% + min(260px, 50cqw - 146px) + 16px); }
 }
 
 .header-title {
@@ -236,7 +241,10 @@ body.hide-thumbs .thumb {
   flex: none;
 }
 
-.header-wordmark {
+/* 重ねた文字ロゴは左に揃える。.i18n-stack の中央揃えより後に効くよう、両方のクラスで指定する。 */
+.header-wordmark.i18n-stack { justify-items: start; }
+
+.header-wordmark-text {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -256,9 +264,12 @@ body.hide-thumbs .thumb {
   letter-spacing: 0.12em;
 }
 
-/* 英語のロゴは文字の大きさを日本語と同じにし、欧文に合わせて字間だけ詰める。 */
-:root[lang="en"] .header-wordmark-main { letter-spacing: 0.01em; }
-:root[lang="en"] .header-wordmark-sub { letter-spacing: 0.06em; }
+/*
+ * 英語のロゴは文字の大きさを日本語と同じにし、欧文に合わせて字間だけ詰める。
+ * 日本語のページでも、重ねて隠した英語のロゴの幅で見出しの幅が決まるので、ページの言語ではなくロゴの言語で指定する。
+ */
+.header-wordmark-text[lang="en"] .header-wordmark-main { letter-spacing: 0.01em; }
+.header-wordmark-text[lang="en"] .header-wordmark-sub { letter-spacing: 0.06em; }
 
 /* チェック柄の上の文字は、柄の明るい線と重なっても読めるよう影を付ける。 */
 :root.dark-theme .header-wordmark-main {
@@ -283,6 +294,10 @@ body.hide-thumbs .thumb {
   position: relative;
   width: 100%;
   max-width: 520px;
+}
+/* 斑点を置く幅では、検索窓の両側に斑点の余白を146pxずつ残す。理由は .header-spots-wide の説明を参照。 */
+@container header-search (min-width: 732px) {
+  .header-search { max-width: min(520px, 100cqw - 292px); }
 }
 
 .header-search-icon {

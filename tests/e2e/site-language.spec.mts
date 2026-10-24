@@ -101,19 +101,70 @@ test.describe("Japanese browsers", () => {
 test.describe("header layout", () => {
     test.use({ locale: "ja-JP", viewport: { width: 1280, height: 720 } });
 
-    test("switching the language keeps the header buttons at the same size", async ({ page }) => {
+    test("switching the language keeps the logo, search box, spots, and buttons in place", async ({ page }) => {
+        await page.addInitScript(() => localStorage.setItem("theme", "light"));
         await openWithEnglishNamedSongs(page, "表記テスト");
-        // ロゴは英語の方が幅が広く、検索窓はその分動く。ボタンは両方の言語の文言を重ねて幅を固定している。
-        const readButtonWidths = () => page.evaluate(() => ["#site-language-btn", "#open-sidebar"].map((selector) =>
-            document.querySelector(selector)?.getBoundingClientRect().width ?? null
-        ));
-        const before = await readButtonWidths();
+        // ロゴとボタンは両方の言語の文言を重ねて幅を固定しているので、切り替えても検索窓と斑点は動かない。
+        const readHeaderLayout = () => page.evaluate(() => [
+            ".header-wordmark", ".header-search", ".header-spots-wide-left", ".header-spots-wide-right", "#site-language-btn", "#open-sidebar"
+        ].map((selector) => {
+            const element = document.querySelector(selector);
+            if (!element || getComputedStyle(element).display === "none") return `${selector}: hidden`;
+            const rect = element.getBoundingClientRect();
+            return `${selector}: ${rect.left},${rect.width}`;
+        }));
+        const before = await readHeaderLayout();
+        expect(before.filter((entry) => entry.endsWith("hidden")), "the spots are shown at 1280px").toEqual([]);
 
         await page.locator("#site-language-btn").click();
         await expect(getVisibleLanguageLabel(page)).toHaveText("日本語");
-        await expect(page.locator(".header-wordmark-main")).toHaveText("Kaneki Caw");
+        await expect(page.locator(".header-wordmark-main:visible")).toHaveText("Kaneki Caw");
 
-        expect(await readButtonWidths()).toEqual(before);
+        expect(await readHeaderLayout()).toEqual(before);
+    });
+});
+
+test.describe("header spots", () => {
+    test.use({ locale: "en-US", viewport: { width: 1280, height: 720 } });
+
+    test("the wide spots stay clear of the logo and search box around the width where they appear", async ({ page }) => {
+        await page.addInitScript(() => localStorage.setItem("theme", "light"));
+        await openWithEnglishNamedSongs(page, "Eine Kleine");
+        // 検索窓の領域の幅を、斑点を出す境界(732px)の前後の小数を含む値に固定して、斑点の表示と位置を確かめる。
+        // 英語のロゴは日本語より幅が広いので、文字と斑点の間隔は英語で確かめる。
+        for (const areaWidth of [731, 731.4, 731.6, 732, 760.5, 811.5, 812, 900]) {
+            const layout = await page.evaluate((width) => {
+                const header = document.querySelector<HTMLElement>(".header");
+                if (header) header.style.gridTemplateColumns = `auto ${width}px auto`;
+                const area = document.querySelector(".header-search-area")?.getBoundingClientRect();
+                const search = document.querySelector(".header-search")?.getBoundingClientRect();
+                const text = [...document.querySelectorAll(".header-wordmark-text")]
+                    .find((element) => getComputedStyle(element).visibility !== "hidden")
+                    ?.getBoundingClientRect();
+                /** 斑点の黒い部分の左右の端を返す。表示していなければ null。 */
+                const readSpot = (selector: string) => {
+                    const spot = document.querySelector(selector);
+                    if (!spot || getComputedStyle(spot).display === "none") return null;
+                    const paths = [...spot.querySelectorAll("path")].map((path) => path.getBoundingClientRect());
+                    return { left: Math.min(...paths.map((path) => path.left)), right: Math.max(...paths.map((path) => path.right)) };
+                };
+                return {
+                    area: area?.width ?? null,
+                    search: search ? { left: search.left, right: search.right } : null,
+                    textRight: text?.right ?? null,
+                    left: readSpot(".header-spots-wide-left"),
+                    right: readSpot(".header-spots-wide-right")
+                };
+            }, areaWidth);
+            const label = `search area ${areaWidth}px`;
+            expect(layout.area, label).toBeCloseTo(areaWidth, 1);
+            expect(layout.left === null, `${label}: both spots are shown or hidden together`).toBe(layout.right === null);
+            expect(layout.left !== null, `${label}: spots are shown from 732px`).toBe(areaWidth >= 732);
+            if (!layout.left || !layout.right || !layout.search || layout.textRight === null) continue;
+            expect(layout.left.left - layout.textRight, `${label}: the left spot keeps 8px from the logo`).toBeGreaterThanOrEqual(7.5);
+            expect(layout.left.right, `${label}: the left spot stays off the search box`).toBeLessThanOrEqual(layout.search.left);
+            expect(layout.right.left, `${label}: the right spot stays off the search box`).toBeGreaterThanOrEqual(layout.search.right);
+        }
     });
 });
 
@@ -130,7 +181,7 @@ test.describe("language in the URL", () => {
         await waitForInitialLoad(page);
 
         await expect(page.locator("html")).toHaveAttribute("lang", "en");
-        await expect(page.locator(".header-wordmark-main")).toHaveText("Kaneki Caw");
+        await expect(page.locator(".header-wordmark-main:visible")).toHaveText("Kaneki Caw");
     });
 
     test("?lang=en opens the site in English, saves the choice, and drops the query", async ({ page }) => {
@@ -160,8 +211,8 @@ test.describe("English browsers", () => {
         await expect(page.locator("html")).toHaveAttribute("lang", "en");
         await expect(page.locator("html")).not.toHaveClass(/i18n-pending/);
         await expect(page).toHaveTitle("Kaneki Caw Song Search");
-        await expect(page.locator(".header-wordmark-main")).toHaveText("Kaneki Caw");
-        await expect(page.locator(".header-wordmark-sub")).toHaveText("Song Search");
+        await expect(page.locator(".header-wordmark-main:visible")).toHaveText("Kaneki Caw");
+        await expect(page.locator(".header-wordmark-sub:visible")).toHaveText("Song Search");
         await expect(getEnglishCardTitle(page)).toHaveText("Eine Kleine");
         await expect(page.locator("#resultCount")).toHaveText("1 result");
         await expect(page.locator("#resultList .song-card .tag").first()).toHaveText("Singing Stream");

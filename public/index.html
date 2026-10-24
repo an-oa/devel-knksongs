@@ -283,9 +283,17 @@
     <header class="header">
       <h1 class="header-title">
         <img class="header-logo" src="goggles.svg" alt="" width="48" height="36">
-        <span class="header-wordmark">
-          <span class="header-wordmark-main" data-i18n="siteName">鐘輝かう</span>
-          <span class="header-wordmark-sub" data-i18n="siteSubName">歌サーチ</span>
+        <!-- 言語を切り替えても検索窓と斑点が動かないよう、両方の言語の文字ロゴを重ねて幅を広いほう(英語)に揃え、
+             ページの言語の方だけを見せる。 -->
+        <span class="header-wordmark i18n-stack">
+          <span class="header-wordmark-text" lang="ja">
+            <span class="header-wordmark-main" data-i18n="siteName" data-i18n-lang="ja">鐘輝かう</span>
+            <span class="header-wordmark-sub" data-i18n="siteSubName" data-i18n-lang="ja">歌サーチ</span>
+          </span>
+          <span class="header-wordmark-text" lang="en">
+            <span class="header-wordmark-main" data-i18n="siteName" data-i18n-lang="en">Kaneki Caw</span>
+            <span class="header-wordmark-sub" data-i18n="siteSubName" data-i18n-lang="en">Song Search</span>
+          </span>
         </span>
         <!-- ライトテーマのホルスタイン柄。狭い画面ではロゴとボタンの間だけに置く。
              ロゴの文字の幅は言語やフォントで変わるので、ロゴの右端を基準に置けるよう見出しの中に入れる。 -->
