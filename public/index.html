@@ -2,10 +2,10 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <!-- テーマ初期化だけを SHA-256 で許可し、YouTube API の script は必要な path に限定する。 -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-efgRYLPUL+yZFXRA2ExM5UWk6WbhpEomVq4BjYTkVQE=' https://www.youtube.com/iframe_api https://www.youtube.com/s/player/; script-src-attr 'none'; style-src 'self'; img-src 'self' https://i.ytimg.com; connect-src 'self' https://docs.google.com https://*.googleusercontent.com; frame-src https://www.youtube.com/embed/ https://www.youtube-nocookie.com/embed/; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <!-- テーマと言語の初期化だけを SHA-256 で許可し、YouTube API の script は必要な path に限定する。 -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-7foxyc25DvizjlB4fQ3IWkXvbkMGKt4EZ2xCn8/rbFo=' https://www.youtube.com/iframe_api https://www.youtube.com/s/player/; script-src-attr 'none'; style-src 'self'; img-src 'self' https://i.ytimg.com; connect-src 'self' https://docs.google.com https://*.googleusercontent.com; frame-src https://www.youtube.com/embed/ https://www.youtube-nocookie.com/embed/; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>鐘輝かう 歌サーチ</title>
+  <title data-i18n="siteTitle">鐘輝かう 歌サーチ</title>
 
   <!-- Canonical -->
   <link rel="canonical" href="https://an-oa.github.io/knksongs/" />
@@ -39,13 +39,40 @@
 
   <script>
     (function () {
+      var root = document.documentElement;
       try {
         var saved = localStorage.getItem('theme');
         var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
         var isDark = saved === 'dark' || (!saved && prefersDark);
-        document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+        root.style.colorScheme = isDark ? 'dark' : 'light';
         if (isDark) {
-          document.documentElement.classList.add('dark-theme');
+          root.classList.add('dark-theme');
+        }
+      } catch (e) {}
+      // 言語は ?lang、保存値、ブラウザの優先言語の順に決める。app/lib/site-language.mts と同じ判定にする。
+      // 英語のときは、日本語の文言を置き換え終わるまで中身を隠す。アプリが外すが、失敗しても4秒後には表示する。
+      try {
+        var param = new URLSearchParams(location.search).get('lang');
+        var language = param === 'en' || param === 'ja' ? param : null;
+        if (!language) {
+          var stored = localStorage.getItem('siteLanguage');
+          language = stored === 'en' || stored === 'ja' ? stored : null;
+        }
+        if (!language) {
+          var preferred = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || ''];
+          var primary = '';
+          for (var i = 0; i < preferred.length; i++) {
+            if (String(preferred[i]).trim()) {
+              primary = String(preferred[i]).trim().toLowerCase();
+              break;
+            }
+          }
+          language = !primary || primary.indexOf('ja') === 0 ? 'ja' : 'en';
+        }
+        if (language === 'en') {
+          root.lang = 'en';
+          root.classList.add('i18n-pending');
+          setTimeout(function () { root.classList.remove('i18n-pending'); }, 4000);
         }
       } catch (e) {}
     })();
@@ -248,17 +275,18 @@
 
   <main class="main-content">
     <header class="header">
-      <!-- ライトテーマのホルスタイン柄。狭い画面ではロゴとボタンの間だけに置く。 -->
-      <svg class="header-spots header-spots-compact" viewBox="0 0 108 56" aria-hidden="true" focusable="false">
-        <path d="M0 0h84c-2 10-10 17-21 19-8 1-12 9-22 10-12 1-23-4-28-13C10 9 4 4 0 0z"/>
-        <path d="M78 34c4-4 13-5 17 0 4 4 1 11-6 12-7 1-14-1-15-6 0-2 2-4 4-6z"/>
-      </svg>
       <h1 class="header-title">
         <img class="header-logo" src="goggles.svg" alt="" width="48" height="36">
         <span class="header-wordmark">
-          <span class="header-wordmark-main">鐘輝かう</span>
-          <span class="header-wordmark-sub">歌サーチ</span>
+          <span class="header-wordmark-main" data-i18n="siteName">鐘輝かう</span>
+          <span class="header-wordmark-sub" data-i18n="siteSubName">歌サーチ</span>
         </span>
+        <!-- ライトテーマのホルスタイン柄。狭い画面ではロゴとボタンの間だけに置く。
+             ロゴの文字の幅は言語やフォントで変わるので、ロゴの右端を基準に置けるよう見出しの中に入れる。 -->
+        <svg class="header-spots header-spots-compact" viewBox="0 0 108 56" aria-hidden="true" focusable="false">
+          <path d="M0 0h84c-2 10-10 17-21 19-8 1-12 9-22 10-12 1-23-4-28-13C10 9 4 4 0 0z"/>
+          <path d="M78 34c4-4 13-5 17 0 4 4 1 11-6 12-7 1-14-1-15-6 0-2 2-4 4-6z"/>
+        </svg>
       </h1>
       <div class="header-search-area">
         <svg class="header-spots header-spots-wide header-spots-wide-left" viewBox="0 0 170 64" aria-hidden="true" focusable="false">

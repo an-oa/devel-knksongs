@@ -1,10 +1,15 @@
 import type { AppUiState } from "../../state.types";
 import { getStoredSettingText, setStoredSettingText } from "../../lib/storage/settings-storage.mjs";
 import {
+    parseSiteLanguageQuery,
     resolveSiteLanguage,
+    SITE_LANGUAGE_QUERY_KEY,
     SITE_LANGUAGE_STORAGE_KEY,
     type SiteLanguage
 } from "../../lib/site-language.mjs";
+
+/** 英語で開いたときに、文言を置き換え終わるまで中身を隠す印。index.html の埋め込みスクリプトが付ける。 */
+const PENDING_TEXT_CLASS = "i18n-pending";
 
 type SiteLanguageUiState = Pick<AppUiState, "language"> & {
     el: Pick<AppUiState["el"], "languageBtn">;
@@ -73,13 +78,30 @@ export function applySiteLanguageFromStorage({ ui }: { ui: SiteLanguageUiState }
 }
 
 /**
+ * URL の ?lang で指定された言語を、言語ボタンで選んだときと同じく保存し、URL からは消す。
+ * 保存後にアドレス欄を元の URL に戻すので、そのまま共有しても言語の指定は残らない。
+ */
+function consumeLanguageFromUrl(): void {
+    if (typeof location === "undefined") return;
+    const language = parseSiteLanguageQuery(location.search);
+    if (!language) return;
+    setStoredSettingText(SITE_LANGUAGE_STORAGE_KEY, language);
+    const url = new URL(location.href);
+    url.searchParams.delete(SITE_LANGUAGE_QUERY_KEY);
+    history.replaceState(history.state, "", url);
+}
+
+/**
  * サイトの言語を復元して固定の文言を合わせ、言語ボタンで切り替えて保存する。
  * 起動時は結果一覧をまだ描いていないので、描画済みの文言の描き直しは切り替えたときだけ行う。
+ * 固定の文言を合わせ終えたら、英語で開いたときに隠していた中身を表示する。
  * @param input サイトの言語の状態と、文言を置き換える処理
  */
 export function setupSiteLanguage({ ui, applyStaticText, refreshDynamicText }: SiteLanguageSetupInput): void {
+    consumeLanguageFromUrl();
     applySiteLanguageFromStorage({ ui });
     applyStaticText(ui.language.current);
+    if (typeof document !== "undefined") document.documentElement.classList.remove(PENDING_TEXT_CLASS);
     const button = ui.el.languageBtn;
     if (!button) return;
     button.addEventListener("click", () => {

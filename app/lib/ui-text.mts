@@ -6,6 +6,9 @@ import type { SiteLanguage } from "./site-language.mjs";
  * 日本語の値は index.html の文言と同じにして、置き換え前後で表示が変わらないようにする。
  */
 type StaticText = {
+    siteTitle: string;
+    siteName: string;
+    siteSubName: string;
     sidebarTitle: string;
     close: string;
     clearConditions: string;
@@ -156,6 +159,9 @@ const ENGLISH_FORMAT_FILTER_NAMES: Record<string, string> = { ...ENGLISH_FORMAT_
 
 const JAPANESE_TEXT: UiText = {
     static: {
+        siteTitle: "鐘輝かう 歌サーチ",
+        siteName: "鐘輝かう",
+        siteSubName: "歌サーチ",
         sidebarTitle: "絞り込み・設定",
         close: "閉じる",
         clearConditions: "条件をクリア",
@@ -256,6 +262,9 @@ const JAPANESE_TEXT: UiText = {
 
 const ENGLISH_TEXT: UiText = {
     static: {
+        siteTitle: "Kaneki Caw Song Search",
+        siteName: "Kaneki Caw",
+        siteSubName: "Song Search",
         sidebarTitle: "Filters & Settings",
         close: "Close",
         clearConditions: "Clear filters",

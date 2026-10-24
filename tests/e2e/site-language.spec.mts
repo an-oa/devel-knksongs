@@ -101,23 +101,40 @@ test.describe("Japanese browsers", () => {
 test.describe("header layout", () => {
     test.use({ locale: "ja-JP", viewport: { width: 1280, height: 720 } });
 
-    test("switching the language keeps the search box and the spots in place", async ({ page }) => {
+    test("switching the language keeps the header buttons at the same size", async ({ page }) => {
         await openWithEnglishNamedSongs(page, "表記テスト");
-        const readLayout = () => page.evaluate(() => [
-            "#site-language-btn",
-            "#searchBox",
-            ".header-spots-wide-left",
-            ".header-spots-wide-right"
-        ].map((selector) => {
-            const rect = document.querySelector(selector)?.getBoundingClientRect();
-            return rect ? [rect.x, rect.width] : null;
-        }));
-        const before = await readLayout();
+        // ロゴは英語の方が幅が広く、検索窓はその分動く。ボタンは両方の言語の文言を重ねて幅を固定している。
+        const readButtonWidths = () => page.evaluate(() => ["#site-language-btn", "#open-sidebar"].map((selector) =>
+            document.querySelector(selector)?.getBoundingClientRect().width ?? null
+        ));
+        const before = await readButtonWidths();
 
         await page.locator("#site-language-btn").click();
         await expect(getVisibleLanguageLabel(page)).toHaveText("日本語");
+        await expect(page.locator(".header-wordmark-main")).toHaveText("Kaneki Caw");
 
-        expect(await readLayout()).toEqual(before);
+        expect(await readButtonWidths()).toEqual(before);
+    });
+});
+
+test.describe("language in the URL", () => {
+    test.use({ locale: "ja-JP" });
+
+    test("?lang=en opens the site in English, saves the choice, and drops the query", async ({ page }) => {
+        await installNetworkMocks(page);
+        await routeSongsJsonFixture(page, createEnglishNamedSongs());
+        await page.goto("/");
+        await page.evaluate(() => localStorage.clear());
+        await page.goto("/?lang=en");
+        await waitForInitialLoad(page);
+
+        await expect(page.locator("html")).toHaveAttribute("lang", "en");
+        await expect(page.locator("html")).not.toHaveClass(/i18n-pending/);
+        await expect(page).toHaveTitle("Kaneki Caw Song Search");
+        expect(new URL(page.url()).search).toBe("");
+        await expect
+            .poll(() => page.evaluate(() => localStorage.getItem("siteLanguage")))
+            .toBe("en");
     });
 });
 
@@ -128,6 +145,10 @@ test.describe("English browsers", () => {
         await openWithEnglishNamedSongs(page, "Eine Kleine");
 
         await expect(page.locator("html")).toHaveAttribute("lang", "en");
+        await expect(page.locator("html")).not.toHaveClass(/i18n-pending/);
+        await expect(page).toHaveTitle("Kaneki Caw Song Search");
+        await expect(page.locator(".header-wordmark-main")).toHaveText("Kaneki Caw");
+        await expect(page.locator(".header-wordmark-sub")).toHaveText("Song Search");
         await expect(getEnglishCardTitle(page)).toHaveText("Eine Kleine");
         await expect(page.locator("#resultCount")).toHaveText("1 result");
         await expect(page.locator("#resultList .song-card .tag").first()).toHaveText("Singing Stream");
@@ -144,6 +165,20 @@ test.describe("English browsers", () => {
         await expect(page.locator("#bookmark-panel-create-btn")).toHaveText("Create");
         await expect(page.locator("#bookmark-panel-new-name")).toHaveAttribute("placeholder", "New bookmark");
         await expect(page.locator("#bookmark-list")).toContainText("No bookmarks yet.");
+    });
+
+    test("keep the narrow-screen Holstein spot clear of the English logo", async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 740 });
+        await page.addInitScript(() => localStorage.setItem("theme", "light"));
+        await openWithEnglishNamedSongs(page, "Eine Kleine");
+
+        const gap = await page.evaluate(() => {
+            const wordmark = document.querySelector(".header-wordmark")?.getBoundingClientRect();
+            const spots = [...document.querySelectorAll(".header-spots-compact path")].map((path) => path.getBoundingClientRect());
+            return wordmark && spots.length > 0 ? Math.min(...spots.map((spot) => spot.left)) - wordmark.right : null;
+        });
+        expect(gap).not.toBeNull();
+        expect(gap).toBeGreaterThanOrEqual(0);
     });
 
     test("show the language button next to the search box on narrow screens", async ({ page }) => {

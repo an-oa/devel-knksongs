@@ -120,3 +120,32 @@ test("site language: the language button switches, saves, and redraws the text",
         assert.equal(redrawCount, 2);
     });
 });
+
+test("site language: ?lang is saved like the language button and dropped from the URL", () => {
+    withSiteLanguageUi(["ja-JP"], (ui) => {
+        const previous = ["location", "history"].map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)] as const);
+        const replacedUrls: string[] = [];
+        setGlobalValue("location", {
+            search: "?lang=en&q=1",
+            href: "https://example.test/knksongs/?lang=en&q=1#top"
+        });
+        setGlobalValue("history", {
+            state: null,
+            replaceState: (_state: unknown, _title: string, url: URL) => { replacedUrls.push(String(url)); }
+        });
+        document.documentElement.classList.add("i18n-pending");
+        try {
+            setupSiteLanguage({ ui, applyStaticText: () => {}, refreshDynamicText: () => {} });
+
+            assert.equal(ui.language.current, "en");
+            assert.equal(globalThis.localStorage.getItem(SITE_LANGUAGE_STORAGE_KEY), "en");
+            assert.deepEqual(replacedUrls, ["https://example.test/knksongs/?q=1#top"]);
+            assert.equal(document.documentElement.classList.contains("i18n-pending"), false, "the page is shown after the text is replaced");
+        } finally {
+            for (const [name, descriptor] of previous) {
+                if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+                else Reflect.deleteProperty(globalThis, name);
+            }
+        }
+    });
+});

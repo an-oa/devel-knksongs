@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { resolveSiteLanguage } from "../app/lib/site-language.mts";
+import { parseSiteLanguageQuery, resolveSiteLanguage } from "../app/lib/site-language.mts";
 
 test("resolveSiteLanguage: a saved choice wins over the browser language", () => {
     assert.equal(resolveSiteLanguage("en", ["ja-JP"]), "en");
@@ -18,4 +18,11 @@ test("resolveSiteLanguage: without a saved choice, only Japanese browsers start 
 test("resolveSiteLanguage: an unknown browser language keeps the Japanese of the HTML", () => {
     assert.equal(resolveSiteLanguage(null, []), "ja");
     assert.equal(resolveSiteLanguage(null, [""]), "ja");
+});
+
+test("parseSiteLanguageQuery: only Japanese and English in ?lang are used", () => {
+    assert.equal(parseSiteLanguageQuery("?lang=en"), "en");
+    assert.equal(parseSiteLanguageQuery("?q=1&lang=ja"), "ja");
+    assert.equal(parseSiteLanguageQuery("?lang=fr"), null);
+    assert.equal(parseSiteLanguageQuery(""), null);
 });
