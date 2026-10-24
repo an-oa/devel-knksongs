@@ -22,6 +22,8 @@
   --ink-color: #1b1b1b;
   /* 曲名リンクは一般的なリンク色の青にし、押せることを色で伝える。白地の上で 4.5:1 以上。 */
   --title-link-color: #1a73e8;
+  /* 指したカードの影。枠は曲名と同じ色にし、影はその色を半透明にしてずらす。 */
+  --card-hover-shadow: rgba(26, 115, 232, 0.55);
   --border-color: #e2ddd0;
   --overlay-color: rgba(0, 0, 0, 0.4);
   --transition-speed: 0.3s;
@@ -66,6 +68,7 @@
   --ink-color: #f2efe8;
   /* ダークは青が赤と金色の配色から浮くため、押せる要素と同じ金色にする。 */
   --title-link-color: #ffc928;
+  --card-hover-shadow: rgba(255, 201, 40, 0.55);
   --border-color: #2f2d29;
   --focus-ring-color: #ffc928;
   --focus-ring-shadow: rgba(255, 201, 40, 0.35);
@@ -1254,14 +1257,10 @@ input[type="text"][aria-invalid="true"] {
 /* サムネイルを表示しない間は、隅で切り取るものがないので 4 隅とも丸くする。 */
 body.hide-thumbs .song-card { border-radius: 12px; }
 
-/* 指すカードは枠を濃くし、鐘の金色の影をずらして付ける。 */
+/* 指すカードは枠を曲名と同じ色にし、同じ色の半透明の影をずらして付ける。 */
 .song-card:hover {
-  outline-color: var(--ink-color);
-  box-shadow: 4px 4px 0 var(--accent-fill);
-}
-:root.dark-theme .song-card:hover {
-  outline-color: var(--accent-fill);
-  box-shadow: 4px 4px 0 rgba(255, 201, 40, 0.55);
+  outline-color: var(--title-link-color);
+  box-shadow: 4px 4px 0 var(--card-hover-shadow);
 }
 
 @media (prefers-reduced-motion: reduce) {
