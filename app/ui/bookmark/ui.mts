@@ -2,6 +2,7 @@ import { createBookmarkNotificationController } from "./notifications.mjs";
 import { getBookmarkIdsInListOrder, setBookmarkPanelError } from "./panel.mjs";
 import { createSidebarSubpanelController } from "../sidebar/subpanel.mjs";
 import { isHtmlElement } from "../../lib/dom-utils.mjs";
+import { getBookmarkText } from "./text.mjs";
 import type { AppDataState, AppUiState } from "../../state.types";
 import type { StorageActionResult } from "../../controllers/storage.mjs";
 
@@ -60,6 +61,14 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
         state: bookmarkPanelUi
     });
     const bookmarkNotifications = createBookmarkNotificationController({ data, ui });
+
+    /**
+     * サイトの言語のブックマークの文言を返す。
+     * @returns ブックマークの文言
+     */
+    function getText() {
+        return getBookmarkText(ui.language.current);
+    }
     const {
         onSelectActiveBookmark,
         onClearActiveBookmark,
@@ -74,26 +83,26 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
 
     /**
      * 上限エラー時に理由別のメッセージを表示し、通知したかどうかを返す。
-     * @param {StorageActionResult} result
-     * @returns {boolean}
+     * @param result 保存・変更の結果
+     * @returns 通知した場合は true
      */
     function notifyIfLimitError(result: StorageActionResult): boolean {
         if (result.ok === true) return false;
         if (result.reason === "max_bookmark_count") {
             const limit = Number.isFinite(result.limit) ? result.limit : null;
             if (limit === null) {
-                alert("ブックマークの登録上限に達しています。不要なブックマークを削除してください。");
+                alert(getText().bookmarkLimitReached);
             } else {
-                alert(`ブックマークは最大${limit}件までです。不要なブックマークを削除してください。`);
+                alert(getText().maxBookmarks(limit));
             }
             return true;
         }
         if (result.reason === "max_songs_per_bookmark") {
             const limit = Number.isFinite(result.limit) ? result.limit : null;
             if (limit === null) {
-                alert("1つのブックマークに登録できる曲数の上限に達しています。");
+                alert(getText().songLimitReached);
             } else {
-                alert(`1つのブックマークに登録できる曲は最大${limit}曲です。`);
+                alert(getText().maxSongs(limit));
             }
             return true;
         }
@@ -102,32 +111,32 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
 
     /**
      * ブックマークが見つからない失敗を共通文言で通知する。
-     * @param {StorageActionResult} result
-     * @returns {boolean}
+     * @param result 保存・変更の結果
+     * @returns 通知した場合は true
      */
     function notifyIfBookmarkNotFoundError(result: StorageActionResult): boolean {
         if (result.ok === true || result.reason !== "bookmark_not_found") return false;
-        alert("ブックマークが見つかりません。画面を更新して再度お試しください。");
+        alert(getText().notFound);
         return true;
     }
 
     /**
      * ブックマーク永続化の失敗を理由別のメッセージで通知する。
-     * @param {StorageActionResult} result
-     * @returns {boolean}
+     * @param result 保存・変更の結果
+     * @returns 通知した場合は true
      */
     function notifyIfBookmarkSaveError(result: StorageActionResult): boolean {
         if (result.ok === true) return false;
         if (result.reason === "unsupported_storage_version") {
-            alert("このアプリより新しい形式のブックマークが保存されているため、変更できません。");
+            alert(getText().newerStorage);
             return true;
         }
         if (result.reason === "storage_reload_required") {
-            alert("別のタブでブックマークが更新された可能性があります。画面を再読み込みしてから、もう一度お試しください。");
+            alert(getText().reloadRequired);
             return true;
         }
         if (result.reason === "storage_write_failed") {
-            alert("ブックマークを保存できませんでした。ブラウザのストレージ設定をご確認ください。");
+            alert(getText().saveFailed);
             return true;
         }
         return false;
@@ -142,21 +151,19 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
 
     /**
      * リネーム失敗時に理由別メッセージを表示し、通知したかどうかを返す。
-     * @param {StorageActionResult} result
-     * @returns {boolean}
+     * @param result 保存・変更の結果
+     * @returns 通知した場合は true
      */
     function notifyIfRenameError(result: StorageActionResult): boolean {
         if (result.ok === true) return false;
         if (notifyIfBookmarkSaveError(result)) return true;
         if (result.reason === "empty_name") {
-            alert("ブックマーク名を入力してください。");
+            alert(getText().nameRequired);
             return true;
         }
         if (result.reason === "max_bookmark_name_length") {
             const limit = Number.isFinite(result.limit) ? result.limit : null;
-            alert(limit === null
-                ? "ブックマーク名の文字数上限を超えています。"
-                : `ブックマーク名は最大${limit}文字までです。`);
+            alert(limit === null ? getText().nameTooLong : getText().maxNameLength(limit));
             return true;
         }
         if (notifyIfBookmarkNotFoundError(result)) return true;
@@ -165,15 +172,15 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
 
     /**
      * 曲追加失敗時に理由別メッセージを表示し、通知したかどうかを返す。
-     * @param {StorageActionResult} result
-     * @returns {boolean}
+     * @param result 保存・変更の結果
+     * @returns 通知した場合は true
      */
     function notifyIfAddSongError(result: StorageActionResult): boolean {
         if (result.ok === true) return false;
         if (notifyIfBookmarkSaveError(result)) return true;
         if (notifyIfLimitError(result)) return true;
         if (result.reason === "duplicate_song") {
-            alert("この曲はすでに選択したブックマークに追加されています。");
+            alert(getText().alreadyAdded);
             return true;
         }
         if (notifyIfBookmarkNotFoundError(result)) return true;
@@ -250,7 +257,7 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
         const listFocus = captureBookmarkListFocus(container);
         const sortedIds = getSortedBookmarkIds();
         if (sortedIds.length === 0) {
-            container.replaceChildren(createEmptyBookmarkElement("ブックマークはまだありません。"));
+            container.replaceChildren(createEmptyBookmarkElement(getText().empty));
         } else {
             const addingMode = isAddingSongMode();
             container.replaceChildren(...sortedIds.map((id) => createBookmarkItemElement(id, addingMode)));
@@ -295,12 +302,12 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
             const renameButton = document.createElement("button");
             renameButton.type = "button";
             renameButton.className = "bookmark-rename-btn";
-            renameButton.setAttribute("aria-label", "ブックマーク名を変更");
-            renameButton.textContent = "変更";
+            renameButton.setAttribute("aria-label", getText().renameLabel);
+            renameButton.textContent = getText().rename;
             const deleteButton = document.createElement("button");
             deleteButton.type = "button";
             deleteButton.className = "bookmark-delete-btn";
-            deleteButton.setAttribute("aria-label", "ブックマークを削除");
+            deleteButton.setAttribute("aria-label", getText().deleteLabel);
             const deleteMark = document.createElement("span");
             deleteMark.textContent = "×";
             deleteButton.append(deleteMark);
@@ -342,7 +349,7 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
         const renameBtn = target.closest(".bookmark-rename-btn");
         if (renameBtn) {
             e.stopPropagation();
-            const newName = prompt("新しいブックマーク名を入力してください:", bookmarkName);
+            const newName = prompt(getText().renamePrompt, bookmarkName);
             if (newName === null) return;
             const result = onRenameBookmark(bookmarkId, newName);
             notifyIfRenameError(result);
@@ -352,7 +359,7 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
         const deleteBtn = target.closest(".bookmark-delete-btn");
         if (deleteBtn) {
             e.stopPropagation();
-            if (confirm(`ブックマーク「${bookmarkName}」を削除しますか？`)) {
+            if (confirm(getText().deleteConfirm(bookmarkName))) {
                 const result = onDeleteBookmark(bookmarkId);
                 if (result.ok === true) {
                     bookmarkNotifications.notifyBookmarkDeleted(bookmarkName);
@@ -417,7 +424,7 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
 
         const newName = nameInput.value.trim();
         if (!newName) {
-            showBookmarkPanelError("ブックマーク名を入力してください。");
+            showBookmarkPanelError(getText().nameRequired);
             nameInput.focus();
             return;
         }
@@ -443,15 +450,13 @@ export function createBookmarkUiController({ data, ui, callbacks }: BookmarkUiCo
             return;
         }
         if (result.reason === "empty_name") {
-            showBookmarkPanelError("ブックマーク名を入力してください。");
+            showBookmarkPanelError(getText().nameRequired);
             nameInput.focus();
             return;
         }
         if (result.reason === "max_bookmark_name_length") {
             const limit = Number.isFinite(result.limit) ? result.limit : null;
-            showBookmarkPanelError(limit === null
-                ? "ブックマーク名の文字数上限を超えています。"
-                : `ブックマーク名は最大${limit}文字までです。`);
+            showBookmarkPanelError(limit === null ? getText().nameTooLong : getText().maxNameLength(limit));
             nameInput.focus();
             return;
         }

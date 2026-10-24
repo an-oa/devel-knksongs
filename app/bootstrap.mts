@@ -474,6 +474,7 @@ function createAppControllers() {
         dateFilterController.refreshDateSelectPlaceholders();
         searchUiActions.refreshQueryValidationMessage();
         youtubeController.refreshCloseButtonLabel();
+        bookmarkUiController?.renderBookmarks();
     }
 
     /**

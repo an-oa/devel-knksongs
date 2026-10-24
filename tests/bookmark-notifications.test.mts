@@ -81,7 +81,7 @@ test("bookmark notifications: replaces toast and clears the previous timer", () 
     }
 });
 
-test("bookmark notifications: saved song titles follow the English name setting", () => {
+test("bookmark notifications: English notifications use English sentences and song titles", () => {
     const restoreDom = installFakeDom();
     const fakeTimeouts = installFakeTimeouts();
 
@@ -96,7 +96,11 @@ test("bookmark notifications: saved song titles follow the English name setting"
 
         const message = ui.el.bookmarkNotificationRegion.querySelector(".bookmark-toast-message");
         assert.ok(message);
-        assert.equal(message.textContent, "ブックマーク「Morning」に「Clear Morning」を保存しました。");
+        assert.equal(message.textContent, "Saved “Clear Morning” to the bookmark “Morning”.");
+        assert.equal(
+            ui.el.bookmarkNotificationRegion.querySelector(".bookmark-toast-close")?.getAttribute("aria-label"),
+            "Close notification"
+        );
     } finally {
         fakeTimeouts.cleanup();
         restoreDom();

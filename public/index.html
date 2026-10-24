@@ -116,7 +116,7 @@
       </section>
 
       <button id="open-bookmark-panel" class="sidebar-link-row" type="button" aria-haspopup="dialog" aria-controls="bookmark-sidebar-panel">
-        <span>ブックマーク</span>
+        <span data-i18n="bookmarks">ブックマーク</span>
         <span class="sidebar-link-row-arrow" aria-hidden="true">›</span>
       </button>
 
@@ -225,19 +225,19 @@
 
     <div id="bookmark-sidebar-panel" class="sidebar-subpanel" aria-hidden="true" hidden>
       <div class="sidebar-subpanel-header">
-        <button id="close-bookmark-panel" class="sidebar-subpanel-back" type="button" aria-label="検索・設定に戻る">← ブックマーク</button>
-        <button id="close-bookmark-sidebar" class="close-btn" aria-label="閉じる">&times;</button>
+        <button id="close-bookmark-panel" class="sidebar-subpanel-back" type="button" aria-label="検索・設定に戻る" data-i18n-aria-label="backToSidebar" data-i18n="bookmarksBack">← ブックマーク</button>
+        <button id="close-bookmark-sidebar" class="close-btn" aria-label="閉じる" data-i18n-aria-label="close">&times;</button>
       </div>
       <div class="sidebar-subpanel-body">
         <div id="bookmark-panel-create" class="bookmark-panel-create">
-          <label class="visually-hidden" for="bookmark-panel-new-name">新規ブックマーク名</label>
-          <input type="text" id="bookmark-panel-new-name" placeholder="新規ブックマーク名" maxlength="64">
-          <button id="bookmark-panel-create-btn" type="button">作成</button>
+          <label class="visually-hidden" for="bookmark-panel-new-name" data-i18n="newBookmarkName">新規ブックマーク名</label>
+          <input type="text" id="bookmark-panel-new-name" placeholder="新規ブックマーク名" data-i18n-placeholder="newBookmarkPlaceholder" maxlength="64">
+          <button id="bookmark-panel-create-btn" type="button" data-i18n="createBookmark">作成</button>
           <div id="bookmark-panel-error" class="bookmark-panel-error" hidden></div>
         </div>
-        <div class="bookmark-panel-actions" role="group" aria-label="ブックマークの入出力">
-          <button id="bookmark-panel-import-btn" type="button">インポート</button>
-          <button id="bookmark-panel-export-btn" type="button">エクスポート</button>
+        <div class="bookmark-panel-actions" role="group" aria-label="ブックマークの入出力" data-i18n-aria-label="bookmarkTransfer">
+          <button id="bookmark-panel-import-btn" type="button" data-i18n="importBookmarks">インポート</button>
+          <button id="bookmark-panel-export-btn" type="button" data-i18n="exportBookmarks">エクスポート</button>
           <input id="bookmark-panel-import-input" type="file" accept="application/json,.json" hidden>
         </div>
         <div id="bookmark-list" class="bookmark-list"></div>

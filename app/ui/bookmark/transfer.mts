@@ -16,7 +16,8 @@ import { getBookmarkIdsInListOrder, setBookmarkPanelError } from "./panel.mjs";
 import { createBookmarkTransferDialogController } from "./transfer-dialog.mjs";
 import type { OpenBookmarkTransferDialog } from "./transfer-dialog.mjs";
 import { MAX_BOOKMARK_IMPORT_BYTES } from "../../lib/storage/bookmark-transfer.mjs";
-import type { AppDataState, AppUiElements } from "../../state.types";
+import type { AppDataState, AppUiElements, SiteLanguageUiRuntimeState } from "../../state.types";
+import { getBookmarkText } from "./text.mjs";
 import type { BookmarkImportPreview, StorageActionResult } from "../../controllers/storage.mjs";
 
 /** エクスポート・インポートから状態管理へ委譲する処理と、差し替えられる入出力。 */
@@ -41,6 +42,8 @@ type BookmarkTransferControllerInput = {
         el: Pick<AppUiElements,
             "bookmarkPanelExportBtn" | "bookmarkPanelImportBtn" | "bookmarkPanelImportInput" | "bookmarkPanelError"
         >;
+        /** ダイアログとメッセージの言語。省略時は日本語にする。 */
+        language?: SiteLanguageUiRuntimeState;
     };
     callbacks: BookmarkTransferCallbacks;
 };
@@ -69,6 +72,14 @@ export function createBookmarkTransferController({ data, ui, callbacks }: Bookma
     }
 
     /**
+     * 今のサイトの言語を返す。
+     * @returns サイトの言語
+     */
+    function getLanguage() {
+        return ui.language?.current ?? "ja";
+    }
+
+    /**
      * パネル上部のエラー欄を消す。
      */
     function clearBookmarkPanelError(): void {
@@ -81,23 +92,27 @@ export function createBookmarkTransferController({ data, ui, callbacks }: Bookma
      */
     async function exportBookmarksFromPanel() {
         clearBookmarkPanelError();
+        const language = getLanguage();
+        const text = getBookmarkText(language);
         const sortedIds = getBookmarkIdsInListOrder(data.bookmarks);
         if (sortedIds.length === 0) {
-            showBookmarkPanelError("エクスポートできるブックマークがありません。");
+            showBookmarkPanelError(text.noExportable);
             return;
         }
         const selectedIds = await openTransferDialog<string[]>({
-            title: "ブックマークのエクスポート",
-            description: "エクスポートするブックマークを選んでください。",
+            title: text.exportTitle,
+            description: text.exportDescription,
             options: sortedIds.map((bookmarkId) => ({
                 id: bookmarkId,
                 name: data.bookmarks[bookmarkId].name,
-                details: [`${data.bookmarks[bookmarkId].songs.length}曲`],
+                details: [text.songCount(data.bookmarks[bookmarkId].songs.length)],
                 checked: true,
                 disabled: false
             })),
-            submitLabel: "エクスポート",
-            describeSelection: buildBookmarkExportSelectionState,
+            submitLabel: text.exportSubmit,
+            selectAllLabel: text.selectAll,
+            cancelLabel: text.cancel,
+            describeSelection: (bookmarkIds) => buildBookmarkExportSelectionState(bookmarkIds, language),
             onSubmit: (bookmarkIds) => ({ ok: true, value: bookmarkIds }),
             returnFocusEl: ui.el.bookmarkPanelExportBtn
         });
@@ -105,7 +120,7 @@ export function createBookmarkTransferController({ data, ui, callbacks }: Bookma
         try {
             const result = onExportBookmarks(selectedIds);
             if (result.ok === false) {
-                showBookmarkPanelError("ブックマークをエクスポートできませんでした。");
+                showBookmarkPanelError(text.exportFailed);
                 return;
             }
             const fileName = typeof result.fileName === "string" && result.fileName.trim()
@@ -114,7 +129,7 @@ export function createBookmarkTransferController({ data, ui, callbacks }: Bookma
             await saveTextFileCallback(result.text, fileName, "application/json");
         } catch (error) {
             if (error && typeof error === "object" && "name" in error && error.name === "AbortError") return;
-            showBookmarkPanelError("ブックマークをエクスポートできませんでした。");
+            showBookmarkPanelError(text.exportFailed);
         }
     }
 
@@ -139,36 +154,40 @@ export function createBookmarkTransferController({ data, ui, callbacks }: Bookma
      */
     function chooseBookmarksToImport(text: string, preview: BookmarkImportPreview): Promise<string | null> {
         const mergeBlocked = preview.mergeBlocker !== null;
+        const language = getLanguage();
+        const labels = getBookmarkText(language);
         return openTransferDialog<string>({
-            title: "ブックマークのインポート",
-            description: "インポートするブックマークを選んでください。手元にある同じブックマークは、ファイルの内容で上書きします。",
-            notice: preview.mergeBlocker ? getBookmarkMergeBlockerMessage(preview.mergeBlocker) : undefined,
-            options: preview.entries.map((entry) => buildBookmarkImportOption(entry, mergeBlocked)),
-            submitLabel: "インポート",
-            describeSelection: (bookmarkIds) => buildBookmarkImportSelectionState(preview, bookmarkIds),
+            title: labels.importTitle,
+            description: labels.importDescription,
+            notice: preview.mergeBlocker ? getBookmarkMergeBlockerMessage(preview.mergeBlocker, language) : undefined,
+            options: preview.entries.map((entry) => buildBookmarkImportOption(entry, mergeBlocked, language)),
+            submitLabel: labels.importSubmit,
+            selectAllLabel: labels.selectAll,
+            cancelLabel: labels.cancel,
+            describeSelection: (bookmarkIds) => buildBookmarkImportSelectionState(preview, bookmarkIds, language),
             onSubmit: (bookmarkIds) => {
                 const result = onImportSelectedBookmarks(text, bookmarkIds);
-                if (result.ok === false) return { ok: false, message: getBookmarkImportErrorMessage(result) };
-                return { ok: true, value: buildBookmarkImportResultMessage(result) };
+                if (result.ok === false) return { ok: false, message: getBookmarkImportErrorMessage(result, language) };
+                return { ok: true, value: buildBookmarkImportResultMessage(result, language) };
             },
             allItemsAction: {
-                menuLabel: "取り込み方を選ぶ",
+                menuLabel: labels.importMenuLabel,
                 selectionItem: {
-                    label: "選んだブックマークを取り込む",
-                    description: "同じものは上書きし、ほかは残します"
+                    label: labels.importSelectedLabel,
+                    description: labels.importSelectedDescription
                 },
                 allItemsItem: {
-                    label: "ブックマーク全体を置換",
-                    description: "今あるブックマークはすべて削除します"
+                    label: labels.replaceAllLabel,
+                    description: labels.replaceAllDescription
                 },
-                description: "今あるブックマークをすべて削除し、ファイルのブックマークだけにします。",
-                submitLabel: "置換",
-                message: buildBookmarkReplaceMessage(preview),
+                description: labels.replaceDescription,
+                submitLabel: labels.replaceSubmit,
+                message: buildBookmarkReplaceMessage(preview, language),
                 run: () => {
-                    if (!confirm(buildBookmarkImportConfirmMessage(preview))) return { ok: false, message: "" };
+                    if (!confirm(buildBookmarkImportConfirmMessage(preview, language))) return { ok: false, message: "" };
                     const result = onReplaceAllBookmarks(text);
-                    if (result.ok === false) return { ok: false, message: getBookmarkImportErrorMessage(result) };
-                    return { ok: true, value: buildBookmarkReplaceResultMessage(result.bookmarkCount) };
+                    if (result.ok === false) return { ok: false, message: getBookmarkImportErrorMessage(result, language) };
+                    return { ok: true, value: buildBookmarkReplaceResultMessage(result.bookmarkCount, language) };
                 }
             },
             returnFocusEl: ui.el.bookmarkPanelImportBtn
@@ -185,29 +204,30 @@ export function createBookmarkTransferController({ data, ui, callbacks }: Bookma
         if (!file) return;
 
         clearBookmarkPanelError();
+        const language = getLanguage();
         try {
             if (file.size > MAX_BOOKMARK_IMPORT_BYTES) {
                 showBookmarkPanelError(getBookmarkImportErrorMessage({
                     ok: false,
                     reason: "max_import_file_size",
                     limit: MAX_BOOKMARK_IMPORT_BYTES
-                }));
+                }, language));
                 return;
             }
             const text = await readFileText(file);
             const preview = onPreviewBookmarkImport(text);
             if (preview.ok === false) {
-                showBookmarkPanelError(getBookmarkImportErrorMessage(preview));
+                showBookmarkPanelError(getBookmarkImportErrorMessage(preview, language));
                 return;
             }
             if (preview.entries.length === 0) {
-                showBookmarkPanelError("インポートできるブックマークがファイルにありません。");
+                showBookmarkPanelError(getBookmarkText(language).noImportable);
                 return;
             }
             const resultMessage = await chooseBookmarksToImport(text, preview);
             if (resultMessage) alert(resultMessage);
         } catch {
-            showBookmarkPanelError("ブックマークファイルを読み込めませんでした。");
+            showBookmarkPanelError(getBookmarkText(language).readFailed);
         } finally {
             input.value = "";
         }

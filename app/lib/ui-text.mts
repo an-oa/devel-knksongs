@@ -24,6 +24,14 @@ type StaticText = {
     collabHostOnly: string;
     harmonyOnly: string;
     collabGuestOnly: string;
+    bookmarks: string;
+    bookmarksBack: string;
+    newBookmarkName: string;
+    newBookmarkPlaceholder: string;
+    createBookmark: string;
+    bookmarkTransfer: string;
+    importBookmarks: string;
+    exportBookmarks: string;
     settings: string;
     backToSidebar: string;
     settingsBack: string;
@@ -166,6 +174,14 @@ const JAPANESE_TEXT: UiText = {
         collabHostOnly: "コラボ(ホスト)",
         harmonyOnly: "ハモリあり",
         collabGuestOnly: "コラボ(ゲスト)",
+        bookmarks: "ブックマーク",
+        bookmarksBack: "← ブックマーク",
+        newBookmarkName: "新規ブックマーク名",
+        newBookmarkPlaceholder: "新規ブックマーク名",
+        createBookmark: "作成",
+        bookmarkTransfer: "ブックマークの入出力",
+        importBookmarks: "インポート",
+        exportBookmarks: "エクスポート",
         settings: "設定",
         backToSidebar: "検索・設定に戻る",
         settingsBack: "← 設定",
@@ -258,6 +274,15 @@ const ENGLISH_TEXT: UiText = {
         collabHostOnly: "Collab (host)",
         harmonyOnly: "With harmony",
         collabGuestOnly: "Collab (guest)",
+        bookmarks: "Bookmarks",
+        bookmarksBack: "← Bookmarks",
+        newBookmarkName: "New bookmark name",
+        // 入力欄の幅に収まるよう、プレースホルダーは読み上げ用のラベルより短くする
+        newBookmarkPlaceholder: "New bookmark",
+        createBookmark: "Create",
+        bookmarkTransfer: "Import and export bookmarks",
+        importBookmarks: "Import",
+        exportBookmarks: "Export",
         settings: "Settings",
         backToSidebar: "Back to filters & settings",
         settingsBack: "← Settings",

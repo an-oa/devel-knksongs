@@ -1,4 +1,5 @@
 import { getSongDisplayTitle } from "../../lib/song-display-name.mjs";
+import { getBookmarkText } from "./text.mjs";
 import { resolveSongRef } from "../../lib/song-lookup.mjs";
 import type { AppDataState, AppUiState } from "../../state.types";
 
@@ -94,7 +95,7 @@ export function createBookmarkNotificationController({
         const closeBtn = document.createElement("button");
         closeBtn.type = "button";
         closeBtn.className = "bookmark-toast-close";
-        closeBtn.setAttribute("aria-label", "通知を閉じる");
+        closeBtn.setAttribute("aria-label", getBookmarkText(ui.language.current).closeNotification);
         closeBtn.setAttribute("popovertarget", toastId);
         closeBtn.setAttribute("popovertargetaction", "hide");
         closeBtn.textContent = "×";
@@ -124,7 +125,7 @@ export function createBookmarkNotificationController({
     function getSongTitleForNotification(songRef: string | null | undefined): string {
         const song = resolveSongRef(lookupUi, data.allSongsRaw, songRef);
         const title = song ? getSongDisplayTitle(song, ui.language.current).text.trim() : "";
-        return title || "曲名不明";
+        return title || getBookmarkText(ui.language.current).unknownSong;
     }
 
     /**
@@ -132,7 +133,7 @@ export function createBookmarkNotificationController({
      * @param {string} bookmarkName
      */
     function notifyBookmarkCreated(bookmarkName: string): void {
-        showBookmarkNotification(`ブックマーク「${bookmarkName}」を作成しました。`);
+        showBookmarkNotification(getBookmarkText(ui.language.current).created(bookmarkName));
     }
 
     /**
@@ -140,7 +141,7 @@ export function createBookmarkNotificationController({
      * @param {string} bookmarkName
      */
     function notifyBookmarkDeleted(bookmarkName: string): void {
-        showBookmarkNotification(`ブックマーク「${bookmarkName}」を削除しました。`);
+        showBookmarkNotification(getBookmarkText(ui.language.current).deleted(bookmarkName));
     }
 
     /**
@@ -156,10 +157,10 @@ export function createBookmarkNotificationController({
     ): void {
         const songTitle = getSongTitleForNotification(songRef);
         if (options && options.createdBookmark) {
-            showBookmarkNotification(`ブックマーク「${bookmarkName}」を作成し、「${songTitle}」を保存しました。`);
+            showBookmarkNotification(getBookmarkText(ui.language.current).createdAndSaved(bookmarkName, songTitle));
             return;
         }
-        showBookmarkNotification(`ブックマーク「${bookmarkName}」に「${songTitle}」を保存しました。`);
+        showBookmarkNotification(getBookmarkText(ui.language.current).saved(bookmarkName, songTitle));
     }
 
     /**
@@ -172,7 +173,7 @@ export function createBookmarkNotificationController({
         songRef: string | null | undefined
     ): void {
         const songTitle = getSongTitleForNotification(songRef);
-        showBookmarkNotification(`ブックマーク「${bookmarkName}」から「${songTitle}」を削除しました。`);
+        showBookmarkNotification(getBookmarkText(ui.language.current).removed(bookmarkName, songTitle));
     }
 
     return {

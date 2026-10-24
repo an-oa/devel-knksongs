@@ -138,6 +138,12 @@ test.describe("English browsers", () => {
         await expect(page.locator("#formatsList")).toContainText("Originals & Covers");
         await expect(page.locator("#dateFromYear option[value='']")).toHaveText("YYYY");
         await expect(page.locator("label[for='relayOnly']")).toContainText("Relay stream");
+
+        await expect(page.locator("#open-bookmark-panel")).toContainText("Bookmarks");
+        await page.locator("#open-bookmark-panel").click();
+        await expect(page.locator("#bookmark-panel-create-btn")).toHaveText("Create");
+        await expect(page.locator("#bookmark-panel-new-name")).toHaveAttribute("placeholder", "New bookmark");
+        await expect(page.locator("#bookmark-list")).toContainText("No bookmarks yet.");
     });
 
     test("show the language button next to the search box on narrow screens", async ({ page }) => {
