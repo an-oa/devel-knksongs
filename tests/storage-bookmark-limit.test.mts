@@ -7,6 +7,7 @@ import { createFakeLocalStorage, readStoredText } from "./fixtures/local-storage
 import { createSongFixture } from "./fixtures/song.mts";
 import type { BookmarkRecord } from "../app/state.types";
 import { installFakeDom } from "./test-helpers.mts";
+import type { SiteLanguage } from "../app/lib/site-language.mts";
 
 /** 保存上限と初期ブックマークを指定し、controller と呼び出し回数を返す。 */
 function setupStorageController({
@@ -45,7 +46,8 @@ function setupStorageController({
         date: {
             bounds: null,
             pendingValues: null
-        }
+        },
+        language: { current: "ja" as SiteLanguage }
     };
     const bookmarkPersistenceController = createBookmarkPersistenceController({
         data,

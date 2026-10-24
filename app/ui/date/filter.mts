@@ -38,8 +38,8 @@ type DateFilterUiElements = Pick<
 type DateFilterUiState = {
     el: DateFilterUiElements;
     date: DateUiRuntimeState;
-    /** 日付の選択欄の先頭(未選択)に出す文言の言語。省略時は index.html と同じ日本語にする。 */
-    language?: SiteLanguageUiRuntimeState;
+    /** 日付の選択欄の先頭(未選択)に出す文言の言語。 */
+    language: SiteLanguageUiRuntimeState;
 };
 
 /**
@@ -56,7 +56,7 @@ export function createDateFilterController({ ui, onDateSelectionChange }: {
      * @returns 年・月・日の未選択の文言
      */
     function getDateSelectText() {
-        return getUiText(ui.language?.current ?? "ja").dateSelect;
+        return getUiText(ui.language.current).dateSelect;
     }
 
     /**

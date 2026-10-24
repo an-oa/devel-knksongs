@@ -359,7 +359,7 @@ test("render: English cards show English names, tags, dates, and labels, and tag
         assert.equal(englishCard.querySelector(".add-to-bookmark-btn")?.getAttribute("aria-label"), "Add to bookmark");
 
         ui.language.current = "ja";
-        controller.updateDisplay();
+        controller.refreshText();
 
         assert.equal(englishTitle?.textContent, "アイネクライネ", "the reused card switches back to Japanese");
         assert.equal(englishTitle?.hasAttribute("lang"), false);
@@ -367,6 +367,86 @@ test("render: English cards show English names, tags, dates, and labels, and tag
         assert.equal(englishArtist?.hasAttribute("lang"), false);
         assert.equal(englishCard.querySelector(".tag")?.textContent, "配信");
         assert.equal(englishCard.querySelector(".add-to-bookmark-btn")?.getAttribute("aria-label"), "ブックマークに追加");
+    } finally {
+        cleanup();
+    }
+});
+
+test("render: refreshText rewrites only the text of the shown cards", () => {
+    const cleanup = installFakeDom();
+    try {
+        const data = createRenderDataState({
+            currentResults: [
+                makeRenderRow({ songKey: "song:en", title: "アイネクライネ", artist: "米津玄師", titleEn: "Eine Kleine", artistEn: "Kenshi Yonezu" })
+            ],
+            displayLimit: 48,
+            activeBookmark: null
+        });
+        const ui = createRenderUiState({
+            el: {
+                resultList: document.createElement("ol"),
+                resultTailSentinel: document.createElement("div")
+            }
+        });
+        let thumbnailUpdateCount = 0;
+        const controller = createRenderController({
+            data,
+            ui,
+            isAllFormatsSelected: () => true,
+            callbacks: createRenderCallbacks({ updateThumbnail: () => { thumbnailUpdateCount += 1; } })
+        });
+
+        controller.updateDisplay();
+        const card = ui.el.resultList.children[0];
+        const actionButton = card.querySelector<HTMLButtonElement>(".add-to-bookmark-btn");
+        const actionHandler = actionButton?.onclick;
+        const thumbnailUpdatesBeforeSwitch = thumbnailUpdateCount;
+
+        ui.language.current = "en";
+        controller.refreshText();
+
+        assert.equal(ui.el.resultList.children[0], card, "the card element is kept");
+        assert.equal(card.querySelector(".title")?.textContent, "Eine Kleine");
+        assert.equal(card.querySelector(".artist")?.textContent, "Kenshi Yonezu");
+        assert.equal(card.querySelector(".tag")?.textContent, "Singing Stream");
+        assert.equal(actionButton?.getAttribute("aria-label"), "Add to bookmark");
+        assert.equal(thumbnailUpdateCount, thumbnailUpdatesBeforeSwitch, "the thumbnail is not updated again");
+        assert.equal(actionButton?.onclick, actionHandler, "the button handler is not set up again");
+    } finally {
+        cleanup();
+    }
+});
+
+test("render: refreshText rewrites the empty state in the current language", () => {
+    const cleanup = installFakeDom();
+    try {
+        const data = createRenderDataState({ currentResults: [], displayLimit: 48, activeBookmark: null });
+        const ui = createRenderUiState({
+            el: {
+                resultList: document.createElement("ol"),
+                resultTailSentinel: document.createElement("div")
+            }
+        });
+        const controller = createRenderController({
+            data,
+            ui,
+            isAllFormatsSelected: () => true,
+            callbacks: createRenderCallbacks()
+        });
+
+        controller.updateDisplay();
+        assert.equal(ui.el.resultList.querySelector(".result-empty-state-title")?.textContent, "見つかりませんでした");
+
+        ui.language.current = "en";
+        controller.refreshText();
+
+        assert.equal(ui.el.resultList.children.length, 1);
+        assert.equal(ui.el.resultList.children[0].classList.contains("result-empty-state"), true);
+        assert.equal(ui.el.resultList.querySelector(".result-empty-state-title")?.textContent, "No songs found");
+        assert.equal(
+            ui.el.resultList.querySelector(".result-empty-state-hint")?.textContent,
+            "Try fewer keywords or clear some filters."
+        );
     } finally {
         cleanup();
     }

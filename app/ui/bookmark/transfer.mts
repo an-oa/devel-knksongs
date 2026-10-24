@@ -42,8 +42,8 @@ type BookmarkTransferControllerInput = {
         el: Pick<AppUiElements,
             "bookmarkPanelExportBtn" | "bookmarkPanelImportBtn" | "bookmarkPanelImportInput" | "bookmarkPanelError"
         >;
-        /** ダイアログとメッセージの言語。省略時は日本語にする。 */
-        language?: SiteLanguageUiRuntimeState;
+        /** ダイアログとメッセージの言語。 */
+        language: SiteLanguageUiRuntimeState;
     };
     callbacks: BookmarkTransferCallbacks;
 };
@@ -76,7 +76,7 @@ export function createBookmarkTransferController({ data, ui, callbacks }: Bookma
      * @returns サイトの言語
      */
     function getLanguage() {
-        return ui.language?.current ?? "ja";
+        return ui.language.current;
     }
 
     /**

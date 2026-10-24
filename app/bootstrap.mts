@@ -479,7 +479,7 @@ function createAppControllers() {
      * 描画済みの文言を今の言語で描き直す。検索はやり直さないので、結果やおすすめの選曲は変わらない。
      */
     function refreshLanguageDependentText(): void {
-        renderController.updateDisplay();
+        renderController.refreshText();
         resultSummaryController.render();
         searchFiltersController.refreshFormatLabels();
         dateFilterController.refreshDateSelectPlaceholders();

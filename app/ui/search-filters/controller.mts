@@ -22,8 +22,8 @@ type SearchFiltersUiState = {
     el: { formatsList?: SearchFormatOptionsList | null } & SearchBooleanFilterElements;
     search: SearchFiltersSearchState;
     date?: SearchFiltersDateState | null;
-    /** 形態の選択肢の名前に使う言語。省略時は index.html と同じ日本語にする。 */
-    language?: SiteLanguageUiRuntimeState;
+    /** 形態の選択肢の名前に使う言語。 */
+    language: SiteLanguageUiRuntimeState;
 };
 
 type SearchFilterChangeOptions = {
@@ -71,7 +71,7 @@ export function createSearchFiltersController({ ui, defaultFormats = [] }: Searc
      * @returns 選択肢に出す名前
      */
     function getFormatLabel(format: string): string {
-        return getUiText(ui.language?.current ?? "ja").formatFilter(format);
+        return getUiText(ui.language.current).formatFilter(format);
     }
 
     /**

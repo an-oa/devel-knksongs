@@ -181,7 +181,7 @@ export function createRenderController({
 
     /**
      * 曲データをカード要素へ反映し、アクションボタンの挙動を設定する。
-     * 曲名とアーティスト名は、設定中の表記で表示する。
+     * 曲名などの文言は updateCardText で、今の言語で書く。
      * @param entry 反映先のカード要素
      * @param row 表示する曲
      * @param resultIndex 結果一覧での位置
@@ -190,36 +190,44 @@ export function createRenderController({
         const bookmarkSongRef = getBookmarkSongRef(row);
         const yt = buildYoutubeTarget(row);
         const titleId = `result-title-${resultIndex + 1}`;
-        const language = ui.language.current;
-        const text = getUiText(language);
         entry.titleHeading.setAttribute("id", titleId);
         entry.content.setAttribute("aria-labelledby", titleId);
         updateThumbnail(entry.thumbDiv, yt);
-        updateTitleLink(entry.titleEl, row, getSongDisplayTitle(row, language), text.card.untitled, language);
-        applyDisplayName(entry.artistEl, getSongDisplayArtist(row, language), text.card.unknownArtist, language);
-        entry.dateEl.textContent = text.card.date(row);
-        updateFooterTags(entry.tagsEl, row, text);
+        updateTitleLinkTarget(entry.titleEl, row);
 
-        const isBookmarkActive = !!data.activeBookmark;
         const btn = entry.actionBtn;
-
-        if (isBookmarkActive) {
+        if (data.activeBookmark) {
             btn.textContent = "×";
             btn.className = "remove-from-bookmark-btn";
-            btn.setAttribute("aria-label", text.card.removeFromBookmark);
-            btn.setAttribute("title", text.card.removeFromBookmark);
             btn.onclick = () => {
                 removeSongFromActiveBookmark(bookmarkSongRef);
             };
         } else {
             btn.textContent = "+";
             btn.className = "add-to-bookmark-btn";
-            btn.setAttribute("aria-label", text.card.addToBookmark);
-            btn.setAttribute("title", text.card.addToBookmark);
             btn.onclick = () => {
                 openBookmarkModal(bookmarkSongRef);
             };
         }
+        updateCardText(entry, row);
+    }
+
+    /**
+     * カードの文言(曲名・アーティスト名・日付・タグ・ボタンの説明)を、今の言語で書く。
+     * サムネイルやクリックの処理は触らないので、言語の切り替えではこれだけを呼べばよい。
+     * @param entry 反映先のカード要素
+     * @param row 表示する曲
+     */
+    function updateCardText(entry: RenderCardEntry, row: Song) {
+        const language = ui.language.current;
+        const text = getUiText(language);
+        applyDisplayName(entry.titleEl, getSongDisplayTitle(row, language), text.card.untitled, language);
+        applyDisplayName(entry.artistEl, getSongDisplayArtist(row, language), text.card.unknownArtist, language);
+        entry.dateEl.textContent = text.card.date(row);
+        updateFooterTags(entry.tagsEl, row, text);
+        const actionLabel = data.activeBookmark ? text.card.removeFromBookmark : text.card.addToBookmark;
+        entry.actionBtn.setAttribute("aria-label", actionLabel);
+        entry.actionBtn.setAttribute("title", actionLabel);
     }
 
     /**
@@ -256,21 +264,11 @@ export function createRenderController({
     }
 
     /**
-     * タイトル表示とリンク属性を更新する。
+     * 曲名のリンク先を更新する。曲名の文字は updateCardText で書く。
      * @param titleEl 曲名のリンク要素
      * @param row 表示する曲
-     * @param title サイトの言語で選んだ曲名
-     * @param fallback 曲名が空のときの表示
-     * @param pageLanguage ページの言語
      */
-    function updateTitleLink(
-        titleEl: HTMLAnchorElement,
-        row: Song,
-        title: SongDisplayName,
-        fallback: string,
-        pageLanguage: SiteLanguage
-    ) {
-        applyDisplayName(titleEl, title, fallback, pageLanguage);
+    function updateTitleLinkTarget(titleEl: HTMLAnchorElement, row: Song) {
         if (row.url) {
             titleEl.classList.add("title-link");
             titleEl.setAttribute("href", row.url);
@@ -678,10 +676,30 @@ export function createRenderController({
         resultTailObservationController.observe();
     }
 
+    /**
+     * 表示中のカードと空の結果の文言を、今の言語で書き直す。言語の切り替えで使う。
+     * サムネイルや再生・クリックの処理には触らず、文字の長さで高さが変わるので配置だけを計算し直す。
+     */
+    function refreshText() {
+        const container = ui.el.resultList;
+        if (!container) return;
+        // 空の結果は renderEmptyResults が一覧の唯一の子として置くので、同じく一覧ごと置き換える。
+        if (container.querySelector(".result-empty-state")) {
+            container.replaceChildren(createEmptyStateElement(getEmptyStateDescriptor()));
+            return;
+        }
+        for (const row of data.currentResults.slice(0, data.displayLimit)) {
+            const entry = renderUi.cardEntriesBySongKey.get(row.songKey);
+            if (entry) updateCardText(entry, row);
+        }
+        refreshLayout();
+    }
+
     return {
         playSongByKey,
         scrollSongIntoView,
         updateDisplay,
+        refreshText,
         refreshLayout
     };
 }

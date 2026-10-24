@@ -93,8 +93,8 @@ type YoutubePlaybackOptions = {
 };
 
 type YoutubeControllerInput = {
-    /** language は閉じるボタンの説明の言語。省略時は日本語にする。 */
-    ui: Pick<AppUiState, "playback"> & Partial<Pick<AppUiState, "language">>;
+    /** language は閉じるボタンの説明の言語。 */
+    ui: Pick<AppUiState, "playback" | "language">;
     youtube: AppYoutubeRuntimeState;
     constants: YoutubeConstants;
 };
@@ -460,7 +460,7 @@ export function createYoutubeController({ ui, youtube, constants }: YoutubeContr
      * @returns 閉じるボタンの説明
      */
     function getCloseButtonLabel(): string {
-        return getUiText(ui.language?.current ?? "ja").card.backToThumbnail;
+        return getUiText(ui.language.current).card.backToThumbnail;
     }
 
     /**

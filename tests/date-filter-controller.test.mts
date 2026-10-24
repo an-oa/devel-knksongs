@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { createDateFilterController } from "../app/ui/date/filter.mts";
 import { createSearchSongFixtureFactory } from "./fixtures/search-song.mts";
 import { installFakeAnimationFrames, installFakeDom, invokeListener } from "./test-helpers.mts";
+import type { SiteLanguage } from "../app/lib/site-language.mts";
 
 const makeRow = createSearchSongFixtureFactory();
 
@@ -29,7 +30,7 @@ function createDateUiState() {
     const toGroup = document.createElement("div");
     toGroup.className = "date-select-group";
     toGroup.append(el.dateToYear, el.dateToMonth, el.dateToDay);
-    return { el, date, fromGroup };
+    return { el, date, fromGroup, language: { current: "ja" as SiteLanguage } };
 }
 
 

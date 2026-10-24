@@ -1,6 +1,7 @@
 import { createYoutubeController } from "../app/controllers/youtube.mts";
 import { createInitialPlaybackUiRuntimeState } from "../app/state.mts";
 import type { AppYoutubeRuntimeState, PlaybackUiRuntimeState } from "../app/state.types";
+import type { SiteLanguage } from "../app/lib/site-language.mts";
 import { createYoutubeIframeApiFixture } from "./fixtures/youtube-api.mts";
 
 export const DEFAULT_YOUTUBE_CONTROLLER_CONSTANTS = {
@@ -20,7 +21,8 @@ export function createYoutubeUiState(input: Partial<PlaybackUiRuntimeState> = {}
             continuousPlayback: false,
             loopPlayback: false,
             ...input
-        }
+        },
+        language: { current: "ja" as SiteLanguage }
     };
 }
 

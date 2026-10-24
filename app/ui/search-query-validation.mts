@@ -49,10 +49,10 @@ function assertUnreachableSearchQueryIssue(issue: never): never {
  * 同種の無効な日付演算子が複数あっても説明文は1回だけ表示する。
  * 境界条件を単体テストするためexportしている。
  * @param parsedQuery 解析済み検索語
- * @param language サイトの言語。省略時は日本語
+ * @param language サイトの言語
  * @returns 表示用エラーメッセージ
  */
-export function getSearchQueryValidationMessage(parsedQuery: ParsedSearchQuery, language: SiteLanguage = "ja"): string {
+export function getSearchQueryValidationMessage(parsedQuery: ParsedSearchQuery, language: SiteLanguage): string {
     const displayedCodes = new Set<SearchQueryIssue["code"]>();
     return parsedQuery.issues
         .filter((issue) => {
@@ -88,14 +88,14 @@ export function clearSearchQueryValidation(
  * @param searchBox 検索入力
  * @param errorElement エラーを表示する要素
  * @param parsedQuery 同じ検索処理内で共有する解析済み検索語
- * @param language エラーの文言の言語。省略時は日本語
+ * @param language エラーの文言の言語
  * @returns 検索語に問題がなければ true
  */
 export function validateSearchQueryInput(
     searchBox: SearchQueryValidationInput | null | undefined,
     errorElement: SearchQueryValidationMessageElement | null | undefined,
-    parsedQuery?: ParsedSearchQuery,
-    language: SiteLanguage = "ja"
+    parsedQuery: ParsedSearchQuery | undefined,
+    language: SiteLanguage
 ): boolean {
     if (!searchBox) return true;
     const effectiveParsedQuery = parsedQuery ?? parseSearchQuery(searchBox.value);

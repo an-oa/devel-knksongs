@@ -23,10 +23,10 @@ test("bookmark text: Japanese and English dictionaries keep the same message key
     assert.deepEqual(Object.keys(getBookmarkText("en")).sort(), Object.keys(getBookmarkText("ja")).sort());
 });
 
-test("bookmark import messages: the language argument selects English and defaults to Japanese", () => {
+test("bookmark import messages: the language argument selects Japanese or English", () => {
     const failure = { ok: false, reason: "max_songs_per_bookmark", limit: 120, bookmarkName: "Morning" } as const;
 
-    assert.equal(getBookmarkImportErrorMessage(failure), "「Morning」は最大120曲までです。");
+    assert.equal(getBookmarkImportErrorMessage(failure, "ja"), "「Morning」は最大120曲までです。");
     assert.equal(getBookmarkImportErrorMessage(failure, "en"), "“Morning” can hold up to 120 songs.");
     assert.equal(
         getBookmarkImportErrorMessage({ ok: false, reason: "invalid_json" }, "en"),

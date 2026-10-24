@@ -90,9 +90,9 @@ export function readFileText(file: { text?: () => Promise<string> } | Blob): Pro
  * 追加でブックマーク数の上限を超えるときの表示メッセージを返す。
  * @param limit ブックマーク数の上限
  * @param available あと追加できる件数
- * @param language 文言の言語。省略時は日本語
+ * @param language 文言の言語
  */
-export function buildBookmarkImportCountLimitMessage(limit: number, available: number, language: SiteLanguage = "ja"): string {
+export function buildBookmarkImportCountLimitMessage(limit: number, available: number, language: SiteLanguage): string {
     return getBookmarkText(language).importCountLimit(limit, available);
 }
 
@@ -108,9 +108,9 @@ function toFiniteLimit(limit: number): number | null {
 /**
  * インポート失敗時の理由に応じた表示メッセージを返す。
  * @param result 解析・検証・保存のいずれかの失敗
- * @param language 文言の言語。省略時は日本語
+ * @param language 文言の言語
  */
-export function getBookmarkImportErrorMessage(result: StorageActionFailure, language: SiteLanguage = "ja"): string {
+export function getBookmarkImportErrorMessage(result: StorageActionFailure, language: SiteLanguage): string {
     const text = getBookmarkText(language);
     if (result.reason === "max_import_file_size") {
         return text.maxImportFileSize(result.limit / 1_000_000);
@@ -158,11 +158,11 @@ export function getBookmarkImportErrorMessage(result: StorageActionFailure, lang
 /**
  * ブックマーク全体を置換する前の確認メッセージを作る。消える件数も示す。
  * @param preview ファイル内と手元の件数
- * @param language 文言の言語。省略時は日本語
+ * @param language 文言の言語
  */
 export function buildBookmarkImportConfirmMessage(
     preview: Pick<BookmarkImportPreview, "bookmarkCount" | "songCount" | "currentBookmarkCount">,
-    language: SiteLanguage = "ja"
+    language: SiteLanguage
 ): string {
     const bookmarkCount = Number.isFinite(preview.bookmarkCount) ? preview.bookmarkCount : 0;
     const songCount = Number.isFinite(preview.songCount) ? preview.songCount : 0;
@@ -173,11 +173,11 @@ export function buildBookmarkImportConfirmMessage(
 /**
  * ブックマーク全体の置換を選んでいる間、決定ボタンの上に出す結果の説明を作る。
  * @param preview ファイル内と手元の件数
- * @param language 文言の言語。省略時は日本語
+ * @param language 文言の言語
  */
 export function buildBookmarkReplaceMessage(
     preview: Pick<BookmarkImportPreview, "bookmarkCount" | "currentBookmarkCount">,
-    language: SiteLanguage = "ja"
+    language: SiteLanguage
 ): string {
     return getBookmarkText(language).replaceMessage(preview.currentBookmarkCount, preview.bookmarkCount);
 }
@@ -185,18 +185,18 @@ export function buildBookmarkReplaceMessage(
 /**
  * ブックマーク全体を置換した結果のメッセージを作る。
  * @param bookmarkCount 置換後のブックマーク数
- * @param language 文言の言語。省略時は日本語
+ * @param language 文言の言語
  */
-export function buildBookmarkReplaceResultMessage(bookmarkCount: number, language: SiteLanguage = "ja"): string {
+export function buildBookmarkReplaceResultMessage(bookmarkCount: number, language: SiteLanguage): string {
     return getBookmarkText(language).replaceResult(bookmarkCount);
 }
 
 /**
  * 追加・上書きを妨げる保存データの状態を、インポート確認画面の注意として返す。
  * @param blocker 保存前の検査で見つかった状態
- * @param language 文言の言語。省略時は日本語
+ * @param language 文言の言語
  */
-export function getBookmarkMergeBlockerMessage(blocker: BookmarkSaveFailure, language: SiteLanguage = "ja"): string {
+export function getBookmarkMergeBlockerMessage(blocker: BookmarkSaveFailure, language: SiteLanguage): string {
     const text = getBookmarkText(language);
     if (blocker.reason === "unsupported_storage_version") return text.mergeBlockedByNewerStorage;
     if (blocker.reason === "storage_reload_required") return text.mergeBlockedByReload;
@@ -208,12 +208,12 @@ export function getBookmarkMergeBlockerMessage(blocker: BookmarkSaveFailure, lan
  * 中身が同じものと、追加・上書きできない状態のときは選べなくする。
  * @param entry 手元と照合したファイル内のブックマーク
  * @param mergeBlocked 追加・上書きを妨げる状態があるかどうか
- * @param language 文言の言語。省略時は日本語
+ * @param language 文言の言語
  */
 export function buildBookmarkImportOption(
     entry: BookmarkImportPreviewEntry,
     mergeBlocked: boolean,
-    language: SiteLanguage = "ja"
+    language: SiteLanguage
 ): BookmarkTransferDialogOption {
     const text = getBookmarkText(language);
     const disabled = mergeBlocked || entry.status === "unchanged";
@@ -259,12 +259,12 @@ export function buildBookmarkImportOption(
  * 選んだインポート候補の件数から、決定ボタンの状態と文言を決める。追加後の件数の上限も確かめる。
  * @param preview 手元と照合したファイルの内容
  * @param selectedIds 選んだファイル内のブックマーク ID
- * @param language 文言の言語。省略時は日本語
+ * @param language 文言の言語
  */
 export function buildBookmarkImportSelectionState(
     preview: Pick<BookmarkImportPreview, "entries" | "currentBookmarkCount" | "maxBookmarkCount" | "mergeBlocker">,
     selectedIds: readonly string[],
-    language: SiteLanguage = "ja"
+    language: SiteLanguage
 ): BookmarkTransferSelectionState {
     if (preview.mergeBlocker) return { message: "", isError: false, canSubmit: false };
     const text = getBookmarkText(language);
@@ -293,11 +293,11 @@ export function buildBookmarkImportSelectionState(
 /**
  * 選んだブックマークの件数から、エクスポートの決定ボタンの状態と文言を決める。
  * @param selectedIds 選んだブックマーク ID
- * @param language 文言の言語。省略時は日本語
+ * @param language 文言の言語
  */
 export function buildBookmarkExportSelectionState(
     selectedIds: readonly string[],
-    language: SiteLanguage = "ja"
+    language: SiteLanguage
 ): BookmarkTransferSelectionState {
     const text = getBookmarkText(language);
     return selectedIds.length > 0
@@ -308,11 +308,11 @@ export function buildBookmarkExportSelectionState(
 /**
  * 選んで取り込んだ結果を、追加と上書きの件数で伝えるメッセージにする。
  * @param result 追加・上書きした件数
- * @param language 文言の言語。省略時は日本語
+ * @param language 文言の言語
  */
 export function buildBookmarkImportResultMessage(
     result: { addedCount: number; updatedCount: number },
-    language: SiteLanguage = "ja"
+    language: SiteLanguage
 ): string {
     return getBookmarkText(language).importResult(result.addedCount, result.updatedCount);
 }

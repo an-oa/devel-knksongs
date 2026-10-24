@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createSearchUiActions } from "../app/ui/core/search-actions.mts";
 import { installFakeDom, invokeListener } from "./test-helpers.mts";
+import type { SiteLanguage } from "../app/lib/site-language.mts";
 
 test("search actions: clear resets conditions before delegating active bookmark cleanup", () => {
     const calls = {
@@ -18,7 +19,8 @@ test("search actions: clear resets conditions before delegating active bookmark 
         el: {
             searchBox: { value: "群青" },
             searchBoxError: null
-        }
+        },
+        language: { current: "ja" as SiteLanguage }
     };
     const search = {
         dataReady: true,
@@ -86,7 +88,7 @@ test("search actions: clear resets conditions before delegating active bookmark 
 });
 
 test("search actions: query and filters are both synchronized before a single search", () => {
-    const ui = { el: { searchBox: { value: "stale query" } } };
+    const ui = { el: { searchBox: { value: "stale query" } }, language: { current: "ja" as SiteLanguage } };
     const search = { dataReady: true, userTouchedQuery: false, userTouchedFilters: false };
     let filtersNeedReset = true;
     let dateSelected = true;
@@ -166,7 +168,8 @@ function createRecordingActions() {
             searchBoxError: null,
             relayOnly: { checked: true },
             harmonyOnly: { checked: true }
-        }
+        },
+        language: { current: "ja" as SiteLanguage }
     };
     const search = { dataReady: true, userTouchedQuery: false, userTouchedFilters: false };
     const controller = createSearchUiActions({
@@ -213,7 +216,8 @@ test("search actions: form handlers mark query and filter changes and clear the 
                 collabGuestOnly: document.createElement("input"),
                 relayOnly: document.createElement("input"),
                 harmonyOnly: document.createElement("input")
-            }
+            },
+            language: { current: "ja" as SiteLanguage }
         };
         ui.el.searchBoxError.hidden = true;
         const search = { dataReady: true, userTouchedQuery: false, userTouchedFilters: false };
