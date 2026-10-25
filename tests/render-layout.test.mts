@@ -354,7 +354,7 @@ test("render: English cards show English names, tags, dates, and labels, and tag
         assert.equal(englishArtist?.hasAttribute("lang"), false);
         assert.equal(japaneseOnlyCard.querySelector(".title")?.textContent, "日本語だけの曲");
         assert.equal(japaneseOnlyCard.querySelector(".title")?.getAttribute("lang"), "ja", "Japanese fallbacks are tagged on the English page");
-        assert.equal(englishCard.querySelector(".tag")?.textContent, "Singing Stream");
+        assert.equal(englishCard.querySelector(".tag")?.textContent, "Stream");
         assert.equal(englishCard.querySelector(".footer-left")?.children[0]?.textContent, "Mar 11, 2026", "the date comes from dateKey");
         assert.equal(englishCard.querySelector(".add-to-bookmark-btn")?.getAttribute("aria-label"), "Add to bookmark");
 
@@ -408,7 +408,7 @@ test("render: refreshText rewrites only the text of the shown cards", () => {
         assert.equal(ui.el.resultList.children[0], card, "the card element is kept");
         assert.equal(card.querySelector(".title")?.textContent, "Eine Kleine");
         assert.equal(card.querySelector(".artist")?.textContent, "Kenshi Yonezu");
-        assert.equal(card.querySelector(".tag")?.textContent, "Singing Stream");
+        assert.equal(card.querySelector(".tag")?.textContent, "Stream");
         assert.equal(actionButton?.getAttribute("aria-label"), "Add to bookmark");
         assert.equal(thumbnailUpdateCount, thumbnailUpdatesBeforeSwitch, "the thumbnail is not updated again");
         assert.equal(actionButton?.onclick, actionHandler, "the button handler is not set up again");

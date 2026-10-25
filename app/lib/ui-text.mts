@@ -146,16 +146,28 @@ function formatEnglishSongDate(song: Pick<Song, "date" | "dateKey">): string {
 
 const JAPANESE_FORMAT_FILTER_NAMES: Record<string, string> = { 歌みた: "オリ曲/歌みた" };
 
-const ENGLISH_FORMAT_NAMES: Record<string, string> = {
+/** 絞り込みと条件チップに出す、マスターシートの英語版のビューと同じ形態の名前。 */
+const ENGLISH_FORMAT_FILTER_NAMES: Record<string, string> = {
     配信: "Singing Stream",
-    歌みた: "Cover Video",
+    歌みた: "Originals & Covers",
     オリ曲: "Original Song",
     ショート: "Shorts",
     切り抜き: "Clip",
     収録: "Pre-recorded"
 };
 
-const ENGLISH_FORMAT_FILTER_NAMES: Record<string, string> = { ...ENGLISH_FORMAT_NAMES, 歌みた: "Originals & Covers" };
+/**
+ * カードのタグに出す形態の名前。カードの下の行は日付・タグ・ボタンで幅が狭いので、シートの名前を短くする。
+ * カード1枚は1件なので単数形にする。Shorts は YouTube の機能の名前なのでそのまま使う。
+ */
+const ENGLISH_FORMAT_TAG_NAMES: Record<string, string> = {
+    配信: "Stream",
+    歌みた: "Cover",
+    オリ曲: "Original",
+    ショート: "Shorts",
+    切り抜き: "Clip",
+    収録: "Recording"
+};
 
 const JAPANESE_TEXT: UiText = {
     static: {
@@ -317,7 +329,7 @@ const ENGLISH_TEXT: UiText = {
         footerUnofficial: "This is an unofficial fan site. Copyrights of the videos and songs belong to their respective owners.",
         footerSource: "It refers to information published on YouTube and does not redistribute any content."
     },
-    formatTag: (format) => ENGLISH_FORMAT_NAMES[format] ?? format,
+    formatTag: (format) => ENGLISH_FORMAT_TAG_NAMES[format] ?? format,
     formatFilter: (format) => ENGLISH_FORMAT_FILTER_NAMES[format] ?? format,
     tags: { collab: "Collab", relay: "Relay", harmony: "Harmony" },
     booleanFilters: {

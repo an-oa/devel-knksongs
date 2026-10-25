@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { getUiText } from "../app/lib/ui-text.mts";
 
-test("ui text: format names follow the English sheet and keep unknown values", () => {
+test("ui text: filter format names follow the English sheet, card tags use short names, and unknown values stay", () => {
     const ja = getUiText("ja");
     const en = getUiText("en");
 
@@ -12,10 +12,14 @@ test("ui text: format names follow the English sheet and keep unknown values", (
 
     assert.deepEqual(
         ["配信", "歌みた", "オリ曲", "ショート", "切り抜き", "収録"].map(en.formatTag),
-        ["Singing Stream", "Cover Video", "Original Song", "Shorts", "Clip", "Pre-recorded"]
+        ["Stream", "Cover", "Original", "Shorts", "Clip", "Recording"],
+        "card tags are short because the card footer is narrow"
     );
-    assert.equal(en.formatFilter("歌みた"), "Originals & Covers", "the filter item also covers original songs");
-    assert.equal(en.formatFilter("収録"), "Pre-recorded");
+    assert.deepEqual(
+        ["配信", "歌みた", "ショート", "切り抜き", "収録"].map(en.formatFilter),
+        ["Singing Stream", "Originals & Covers", "Shorts", "Clip", "Pre-recorded"],
+        "the filters keep the names of the English sheet, and the cover item also covers original songs"
+    );
     assert.equal(en.formatTag("新しい形態"), "新しい形態", "unknown formats are shown as they are");
 });
 
