@@ -215,7 +215,7 @@ test.describe("English browsers", () => {
         await expect(page.locator(".header-wordmark-sub:visible")).toHaveText("Song Search");
         await expect(getEnglishCardTitle(page)).toHaveText("Eine Kleine");
         await expect(page.locator("#resultCount")).toHaveText("1 result");
-        await expect(page.locator("#resultList .song-card .tag").first()).toHaveText("Singing Stream");
+        await expect(page.locator("#resultList .song-card .tag").first()).toHaveText("Stream");
         await expect(getVisibleLanguageLabel(page)).toHaveText("日本語");
 
         await openSidebar(page);

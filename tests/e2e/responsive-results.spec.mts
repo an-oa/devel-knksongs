@@ -505,3 +505,56 @@ test("vertical playback expands its card without overlap and restores the masonr
     await expect.poll(readPositions).toEqual(before);
     await expectCardsInsideLayout(page);
 });
+
+for (const language of ["ja", "en"] as const) {
+    test(`card footers keep the date on one line and the bookmark button inside the card with many tags (${language})`, async ({ page }) => {
+        await page.addInitScript((siteLanguage) => localStorage.setItem("siteLanguage", siteLanguage), language);
+        await installNetworkMocks(page);
+        // 形態・コラボ・リレー・ハモリのタグがすべて付く曲と、今のデータにある3つのタグの組み合わせを並べる。
+        // 日付は英語で最も長い形(「Sep 30, 2024」)になるようにする。
+        const tagSets = [
+            { streamRole: "ゲスト", isRelay: true, isHarmony: true },
+            { streamRole: "", isRelay: true, isHarmony: true },
+            { streamRole: "ゲスト", isRelay: true, isHarmony: false }
+        ];
+        const songs = createScrollableResultSongs(tagSets.length).map((song, index) => ({
+            ...song,
+            ...tagSets[index],
+            date: "2024/09/30",
+            dateKey: 20240930
+        }));
+        await routeSongsJsonFixture(page, songs);
+        await page.goto("/");
+        await waitForInitialLoad(page);
+        await filterBySongTitle(page, "Scroll Song");
+
+        for (const width of [320, 1280]) {
+            await page.setViewportSize({ width, height: 900 });
+            await expect(page.locator("#resultList .song-card")).toHaveCount(tagSets.length);
+            await expect(page.locator("#resultList .song-card").first().locator(".tag")).toHaveCount(4);
+            const footers = await page.locator("#resultList .song-card").evaluateAll((cards) => cards.map((card) => {
+                const cardRect = card.getBoundingClientRect();
+                const date = card.querySelector(".footer-left span");
+                const dateRange = document.createRange();
+                if (date) dateRange.selectNodeContents(date);
+                const dateRight = date ? date.getBoundingClientRect().right : Number.NaN;
+                const tags = [...card.querySelectorAll(".tag")].map((tag) => tag.getBoundingClientRect());
+                const button = card.querySelector(".card-footer button")?.getBoundingClientRect();
+                return {
+                    dateLines: date ? dateRange.getClientRects().length : 0,
+                    tagsClearOfDate: tags.every((tag) => tag.left >= dateRight),
+                    tagsInsideCard: tags.every((tag) => tag.right <= cardRect.right + 0.5),
+                    buttonInsideCard: !!button && button.left >= cardRect.left && button.right <= cardRect.right + 0.5
+                };
+            }));
+            for (const [index, footer] of footers.entries()) {
+                expect(footer, `${width}px card ${index + 1}`).toEqual({
+                    dateLines: 1,
+                    tagsClearOfDate: true,
+                    tagsInsideCard: true,
+                    buttonInsideCard: true
+                });
+            }
+        }
+    });
+}

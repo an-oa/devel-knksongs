@@ -1567,9 +1567,10 @@ body.hide-thumbs .song-card { border-radius: 12px; }
   align-items: center;
   min-height: 16px;
 }
-.footer-left { gap: 8px; }
+/* 日付は折り返さない。タグが入りきらないときは、タグを右寄せのまま2行目へ折り返し、ボタンをカードの中に残す。 */
+.footer-left { gap: 8px; white-space: nowrap; }
 .footer-right { justify-content: flex-end; }
-.footer-tags { gap: 6px; }
+.footer-tags { flex-wrap: wrap; justify-content: flex-end; gap: 4px 6px; }
 
 .tag {
   display: inline-flex;
