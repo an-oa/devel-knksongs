@@ -108,6 +108,20 @@ body {
 }
 input, button { font-family: inherit; }
 
+/*
+ * ロゴやボタン、設定の文言などは読むか押すための表示なので、スマホで長押ししても文字を選択しない。
+ * 曲名とアーティスト名は、ほかのサービスで探すためにコピーできるよう、.title と .artist で選択できるようにする。
+ * 入力欄は、選択できないと iPhone で文字の入力やカーソルの移動ができなくなることがあるので、選択できるようにする。
+ */
+body {
+  -webkit-user-select: none;
+  user-select: none;
+}
+input, textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 .visually-hidden:where(:not(:focus-within, :active)) {
   position: absolute !important;
   clip-path: inset(50%) !important;
@@ -1527,6 +1541,8 @@ body.hide-thumbs .song-card { border-radius: 12px; }
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  -webkit-user-select: text;
+  user-select: text;
 }
 .title-link { text-decoration: none; }
 .title-link:hover {
@@ -1543,6 +1559,8 @@ body.hide-thumbs .song-card { border-radius: 12px; }
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 .card-footer {
