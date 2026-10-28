@@ -108,6 +108,25 @@ body {
 }
 input, button { font-family: inherit; }
 
+/*
+ * ロゴやボタン、設定の文言などは読むか押すための表示なので、スマホで長押ししても文字を選択しない。
+ * 曲名とアーティスト名は、ほかのサービスで探すためにコピーできるよう、選択できるままにする。
+ * 選択しない指定は文字のある部品だけに付け、ページ全体には付けない。選択しない場所をクリックしても
+ * 選択は解除されないので、ページ全体に付けると、曲名をコピーした後に余白をクリックしても選択が残る。
+ */
+button, label, legend,
+.header-title,
+.result-summary-count, .search-query-error, .result-empty-state-title, .result-empty-state-hint,
+.footer-left > span, .tag,
+.site-footer p,
+.sidebar-title-group, .section-label, .sidebar-group-title, .menu-item-toggle > span, .setting-item-help,
+.bookmark-panel-error, .bookmark-empty-state,
+.bookmark-transfer-title, .bookmark-transfer-description, .bookmark-transfer-notice, .bookmark-transfer-status,
+.bookmark-toast-message {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 .visually-hidden:where(:not(:focus-within, :active)) {
   position: absolute !important;
   clip-path: inset(50%) !important;
